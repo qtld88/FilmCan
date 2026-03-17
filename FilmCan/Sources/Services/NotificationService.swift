@@ -1,12 +1,20 @@
 import Foundation
 import UserNotifications
+import os
+#if canImport(AppKit)
 import AppKit
+#endif
+#if canImport(UIKit)
+import UIKit
+#endif
 
 class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationService()
     
     private var isAuthorized = false
-    private var presentationOptions: UNNotificationPresentationOptions = [.banner, .list, .sound, .badge]
+    private var presentationOptions: UNNotificationPresentationOptions = [.banner, .sound, .badge]
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "FilmCan", category: "NotificationService")
+    private let badgeCountDefaultsKey = "FilmCan.notificationBadgeCount"
     
     private override init() {
         super.init()
@@ -24,23 +32,35 @@ class NotificationService: NSObject, UNUserNotificationCenterDelegate {
                     self.requestAuthorization()
                 }
             case .authorized, .provisional:
-                self.isAuthorized = true
+                DispatchQueue.main.async {
+                    self.isAuthorized = true
+                }
                 self.updatePresentationOptions(settings)
             case .denied:
-                self.isAuthorized = false
+                DispatchQueue.main.async {
+                    self.isAuthorized = false
+                }
             case .ephemeral:
-                self.isAuthorized = false
+                DispatchQueue.main.async {
+                    self.isAuthorized = false
+                }
             @unknown default:
-                self.isAuthorized = false
+                DispatchQueue.main.async {
+                    self.isAuthorized = false
+                }
             }
         }
     }
     
-    private func requestAuthorization() {
+    private func requestAuthorization(completion: @escaping (_ granted: Bool) -> Void = { _ in }) {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error {
+                self.logger.error("Notification authorization request failed: \(error.localizedDescription, privacy: .public)")
+            }
             DispatchQueue.main.async {
                 self.isAuthorized = granted
+                completion(granted)
             }
         }
     }
@@ -49,29 +69,31 @@ class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         let center = UNUserNotificationCenter.current()
         
         center.getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized || 
-                  settings.authorizationStatus == .provisional else {
+            switch settings.authorizationStatus {
+            case .authorized, .provisional:
+                self.updatePresentationOptions(settings)
+                self.scheduleNotification(
+                    title: title,
+                    body: body,
+                    identifier: identifier
+                )
+            case .notDetermined:
+                self.requestAuthorization { granted in
+                    guard granted else { return }
+                    center.getNotificationSettings { postAuthSettings in
+                        self.updatePresentationOptions(postAuthSettings)
+                        self.scheduleNotification(
+                            title: title,
+                            body: body,
+                            identifier: identifier
+                        )
+                    }
+                }
+            case .denied, .ephemeral:
+                return
+            @unknown default:
                 return
             }
-
-            self.updatePresentationOptions(settings)
-            
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-            if #available(macOS 12.0, *) {
-                content.interruptionLevel = .active
-            }
-
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-            let request = UNNotificationRequest(
-                identifier: identifier,
-                content: content,
-                trigger: trigger
-            )
-
-            center.add(request, withCompletionHandler: nil)
         }
     }
     
@@ -97,13 +119,16 @@ class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
             if settings.authorizationStatus == .notDetermined {
-                self.requestAuthorization()
-                completion()
+                self.requestAuthorization { _ in
+                    completion()
+                }
             } else if settings.authorizationStatus == .denied {
                 completion()
             } else {
-                self.isAuthorized = true
-                completion()
+                DispatchQueue.main.async {
+                    self.isAuthorized = true
+                    completion()
+                }
             }
         }
     }
@@ -114,7 +139,9 @@ class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler(presentationOptions)
+        DispatchQueue.main.async {
+            completionHandler(self.presentationOptions)
+        }
     }
     
     // Handle notification tap
@@ -124,26 +151,106 @@ class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         DispatchQueue.main.async {
+#if canImport(AppKit)
             NSApp.activate(ignoringOtherApps: true)
+#endif
+            self.clearBadge()
         }
         
         completionHandler()
     }
 
     private func updatePresentationOptions(_ settings: UNNotificationSettings) {
+        #if os(macOS)
         if #available(macOS 10.14, *) {
             switch settings.alertStyle {
             case .banner:
-                presentationOptions = [.banner, .list, .sound, .badge]
+                presentationOptions = [.banner, .sound, .badge]
             case .alert:
-                presentationOptions = [.banner, .list, .sound, .badge]
+                presentationOptions = [.banner, .sound, .badge]
             case .none:
-                presentationOptions = [.list, .sound, .badge]
+                presentationOptions = [.sound, .badge]
             @unknown default:
-                presentationOptions = [.banner, .list, .sound, .badge]
+                presentationOptions = [.banner, .sound, .badge]
             }
         } else {
-            presentationOptions = [.banner, .list, .sound, .badge]
+            presentationOptions = [.banner, .sound, .badge]
         }
+        #else
+        presentationOptions = [.banner, .sound, .badge]
+        #endif
+    }
+
+    private func scheduleNotification(title: String, body: String, identifier: String) {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+
+        let shouldShowBadge = !isAppActive()
+        let badgeCount = shouldShowBadge ? bumpBadgeCount() : 0
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        if shouldShowBadge {
+            content.badge = NSNumber(value: badgeCount)
+        }
+        if #available(iOS 15.0, macOS 12.0, *) {
+            content.interruptionLevel = .active
+        }
+
+        let request = UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: nil
+        )
+
+        DispatchQueue.main.async {
+            center.add(request) { error in
+                if let error {
+                    self.logger.error("Failed to schedule notification: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+
+        DispatchQueue.main.async {
+            if shouldShowBadge {
+                self.applyBadge(count: badgeCount)
+            } else {
+                self.clearBadge()
+            }
+        }
+    }
+
+    private func bumpBadgeCount() -> Int {
+        let defaults = UserDefaults.standard
+        let next = defaults.integer(forKey: badgeCountDefaultsKey) + 1
+        defaults.set(next, forKey: badgeCountDefaultsKey)
+        return next
+    }
+
+    func clearBadge() {
+        let defaults = UserDefaults.standard
+        defaults.set(0, forKey: badgeCountDefaultsKey)
+        applyBadge(count: 0)
+    }
+
+    private func applyBadge(count: Int) {
+        #if canImport(AppKit)
+        NSApp.dockTile.badgeLabel = count > 0 ? String(count) : nil
+        #endif
+        if #available(iOS 16.0, macOS 13.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(count, withCompletionHandler: nil)
+        }
+    }
+
+    private func isAppActive() -> Bool {
+        #if canImport(AppKit)
+        return NSApp.isActive
+        #elseif canImport(UIKit)
+        return UIApplication.shared.applicationState == .active
+        #else
+        return false
+        #endif
     }
 }

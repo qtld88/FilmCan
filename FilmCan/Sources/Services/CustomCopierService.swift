@@ -52,7 +52,8 @@ class CustomCopierService: ObservableObject, TransferService {
         parallelCopyEnabled: Bool,
         duplicatePolicy: OrganizationPreset.DuplicatePolicy,
         duplicateCounterTemplate: String,
-        duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?
+        duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?,
+        verificationEnabled: Bool
     ) async throws -> TransferResult {
         isCancelled = false
         isPaused = false
@@ -86,7 +87,7 @@ class CustomCopierService: ObservableObject, TransferService {
             : [:]
         let hasHashIndex = !hashIndex.isEmpty
         let shouldPrecheck = useHashListPrecheck && hasHashIndex
-        let verificationReadMultiplier: Int64 = 1
+        let verificationReadMultiplier: Int64 = verificationEnabled ? 1 : 0
 
         func mergeWarning(_ existing: String?, _ extra: String) -> String {
             if let existing, !existing.isEmpty {
@@ -104,11 +105,12 @@ class CustomCopierService: ObservableObject, TransferService {
         progress.totalBytes = totalBytes
         progress.filesTotal = entries.count
         progress.verificationPhase = .idle
-        progress.verificationFilesTotal = entries.count
+        progress.verificationFilesTotal = verificationEnabled ? entries.count : 0
         progress.verificationFilesCompleted = 0
-        progress.verificationBytesTotal = totalBytes * verificationReadMultiplier
+        progress.verificationBytesTotal = verificationEnabled ? totalBytes * verificationReadMultiplier : 0
         progress.verificationBytesCompleted = 0
         progress.verificationHasStarted = false
+        progress.verificationIsActive = false
         let progressThrottle = ProgressThrottle(interval: 0.1)
         let verificationByteThrottle = ProgressThrottle(interval: 0.1)
         let cancellationState = self.cancellationState
@@ -133,23 +135,45 @@ class CustomCopierService: ObservableObject, TransferService {
         var activeDuplicateCounterTemplate = duplicateCounterTemplate
         var organizationRoots: [String: String] = [:]
         var verificationContinuation: AsyncStream<FileCopyResult>.Continuation? = nil
-        let verificationStream = AsyncStream<FileCopyResult> { continuation in
-            verificationContinuation = continuation
-        }
+        let verificationStream: AsyncStream<FileCopyResult>? = verificationEnabled
+            ? AsyncStream<FileCopyResult> { continuation in
+                verificationContinuation = continuation
+            }
+            : nil
         let copier = verifyWorker
-        let workerCount = await detectOptimalVerificationWorkers(destination: destination)
+        let averageFileSize = entries.isEmpty ? 0 : totalBytes / Int64(entries.count)
+        let sourceDriveIds = Set(sources.map { DriveUtilities.driveId(for: $0) })
+        let destinationDriveId = DriveUtilities.driveId(for: destination)
+        let sameVolume = sourceDriveIds.contains(destinationDriveId)
+        let workerCount = await detectOptimalVerificationWorkers(
+            destination: destination,
+            averageFileSize: averageFileSize,
+            sameVolume: sameVolume
+        )
         #if DEBUG
         let driveType = workerCount > 1 ? "SSD" : "HDD/Unknown"
         DebugLog.info("🔧 Verification workers: \(workerCount) (detected \(driveType))")
         #endif
         let verificationWorkerCount = workerCount
         let verificationBytes = VerificationByteCounter()
-        let hashListWriter = hashListPath.flatMap { HashListWriter(outputPath: $0, algorithm: hashAlgorithm) }
-        let verificationTask = Task.detached(priority: .utility) {
-            await withTaskGroup(of: Void.self) { group in
-                for _ in 0..<verificationWorkerCount {
-                    group.addTask {
-                        for await result in verificationStream {
+        let hashListWriter: HashListWriter?
+        if verificationEnabled, let hashListPath {
+            do {
+                hashListWriter = try HashListWriter(outputPath: hashListPath, algorithm: hashAlgorithm)
+            } catch {
+                await warningCollector.append("Hash list could not be created: \(error.localizedDescription)")
+                hashListWriter = nil
+            }
+        } else {
+            hashListWriter = nil
+        }
+        let verificationTask: Task<Void, Never>? = verificationEnabled
+            ? Task.detached(priority: .utility) {
+                guard let verificationStream else { return }
+                await withTaskGroup(of: Void.self) { group in
+                    for _ in 0..<verificationWorkerCount {
+                        group.addTask {
+                            for await result in verificationStream {
                             if shouldCancel() || Task.isCancelled { break }
                             let fileName = (result.destinationPath as NSString).lastPathComponent
                             let activeCount = await verificationActivity.increment()
@@ -248,6 +272,7 @@ class CustomCopierService: ObservableObject, TransferService {
                 }
             }
         }
+        : nil
 
         func resolveDuplicateAction(
             sourcePath: String,
@@ -357,9 +382,11 @@ class CustomCopierService: ObservableObject, TransferService {
                     case .skip:
                         let skippedBytes = sourceEntries.reduce(Int64(0)) { $0 + $1.size }
                         skippedWithoutVerification = true
-                        let completedBytes = await verificationBytes.add(skippedBytes * verificationReadMultiplier)
-                        progress.verificationBytesCompleted = completedBytes
-                        progress.verificationFilesTotal = max(progress.verificationFilesTotal - sourceEntries.count, 0)
+                        if verificationEnabled {
+                            let completedBytes = await verificationBytes.add(skippedBytes * verificationReadMultiplier)
+                            progress.verificationBytesCompleted = completedBytes
+                            progress.verificationFilesTotal = max(progress.verificationFilesTotal - sourceEntries.count, 0)
+                        }
                         filesSkipped += sourceEntries.count
                         let completedCount = await copyFileCounter.increment(by: sourceEntries.count)
                         progress.filesCompleted = completedCount
@@ -384,6 +411,7 @@ class CustomCopierService: ObservableObject, TransferService {
                 try? fm.createDirectory(atPath: parent, withIntermediateDirectories: true)
             }
 
+            let normalizedBaseTarget = URL(fileURLWithPath: baseTarget).standardizedFileURL.path
             var copyJobs: [CopyJob] = []
 
             for entry in sourceEntries {
@@ -396,12 +424,11 @@ class CustomCopierService: ObservableObject, TransferService {
                     destinationPath = baseTarget
                 }
 
-                var normalizedDestination: String? = nil
                 func normalizedDestinationPath() -> String {
-                    if let normalizedDestination { return normalizedDestination }
-                    let value = URL(fileURLWithPath: destinationPath).standardizedFileURL.path
-                    normalizedDestination = value
-                    return value
+                    if sourceIsDirectory {
+                        return (normalizedBaseTarget as NSString).appendingPathComponent(entry.relativePath)
+                    }
+                    return normalizedBaseTarget
                 }
 
                 if shouldPrecheck {
@@ -410,22 +437,26 @@ class CustomCopierService: ObservableObject, TransferService {
                        fm.fileExists(atPath: normalizedDestination),
                        let sourceHash = await hashSourceAsync(entry.sourcePath),
                        sourceHash.lowercased() == expectedHash {
-                        if !progress.verificationHasStarted {
-                            progress.verificationHasStarted = true
-                            progress.verificationPhase = .verifying
-                            if progress.verificationStartTime == nil {
-                                progress.verificationStartTime = Date()
+                        if verificationEnabled {
+                            if !progress.verificationHasStarted {
+                                progress.verificationHasStarted = true
+                                progress.verificationPhase = .verifying
+                                if progress.verificationStartTime == nil {
+                                    progress.verificationStartTime = Date()
+                                }
                             }
                         }
                         filesSkipped += 1
                         let completedCount = await copyFileCounter.increment()
                         progress.filesCompleted = completedCount
-                        let skippedBytes = entry.size * verificationReadMultiplier
-                        let completedBytes = await verificationBytes.add(skippedBytes)
-                        progress.verificationBytesCompleted = completedBytes
-                        let count = await verificationProgress.increment()
-                        progress.verificationFilesCompleted = count
-                        progress.verificationCurrentFile = (entry.sourcePath as NSString).lastPathComponent
+                        if verificationEnabled {
+                            let skippedBytes = entry.size * verificationReadMultiplier
+                            let completedBytes = await verificationBytes.add(skippedBytes)
+                            progress.verificationBytesCompleted = completedBytes
+                            let count = await verificationProgress.increment()
+                            progress.verificationFilesCompleted = count
+                            progress.verificationCurrentFile = (entry.sourcePath as NSString).lastPathComponent
+                        }
                         continue
                     }
                 }
@@ -440,10 +471,12 @@ class CustomCopierService: ObservableObject, TransferService {
                     switch resolution.action {
                     case .skip:
                         skippedWithoutVerification = true
-                        let skippedBytes = entry.size * verificationReadMultiplier
-                        let completedBytes = await verificationBytes.add(skippedBytes)
-                        progress.verificationBytesCompleted = completedBytes
-                        progress.verificationFilesTotal = max(progress.verificationFilesTotal - 1, 0)
+                        if verificationEnabled {
+                            let skippedBytes = entry.size * verificationReadMultiplier
+                            let completedBytes = await verificationBytes.add(skippedBytes)
+                            progress.verificationBytesCompleted = completedBytes
+                            progress.verificationFilesTotal = max(progress.verificationFilesTotal - 1, 0)
+                        }
                         filesSkipped += 1
                         let completedCount = await copyFileCounter.increment()
                         progress.filesCompleted = completedCount
@@ -460,22 +493,26 @@ class CustomCopierService: ObservableObject, TransferService {
                                fm.fileExists(atPath: normalizedDestination),
                                let sourceHash = await hashSourceAsync(entry.sourcePath),
                                sourceHash.lowercased() == expectedHash {
-                                let skippedBytes = entry.size * verificationReadMultiplier
-                                let completedBytes = await verificationBytes.add(skippedBytes)
-                                progress.verificationBytesCompleted = completedBytes
+                                if verificationEnabled {
+                                    let skippedBytes = entry.size * verificationReadMultiplier
+                                    let completedBytes = await verificationBytes.add(skippedBytes)
+                                    progress.verificationBytesCompleted = completedBytes
+                                }
                                 filesSkipped += 1
                                 let completedCount = await copyFileCounter.increment()
                                 progress.filesCompleted = completedCount
-                                if !progress.verificationHasStarted {
-                                    progress.verificationHasStarted = true
-                                    progress.verificationPhase = .verifying
-                                    if progress.verificationStartTime == nil {
-                                        progress.verificationStartTime = Date()
+                                if verificationEnabled {
+                                    if !progress.verificationHasStarted {
+                                        progress.verificationHasStarted = true
+                                        progress.verificationPhase = .verifying
+                                        if progress.verificationStartTime == nil {
+                                            progress.verificationStartTime = Date()
+                                        }
                                     }
+                                    let count = await verificationProgress.increment()
+                                    progress.verificationFilesCompleted = count
+                                    progress.verificationCurrentFile = (entry.sourcePath as NSString).lastPathComponent
                                 }
-                                let count = await verificationProgress.increment()
-                                progress.verificationFilesCompleted = count
-                                progress.verificationCurrentFile = (entry.sourcePath as NSString).lastPathComponent
                                 continue
                             }
                         }
@@ -498,116 +535,123 @@ class CustomCopierService: ObservableObject, TransferService {
 
             if copyJobs.isEmpty { continue }
 
-            let averageSize = copyJobs.reduce(Int64(0)) { $0 + $1.entry.size } / Int64(copyJobs.count)
-            let sourceRoots = Array(Set(copyJobs.map { $0.entry.sourceRoot }))
-            let sourceIsSSD = parallelCopyEnabled ? await allVolumesAreSolidState(sourceRoots) : false
-            let workerCount = parallelCopyEnabled
-                ? await detectOptimalCopyWorkers(
-                    destination: baseTarget,
-                    sourceIsSSD: sourceIsSSD,
-                    averageFileSize: averageSize
-                )
-                : 1
-            let activeWorkers = max(1, min(workerCount, copyJobs.count))
-            if activeWorkers > 1 {
-                copyJobs.sort { $0.entry.size > $1.entry.size }
-            }
-            let jobQueue = JobQueue(jobs: copyJobs)
+            let jobBatches = bucketCopyJobs(
+                copyJobs,
+                ordering: fileOrdering,
+                parallelCopyEnabled: parallelCopyEnabled
+            )
 
-            await withTaskGroup(of: Void.self) { group in
-                for _ in 0..<activeWorkers {
-                    let worker = FileStreamCopier()
-                    group.addTask {
-                        while let job = await jobQueue.next() {
-                            if shouldCancel() { break }
-                            if await abortState.shouldAbort() { break }
+            for batch in jobBatches where !batch.isEmpty {
+                let averageSize = batch.reduce(Int64(0)) { $0 + $1.entry.size } / Int64(batch.count)
+                let sourceRoots = Array(Set(batch.map { $0.entry.sourceRoot }))
+                let sourceIsSSD = parallelCopyEnabled ? await allVolumesAreSolidState(sourceRoots) : false
+                let workerCount = parallelCopyEnabled
+                    ? await detectOptimalCopyWorkers(
+                        destination: baseTarget,
+                        sourceIsSSD: sourceIsSSD,
+                        averageFileSize: averageSize
+                    )
+                    : 1
+                let activeWorkers = max(1, min(workerCount, batch.count))
+                let jobQueue = JobQueue(jobs: batch)
 
-                            await MainActor.run {
-                                self.progress.currentFile = job.fileName
-                            }
-
-                            let fileId = job.destinationPath
-                            do {
-                                let result = try await worker.copyFile(
-                                    source: job.entry.sourcePath,
-                                    destination: job.destinationPath,
-                                    hashDuringCopy: true,
-                                    hashAlgorithm: hashAlgorithm,
-                                    shouldCancel: shouldCancel
-                                ) { bytesInFile in
-                                    let now = Date()
-                                    guard progressThrottle.shouldEmit(now: now) else { return }
-                                    Task {
-                                        let total = await copyProgress.update(fileId: fileId, bytes: bytesInFile)
-                                        await MainActor.run {
-                                            self.progress.bytesCompleted = total
-                                            self.progress.cumulativeBytes = total
-                                            self.updateSpeedAndEta()
-                                        }
-                                    }
-                                }
-
-                                let total = await copyProgress.update(fileId: fileId, bytes: result.bytesWritten)
-                                await copyProgress.finish(fileId: fileId)
-                                let completedCount = await copyFileCounter.increment()
+                await withTaskGroup(of: Void.self) { group in
+                    for _ in 0..<activeWorkers {
+                        let worker = FileStreamCopier()
+                        group.addTask {
+                            while let job = await jobQueue.next() {
+                                if shouldCancel() { break }
+                                if await abortState.shouldAbort() { break }
 
                                 await MainActor.run {
-                                    self.progress.filesCompleted = completedCount
-                                    self.progress.bytesCompleted = total
-                                    self.progress.cumulativeBytes = total
-                                    self.updateSpeedAndEta()
-                                    self.progress.completedFiles.insert(result.destinationPath, at: 0)
-                                    if self.progress.completedFiles.count > 50 {
-                                        self.progress.completedFiles.removeLast()
-                                    }
+                                    self.progress.currentFile = job.fileName
                                 }
 
-                                await transferredPaths.append(result.destinationPath)
-
-                                if let destHash = result.destinationHash, let sourceHash = result.sourceHash {
-                                    await MainActor.run {
-                                        if !self.progress.verificationHasStarted {
-                                            self.progress.verificationHasStarted = true
-                                            self.progress.verificationPhase = .verifying
-                                            if self.progress.verificationStartTime == nil {
-                                                self.progress.verificationStartTime = Date()
+                                let fileId = job.destinationPath
+                                do {
+                                    let result = try await worker.copyFile(
+                                        source: job.entry.sourcePath,
+                                        destination: job.destinationPath,
+                                        hashDuringCopy: verificationEnabled,
+                                        hashAlgorithm: hashAlgorithm,
+                                        shouldCancel: shouldCancel
+                                    ) { bytesInFile in
+                                        let now = Date()
+                                        guard progressThrottle.shouldEmit(now: now) else { return }
+                                        Task {
+                                            let total = await copyProgress.update(fileId: fileId, bytes: bytesInFile)
+                                            await MainActor.run {
+                                                self.progress.bytesCompleted = total
+                                                self.progress.cumulativeBytes = total
+                                                self.updateSpeedAndEta()
                                             }
                                         }
-                                        self.progress.verificationCurrentFile = job.fileName
                                     }
-                                    let count = await verificationProgress.increment()
+
+                                    let total = await copyProgress.update(fileId: fileId, bytes: result.bytesWritten)
+                                    await copyProgress.finish(fileId: fileId)
+                                    let completedCount = await copyFileCounter.increment()
+
                                     await MainActor.run {
-                                        self.progress.verificationFilesCompleted = count
+                                        self.progress.filesCompleted = completedCount
+                                        self.progress.bytesCompleted = total
+                                        self.progress.cumulativeBytes = total
+                                        self.updateSpeedAndEta()
+                                        self.progress.completedFiles.insert(result.destinationPath, at: 0)
+                                        if self.progress.completedFiles.count > 50 {
+                                            self.progress.completedFiles.removeLast()
+                                        }
                                     }
-                                    let bytes = await verificationBytes.add(result.bytesWritten * verificationReadMultiplier)
-                                    await MainActor.run {
-                                        self.progress.verificationBytesCompleted = bytes
+
+                                    await transferredPaths.append(result.destinationPath)
+
+                                    if verificationEnabled {
+                                        if let destHash = result.destinationHash, let sourceHash = result.sourceHash {
+                                            await MainActor.run {
+                                                if !self.progress.verificationHasStarted {
+                                                    self.progress.verificationHasStarted = true
+                                                    self.progress.verificationPhase = .verifying
+                                                    if self.progress.verificationStartTime == nil {
+                                                        self.progress.verificationStartTime = Date()
+                                                    }
+                                                }
+                                                self.progress.verificationCurrentFile = job.fileName
+                                            }
+                                            let count = await verificationProgress.increment()
+                                            await MainActor.run {
+                                                self.progress.verificationFilesCompleted = count
+                                            }
+                                            let bytes = await verificationBytes.add(result.bytesWritten * verificationReadMultiplier)
+                                            await MainActor.run {
+                                                self.progress.verificationBytesCompleted = bytes
+                                            }
+                                            if destHash != sourceHash {
+                                                let mismatch = "\(result.sourcePath): source=\(sourceHash.hexString) dest=\(destHash.hexString)"
+                                                await failureCollector.append(mismatch)
+                                                #if DEBUG
+                                                DebugLog.warn("⚠️ VERIFICATION FAILED: \(mismatch)")
+                                                #endif
+                                            } else {
+                                                await hashListWriter?.append(hash: destHash, path: result.destinationPath)
+                                            }
+                                        } else {
+                                            verificationContinuation?.yield(result)
+                                        }
                                     }
-                                    if destHash != sourceHash {
-                                        let mismatch = "\(result.sourcePath): source=\(sourceHash.hexString) dest=\(destHash.hexString)"
-                                        await failureCollector.append(mismatch)
-                                        #if DEBUG
-                                        DebugLog.warn("⚠️ VERIFICATION FAILED: \(mismatch)")
-                                        #endif
-                                    } else {
-                                        await hashListWriter?.append(hash: destHash, path: result.destinationPath)
-                                    }
-                                } else {
-                                    verificationContinuation?.yield(result)
-                                }
-                            } catch {
-                                do {
-                                    try fm.removeItem(atPath: job.destinationPath)
                                 } catch {
-                                    await warningCollector.append(
-                                        "Could not remove partial file at \(job.destinationPath): \(error.localizedDescription)"
-                                    )
-                                }
-                                if case FileCopyError.cancelled = error {
+                                    do {
+                                        try fm.removeItem(atPath: job.destinationPath)
+                                    } catch {
+                                        await warningCollector.append(
+                                            "Could not remove partial file at \(job.destinationPath): \(error.localizedDescription)"
+                                        )
+                                    }
+                                    if case FileCopyError.cancelled = error {
+                                        break
+                                    }
+                                    await abortState.setError(error.localizedDescription)
                                     break
                                 }
-                                await abortState.setError(error.localizedDescription)
-                                break
                             }
                         }
                     }
@@ -621,21 +665,29 @@ class CustomCopierService: ObservableObject, TransferService {
             }
         }
 
-        verificationContinuation?.finish()
-        if shouldCancel() || abortDueToError {
-            verificationTask.cancel()
+        if verificationEnabled {
+            verificationContinuation?.finish()
+            if shouldCancel() || abortDueToError {
+                verificationTask?.cancel()
+            }
         }
         progress.copyingDone = true
-        if progress.verificationFilesTotal > 0 {
+        if verificationEnabled && progress.verificationFilesTotal > 0 {
             progress.phase = .verifying
         }
-        _ = await verificationTask.value
-        let verifiedCount = await verificationProgress.value()
-        progress.verificationFilesCompleted = verifiedCount
-        progress.verificationBytesCompleted = await verificationBytes.value()
-        progress.verificationIsActive = false
-        if shouldCancel() || abortDueToError {
-            progress.verificationFilesTotal = verifiedCount
+        if let verificationTask {
+            _ = await verificationTask.value
+            let verifiedCount = await verificationProgress.value()
+            progress.verificationFilesCompleted = verifiedCount
+            progress.verificationBytesCompleted = await verificationBytes.value()
+            progress.verificationIsActive = false
+            if shouldCancel() || abortDueToError {
+                progress.verificationFilesTotal = verifiedCount
+            }
+        } else {
+            progress.verificationFilesCompleted = 0
+            progress.verificationBytesCompleted = 0
+            progress.verificationIsActive = false
         }
         let bytesCompleted = await copyProgress.value()
         let filesCompleted = await copyFileCounter.value()
@@ -689,6 +741,14 @@ class CustomCopierService: ObservableObject, TransferService {
         finalResult.duplicatePolicy = duplicatePolicy
         finalResult.duplicateHits = duplicateHits
         let verificationFailures = await failureCollector.all()
+        if !verificationFailures.isEmpty {
+            let limit = 50
+            let slice = verificationFailures.prefix(limit)
+            finalResult.errors = Array(slice)
+            if verificationFailures.count > limit {
+                finalResult.errors.append("…and \(verificationFailures.count - limit) more")
+            }
+        }
         if !verificationFailures.isEmpty || isCancelled || isPaused {
             await hashListWriter?.removeFile()
         } else if let hashListWriter {
@@ -710,7 +770,8 @@ class CustomCopierService: ObservableObject, TransferService {
             finalResult.errorMessage = abortMessage ?? "Copy failed."
         }
 
-        finalResult.wasVerified = verificationFailures.isEmpty
+        finalResult.wasVerified = verificationEnabled
+            && verificationFailures.isEmpty
             && !isCancelled
             && !isPaused
             && !skippedWithoutVerification
@@ -741,7 +802,7 @@ class CustomCopierService: ObservableObject, TransferService {
 
         progress.isRunning = false
         progress.phase = .finished
-        progress.verificationPhase = finalResult.success ? .complete : .idle
+        progress.verificationPhase = (verificationEnabled && finalResult.success) ? .complete : .idle
         progress.verificationCurrentFile = ""
 
         #if DEBUG
@@ -779,6 +840,7 @@ class CustomCopierService: ObservableObject, TransferService {
 
         let hasCopyWarmup = copyBytes >= minWarmupBytes && elapsed >= minWarmupSeconds
         let hasVerifyWarmup = progress.verificationBytesCompleted >= minWarmupBytes
+            || progress.verificationFilesCompleted >= 10
         if !hasCopyWarmup && !hasVerifyWarmup {
             progress.estimatedTimeRemaining = nil
             smoothedEta = nil
@@ -792,18 +854,32 @@ class CustomCopierService: ObservableObject, TransferService {
 
         let copyRemaining = max(totalCopyBytes - copyBytes, 0)
         let verifyRemaining = max(progress.verificationBytesTotal - progress.verificationBytesCompleted, 0)
+        let copyFilesRemaining = max(progress.filesTotal - progress.filesCompleted, 0)
+        let verifyFilesRemaining = max(progress.verificationFilesTotal - progress.verificationFilesCompleted, 0)
 
         var verifySpeed = copySpeed
+        var verifyFileRate: Double = 0
         if progress.verificationHasStarted,
            let verifyStart = progress.verificationStartTime {
             let verifyElapsed = now.timeIntervalSince(verifyStart)
             if verifyElapsed > 0, progress.verificationBytesCompleted > 0 {
                 verifySpeed = Double(progress.verificationBytesCompleted) / verifyElapsed
             }
+            if verifyElapsed > 0, progress.verificationFilesCompleted > 0 {
+                verifyFileRate = Double(progress.verificationFilesCompleted) / verifyElapsed
+            }
         }
 
-        let copyTime = copySpeed > 0 ? Double(copyRemaining) / copySpeed : 0
-        let verifyTime = verifySpeed > 0 ? Double(verifyRemaining) / verifySpeed : 0
+        let copyTimeBytes = copySpeed > 0 ? Double(copyRemaining) / copySpeed : 0
+        let copyFileRate = elapsed > 0 && progress.filesCompleted > 0
+            ? Double(progress.filesCompleted) / elapsed
+            : 0
+        let copyTimeFiles = copyFileRate > 0 ? Double(copyFilesRemaining) / copyFileRate : 0
+        let copyTime = max(copyTimeBytes, copyTimeFiles)
+
+        let verifyTimeBytes = verifySpeed > 0 ? Double(verifyRemaining) / verifySpeed : 0
+        let verifyTimeFiles = verifyFileRate > 0 ? Double(verifyFilesRemaining) / verifyFileRate : 0
+        let verifyTime = max(verifyTimeBytes, verifyTimeFiles)
         let remaining = max(copyTime, verifyTime)
         if remaining <= 0 {
             progress.estimatedTimeRemaining = nil
@@ -982,16 +1058,17 @@ class CustomCopierService: ObservableObject, TransferService {
         }
     }
 
+    nonisolated private static func volumeIsSolidState(for url: URL) -> Bool? {
+        let key = URLResourceKey(rawValue: "NSURLVolumeIsSolidStateKey")
+        guard let values = try? url.resourceValues(forKeys: [key]) else {
+            return nil
+        }
+        return values.allValues[key] as? Bool
+    }
+
     private func detectOptimalCopyWorkers(destination: String, sourceIsSSD: Bool, averageFileSize: Int64) async -> Int {
         let url = URL(fileURLWithPath: destination)
-        let solidStateKey = URLResourceKey(rawValue: "volumeIsSolidState")
-        let isSSD: Bool
-        if let values = try? url.resourceValues(forKeys: [solidStateKey]),
-           let solid = values.allValues[solidStateKey] as? Bool {
-            isSSD = solid
-        } else {
-            isSSD = false
-        }
+        let isSSD = Self.volumeIsSolidState(for: url) ?? false
 
         let cpuCount = max(1, ProcessInfo.processInfo.activeProcessorCount)
         let cpuCap = max(1, cpuCount / 2)
@@ -1015,32 +1092,76 @@ class CustomCopierService: ObservableObject, TransferService {
     }
 
     private func allVolumesAreSolidState(_ paths: [String]) async -> Bool {
-        await Task.detached(priority: .utility) {
-            let solidStateKey = URLResourceKey(rawValue: "volumeIsSolidState")
+        let task = Task.detached(priority: .utility) {
             var sawKnown = false
             for path in paths {
                 let url = URL(fileURLWithPath: path)
-                guard let values = try? url.resourceValues(forKeys: [solidStateKey]) else {
-                    continue
-                }
-                if let solid = values.allValues[solidStateKey] as? Bool {
+                if let solid = Self.volumeIsSolidState(for: url) {
                     sawKnown = true
-                    if !solid { return false }
+                    if !solid {
+                        return false
+                    }
                 }
             }
             return sawKnown
-        }.value
+        }
+        return await task.value
     }
 
-    private func detectOptimalVerificationWorkers(destination: String) async -> Int {
+    private func bucketCopyJobs(
+        _ jobs: [CopyJob],
+        ordering: FileOrdering,
+        parallelCopyEnabled: Bool
+    ) -> [[CopyJob]] {
+        guard parallelCopyEnabled else { return [jobs] }
+        guard ordering == .largeFirst || ordering == .smallFirst else { return [jobs] }
+        let smallLimit: Int64 = 1 * 1024 * 1024
+        let mediumLimit: Int64 = 50 * 1024 * 1024
+        var small: [CopyJob] = []
+        var medium: [CopyJob] = []
+        var large: [CopyJob] = []
+
+        for job in jobs {
+            let size = job.entry.size
+            if size < smallLimit {
+                small.append(job)
+            } else if size < mediumLimit {
+                medium.append(job)
+            } else {
+                large.append(job)
+            }
+        }
+
+        let ordered = ordering == .largeFirst
+            ? [large, medium, small]
+            : [small, medium, large]
+        return ordered.filter { !$0.isEmpty }
+    }
+
+    private func detectOptimalVerificationWorkers(
+        destination: String,
+        averageFileSize: Int64,
+        sameVolume: Bool
+    ) async -> Int {
         let url = URL(fileURLWithPath: destination)
-        let solidStateKey = URLResourceKey(rawValue: "volumeIsSolidState")
-        if let values = try? url.resourceValues(forKeys: [solidStateKey]),
-           let isSSD = values.allValues[solidStateKey] as? Bool {
-            if !isSSD { return 1 }
+        if let isSSD = Self.volumeIsSolidState(for: url) {
+            if !isSSD {
+                return 1
+            }
+            if sameVolume {
+                return 1
+            }
             let cpuCount = max(1, ProcessInfo.processInfo.activeProcessorCount)
             let scaled = max(1, cpuCount / 2)
-            return min(4, scaled)
+            let tinyLimit: Int64 = 1 * 1024 * 1024
+            let mediumLimit: Int64 = 50 * 1024 * 1024
+            if averageFileSize < tinyLimit {
+                return min(8, scaled)
+            }
+            if averageFileSize < mediumLimit {
+                return min(4, scaled)
+            }
+            return min(2, scaled)
         }
         return 1
     }

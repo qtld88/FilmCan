@@ -7,10 +7,12 @@ enum PreviewCalculator {
         let folders: Int
         let itemCount: Int
         let modified: Date?
+        let version: Int
     }
 
     private static var cache: [String: CacheEntry] = [:]
     private static let cacheLock = NSLock()
+    private static let cacheVersion = 2
 
     static func calculateTotalsAndSizes(for sources: [String]) -> (Int64, Int, Int, [String: Int64], [String: Int]) {
         var totalBytes: Int64 = 0
@@ -35,15 +37,30 @@ enum PreviewCalculator {
             }
 
             if !isDir.boolValue {
-                if let attrs = try? fm.attributesOfItem(atPath: path),
-                   let size = attrs[.size] as? Int64 {
+                let fileURL = URL(fileURLWithPath: path)
+                let keys: Set<URLResourceKey> = [
+                    .fileSizeKey,
+                    .fileAllocatedSizeKey,
+                    .totalFileAllocatedSizeKey
+                ]
+                if let values = try? fileURL.resourceValues(forKeys: keys) {
+                    let logicalSize = Int64(values.fileSize ?? 0)
+                    let allocatedSize = Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0)
+                    let size = max(logicalSize, allocatedSize)
                     totalBytes += size
                     sizes[path] = size
                     totalFiles += 1
                     itemCounts[path] = 1
                     storeCache(
                         path: path,
-                        entry: CacheEntry(size: size, files: 1, folders: 0, itemCount: 1, modified: modDate)
+                        entry: CacheEntry(
+                            size: size,
+                            files: 1,
+                            folders: 0,
+                            itemCount: 1,
+                            modified: modDate,
+                            version: cacheVersion
+                        )
                     )
                 }
                 continue
@@ -53,21 +70,49 @@ enum PreviewCalculator {
             var sourceItems = 0
             var sourceFiles = 0
             var sourceFolders = 0
+            let excludedDirectoryNames: Set<String> = [
+                ".Trashes",
+                ".fseventsd",
+                ".Spotlight-V100",
+                ".DocumentRevisions-V100",
+                ".TemporaryItems",
+                FilmCanPaths.hidden
+            ]
+            let keys: Set<URLResourceKey> = [
+                .isDirectoryKey,
+                .isSymbolicLinkKey,
+                .fileSizeKey,
+                .fileAllocatedSizeKey,
+                .totalFileAllocatedSizeKey
+            ]
             if let enumerator = fm.enumerator(
                 at: URL(fileURLWithPath: path),
-                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey],
-                options: [.skipsHiddenFiles]
+                includingPropertiesForKeys: Array(keys),
+                options: []
             ) {
                 for case let url as URL in enumerator {
-                    if let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey]) {
+                    let filePath = url.path
+                    if FilmCanPaths.isHidden(filePath) {
+                        enumerator.skipDescendants()
+                        continue
+                    }
+                    if let values = try? url.resourceValues(forKeys: keys) {
+                        if values.isSymbolicLink == true {
+                            continue
+                        }
                         if values.isDirectory == true {
+                            if excludedDirectoryNames.contains(url.lastPathComponent) {
+                                enumerator.skipDescendants()
+                            }
                             totalFolders += 1
                             sourceFolders += 1
                         } else {
                             totalFiles += 1
                             sourceFiles += 1
                             sourceItems += 1
-                            let size = Int64(values.fileSize ?? 0)
+                            let logicalSize = Int64(values.fileSize ?? 0)
+                            let allocatedSize = Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0)
+                            let size = max(logicalSize, allocatedSize)
                             totalBytes += size
                             sourceBytes += size
                         }
@@ -83,7 +128,8 @@ enum PreviewCalculator {
                     files: sourceFiles,
                     folders: sourceFolders,
                     itemCount: sourceItems,
-                    modified: modDate
+                    modified: modDate,
+                    version: cacheVersion
                 )
             )
         }
@@ -96,6 +142,7 @@ enum PreviewCalculator {
         defer { cacheLock.unlock() }
         guard let entry = cache[path] else { return nil }
         guard entry.modified == modified else { return nil }
+        guard entry.version == cacheVersion else { return nil }
         return entry
     }
 

@@ -8,7 +8,8 @@
   <a href="docs/installation.md">Install</a> •
   <a href="docs/quickstart.md">Quick Start</a> •
   <a href="docs/index.md">Docs</a> •
-  <a href="docs/faq.md">FAQ</a>
+  <a href="docs/faq.md">FAQ</a> •
+  <a href="docs/privacy.md">Privacy</a>
 </p>
 
 ---
@@ -59,6 +60,8 @@ Done. FilmCan copies, verify and save checksums.
 - [Troubleshooting](docs/troubleshooting.md)
 - [FAQ](docs/faq.md)
 - [Documentation](docs/index.md)
+- [Privacy](docs/privacy.md)
+- [AI Usage](docs/ai-usage.md)
 - [Report a bug](docs/contributing.md)
 
 ---

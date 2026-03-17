@@ -253,16 +253,24 @@ class RsyncService: ObservableObject {
         hashListTask = nil
         self.hashListPath = hashListPath
         hashListWarning = nil
-        guard let hashListPath, let writer = HashListWriter(outputPath: hashListPath, algorithm: .xxh128) else { return }
-        hashListWriter = writer
+        guard let hashListPath else { return }
+        let writer: HashListWriter
+        do {
+            writer = try HashListWriter(outputPath: hashListPath, algorithm: .xxh128)
+            hashListWriter = writer
+        } catch {
+            hashListWarning = "Hash list could not be created: \(error.localizedDescription)"
+            return
+        }
         let stream = AsyncStream<String> { continuation in
             self.hashListContinuation = continuation
         }
+        let writerRef = writer
         hashListTask = Task.detached(priority: .utility) {
             for await path in stream {
                 if Task.isCancelled { break }
                 if let hash = Hashing.hash(for: URL(fileURLWithPath: path), algorithm: .xxh128) {
-                    await writer.append(hashHex: hash, path: path)
+                    await writerRef.append(hashHex: hash, path: path)
                 }
             }
         }
@@ -550,6 +558,17 @@ class RsyncService: ObservableObject {
             if !diffLines.isEmpty {
                 finalResult.success = false
                 finalResult.errorMessage = "Post-copy verification failed: files differ between source and destination"
+                let limit = 50
+                let trimmed = diffLines.prefix(limit)
+                finalResult.errors = trimmed.map { line in
+                    if let space = line.firstIndex(of: " ") {
+                        return String(line[line.index(after: space)...])
+                    }
+                    return line
+                }
+                if diffLines.count > limit {
+                    finalResult.errors.append("…and \(diffLines.count - limit) more")
+                }
                 appendVerificationLog(
                     logFile: logFile,
                     title: "Verification differences",
@@ -558,6 +577,7 @@ class RsyncService: ObservableObject {
             } else if verifyTask.terminationStatus != 0 && !errorLines.isEmpty {
                 finalResult.success = false
                 finalResult.errorMessage = "Post-copy verification failed: \(errorLines.first ?? "Unknown error")"
+                finalResult.errors = errorLines
                 appendVerificationLog(
                     logFile: logFile,
                     title: "Verification error",
@@ -1801,9 +1821,33 @@ class RsyncService: ObservableObject {
             return "Error starting client-server protocol"
         case 9:
             if lastTerminationReason == .uncaughtSignal {
-                return "Rsync was killed by the system (signal 9). Common causes include macOS quarantine/Gatekeeper, low memory, or security software. Move FilmCan to /Applications and open it once, or remove quarantine, then retry."
+                return """
+                Rsync was stopped by macOS (signal 9).
+
+                Try this:
+                1. Move FilmCan.app to /Applications.
+                2. Open FilmCan once from /Applications. If macOS blocks it, go to System Settings > Privacy & Security and click "Open Anyway".
+                3. Retry the transfer.
+
+                If it still fails, remove quarantine in Terminal:
+                sudo xattr -dr com.apple.quarantine /Applications/FilmCan.app
+
+                If it still fails after that, restart the Mac, close heavy apps, and check any security/antivirus tools that might block command-line binaries.
+                """
             }
-            return "Rsync error (code 9). The process was terminated unexpectedly (possible causes: quarantine, low memory, or security software)."
+            return """
+            Rsync was terminated unexpectedly (code 9).
+
+            Try this:
+            1. Move FilmCan.app to /Applications.
+            2. Open FilmCan once from /Applications. If macOS blocks it, go to System Settings > Privacy & Security and click "Open Anyway".
+            3. Retry the transfer.
+
+            If it still fails, remove quarantine in Terminal:
+            sudo xattr -dr com.apple.quarantine /Applications/FilmCan.app
+
+            If it still fails after that, restart the Mac, close heavy apps, and check any security/antivirus tools that might block command-line binaries.
+            """
         case 6:
             let firstLine = stderr
                 .split(separator: "\n")

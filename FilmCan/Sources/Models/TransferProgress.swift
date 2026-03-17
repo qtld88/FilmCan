@@ -72,11 +72,12 @@ class TransferProgress: ObservableObject {
         if !isRunning && phase == .finished && !hasError && !isCancelled && !isPaused {
             return 1.0
         }
-        if totalBytes > 0 {
-            return min(1.0, Double(cumulativeBytes) / Double(totalBytes))
-        }
-        guard filesTotal > 0 else { return 0 }
-        return min(1.0, Double(filesCompleted) / Double(filesTotal))
+        return weightedProgress(
+            bytesCompleted: cumulativeBytes,
+            bytesTotal: totalBytes,
+            filesCompleted: filesCompleted,
+            filesTotal: filesTotal
+        )
     }
 
     var formattedProgress: String {
@@ -114,6 +115,46 @@ class TransferProgress: ObservableObject {
     var verificationBytesProgress: Double {
         guard verificationBytesTotal > 0 else { return 0 }
         return min(1.0, Double(verificationBytesCompleted) / Double(verificationBytesTotal))
+    }
+
+    var verificationWeightedProgress: Double {
+        weightedProgress(
+            bytesCompleted: verificationBytesCompleted,
+            bytesTotal: verificationBytesTotal,
+            filesCompleted: verificationFilesCompleted,
+            filesTotal: verificationFilesTotal
+        )
+    }
+
+    private func weightedProgress(
+        bytesCompleted: Int64,
+        bytesTotal: Int64,
+        filesCompleted: Int,
+        filesTotal: Int
+    ) -> Double {
+        let byteProgress = bytesTotal > 0
+            ? min(1.0, max(0, Double(bytesCompleted) / Double(bytesTotal)))
+            : 0
+        let fileProgress = filesTotal > 0
+            ? min(1.0, max(0, Double(filesCompleted) / Double(filesTotal)))
+            : 0
+        if bytesTotal <= 0, filesTotal > 0 {
+            return fileProgress
+        }
+        if filesTotal <= 0 {
+            return byteProgress
+        }
+        let averageFileSize = bytesTotal / Int64(max(filesTotal, 1))
+        let fileWeight: Double
+        if averageFileSize < 1 * 1024 * 1024 {
+            fileWeight = 0.5
+        } else if averageFileSize < 10 * 1024 * 1024 {
+            fileWeight = 0.3
+        } else {
+            fileWeight = 0.1
+        }
+        let combined = (1.0 - fileWeight) * byteProgress + fileWeight * fileProgress
+        return min(1.0, max(0, combined))
     }
 
     var sourceHashingProgress: Double {

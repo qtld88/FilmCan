@@ -23,6 +23,10 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 **No notifications**  
 **System Settings** > **Notifications** > FilmCan > Enable
 
+**Webhook not working**  
+- Check the webhook URL and internet connection
+- Verify your endpoint accepts JSON POST requests
+
 ---
 
 ## Transfer Issues
@@ -32,6 +36,10 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 - Destination is writable with free space
 - Check safety warnings in the UI
 
+**Error details**  
+- During a run, FilmCan shows the failure reason under each destination’s progress bar.  
+- After a run, the same reason is stored in Transfer History.
+
 **Stuck or slow**  
 - Large files take time (check drive activity)
 - Try sequential mode instead of parallel
@@ -40,7 +48,7 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 
 **Incomplete**  
 - Check destination has space
-- Review logs in Transfer History (if logs are enabled)
+- Review the log file at the configured log folder (if logs are enabled)
 - Resume or re-run
 
 ---
@@ -68,10 +76,12 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 - Re-copy the file
 - Run **Disk Utility** > **First Aid**
 - Try another drive
+ - If using FilmCan Engine, confirm **Hash verification** is enabled
 
 **Hash list not found**  
-- Check the stored path in Transfer History
+- Confirm the destination is mounted and check `<destination>/.filmcan/hashlists/`
 - Re-run the backup to generate a new hash list
+ - Hash lists are created only when **Hash verification** is enabled (FilmCan Engine) or when rsync verification is enabled
 
 ---
 

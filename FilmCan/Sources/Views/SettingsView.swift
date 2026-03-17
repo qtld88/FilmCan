@@ -11,6 +11,10 @@ struct SettingsView: View {
     @AppStorage("ntfyBearerToken") private var ntfyBearerToken: String = ""
     @AppStorage("ntfyTitleTemplate") private var ntfyTitleTemplate: String = "{source}'s backup to {destinations} for {movie} : {backupStatus}"
     @AppStorage("ntfyMessageTemplate") private var ntfyMessageTemplate: String = "{bytes} ({files} files) from {source} has been {backupAction} to {destination} in {duration}.\n{backupDetails}"
+    @AppStorage("webhookEnabled") private var webhookEnabled: Bool = false
+    @AppStorage("webhookURL") private var webhookURL: String = ""
+    @AppStorage("webhookHeaders") private var webhookHeaders: String = ""
+    @AppStorage("webhookSecret") private var webhookSecret: String = ""
     @AppStorage("historyRetentionLimit") private var historyRetentionLimit: Int = 200
     @AppStorage("appearanceAccentHex") private var appearanceAccentHex: String = AppearanceDefaults.accentHex
     @AppStorage("appearanceAccentMode") private var appearanceAccentMode: String = AppearanceDefaults.accentMode
@@ -48,7 +52,11 @@ struct SettingsView: View {
                 ntfyURL: $ntfyURL,
                 ntfyBearerToken: $ntfyBearerToken,
                 ntfyTitleTemplate: $ntfyTitleTemplate,
-                ntfyMessageTemplate: $ntfyMessageTemplate
+                ntfyMessageTemplate: $ntfyMessageTemplate,
+                webhookEnabled: $webhookEnabled,
+                webhookURL: $webhookURL,
+                webhookHeaders: $webhookHeaders,
+                legacyWebhookSecret: $webhookSecret
             )
             .tabItem {
                 Label("Push", systemImage: "paperplane")
@@ -249,6 +257,13 @@ struct NotificationsSettingsView: View {
                     .tint(FilmCanTheme.toggleTint)
                 Toggle("Notify on backup error", isOn: $notifyOnError)
                     .tint(FilmCanTheme.toggleTint)
+
+                Button("Send test notification") {
+                    NotificationService.shared.notify(
+                        title: "FilmCan Test",
+                        body: "If you can read this, banners are working."
+                    )
+                }
             }
         }
         .formStyle(.grouped)
@@ -263,6 +278,10 @@ struct PushSettingsView: View {
     @Binding var ntfyBearerToken: String
     @Binding var ntfyTitleTemplate: String
     @Binding var ntfyMessageTemplate: String
+    @Binding var webhookEnabled: Bool
+    @Binding var webhookURL: String
+    @Binding var webhookHeaders: String
+    @Binding var legacyWebhookSecret: String
 
     var body: some View {
         Form {
@@ -332,10 +351,49 @@ struct PushSettingsView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
+
+            Section("Webhook") {
+                Toggle("Send webhook notifications", isOn: $webhookEnabled)
+                    .tint(FilmCanTheme.toggleTint)
+                TextField("Webhook URL :", text: $webhookURL)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!webhookEnabled)
+                Text("Custom headers (one per line)")
+                    .font(FilmCanFont.body(12))
+                    .foregroundColor(FilmCanTheme.textPrimary)
+                TextEditor(text: $webhookHeaders)
+                    .font(FilmCanFont.body(12))
+                    .frame(minHeight: 80)
+                    .padding(6)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .cornerRadius(6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    )
+                    .disabled(!webhookEnabled)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sends a JSON payload using the same title and message templates as ntfy.")
+                    Text("Example: Authorization: Bearer <token>")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()
         .padding(.top, 30)
+        .onAppear {
+            migrateLegacyWebhookSecretIfNeeded()
+        }
+    }
+
+    private func migrateLegacyWebhookSecretIfNeeded() {
+        let trimmedHeaders = webhookHeaders.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSecret = legacyWebhookSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedHeaders.isEmpty, !trimmedSecret.isEmpty else { return }
+        webhookHeaders = "Authorization: Bearer \(trimmedSecret)"
+        legacyWebhookSecret = ""
     }
 
     private var tokenList: [(token: String, description: String)] {
@@ -692,6 +750,14 @@ struct HotkeyRow: View {
 struct AboutView: View {
     @Environment(\.openURL) private var openURL
 
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    private var buildNumber: String? {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -702,7 +768,7 @@ struct AboutView: View {
             Text("FilmCan")
                 .font(.title)
 
-            Text("Version 1.0.0")
+            Text(buildNumber.map { "Version \(appVersion) (\($0))" } ?? "Version \(appVersion)")
                 .font(.caption)
                 .foregroundColor(.secondary)
 

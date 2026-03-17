@@ -614,6 +614,36 @@ class BackupEditorViewModel: ObservableObject {
                 return false
             }
         }
+
+        func normalizedPath(_ path: String) -> String {
+            URL(fileURLWithPath: path)
+                .standardizedFileURL
+                .resolvingSymlinksInPath()
+                .path
+        }
+
+        // Prevent destinations inside sources (and exact matches).
+        let normalizedSources = config.sourcePaths.map(normalizedPath)
+        let normalizedDestinations = config.destinationPaths.map(normalizedPath)
+        for sourcePath in normalizedSources {
+            var isDirectory: ObjCBool = false
+            _ = fm.fileExists(atPath: sourcePath, isDirectory: &isDirectory)
+            let sourceName = (sourcePath as NSString).lastPathComponent
+            let sourcePrefix = sourcePath.hasSuffix("/") ? sourcePath : sourcePath + "/"
+            for destPath in normalizedDestinations {
+                if destPath == sourcePath {
+                    validationMessage = "Source and destination are the same: \(sourceName)"
+                    showValidationError = true
+                    return false
+                }
+                if isDirectory.boolValue, destPath.hasPrefix(sourcePrefix) {
+                    let destName = (destPath as NSString).lastPathComponent
+                    validationMessage = "Destination “\(destName)” is inside source “\(sourceName)”. Choose a destination outside the source folder."
+                    showValidationError = true
+                    return false
+                }
+            }
+        }
         
         // Validate destinations
         for dest in config.destinationPaths {

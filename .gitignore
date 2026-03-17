@@ -9,6 +9,8 @@ build/
 dist/
 *.xcuserstate
 *.xcuserdata/
+xcuserdata/
+*.xcuserdatad/
 *.xcscmblueprint
 *.xccheckout
 *.xcodeproj/project.xcworkspace/

@@ -18,13 +18,14 @@
 
 ## Permissions
 
-Grant these when prompted:
+Grant these in System Settings:
 
 - **Notifications**: get alerts when transfers finish
 - **Full Disk Access**: read cards and write to drives
 
-If you missed the prompt:
-- **System Settings** > **Privacy & Security** > **Full Disk Access** / **Notifications**
+Paths:
+- **System Settings** > **Privacy & Security** > **Full Disk Access**
+- **System Settings** > **Notifications** > FilmCan
 
 ---
 

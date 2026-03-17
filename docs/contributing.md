@@ -31,11 +31,7 @@ open FilmCan/FilmCan.xcodeproj
 ```
 
 **Test checklist:**
-- Small and large files
-- Multiple destinations
-- Stop/resume
-- Verification + hash lists
-- Organization presets
+Follow the [QA checklist](./qa.md) before submitting a release or major change.
 
 ---
 

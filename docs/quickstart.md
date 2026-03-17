@@ -34,8 +34,8 @@ Click **Run Now**
 
 FilmCan will:
 - Copy files to all destinations
-- Verify every byte (if enabled; always on for FilmCan Engine)
-- Generate a hash list for later verification (on successful transfers)
+- Hash-verify every byte (when enabled)
+- Generate a hash list for later verification (when hash verification is enabled)
 
 Results appear in **Transfer History** (click the **clock** icon)
 
@@ -50,6 +50,13 @@ Want files organized by date or card?
 3. Files get renamed/organized automatically
 
 [Learn more →](./features/destination-presets.md)
+
+---
+
+## Notes
+
+- FilmCan stores history locally on your Mac.
+- Transfers require read access to sources and write access to destinations.
 
 ---
 

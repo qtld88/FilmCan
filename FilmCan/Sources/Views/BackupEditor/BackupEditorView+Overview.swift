@@ -50,6 +50,10 @@ extension BackupEditorView {
                     DriveAnchorData(flowFrame: bounds)
                 }
             
+            let verifyEnabled = viewModel.rsyncOptions.copyEngine == .custom
+                ? viewModel.rsyncOptions.customVerifyEnabled
+                : viewModel.rsyncOptions.postVerify
+
             DestinationListView(
                 destinations: Binding(
                     get: { viewModel.destinations },
@@ -77,7 +81,7 @@ extension BackupEditorView {
                 sourcePaths: viewModel.sourcePaths,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
-                postVerifyEnabled: viewModel.rsyncOptions.postVerify,
+                postVerifyEnabled: verifyEnabled,
                 fulfilledDestinations: fulfilledDestinationsForCurrentConfig()
             )
             .frame(maxWidth: .infinity)
@@ -148,6 +152,10 @@ extension BackupEditorView {
                 Spacer()
             }
             
+            let verifyEnabled = viewModel.rsyncOptions.copyEngine == .custom
+                ? viewModel.rsyncOptions.customVerifyEnabled
+                : viewModel.rsyncOptions.postVerify
+
             DestinationListView(
                 destinations: Binding(
                     get: { viewModel.destinations },
@@ -175,7 +183,7 @@ extension BackupEditorView {
                 sourcePaths: viewModel.sourcePaths,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
-                postVerifyEnabled: viewModel.rsyncOptions.postVerify,
+                postVerifyEnabled: verifyEnabled,
                 fulfilledDestinations: fulfilledDestinationsForCurrentConfig()
             )
             .frame(maxWidth: .infinity)

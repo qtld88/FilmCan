@@ -91,6 +91,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         notificationService.ensureAuthorized()
         
     }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        NotificationService.shared.clearBadge()
+    }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false  // Keep app running in background

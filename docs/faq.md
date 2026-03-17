@@ -5,7 +5,7 @@
 ## Basics
 
 **What is FilmCan?**  
-Professional backup for camera cards. Copies to multiple drives with verification.
+Professional backup for camera cards. Copies to multiple drives with optional hash verification.
 
 **Is it free?**  
 Yes. GPL-3.0 licensed.
@@ -28,13 +28,13 @@ Not officially supported. Local drives are recommended.
 ## Verification
 
 **How do I verify backups?**  
-Enable verification in Options. FilmCan uses xxHash128 checksums.
+Enable hash verification in Options. FilmCan uses xxHash128 hashes.
 
 **Can I stop and resume?**  
 Yes for rsync runs when **Allow resume after stop** is enabled. FilmCan Engine restarts the current file on resume. See [Stop & Resume](./features/stop.md).
 
 **Hash lists?**  
-Yes. Created automatically for later verification. See [Hash Lists](./features/hash-lists.md).
+Yes. Created automatically when hash verification is enabled. See [Hash Lists](./features/hash-lists.md).
 
 ---
 
@@ -60,7 +60,7 @@ Both available. See [Copy Engines](./features/copy-engines.md).
 Yes. See [Custom rsync](./features/custom-rsync.md).
 
 **Does it upload anything?**  
-No. All transfers are local.
+No file uploads. Transfers stay local; optional notifications (ntfy/webhook) only send status metadata.
 
 ---
 

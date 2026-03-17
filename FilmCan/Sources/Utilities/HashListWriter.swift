@@ -7,7 +7,7 @@ actor HashListWriter {
     private let algorithm: FilmCanHashAlgorithm
     private var writeError: String? = nil
 
-    init?(outputPath: String, algorithm: FilmCanHashAlgorithm = .xxh128) {
+    init(outputPath: String, algorithm: FilmCanHashAlgorithm = .xxh128) throws {
         self.outputPath = outputPath
         self.algorithm = algorithm
         let outputURL = URL(fileURLWithPath: outputPath)
@@ -24,7 +24,7 @@ actor HashListWriter {
             }
         } catch {
             handle = nil
-            return nil
+            throw error
         }
     }
 

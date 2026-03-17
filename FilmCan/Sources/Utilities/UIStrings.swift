@@ -52,19 +52,20 @@ enum UIStrings {
             "Verification is optional and can be turned off"
         ]
         static let filmCanTitle = "FilmCan Engine"
-        static let filmCanSubtitle = "Streamlined copier optimized for speed with built-in verification."
+        static let filmCanSubtitle = "Streamlined copier optimized for speed with optional hash verification."
         static let filmCanProsTitle = "Pros"
         static let filmCanConsTitle = "Cons"
         static let filmCanPros = [
             "Full card backups to local drives",
             "Maximum speed (20-30% faster verification)",
             "Simple, reliable copying",
-            "Guaranteed verification (always on)"
+            "Hash verification toggle for safety vs speed"
         ]
         static let filmCanCons = [
             "No incremental sync or resume",
             "No custom filters or exclusions",
-            "Always copies all files"
+            "Always copies all files",
+            "Slower on lots of tiny files"
         ]
     }
 

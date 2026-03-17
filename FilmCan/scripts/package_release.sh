@@ -58,6 +58,7 @@ DMG_PATH="${DIST_DIR}/FilmCan.dmg"
 DMG_TEMP="${DIST_DIR}/FilmCan-temp.dmg"
 CUSTOMIZE_DMG=1
 MOUNT_DIR=""
+MOUNT_DEVICE=""
 
 ensure_not_open() {
   local file="$1"
@@ -103,7 +104,7 @@ create_udzo() {
 }
 
 create_udrw() {
-  local image="$1"
+    local image="$1"
   ensure_unmounted_image "$image"
   hdiutil create -volname "FilmCan" -srcfolder "$STAGE_DIR" -ov -format UDRW "$image"
 }
@@ -212,10 +213,9 @@ if ! create_udrw "$DMG_TEMP"; then
 fi
 
 if [ "$CUSTOMIZE_DMG" -eq 1 ]; then
-  MOUNT_DIR="$(
-    hdiutil attach -readwrite -noverify -noautoopen "$DMG_TEMP" \
-      | awk '/\/Volumes\// {print $3; exit}'
-  )"
+  ATTACH_INFO="$(hdiutil attach -readwrite -noverify -noautoopen "$DMG_TEMP")"
+  MOUNT_DIR="$(echo "$ATTACH_INFO" | awk '/\/Volumes\// {print $3; exit}')"
+  MOUNT_DEVICE="$(echo "$ATTACH_INFO" | awk '/\/Volumes\// {print $1; exit}')"
   if [ -z "$MOUNT_DIR" ]; then
     CUSTOMIZE_DMG=0
   fi
@@ -229,6 +229,7 @@ try
   tell application "Finder"
     tell disk "FilmCan"
       open
+      delay 1
       set current view of container window to icon view
       set toolbar visible of container window to false
       set statusbar visible of container window to false
@@ -244,9 +245,9 @@ try
       set background picture of icon view options of container window to file ".background:background.png"
       set position of item "FilmCan.app" of container window to {190, 260}
       set position of item "Applications" of container window to {520, 260}
-      close
-      open
       update without registering applications
+      delay 2
+      close
       delay 1
     end tell
   end tell
@@ -265,16 +266,6 @@ EOF
   fi
 fi
 
-if [ "$CUSTOMIZE_DMG" -eq 1 ] && [ -n "$MOUNT_DIR" ]; then
-  for i in 1 2 3 4 5; do
-    if [ -f "$MOUNT_DIR/.DS_Store" ]; then
-      cp "$MOUNT_DIR/.DS_Store" "$STAGE_DIR/.DS_Store" || true
-      break
-    fi
-    sleep "$SHORT_DELAY"
-  done
-fi
-
 if [ "$CUSTOMIZE_DMG" -eq 0 ]; then
   if [ -n "$MOUNT_DIR" ]; then
     hdiutil detach "$MOUNT_DIR" || true
@@ -288,7 +279,15 @@ fi
 sync
 DETACH_OK=0
 for i in 1 2 3 4 5; do
+  if [ -n "$MOUNT_DEVICE" ] && hdiutil detach "$MOUNT_DEVICE" >/dev/null 2>&1; then
+    DETACH_OK=1
+    break
+  fi
   if hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1; then
+    DETACH_OK=1
+    break
+  fi
+  if [ -n "$MOUNT_DEVICE" ] && hdiutil detach -force "$MOUNT_DEVICE" >/dev/null 2>&1; then
     DETACH_OK=1
     break
   fi
@@ -301,6 +300,9 @@ done
 
 if [ "$DETACH_OK" -ne 1 ]; then
   echo "warning: Could not detach image, forcing unmount..." >&2
+  if [ -n "$MOUNT_DEVICE" ]; then
+    diskutil unmount force "$MOUNT_DEVICE" >/dev/null 2>&1 || true
+  fi
   diskutil unmount force "$MOUNT_DIR" >/dev/null 2>&1 || true
   killall Finder 2>/dev/null || true
   sleep "$RETRY_DELAY"
@@ -309,13 +311,6 @@ if [ "$DETACH_OK" -ne 1 ]; then
     rm -f "$DMG_TEMP"
     exit 1
   fi
-fi
-
-if [ -f "$STAGE_DIR/.DS_Store" ]; then
-  rm -f "$DMG_TEMP"
-  create_udzo "$DMG_PATH"
-  echo "Created: ${DMG_PATH}"
-  exit 0
 fi
 
 wait_for_image_release "$DMG_TEMP" || sleep "$LONG_DELAY"

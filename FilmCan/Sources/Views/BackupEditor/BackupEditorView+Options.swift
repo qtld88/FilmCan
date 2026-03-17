@@ -561,29 +561,6 @@ extension BackupEditorView {
         VStack(alignment: .leading, spacing: 12) {
             copyEnginePicker()
 
-            let copyContentsInfo = InfoPopoverContent(
-                title: "Copy folder contents only",
-                description: "When on, FilmCan skips the top-level folder and copies only its contents into the destination.",
-                pros: [
-                    "Avoids an extra nested folder",
-                    "Merges contents into an existing destination"
-                ],
-                cons: [
-                    "Higher risk of name collisions",
-                    "Less obvious where the files came from"
-                ]
-            )
-
-            optionRow(
-                icon: "folder.badge.minus",
-                iconColor: FilmCanTheme.textSecondary,
-                title: "Copy folder contents only",
-                subtitle: "",
-                isOn: $viewModel.copyFolderContents,
-                textWidth: basicOptionTextWidth,
-                info: copyContentsInfo
-            )
-
             let parallelCopyInfo = InfoPopoverContent(
                 title: "Automatic parallel copy",
                 description: "Let FilmCan decide when to copy multiple files in parallel.",
@@ -609,7 +586,33 @@ extension BackupEditorView {
             )
             .disabled(!isCustomEngine)
             .opacity(isCustomEngine ? 1 : 0.5)
-            
+
+            let verificationInfo = InfoPopoverContent(
+                title: "Hash verification",
+                description: "When on, FilmCan computes hashes during copy and verifies every file at the destination.",
+                pros: [
+                    "Detects corruption or incomplete writes",
+                    "Creates a hash list for later re-checks"
+                ],
+                cons: [
+                    "Adds extra reads and can slow down some drives",
+                    "Disabling it skips hash list generation"
+                ],
+                notes: ["Use this for safety-critical backups. Turn off for speed when needed."]
+            )
+
+            optionRow(
+                icon: "checkmark.seal",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Hash verification",
+                subtitle: isCustomEngine ? "" : "Only available with FilmCan Engine",
+                isOn: $viewModel.rsyncOptions.customVerifyEnabled,
+                textWidth: basicOptionTextWidth,
+                info: verificationInfo
+            )
+            .disabled(!isCustomEngine)
+            .opacity(isCustomEngine ? 1 : 0.5)
+
             HStack(spacing: optionSpacing) {
                 Image(systemName: "doc.on.doc")
                     .font(.title3)
@@ -845,6 +848,29 @@ extension BackupEditorView {
                 .padding(.top, 4)
             }
 
+            let copyContentsInfo = InfoPopoverContent(
+                title: "Copy folder contents only",
+                description: "When on, FilmCan skips the top-level folder and copies only its contents into the destination.",
+                pros: [
+                    "Avoids an extra nested folder",
+                    "Merges contents into an existing destination"
+                ],
+                cons: [
+                    "Higher risk of name collisions",
+                    "Less obvious where the files came from"
+                ]
+            )
+
+            optionRow(
+                icon: "folder.badge.minus",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Copy folder contents only",
+                subtitle: "",
+                isOn: $viewModel.copyFolderContents,
+                textWidth: basicOptionTextWidth,
+                info: copyContentsInfo
+            )
+
             if let presetBinding = editingOrganizationPresetBinding {
                 fileFilterPatternsSection(presetBinding: presetBinding)
                     .padding(.leading, optionIconWidth + optionSpacing)
@@ -947,12 +973,12 @@ extension BackupEditorView {
                 iconColor: FilmCanTheme.textSecondary,
                 title: "Verify after copy",
                 subtitle: isCustomEngine
-                    ? "Built into FilmCan Engine (always enabled)"
+                    ? "Managed in Basic tab for FilmCan Engine"
                     : "Ensures files copied correctly (recommended)",
                 isOn: $viewModel.rsyncOptions.postVerify,
                 textWidth: basicOptionTextWidth,
                 helpText: isCustomEngine
-                    ? "FilmCan Engine always verifies during the copy."
+                    ? "Use the Hash verification toggle in the Basic tab."
                     : "Runs a checksum-based verification after copying."
             )
             .disabled(isCustomEngine)

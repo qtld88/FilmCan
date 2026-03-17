@@ -38,7 +38,9 @@ enum FileEnumerator {
                 .isRegularFileKey,
                 .isDirectoryKey,
                 .isSymbolicLinkKey,
-                .fileSizeKey
+                .fileSizeKey,
+                .fileAllocatedSizeKey,
+                .totalFileAllocatedSizeKey
             ]
 
             for source in sources {
@@ -81,7 +83,9 @@ enum FileEnumerator {
                                 copyOnlyPatterns: copyOnlyPatterns,
                                 excludePatterns: excludePatterns
                             ) {
-                                let size = Int64(values?.fileSize ?? 0)
+                                let logicalSize = Int64(values?.fileSize ?? 0)
+                                let allocatedSize = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
+                                let size = max(logicalSize, allocatedSize)
                                 entries.append(
                                     SourceFileEntry(
                                         sourcePath: path,
@@ -104,8 +108,10 @@ enum FileEnumerator {
                         copyOnlyPatterns: copyOnlyPatterns,
                         excludePatterns: excludePatterns
                     ) {
-                        let attrs = try? fm.attributesOfItem(atPath: source)
-                        let size = Int64((attrs?[.size] as? NSNumber)?.int64Value ?? 0)
+                        let values = try? fileURL.resourceValues(forKeys: keys)
+                        let logicalSize = Int64(values?.fileSize ?? 0)
+                        let allocatedSize = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
+                        let size = max(logicalSize, allocatedSize)
                         entries.append(
                             SourceFileEntry(
                                 sourcePath: source,

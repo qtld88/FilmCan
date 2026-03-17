@@ -11,6 +11,7 @@ struct DestinationListView: View {
     @State private var dragPayload: String? = nil
     @State private var draggingDriveId: String? = nil
     @State private var draggingPath: String? = nil
+    @State private var knownDestinations: Set<String> = []
     var showsTitle: Bool = true
     var headerView: AnyView? = nil
     var footerView: AnyView? = nil
@@ -85,6 +86,19 @@ struct DestinationListView: View {
             .shadow(color: isTourHighlighted ? FilmCanTheme.brandYellow.opacity(0.35) : .clear, radius: 10)
             .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDrop(providers: providers)
+            }
+            .onAppear {
+                knownDestinations = Set(destinations)
+            }
+            .onChange(of: destinations) { newValue in
+                let updated = Set(newValue)
+                let added = updated.subtracting(knownDestinations)
+                if !added.isEmpty {
+                    for path in added {
+                        transferViewModel.resetDestinationPresentation(for: path)
+                    }
+                }
+                knownDestinations = updated
             }
         }
     }
@@ -667,6 +681,7 @@ struct DestinationListView: View {
         presentation: TransferViewModel.DestinationPresentation
     ) -> some View {
         let failureText = presentation.failureMessage
+        let failureDetails = failureDetails(for: destination)
         let warning = presentation.warningMessage
         let showCancel = presentation.canCancel
         return VStack(alignment: .leading, spacing: 10) {
@@ -679,6 +694,9 @@ struct DestinationListView: View {
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
                         .layoutPriority(1)
+                    if let failureDetails {
+                        InfoPopoverButton(content: failureDetails)
+                    }
                     Spacer()
                     if showCancel {
                         Button("Cancel") { transferViewModel.cancelDestination(destination) }
@@ -719,6 +737,39 @@ struct DestinationListView: View {
             }
             .padding(.leading, 24)
         }
+    }
+
+    private func failureDetails(for destination: String) -> InfoPopoverContent? {
+        guard let result = transferResult(for: destination),
+              let message = result.errorMessage,
+              !message.isEmpty,
+              !result.errors.isEmpty else {
+            return nil
+        }
+        let limit = 8
+        let normalized = result.errors.prefix(limit).map(normalizeFailureLine(_:))
+        let extraCount = result.errors.count - normalized.count
+        var notes = normalized
+        if extraCount > 0 {
+            notes.append("…and \(extraCount) more")
+        }
+        return InfoPopoverContent(
+            title: "Failure details",
+            description: message,
+            notes: notes
+        )
+    }
+
+    private func normalizeFailureLine(_ line: String) -> String {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let range = trimmed.range(of: ": source=") {
+            return String(trimmed[..<range.lowerBound])
+        }
+        if let space = trimmed.firstIndex(of: " ") {
+            let suffix = trimmed[trimmed.index(after: space)...]
+            return String(suffix)
+        }
+        return trimmed
     }
 
     private func progressValue(for destination: String, source: String) -> Double {
@@ -769,14 +820,14 @@ struct DestinationListView: View {
 
     private func verificationProgressValue(for destination: String, showProgress: Bool) -> Double {
         guard shouldShowVerificationRow(for: destination, showProgress: showProgress) else { return 0 }
-        return min(max(0, progress.verificationBytesProgress), 1)
+        return min(max(0, progress.verificationWeightedProgress), 1)
     }
 
     private func verificationPercentText(for destination: String, showProgress: Bool) -> String? {
         guard shouldShowVerificationRow(for: destination, showProgress: showProgress) else { return nil }
         guard progress.verificationHasStarted else { return nil }
-        guard progress.verificationBytesTotal > 0 else { return nil }
-        let percent = Int(round(progress.verificationBytesProgress * 100))
+        guard progress.verificationBytesTotal > 0 || progress.verificationFilesTotal > 0 else { return nil }
+        let percent = Int(round(progress.verificationWeightedProgress * 100))
         return "\(percent)%"
     }
 

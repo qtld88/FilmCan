@@ -82,28 +82,7 @@ struct BackupEditorView: View {
     
     var body: some View {
         GeometryReader { proxy in
-            let historyWidth = isHistoryVisible ? historyPanelWidth : 0
-            let contentWidth = max(proxy.size.width - 48 - historyWidth, 0)
-            let isOverviewWide = contentWidth >= 750
-            let contentPadding: CGFloat = contentWidth < 520 ? 12 : 24
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    overviewSection(isWide: isOverviewWide)
-
-                    optionsSection()
-                    
-            }
-                .padding(contentPadding)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .onTapGesture {
-                if isEditingName {
-                    confirmEditingName()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(FilmCanTheme.backgroundGradient)
+            editorContent(proxy: proxy)
         }
         .sheet(isPresented: $showFolderPicker) {
             FolderPickerSheet(mode: folderPickerMode) { path in
@@ -212,5 +191,29 @@ struct BackupEditorView: View {
         .onReceive(NotificationCenter.default.publisher(for: .filmCanDriveListChanged)) { _ in
             refreshAllDriveData(includePreview: false)
         }
+    }
+
+    @ViewBuilder
+    private func editorContent(proxy: GeometryProxy) -> some View {
+        let historyWidth = isHistoryVisible ? historyPanelWidth : 0
+        let contentWidth = max(proxy.size.width - 48 - historyWidth, 0)
+        let isOverviewWide = contentWidth >= 750
+        let contentPadding: CGFloat = contentWidth < 520 ? 12 : 24
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                overviewSection(isWide: isOverviewWide)
+                optionsSection()
+            }
+            .padding(contentPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onTapGesture {
+            if isEditingName {
+                confirmEditingName()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(FilmCanTheme.backgroundGradient)
     }
 }

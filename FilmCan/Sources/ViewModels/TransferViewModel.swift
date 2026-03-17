@@ -13,6 +13,9 @@ class TransferViewModel: ObservableObject {
     @AppStorage("ntfyBearerToken") private var ntfyBearerToken: String = ""
     @AppStorage("ntfyTitleTemplate") private var ntfyTitleTemplate: String = "{source}'s backup to {destinations} for {movie} : {backupStatus}"
     @AppStorage("ntfyMessageTemplate") private var ntfyMessageTemplate: String = "{bytes} ({files} files) from {source} has been {backupAction} to {destination} in {duration}.\n{backupDetails}"
+    @AppStorage("webhookEnabled") private var webhookEnabled: Bool = false
+    @AppStorage("webhookURL") private var webhookURL: String = ""
+    @AppStorage("webhookHeaders") private var webhookHeaders: String = ""
     @AppStorage("historyRetentionLimit") private var historyRetentionLimit: Int = 200
     
     @Published var isTransferring: Bool = false
@@ -188,6 +191,17 @@ class TransferViewModel: ObservableObject {
 
     func clearVerifiedDestinations(for configId: UUID) {
         verifiedDestinationsByConfig.removeValue(forKey: configId)
+    }
+
+    func resetDestinationPresentation(for destination: String) {
+        results.removeAll { $0.destination == destination }
+        cancelledDestinations.remove(destination)
+        destinationProgress.removeValue(forKey: destination)
+        let prefix = destination + "||"
+        pathProgress = pathProgress.filter { key, _ in !key.hasPrefix(prefix) }
+        if currentDestination == destination && !isTransferring {
+            currentDestination = ""
+        }
     }
 
     func progressForPath(destination: String, source: String) -> Double {
@@ -384,6 +398,9 @@ class TransferViewModel: ObservableObject {
             if ntfyEnabled, !ntfyURL.isEmpty {
                 sendNtfySummary(summary: summary)
             }
+            if webhookEnabled, !webhookURL.isEmpty {
+                sendWebhookSummary(summary: summary)
+            }
         }
     }
 
@@ -392,6 +409,7 @@ class TransferViewModel: ObservableObject {
         let body: String
         let messageTitle: String
         let messageBody: String
+        let fields: [String: String]
         let allSuccess: Bool
         let wasPaused: Bool
     }
@@ -450,49 +468,34 @@ class TransferViewModel: ObservableObject {
         let destinationsText = formatQuotedList(config.destinationPaths)
         let template = ntfyMessageTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
         let titleTemplate = ntfyTitleTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+        let replacements: [String: String] = [
+            "{movie}": config.name,
+            "{source}": sourceName,
+            "{destination}": destinationName,
+            "{sources}": sourcesText,
+            "{destinations}": destinationsText,
+            "{backupAction}": backupAction,
+            "{bytes}": bytesText,
+            "{files}": "\(totalFiles)",
+            "{duration}": durationText,
+            "{backupStatus}": backupStatus,
+            "{backupDetails}": backupDetails
+        ]
+
         let messageTitle = titleTemplate.isEmpty
             ? title
-            : applyTemplate(
-                titleTemplate,
-                replacements: [
-                    "{movie}": config.name,
-                    "{source}": sourceName,
-                    "{destination}": destinationName,
-                    "{sources}": sourcesText,
-                    "{destinations}": destinationsText,
-                    "{backupAction}": backupAction,
-                    "{bytes}": bytesText,
-                    "{files}": "\(totalFiles)",
-                    "{duration}": durationText,
-                    "{backupStatus}": backupStatus,
-                    "{backupDetails}": backupDetails
-                ]
-            )
+            : applyTemplate(titleTemplate, replacements: replacements)
 
         let messageBody = template.isEmpty
             ? body
-            : applyTemplate(
-                template,
-                replacements: [
-                    "{movie}": config.name,
-                    "{source}": sourceName,
-                    "{destination}": destinationName,
-                    "{sources}": sourcesText,
-                    "{destinations}": destinationsText,
-                    "{backupAction}": backupAction,
-                    "{bytes}": bytesText,
-                    "{files}": "\(totalFiles)",
-                    "{duration}": durationText,
-                    "{backupStatus}": backupStatus,
-                    "{backupDetails}": backupDetails
-                ]
-            )
+            : applyTemplate(template, replacements: replacements)
 
         return DestinationNotificationSummary(
             title: title,
             body: body,
             messageTitle: messageTitle,
             messageBody: messageBody,
+            fields: replacements,
             allSuccess: allSuccess,
             wasPaused: wasPaused
         )
@@ -505,6 +508,18 @@ class TransferViewModel: ObservableObject {
             title: summary.messageTitle,
             message: summary.messageBody,
             fields: [:]
+        )
+    }
+
+    private func sendWebhookSummary(summary: DestinationNotificationSummary) {
+        WebhookService.sendJSON(
+            urlString: webhookURL,
+            headers: WebhookService.parseHeaders(from: webhookHeaders),
+            payload: [
+                "title": summary.messageTitle,
+                "message": summary.messageBody,
+                "fields": summary.fields
+            ]
         )
     }
 
@@ -882,7 +897,9 @@ class TransferViewModel: ObservableObject {
                     algorithm: .xxh128
                 )
                 let outputDir = FilmCanPaths.hashListPath(for: destination)
-                let customHashListPath = (outputDir as NSString).appendingPathComponent(fileName)
+                let customHashListPath = options.customVerifyEnabled
+                    ? (outputDir as NSString).appendingPathComponent(fileName)
+                    : nil
                 result = try await custom.runCopy(
                     sources: sources,
                     destination: destination,
@@ -895,7 +912,8 @@ class TransferViewModel: ObservableObject {
                     parallelCopyEnabled: options.parallelCopyEnabled,
                     duplicatePolicy: duplicatePolicy,
                     duplicateCounterTemplate: duplicateCounterTemplate,
-                    duplicateResolver: duplicateResolver
+                    duplicateResolver: duplicateResolver,
+                    verificationEnabled: options.customVerifyEnabled
                 )
                 if duplicatePromptCancelled {
                     if let logFile = effectiveLogFile {
@@ -953,7 +971,8 @@ class TransferViewModel: ObservableObject {
                 result.visibleFilesTransferred = visibleTransferred
                 result.visibleFilesSkipped = max(0, visibleTotal - visibleTransferred)
             }
-            if result.success && result.hashListPath == nil {
+            let shouldGenerateHashList = options.copyEngine == .rsync || options.customVerifyEnabled
+            if result.success && result.hashListPath == nil && shouldGenerateHashList {
                 await MainActor.run {
                     self.progress.verificationPhase = .generatingHashList
                 }
@@ -972,13 +991,14 @@ class TransferViewModel: ObservableObject {
             }
             return result
         } catch {
+            let message = error.localizedDescription
             return TransferResult(
                 configurationName: configName,
                 destination: destination,
                 startTime: Date(),
                 endTime: Date(),
                 success: false,
-                errorMessage: error.localizedDescription,
+                errorMessage: message.isEmpty ? "Transfer failed." : message,
                 warningMessage: logWarning,
                 logFilePath: effectiveLogFile
             )
@@ -1209,6 +1229,12 @@ class TransferViewModel: ObservableObject {
         lines.append("Transferred items:")
         lines.append(transferredList)
         lines.append("")
+
+        if !result.errors.isEmpty {
+            lines.append("Verification issues:")
+            lines.append(result.errors.map { "  \($0)" }.joined(separator: "\n"))
+            lines.append("")
+        }
 
         let content = lines.joined(separator: "\n")
         do {

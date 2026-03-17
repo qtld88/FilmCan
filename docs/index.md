@@ -7,6 +7,7 @@
 - [Installation](./installation.md)
 - [Quick Start](./quickstart.md)
 - [FAQ](./faq.md)
+- [Architecture](./architecture.md)
 
 ---
 
@@ -32,3 +33,7 @@
 - [Troubleshooting](./troubleshooting.md)
 - [Support](./support.md)
 - [Contributing](./contributing.md)
+- [Privacy Policy](./privacy.md)
+- [QA Checklist](./qa.md)
+- [Technical Debt](./technical-debt.md)
+- [AI Usage](./ai-usage.md)

@@ -10,8 +10,8 @@ The **Transfer refinements** tab appears only when **Copy engine** is set to `rs
 See [Copy Engines](./copy-engines.md) for engine behavior.
 
 - **Copy engine** — choose `rsync` or `FilmCan Engine`. See [Copy Engines](./copy-engines.md).
-- **Copy folder contents only** — copies the contents of a source folder without the top-level folder.
 - **Automatic parallel copy** — FilmCan Engine only.
+- **Hash verification** — FilmCan Engine only. When off, no hash list is generated.
 - **Duplicate policy** — `Skip`, `Overwrite`, `Add counter`, `Verify using hash list`, `Ask each time`. See [Destination Presets](./destination-presets.md).
 - **Counter style** — shown only when **Duplicate policy** is `Add counter`.
 - **Copy mode** — `One destination at a time` or `All destinations at once`.
@@ -25,6 +25,7 @@ See [Source Selection](./source-selection.md) for patterns and auto-detect detai
 
 - **Auto-detect sources** — toggle.
 - **Drive and folder names to detect** — shown when **Auto-detect sources** is on.
+- **Copy folder contents only** — copies the contents of a source folder without the top-level folder.
 - **Copy-only patterns (optional)**.
 - **Include patterns (optional)**.
 - **Exclude patterns (optional)**.

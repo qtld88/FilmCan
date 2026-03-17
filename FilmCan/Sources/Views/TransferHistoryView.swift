@@ -279,6 +279,7 @@ struct TransferHistoryView: View {
                     .foregroundColor(FilmCanTheme.brandRed)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 10)
+                    .help(entryErrorMessage(entry) ?? "")
             }
         }
         .frame(width: 200, height: 200)
@@ -437,16 +438,30 @@ struct TransferHistoryView: View {
     private func historyListRow(_ entry: TransferHistoryEntry) -> some View {
         let isSuccess = entry.success
         let color = isSuccess ? FilmCanTheme.brandGreen : FilmCanTheme.brandRed
-        return HStack(spacing: 8) {
-            Image(systemName: isSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundColor(color)
-                .font(.system(size: 12, weight: .semibold))
-            Text(sourceLabelText(for: entry.sources))
-                .font(FilmCanFont.body(12))
-                .foregroundColor(color)
-                .lineLimit(1)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Image(systemName: isSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundColor(color)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(sourceLabelText(for: entry.sources))
+                    .font(FilmCanFont.body(12))
+                    .foregroundColor(color)
+                    .lineLimit(1)
+            }
+            if !isSuccess, let error = entryErrorMessage(entry), !error.isEmpty {
+                Text(error)
+                    .font(FilmCanFont.body(11))
+                    .foregroundColor(FilmCanTheme.textSecondary)
+                    .lineLimit(2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func entryErrorMessage(_ entry: TransferHistoryEntry) -> String? {
+        let message = entry.results.compactMap { $0.errorMessage }.first
+        let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (trimmed?.isEmpty ?? true) ? nil : trimmed
     }
 
     private func destinationCard(_ item: DestinationItem) -> some View {
@@ -524,12 +539,14 @@ struct TransferHistoryView: View {
                     .foregroundColor(.orange)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 10)
+                    .help(result.errorMessage ?? "Stopped by user")
             } else {
                 Text("FAILED")
                     .font(FilmCanFont.title(16))
                     .foregroundColor(FilmCanTheme.brandRed)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 10)
+                    .help(result.errorMessage ?? "")
             }
         }
         .frame(width: 200, height: 200)

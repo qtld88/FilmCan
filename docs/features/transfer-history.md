@@ -4,6 +4,13 @@ Review past backups and verify data.
 
 ---
 
+## Limitations
+
+- History is stored locally on your Mac (not synced).
+- Clearing history removes resume and verification context for that backup.
+
+---
+
 ## What's Logged
 
 - Time, duration, source, destinations
@@ -22,7 +29,7 @@ Click the **clock** icon
 ## Actions
 
 **Check Data**  
-Compares destination's files against the saved checksums.
+Compares destination's files against the saved hashes.
 
 **Use It Again**  
 Recreate a backup from a past run.

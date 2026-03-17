@@ -35,31 +35,6 @@ extension Data {
     }
 }
 
-extension Notification.Name {
-    static let filmCanRestartTour = Notification.Name("FilmCanRestartTour")
-    static let filmCanTourNameConfirmed = Notification.Name("FilmCanTourNameConfirmed")
-    static let filmCanTourNameSubmitted = Notification.Name("FilmCanTourNameSubmitted")
-    static let filmCanHotkeyRunNow = Notification.Name("FilmCanHotkeyRunNow")
-    static let filmCanHotkeyAddSource = Notification.Name("FilmCanHotkeyAddSource")
-    static let filmCanHotkeyAddDestination = Notification.Name("FilmCanHotkeyAddDestination")
-    static let filmCanHotkeyRefreshDrives = Notification.Name("FilmCanHotkeyRefreshDrives")
-    static let filmCanDriveListChanged = Notification.Name("FilmCanDriveListChanged")
-}
-
-enum FilmCanPaths {
-    static let hidden = ".filmcan"
-    static let partial = "\(hidden)/partial"
-    static let hashLists = "\(hidden)/hashlists"
-
-    static func hashListPath(for basePath: String) -> String {
-        (basePath as NSString).appendingPathComponent(hashLists)
-    }
-
-    static func isHidden(_ path: String) -> Bool {
-        path.contains("/\(hidden)/")
-    }
-}
-
 enum FilmCanFormatters {
     static func bytes(_ bytes: Int64, style: ByteCountFormatter.CountStyle = .decimal) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: style)
@@ -102,4 +77,29 @@ enum FilmCanFormatters {
         let hours = Int((Double(total) / 3600.0).rounded())
         return "About \(max(1, hours)) hours"
     }
+}
+
+enum FilmCanPaths {
+    static let hidden = ".filmcan"
+    static let partial = "\(hidden)/partial"
+    static let hashLists = "\(hidden)/hashlists"
+
+    static func hashListPath(for basePath: String) -> String {
+        (basePath as NSString).appendingPathComponent(hashLists)
+    }
+
+    static func isHidden(_ path: String) -> Bool {
+        path.contains("/\(hidden)/")
+    }
+}
+
+extension Notification.Name {
+    static let filmCanRestartTour = Notification.Name("FilmCanRestartTour")
+    static let filmCanTourNameConfirmed = Notification.Name("FilmCanTourNameConfirmed")
+    static let filmCanTourNameSubmitted = Notification.Name("FilmCanTourNameSubmitted")
+    static let filmCanHotkeyRunNow = Notification.Name("FilmCanHotkeyRunNow")
+    static let filmCanHotkeyAddSource = Notification.Name("FilmCanHotkeyAddSource")
+    static let filmCanHotkeyAddDestination = Notification.Name("FilmCanHotkeyAddDestination")
+    static let filmCanHotkeyRefreshDrives = Notification.Name("FilmCanHotkeyRefreshDrives")
+    static let filmCanDriveListChanged = Notification.Name("FilmCanDriveListChanged")
 }

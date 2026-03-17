@@ -59,7 +59,11 @@ actor FileStreamCopier {
 
         let destDir = (destination as NSString).deletingLastPathComponent
         if !fm.fileExists(atPath: destDir) {
-            try fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+            do {
+                try fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+            } catch {
+                throw FileCopyError.destinationNotWritable(destDir)
+            }
         }
 
         guard let sourceHandle = FileHandle(forReadingAtPath: source) else {
@@ -67,7 +71,9 @@ actor FileStreamCopier {
         }
         defer { try? sourceHandle.close() }
 
-        fm.createFile(atPath: destination, contents: nil)
+        if !fm.createFile(atPath: destination, contents: nil) {
+            throw FileCopyError.destinationNotWritable(destination)
+        }
         guard let destHandle = FileHandle(forWritingAtPath: destination) else {
             throw FileCopyError.destinationNotWritable(destination)
         }
@@ -136,7 +142,7 @@ actor FileStreamCopier {
                 }
                 
                 totalBytes += Int64(data.count)
-                if isExFAT {
+                if hashDuringCopy && isExFAT {
                     bytesSinceSync += Int64(data.count)
                     if bytesSinceSync >= exfatSyncInterval {
                         try? destHandle.synchronize()
@@ -163,13 +169,17 @@ actor FileStreamCopier {
         }
         
         // Ensure file is fully written
-        if isExFAT {
-            if bytesSinceSync > 0 {
+        if hashDuringCopy {
+            if isExFAT {
+                if bytesSinceSync > 0 {
+                    try? destHandle.synchronize()
+                }
+                try? destHandle.close()
+            } else {
                 try? destHandle.synchronize()
+                try? destHandle.close()
             }
-            try? destHandle.close()
         } else {
-            try? destHandle.synchronize()
             try? destHandle.close()
         }
         didCloseDestHandle = true

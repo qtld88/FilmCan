@@ -28,24 +28,103 @@ struct MainView: View {
     @AppStorage("appearanceTextHex") private var appearanceTextHex: String = AppearanceDefaults.textHex
     
     var body: some View {
-        HStack(spacing: 0) {
-            if let configId = appState.selectedConfigId,
-               let config = appState.storage.configurations.first(where: { $0.id == configId }) {
-                BackupEditorView(
-                    config: config,
-                    transferViewModel: transferViewModel,
-                    isHistoryVisible: showHistoryPanel,
-                    onToggleHistory: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showHistoryPanel.toggle()
+        decoratedContent
+            .onAppear {
+                if !didShowQuickTour {
+                    startTour()
+                }
+                registerDriveObservers()
+                scheduleDonationPromptCheck()
+            }
+            .onReceive(Timer.publish(every: 6, on: .main, in: .common).autoconnect()) { _ in
+                NotificationCenter.default.post(name: .filmCanDriveListChanged, object: nil)
+            }
+            .onChange(of: canAdvanceTourStep) { completed in
+                if showQuickTour && completed && !lastTourCanAdvance && currentTourStep.requirement != .none {
+                    if currentTourStep.autoAdvance {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            advanceTour(by: 1)
                         }
                     }
-                )
-                    .id(config.id)
-            } else {
-                emptyStateView
+                }
+                lastTourCanAdvance = completed
             }
+            .onChange(of: quickTourIndex) { _ in
+                lastTourCanAdvance = canAdvanceTourStep
+                updateTourSideEffects()
+            }
+            .onChange(of: showQuickTour) { _ in
+                lastTourCanAdvance = canAdvanceTourStep
+                updateTourSideEffects()
+                if !showQuickTour && pendingDonationPromptCheck {
+                    pendingDonationPromptCheck = false
+                    evaluateDonationPrompt()
+                }
+            }
+            .onChange(of: storage.configurations) { _ in
+                guard showQuickTour, currentTourStep.requirement == .createdBackup else { return }
+                if canAdvanceTourStep {
+                    advanceTour(by: 1)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .filmCanRestartTour)) { _ in
+                didShowQuickTour = false
+                startTour()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .filmCanTourNameConfirmed)) { _ in
+                guard showQuickTour, currentTourStep.requirement == .renamedBackup else { return }
+                let name = selectedConfig?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                quickTourNameConfirmed = !name.isEmpty
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .filmCanTourNameSubmitted)) { _ in
+                guard showQuickTour, currentTourStep.requirement == .renamedBackup else { return }
+                let name = selectedConfig?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !name.isEmpty else { return }
+                quickTourNameConfirmed = true
+                advanceTour(by: 1)
+            }
+            .sheet(isPresented: $showDonationPrompt, onDismiss: {
+                recordDonationSkipIfNeeded()
+            }) {
+                DonationPromptView(
+                    transferCount: donationPromptTransferCount,
+                    onSkip: handleDonationSkip,
+                    onDonated: handleDonationDonated
+                )
+            }
+    }
 
+    private var baseContent: some View {
+        mainContent
+            .background(FilmCanTheme.backgroundGradient)
+            .background(WindowTitleSetter(title: ""))
+    }
+
+    private var insetContent: some View {
+        baseContent.safeAreaInset(edge: .top, spacing: 0) {
+            topBar
+        }
+    }
+
+    private var overlayContent: some View {
+        insetContent
+            .coordinateSpace(name: TourCoordinateSpace.name)
+            .overlayPreferenceValue(TourAnchorPreferenceKey.self) { anchors in
+                quickTourOverlay(anchors: anchors)
+            }
+    }
+
+    private var decoratedContent: some View {
+        overlayContent
+            .accentColor(FilmCanTheme.brandYellow)
+            .textSelection(.enabled)
+            .id(appearanceSignature)
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
+        HStack(spacing: 0) {
+            editorPanel
             if showHistoryPanel {
                 Divider()
                     .ignoresSafeArea()
@@ -55,108 +134,62 @@ struct MainView: View {
                     .tourAnchor("historyPanel")
             }
         }
-        .background(FilmCanTheme.backgroundGradient)
-        .background(WindowTitleSetter(title: ""))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: 20) {
-                BackupListView(
-                    viewModel: listViewModel,
-                    transferViewModel: transferViewModel,
-                    appState: appState,
-                    trailingInset: 0
-                )
+    }
 
-                historyButton
-                    .padding(.trailing, 8)
-            }
-            .frame(height: 44)
-            .background(FilmCanTheme.sidebar)
-            .overlay(alignment: .bottom) {
-                Divider()
-                    .background(FilmCanTheme.cardStroke)
-            }
-        }
-        .coordinateSpace(name: TourCoordinateSpace.name)
-        .overlayPreferenceValue(TourAnchorPreferenceKey.self) { anchors in
-            if showQuickTour {
-                QuickTourView(
-                    isPresented: $showQuickTour,
-                    didShowTour: $didShowQuickTour,
-                    steps: QuickTourStep.defaultSteps,
-                    currentIndex: quickTourIndex,
-                    canAdvance: canAdvanceTourStep,
-                    anchors: anchors,
-                    onBack: { advanceTour(by: -1) },
-                    onNext: { advanceTour(by: 1) },
-                    onDone: finishTour,
-                    onSkip: { showQuickTour = false }
-                )
-            }
-        }
-        .accentColor(FilmCanTheme.brandYellow)
-        .textSelection(.enabled)
-        .id(appearanceSignature)
-        .onAppear {
-            if !didShowQuickTour {
-                startTour()
-            }
-            registerDriveObservers()
-            scheduleDonationPromptCheck()
-        }
-        .onReceive(Timer.publish(every: 6, on: .main, in: .common).autoconnect()) { _ in
-            NotificationCenter.default.post(name: .filmCanDriveListChanged, object: nil)
-        }
-        .onChange(of: canAdvanceTourStep) { completed in
-            if showQuickTour && completed && !lastTourCanAdvance && currentTourStep.requirement != .none {
-                if currentTourStep.autoAdvance {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        advanceTour(by: 1)
+    @ViewBuilder
+    private var editorPanel: some View {
+        if let configId = appState.selectedConfigId,
+           let config = appState.storage.configurations.first(where: { $0.id == configId }) {
+            BackupEditorView(
+                config: config,
+                transferViewModel: transferViewModel,
+                isHistoryVisible: showHistoryPanel,
+                onToggleHistory: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showHistoryPanel.toggle()
                     }
                 }
-            }
-            lastTourCanAdvance = completed
+            )
+            .id(config.id)
+        } else {
+            emptyStateView
         }
-        .onChange(of: quickTourIndex) { _ in
-            lastTourCanAdvance = canAdvanceTourStep
-            updateTourSideEffects()
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 20) {
+            BackupListView(
+                viewModel: listViewModel,
+                transferViewModel: transferViewModel,
+                appState: appState,
+                trailingInset: 0
+            )
+
+            historyButton
+                .padding(.trailing, 8)
         }
-        .onChange(of: showQuickTour) { _ in
-            lastTourCanAdvance = canAdvanceTourStep
-            updateTourSideEffects()
-            if !showQuickTour && pendingDonationPromptCheck {
-                pendingDonationPromptCheck = false
-                evaluateDonationPrompt()
-            }
+        .frame(height: 44)
+        .background(FilmCanTheme.sidebar)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .background(FilmCanTheme.cardStroke)
         }
-        .onChange(of: storage.configurations) { _ in
-            guard showQuickTour, currentTourStep.requirement == .createdBackup else { return }
-            if canAdvanceTourStep {
-                advanceTour(by: 1)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .filmCanRestartTour)) { _ in
-            didShowQuickTour = false
-            startTour()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .filmCanTourNameConfirmed)) { _ in
-            guard showQuickTour, currentTourStep.requirement == .renamedBackup else { return }
-            let name = selectedConfig?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            quickTourNameConfirmed = !name.isEmpty
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .filmCanTourNameSubmitted)) { _ in
-            guard showQuickTour, currentTourStep.requirement == .renamedBackup else { return }
-            let name = selectedConfig?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !name.isEmpty else { return }
-            quickTourNameConfirmed = true
-            advanceTour(by: 1)
-        }
-        .sheet(isPresented: $showDonationPrompt, onDismiss: {
-            recordDonationSkipIfNeeded()
-        }) {
-            DonationPromptView(
-                transferCount: donationPromptTransferCount,
-                onSkip: handleDonationSkip,
-                onDonated: handleDonationDonated
+    }
+
+    @ViewBuilder
+    private func quickTourOverlay(anchors: [String: CGRect]) -> some View {
+        if showQuickTour {
+            QuickTourView(
+                isPresented: $showQuickTour,
+                didShowTour: $didShowQuickTour,
+                steps: QuickTourStep.defaultSteps,
+                currentIndex: quickTourIndex,
+                canAdvance: canAdvanceTourStep,
+                anchors: anchors,
+                onBack: { advanceTour(by: -1) },
+                onNext: { advanceTour(by: 1) },
+                onDone: finishTour,
+                onSkip: { showQuickTour = false }
             )
         }
     }

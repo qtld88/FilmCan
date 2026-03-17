@@ -56,6 +56,8 @@ Result:
 | **Verify using hash list** | Compare to existing hash list before writing |
 | **Ask** | Prompt every time |
 
+**Note:** Hash lists are created only when **Hash verification** is enabled (FilmCan Engine) or when rsync verification is enabled.
+
 ---
 
 ## Custom Day Boundary

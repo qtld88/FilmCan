@@ -17,6 +17,7 @@ struct RsyncOptions: Codable, Equatable {
     var customArgs: String = ""           // Additional custom arguments
     var fileOrdering: FileOrdering = .defaultOrder
     var parallelCopyEnabled: Bool = true  // FilmCan Engine: allow parallel file copy
+    var customVerifyEnabled: Bool = true  // FilmCan Engine: verify with hashes during copy
 
     private static let defaultExcludedRootDirectories: [String] = [
         ".Trashes",
