@@ -1,0 +1,133 @@
+name: FilmCan
+options:
+  bundleIdPrefix: com.filmcan
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    ARCHS: "arm64 x86_64"
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    PRODUCT_NAME: FilmCan
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ONLY_ACTIVE_ARCH: "NO"
+
+targets:
+  FilmCan:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    preBuildScripts:
+      - name: Embed rsync
+        script: |
+          REQUIRED_VERSION="3.4.0"
+
+          find_rsync() {
+            local path="$1"
+            local arch="$2"
+            if [ -x "$path" ] && lipo -archs "$path" | grep -q "$arch"; then
+              echo "$path"
+            fi
+          }
+
+          check_version() {
+            local path="$1"
+            local label="$2"
+            local version
+            version="$("$path" --version | head -n 1 | awk '{print $3}')"
+            if [ -z "$version" ]; then
+              echo "warning: Unable to determine rsync version for $label. Bundle will proceed, but features like xxh128 may be unavailable."
+              return
+            fi
+            local min_ok
+            min_ok="$(printf '%s\n' "$REQUIRED_VERSION" "$version" | sort -V | head -n 1)"
+            if [ "$min_ok" != "$REQUIRED_VERSION" ]; then
+              if [ "$CONFIGURATION" = "Release" ]; then
+                echo "error: rsync $version ($label) found. FilmCan requires rsync $REQUIRED_VERSION+ for xxh128/checksum-choice. Update Homebrew rsync."
+                exit 1
+              fi
+              echo "warning: rsync $version ($label) found. FilmCan requires rsync $REQUIRED_VERSION+ for xxh128/checksum-choice."
+            fi
+          }
+
+          RSYNC_ARM64=""
+          if [ -n "${RSYNC_ARM64_PATH:-}" ] && [ -x "$RSYNC_ARM64_PATH" ]; then
+            RSYNC_ARM64="$RSYNC_ARM64_PATH"
+          else
+            RSYNC_ARM64="$(find_rsync "/opt/homebrew/bin/rsync" "arm64")"
+          fi
+
+          RSYNC_X86_64=""
+          if [ -n "${RSYNC_X86_64_PATH:-}" ] && [ -x "$RSYNC_X86_64_PATH" ]; then
+            RSYNC_X86_64="$RSYNC_X86_64_PATH"
+          else
+            RSYNC_X86_64="$(find_rsync "/usr/local/bin/rsync" "x86_64")"
+          fi
+
+          if [ -z "$RSYNC_ARM64" ] || [ -z "$RSYNC_X86_64" ]; then
+            if [ "$CONFIGURATION" = "Release" ]; then
+              echo "error: Both arm64 and x86_64 Homebrew rsync are required to bundle universal rsync."
+              echo "       Set RSYNC_ARM64_PATH and RSYNC_X86_64_PATH to custom binaries if needed."
+              exit 1
+            fi
+            echo "warning: Missing arm64 or x86_64 rsync. Bundle will include only the available architecture."
+          fi
+
+          if [ -n "$RSYNC_ARM64" ]; then
+            check_version "$RSYNC_ARM64" "arm64"
+          fi
+          if [ -n "$RSYNC_X86_64" ]; then
+            check_version "$RSYNC_X86_64" "x86_64"
+          fi
+
+          RSYNC_DEST_DIR="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync"
+          mkdir -p "$RSYNC_DEST_DIR"
+          bundle_deps() {
+            local rsync_path="$1"
+            local arch="$2"
+            local rsync_dest="$RSYNC_DEST_DIR/rsync-$arch"
+            local lib_dir="$RSYNC_DEST_DIR/lib/$arch"
+            mkdir -p "$lib_dir"
+            cp "$rsync_path" "$rsync_dest"
+            chmod +x "$rsync_dest"
+
+            local libs
+            libs="$(otool -L "$rsync_path" | awk 'NR>1 {print $1}' | grep -v '^/usr/lib/' | grep -v '^/System/Library/')"
+            for lib in $libs; do
+              local base
+              base="$(basename "$lib")"
+              cp "$lib" "$lib_dir/$base"
+              chmod +x "$lib_dir/$base"
+              install_name_tool -change "$lib" "@loader_path/lib/$arch/$base" "$rsync_dest"
+            done
+          }
+
+          if [ -n "$RSYNC_ARM64" ]; then
+            bundle_deps "$RSYNC_ARM64" "arm64"
+          fi
+          if [ -n "$RSYNC_X86_64" ]; then
+            bundle_deps "$RSYNC_X86_64" "x86_64"
+          fi
+        outputFiles:
+          - ${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync/rsync-arm64
+          - ${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync/rsync-x86_64
+    settings:
+      base:
+        INFOPLIST_FILE: Sources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.filmcan.app
+        COMBINE_HIDPI_IMAGES: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: NO
+    entitlements:
+      path: Sources/FilmCan.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.files.user-selected.read-write: true
