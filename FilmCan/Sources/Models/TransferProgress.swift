@@ -61,6 +61,7 @@ class TransferProgress: ObservableObject {
 
     // Current file being transferred, and log of completed ones (newest first, capped at 50)
     @Published var currentFile: String = ""
+    @Published var currentTask: String = ""
     @Published var completedFiles: [String] = []
 
     // Error tracking

@@ -120,3 +120,67 @@ extension Notification.Name {
     static let filmCanHotkeyRefreshDrives = Notification.Name("FilmCanHotkeyRefreshDrives")
     static let filmCanDriveListChanged = Notification.Name("FilmCanDriveListChanged")
 }
+
+// MARK: - TransferProgress + fan-out
+
+extension TransferProgress {
+    func incorporate(_ dest: DestProgress) {
+        totalBytes = max(totalBytes, dest.bytesTotal)
+        bytesCompleted += dest.bytesCompleted
+        filesTotal = max(filesTotal, dest.filesTotal)
+        filesCompleted += dest.filesCompleted
+        // Track worst status
+        switch dest.status {
+        case .pending: if currentTask.isEmpty { currentTask = dest.displayName }
+        case .active: currentTask = dest.displayName
+        case .complete: break
+        case .failed: currentTask = "⚠ \(dest.displayName)"
+        }
+    }
+}
+
+// MARK: - DestProgress + DestResult extensions
+
+extension DestProgress {
+    var isActive: Bool {
+        if case .active = status { return true }
+        return false
+    }
+
+    var isComplete: Bool {
+        if case .complete = status { return true }
+        return false
+    }
+
+    var isFailed: Bool {
+        if case .failed = status { return true }
+        return false
+    }
+
+    var progressFraction: Double {
+        guard bytesTotal > 0 else { return 0 }
+        return min(Double(bytesCompleted) / Double(bytesTotal), 1.0)
+    }
+
+    var speedFormatted: String {
+        if speedBytesPerSecond >= 1_000_000_000 {
+            return String(format: "%.1f GB/s", speedBytesPerSecond / 1_000_000_000)
+        } else if speedBytesPerSecond >= 1_000_000 {
+            return String(format: "%.1f MB/s", speedBytesPerSecond / 1_000_000)
+        } else if speedBytesPerSecond >= 1_000 {
+            return String(format: "%.1f KB/s", speedBytesPerSecond / 1_000)
+        } else {
+            return "\(Int(speedBytesPerSecond)) B/s"
+        }
+    }
+}
+
+extension DestResult {
+    var isError: Bool { !success }
+    var errorMessage: String { failureReason?.displayMessage ?? "OK" }
+    var summaryLine: String {
+        let status = success ? "✓" : "✗"
+        let bytes = ByteCountFormatter.string(fromByteCount: bytesTransferred, countStyle: .file)
+        return "\(status) \(displayName): \(bytes) in \(String(format: "%.1f", durationSec))s"
+    }
+}
