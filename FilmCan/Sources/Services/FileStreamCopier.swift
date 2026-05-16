@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct FileCopyResult {
     let sourcePath: String
@@ -41,6 +42,29 @@ actor FileStreamCopier {
     private let exfatBufferSize = 4 * 1024 * 1024
     private let exfatSyncInterval: Int64 = 32 * 1024 * 1024
     private var exfatCache: [String: Bool] = [:]
+    var requiresFullFsync: Bool = false
+    var chunkSizeOverride: Int? = nil
+
+    private var chunkSize: Int {
+        chunkSizeOverride ?? defaultBufferSize
+    }
+
+    private func enableNoCache(handle: FileHandle, path: String) {
+        let fd = handle.fileDescriptor
+        let ret = fcntl(fd, F_NOCACHE, 1)
+        if ret == -1 {
+            // F_NOCACHE not supported by this filesystem — best-effort, skip
+        }
+    }
+
+    private func fullFsyncIfNeeded(destHandle: FileHandle, destPath: String) throws {
+        guard requiresFullFsync else { return }
+        let fd = destHandle.fileDescriptor
+        let ret = fcntl(fd, F_FULLFSYNC)
+        if ret == -1 {
+            fsync(fd)
+        }
+    }
 
     /// Copy file with source hashing, return immediately without verifying destination
     /// Call computeFileHash() later to check destination hash
@@ -70,6 +94,7 @@ actor FileStreamCopier {
             throw FileCopyError.sourceNotReadable(source)
         }
         defer { try? sourceHandle.close() }
+        enableNoCache(handle: sourceHandle, path: source)
 
         if !fm.createFile(atPath: destination, contents: nil) {
             throw FileCopyError.destinationNotWritable(destination)
@@ -83,6 +108,7 @@ actor FileStreamCopier {
                 try? destHandle.close()
             }
         }
+        enableNoCache(handle: destHandle, path: destination)
 
         var sourceHasher: StreamingHasher? = nil
         if hashDuringCopy {
@@ -97,7 +123,7 @@ actor FileStreamCopier {
         let isExFAT = isExFATFilesystem(path: destination)
         // Handle empty files explicitly
         let sourceSize = Int64((try? fm.attributesOfItem(atPath: source)[.size] as? NSNumber)?.int64Value ?? 0)
-        let bufferSize = isExFAT ? exfatBufferSize : defaultBufferSize
+        let bufferSize = chunkSizeOverride ?? (isExFAT ? exfatBufferSize : defaultBufferSize)
         if sourceSize == 0 {
             let emptyHash: Data? = hashDuringCopy ? sourceHasher?.finalize() : nil
             try? copyFileAttributes(from: source, to: destination)
@@ -160,6 +186,8 @@ actor FileStreamCopier {
                 break
             }
         }
+
+        try fullFsyncIfNeeded(destHandle: destHandle, destPath: destination)
 
         let sourceHash: Data?
         if let hasher = sourceHasher {
