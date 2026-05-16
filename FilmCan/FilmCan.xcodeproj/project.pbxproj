@@ -66,6 +66,7 @@
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
 		C9BB15A21E833EA6850E5D34 /* BackupEditorView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */; };
 		CBCCDFAEC8E315B3158B8ED8 /* HashListBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2147830DD49FC39B828D61 /* HashListBuilder.swift */; };
+		CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */; };
 		CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */; };
 		CF26D25B0D58A7227FCA5275 /* HashListWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493E9CCA8A02D3E16ADEB97C /* HashListWriter.swift */; };
 		D253DFE921F577B38B44CF23 /* FileStreamCopier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */; };
@@ -121,6 +122,7 @@
 		40E6C2BF26C154734D9112D1 /* FileOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOrdering.swift; sourceTree = "<group>"; };
 		43A1BB108A96290E666D66D7 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
 		4614DA736DD0AF7010D27E51 /* FilmCanTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanTheme.swift; sourceTree = "<group>"; };
+		4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSpeedProbe.swift; sourceTree = "<group>"; };
 		493E9CCA8A02D3E16ADEB97C /* HashListWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListWriter.swift; sourceTree = "<group>"; };
 		4E3097772416FE89A21C7E62 /* RsyncOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RsyncOptions.swift; sourceTree = "<group>"; };
 		51F3544361F9AB588C49995D /* FolderPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickerSheet.swift; sourceTree = "<group>"; };
@@ -220,6 +222,7 @@
 				CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */,
 				205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */,
 				A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */,
+				4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */,
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
 				F40F951445F8238F0B740353 /* PreviewCalculator.swift */,
 				B06EB2AD3767834B698BF542 /* RsyncService.swift */,
@@ -549,6 +552,7 @@
 				B367BE269DB7059A5820B67D /* LogFolderNamer.swift in Sources */,
 				9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */,
 				A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */,
+				CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */,
 				017252CB409DF5109BFB09CA /* NotificationService.swift in Sources */,
 				5479C010F2A311E752679B2F /* OrganizationPreset.swift in Sources */,
 				B554D2819BD859BE97459AB4 /* OrganizationSettingsView.swift in Sources */,
