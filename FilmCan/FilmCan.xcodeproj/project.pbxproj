@@ -29,9 +29,11 @@
 		3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EDF10844CC898228982672 /* DuplicatePrompt.swift */; };
 		40FA5D85515E21FADAFE1D60 /* QuickTourView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D862BDFCB070BBF317B5C2 /* QuickTourView.swift */; };
 		489356ED8541D3AF5C041185 /* MHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A38DB3B25239F8094E5EFC /* MHLWriter.swift */; };
+		4E3F4192B4F29DD714EC6682 /* DestWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2314F69E3FD8DCE91282F1FA /* DestWriter.swift */; };
 		539707B5A95FBD91D26F1E41 /* FilmCanTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4614DA736DD0AF7010D27E51 /* FilmCanTheme.swift */; };
 		541F1E7A97B9DAC792BC5912 /* BackupEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */; };
 		5479C010F2A311E752679B2F /* OrganizationPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D90641C9B9019E8312A23E /* OrganizationPreset.swift */; };
+		5510B5B1330752EBEEB968E6 /* OrphanCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */; };
 		57BA4BC4B86BCAE146F33A32 /* DestinationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1EF3014920FF86C66BBDA1F /* DestinationListView.swift */; };
 		58B0C02F251AA3212196E62C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3536A61B485A79461038B1C /* Constants.swift */; };
 		5DECD6CD2594574259237074 /* CustomCopierSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */; };
@@ -122,6 +124,7 @@
 		1D28EDE431F28873920B2B30 /* OrganizationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationSettingsView.swift; sourceTree = "<group>"; };
 		1D33906FE8BD0F1A2C8192DF /* FilmCan.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FilmCan.entitlements; sourceTree = "<group>"; };
 		205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifier.swift; sourceTree = "<group>"; };
+		2314F69E3FD8DCE91282F1FA /* DestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestWriter.swift; sourceTree = "<group>"; };
 		297A6705D2E34EA8E454FB3B /* TransferProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferProgress.swift; sourceTree = "<group>"; };
 		2BABC9B93BCC84A6687D8C17 /* DriveUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveUtilities.swift; sourceTree = "<group>"; };
 		2F67DC91E4B3EC90EB8F6AFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -148,6 +151,7 @@
 		6D21EBB57C39AFD5E1C83811 /* MHLReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLReaderTests.swift; sourceTree = "<group>"; };
 		73C4305DE01CFC043DF8C21A /* TransferResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferResult.swift; sourceTree = "<group>"; };
 		73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstantsTests.swift; sourceTree = "<group>"; };
+		7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrphanCleaner.swift; sourceTree = "<group>"; };
 		76EDF10844CC898228982672 /* DuplicatePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePrompt.swift; sourceTree = "<group>"; };
 		78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationTemplate.swift; sourceTree = "<group>"; };
 		79A38DB3B25239F8094E5EFC /* MHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLWriter.swift; sourceTree = "<group>"; };
@@ -233,12 +237,14 @@
 				64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */,
 				FEAB41177986B7BBED498656 /* CustomCopierService.swift */,
 				CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */,
+				2314F69E3FD8DCE91282F1FA /* DestWriter.swift */,
 				205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */,
 				A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */,
 				D4123D4442C95453ADA7A942 /* MHLReader.swift */,
 				79A38DB3B25239F8094E5EFC /* MHLWriter.swift */,
 				4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */,
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
+				7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */,
 				F40F951445F8238F0B740353 /* PreviewCalculator.swift */,
 				B06EB2AD3767834B698BF542 /* RsyncService.swift */,
 				EA563679AEE01B0FF5D12CB7 /* TransferService.swift */,
@@ -546,6 +552,7 @@
 				F815188F2A0AC030BBEF3C0D /* DestProgress.swift in Sources */,
 				D7A83CF121B3D61390AF5391 /* DestResult.swift in Sources */,
 				AB7A8CF9DC4FAA379BE7064B /* DestStatus.swift in Sources */,
+				4E3F4192B4F29DD714EC6682 /* DestWriter.swift in Sources */,
 				57BA4BC4B86BCAE146F33A32 /* DestinationListView.swift in Sources */,
 				0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */,
 				94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */,
@@ -582,6 +589,7 @@
 				B554D2819BD859BE97459AB4 /* OrganizationSettingsView.swift in Sources */,
 				E3339064DFC685E6CCD9EABF /* OrganizationSheet.swift in Sources */,
 				F2AE780EA1EC53701F50D3C7 /* OrganizationTemplate.swift in Sources */,
+				5510B5B1330752EBEEB968E6 /* OrphanCleaner.swift in Sources */,
 				712C89C119B957716D4B9AEB /* PreviewCalculator.swift in Sources */,
 				BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */,
 				40FA5D85515E21FADAFE1D60 /* QuickTourView.swift in Sources */,

@@ -20,6 +20,7 @@ enum FileCopyError: LocalizedError {
     case copyFailed(String)
     case verificationFailed(String)
     case cancelled
+    case readFailed
 
     var errorDescription: String? {
         switch self {
@@ -33,6 +34,8 @@ enum FileCopyError: LocalizedError {
             return "Verification failed: \(path)"
         case .cancelled:
             return "Copy cancelled"
+        case .readFailed:
+            return "Failed to read from file"
         }
     }
 }
@@ -44,6 +47,11 @@ actor FileStreamCopier {
     private var exfatCache: [String: Bool] = [:]
     var requiresFullFsync: Bool = false
     var chunkSizeOverride: Int? = nil
+
+    func configure(requiresFullFsync: Bool, chunkSizeOverride: Int?) {
+        self.requiresFullFsync = requiresFullFsync
+        self.chunkSizeOverride = chunkSizeOverride
+    }
 
     private var chunkSize: Int {
         chunkSizeOverride ?? defaultBufferSize

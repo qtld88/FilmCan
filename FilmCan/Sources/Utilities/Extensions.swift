@@ -31,7 +31,7 @@ extension Data {
     }
 
     var hexString: String {
-        map { String(format: "%02x", $0) }.joined()
+        map { String(format: "%02hhx", $0) }.joined()
     }
 }
 
@@ -90,6 +90,23 @@ enum FilmCanPaths {
 
     static func isHidden(_ path: String) -> Bool {
         path.contains("/\(hidden)/")
+    }
+}
+
+extension FileHandle {
+    func readUpToLengthOrThrow(_ length: Int) throws -> Data {
+        if #available(macOS 10.15.4, *) {
+            guard let data = try self.read(upToCount: length) else {
+                throw FileCopyError.readFailed
+            }
+            return data
+        } else {
+            let data = self.readData(ofLength: length)
+            if data.isEmpty {
+                throw FileCopyError.readFailed
+            }
+            return data
+        }
     }
 }
 
