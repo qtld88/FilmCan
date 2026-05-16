@@ -122,6 +122,11 @@ actor FanOutCopier {
 
             let sourceHash = sourceHasher.finalize().hexString
 
+            // Append to MHL writer
+            if let mhlWriter = mhlWriter {
+                try await mhlWriter.append(hash: sourceHash, fileName: sourceName)
+            }
+
             // For each destination: write file, produce result
             for dest in config.destinations {
                 let destPath = (dest.destPath as NSString).appendingPathComponent(sourceName)
