@@ -145,3 +145,6 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/FilmCan.app/Contents/MacOS/FilmCan"
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "13.0"
+        INFOPLIST_FILE: Tests/Info.plist
+        PRODUCT_MODULE_NAME: FilmCanTests
+        SWIFT_INSTALL_OBJC_HEADER: NO

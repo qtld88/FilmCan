@@ -1,6 +1,6 @@
 import Foundation
 
-struct RsyncOptions: Codable, Equatable {
+struct RsyncOptions: Equatable {
     var copyEngine: CopyEngine = .rsync
     var useChecksum: Bool = false         // -c flag
     var verbose: Bool = true               // -v
@@ -18,6 +18,7 @@ struct RsyncOptions: Codable, Equatable {
     var fileOrdering: FileOrdering = .defaultOrder
     var parallelCopyEnabled: Bool = true  // FilmCan Engine: allow parallel file copy
     var customVerifyEnabled: Bool = true  // FilmCan Engine: verify with hashes during copy
+    var verificationMode: VerifyMode = .paranoid
 
     private static let defaultExcludedRootDirectories: [String] = [
         ".Trashes",
@@ -92,5 +93,60 @@ struct RsyncOptions: Codable, Equatable {
             return cleaned.split(whereSeparator: \.isWhitespace).map(String.init)
         }
         return raw.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+}
+
+extension RsyncOptions: Codable {
+    enum CodingKeys: String, CodingKey {
+        case copyEngine, useChecksum, verbose, showProgress, showStats, humanReadable
+        case delete, inplace, postVerify, onlyCopyChanged, useHashListPrecheck
+        case reuseOrganizedFiles, allowResume, customArgs, fileOrdering
+        case parallelCopyEnabled, customVerifyEnabled, verificationMode
+    }
+
+    // Memberwise init is synthesized by Swift — no explicit declaration needed.
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        copyEngine = try c.decodeIfPresent(CopyEngine.self, forKey: .copyEngine) ?? .rsync
+        useChecksum = try c.decodeIfPresent(Bool.self, forKey: .useChecksum) ?? false
+        verbose = try c.decodeIfPresent(Bool.self, forKey: .verbose) ?? true
+        showProgress = try c.decodeIfPresent(Bool.self, forKey: .showProgress) ?? true
+        showStats = try c.decodeIfPresent(Bool.self, forKey: .showStats) ?? true
+        humanReadable = try c.decodeIfPresent(Bool.self, forKey: .humanReadable) ?? true
+        delete = try c.decodeIfPresent(Bool.self, forKey: .delete) ?? false
+        inplace = try c.decodeIfPresent(Bool.self, forKey: .inplace) ?? false
+        postVerify = try c.decodeIfPresent(Bool.self, forKey: .postVerify) ?? true
+        onlyCopyChanged = try c.decodeIfPresent(Bool.self, forKey: .onlyCopyChanged) ?? true
+        useHashListPrecheck = try c.decodeIfPresent(Bool.self, forKey: .useHashListPrecheck) ?? false
+        reuseOrganizedFiles = try c.decodeIfPresent(Bool.self, forKey: .reuseOrganizedFiles) ?? false
+        allowResume = try c.decodeIfPresent(Bool.self, forKey: .allowResume) ?? true
+        customArgs = try c.decodeIfPresent(String.self, forKey: .customArgs) ?? ""
+        fileOrdering = try c.decodeIfPresent(FileOrdering.self, forKey: .fileOrdering) ?? .defaultOrder
+        parallelCopyEnabled = try c.decodeIfPresent(Bool.self, forKey: .parallelCopyEnabled) ?? true
+        customVerifyEnabled = try c.decodeIfPresent(Bool.self, forKey: .customVerifyEnabled) ?? true
+        verificationMode = try c.decodeIfPresent(VerifyMode.self, forKey: .verificationMode) ?? .paranoid
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(copyEngine, forKey: .copyEngine)
+        try c.encode(useChecksum, forKey: .useChecksum)
+        try c.encode(verbose, forKey: .verbose)
+        try c.encode(showProgress, forKey: .showProgress)
+        try c.encode(showStats, forKey: .showStats)
+        try c.encode(humanReadable, forKey: .humanReadable)
+        try c.encode(delete, forKey: .delete)
+        try c.encode(inplace, forKey: .inplace)
+        try c.encode(postVerify, forKey: .postVerify)
+        try c.encode(onlyCopyChanged, forKey: .onlyCopyChanged)
+        try c.encode(useHashListPrecheck, forKey: .useHashListPrecheck)
+        try c.encode(reuseOrganizedFiles, forKey: .reuseOrganizedFiles)
+        try c.encode(allowResume, forKey: .allowResume)
+        try c.encode(customArgs, forKey: .customArgs)
+        try c.encode(fileOrdering, forKey: .fileOrdering)
+        try c.encode(parallelCopyEnabled, forKey: .parallelCopyEnabled)
+        try c.encode(customVerifyEnabled, forKey: .customVerifyEnabled)
+        try c.encode(verificationMode, forKey: .verificationMode)
     }
 }
