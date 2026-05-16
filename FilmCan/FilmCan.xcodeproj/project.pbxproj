@@ -53,6 +53,7 @@
 		A130CD37D34920402619C20C /* TransferHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4C9259A7AF9ACBC20B9852 /* TransferHistoryView.swift */; };
 		A21DBD43D194DFEB77A0DC78 /* TransferViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13D3F43F96E0A035C1266F8F /* TransferViewModel.swift */; };
 		A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6DAECC7717B5F2550472F23 /* MainView.swift */; };
+		A630CD6871F678915F92AC17 /* DriveSpeedClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */; };
 		AB7A8CF9DC4FAA379BE7064B /* DestStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C58BD6BBAE45AB2BED7FDAA /* DestStatus.swift */; };
 		ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE87AE92E6D0FD2C5F1566BA /* TitlebarAccessory.swift */; };
 		ADE31DDEE0B65D6199D89613 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EB91D5AC324DFAEC3E376F /* SettingsView.swift */; };
@@ -82,6 +83,7 @@
 		EB135DDE8A17EF04263A2AB2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D1A5B5BDD573D20E4EF6A03 /* AppState.swift */; };
 		EC5874CE48288D04FD140DD1 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8EAD261337C6BEE4032A23E /* DebugLog.swift */; };
 		F2AE780EA1EC53701F50D3C7 /* OrganizationTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */; };
+		F2E0833957D8398B94F490D7 /* DriveSpeedClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */; };
 		F815188F2A0AC030BBEF3C0D /* DestProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25CADDC1BE66072D93ADFD6 /* DestProgress.swift */; };
 		FA5BA2A86E85CD12D7EFE614 /* UIStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB457DCE07BC5C884750E430 /* UIStrings.swift */; };
 		FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */; };
@@ -110,6 +112,7 @@
 		1C05BF20EEBC1E7CC7DB8795 /* XXHash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XXHash.swift; sourceTree = "<group>"; };
 		1D28EDE431F28873920B2B30 /* OrganizationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationSettingsView.swift; sourceTree = "<group>"; };
 		1D33906FE8BD0F1A2C8192DF /* FilmCan.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FilmCan.entitlements; sourceTree = "<group>"; };
+		205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifier.swift; sourceTree = "<group>"; };
 		297A6705D2E34EA8E454FB3B /* TransferProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferProgress.swift; sourceTree = "<group>"; };
 		2BABC9B93BCC84A6687D8C17 /* DriveUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveUtilities.swift; sourceTree = "<group>"; };
 		2F67DC91E4B3EC90EB8F6AFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -137,6 +140,7 @@
 		76EDF10844CC898228982672 /* DuplicatePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePrompt.swift; sourceTree = "<group>"; };
 		78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationTemplate.swift; sourceTree = "<group>"; };
 		7C2B80B5C43ED6BC09ECCACC /* EngineHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineHelpSheet.swift; sourceTree = "<group>"; };
+		7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifierTests.swift; sourceTree = "<group>"; };
 		867AFB25988C222B6A24039C /* PreviewInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewInfo.swift; sourceTree = "<group>"; };
 		8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListNamer.swift; sourceTree = "<group>"; };
 		93EB91D5AC324DFAEC3E376F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -214,6 +218,7 @@
 				64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */,
 				FEAB41177986B7BBED498656 /* CustomCopierService.swift */,
 				CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */,
+				205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */,
 				A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */,
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
 				F40F951445F8238F0B740353 /* PreviewCalculator.swift */,
@@ -256,6 +261,7 @@
 			isa = PBXGroup;
 			children = (
 				73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */,
+				7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */,
 				E47CF7DDB3A7E4B996579E0F /* Info.plist */,
 				F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */,
 			);
@@ -487,6 +493,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */,
+				F2E0833957D8398B94F490D7 /* DriveSpeedClassifierTests.swift in Sources */,
 				6A1495C244606EC2E72C29E9 /* TransferProgressTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -517,6 +524,7 @@
 				57BA4BC4B86BCAE146F33A32 /* DestinationListView.swift in Sources */,
 				0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */,
 				94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */,
+				A630CD6871F678915F92AC17 /* DriveSpeedClassifier.swift in Sources */,
 				9A1054E723849EB87CABFE7E /* DriveUtilities.swift in Sources */,
 				3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */,
 				CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */,
