@@ -25,6 +25,7 @@
 		2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */; };
 		27F7F97E8A992AEC94CBD902 /* EngineHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2B80B5C43ED6BC09ECCACC /* EngineHelpSheet.swift */; };
 		33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */; };
+		392EFFD780CF6346123B3FA7 /* DryRunReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */; };
 		3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */; };
 		3D7C343E514CF3B6D7683BD1 /* XXHash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C05BF20EEBC1E7CC7DB8795 /* XXHash.swift */; };
 		3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EDF10844CC898228982672 /* DuplicatePrompt.swift */; };
@@ -50,6 +51,7 @@
 		818A3B2F83A72582CF1CB60D /* FlowLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */; };
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
+		8E3A60028B4927FA5CD1C2A2 /* DryRunPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18663FD23B1C73B08D717384 /* DryRunPlanner.swift */; };
 		8EA1BB03FD52EB731E4D533E /* HashListNamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */; };
 		9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0874AFE948C474D013C69931 /* LogSettingsView.swift */; };
 		939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */; };
@@ -121,6 +123,7 @@
 		1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransferViewModel+Presentation.swift"; sourceTree = "<group>"; };
 		13273CE3DB6E17D073212DFE /* BoundedChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedChannel.swift; sourceTree = "<group>"; };
 		13D3F43F96E0A035C1266F8F /* TransferViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferViewModel.swift; sourceTree = "<group>"; };
+		18663FD23B1C73B08D717384 /* DryRunPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunPlanner.swift; sourceTree = "<group>"; };
 		1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedChannelTests.swift; sourceTree = "<group>"; };
 		1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLinkView.swift; sourceTree = "<group>"; };
 		1C05BF20EEBC1E7CC7DB8795 /* XXHash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XXHash.swift; sourceTree = "<group>"; };
@@ -146,6 +149,7 @@
 		5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePromptSheet.swift; sourceTree = "<group>"; };
 		5E84E2F5E2941DED39DB6EDD /* FileEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileEnumerator.swift; sourceTree = "<group>"; };
 		61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhookService.swift; sourceTree = "<group>"; };
+		64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunReport.swift; sourceTree = "<group>"; };
 		64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStorage.swift; sourceTree = "<group>"; };
 		65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChooserView.swift; sourceTree = "<group>"; };
 		68D90641C9B9019E8312A23E /* OrganizationPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationPreset.swift; sourceTree = "<group>"; };
@@ -245,6 +249,7 @@
 				CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */,
 				2314F69E3FD8DCE91282F1FA /* DestWriter.swift */,
 				205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */,
+				18663FD23B1C73B08D717384 /* DryRunPlanner.swift */,
 				B3F3E1E15AB98D6E20FE01A1 /* FanOutCopier.swift */,
 				A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */,
 				D4123D4442C95453ADA7A942 /* MHLReader.swift */,
@@ -341,6 +346,7 @@
 				B25CADDC1BE66072D93ADFD6 /* DestProgress.swift */,
 				CB7BCF3596001402A6F510FC /* DestResult.swift */,
 				6C58BD6BBAE45AB2BED7FDAA /* DestStatus.swift */,
+				64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */,
 				76EDF10844CC898228982672 /* DuplicatePrompt.swift */,
 				40E6C2BF26C154734D9112D1 /* FileOrdering.swift */,
 				68D90641C9B9019E8312A23E /* OrganizationPreset.swift */,
@@ -568,6 +574,8 @@
 				94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */,
 				A630CD6871F678915F92AC17 /* DriveSpeedClassifier.swift in Sources */,
 				9A1054E723849EB87CABFE7E /* DriveUtilities.swift in Sources */,
+				8E3A60028B4927FA5CD1C2A2 /* DryRunPlanner.swift in Sources */,
+				392EFFD780CF6346123B3FA7 /* DryRunReport.swift in Sources */,
 				3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */,
 				CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */,
 				27F7F97E8A992AEC94CBD902 /* EngineHelpSheet.swift in Sources */,
