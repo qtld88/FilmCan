@@ -814,6 +814,69 @@ class CustomCopierService: ObservableObject, TransferService {
         return finalResult
     }
 
+    /// Fan-out copy: copies sources to multiple destinations in parallel
+    func runCopyFanOut(
+        sources: [String],
+        fanOutDestinations: [DestWriter.Config],
+        configName: String,
+        organizationPreset: OrganizationPreset?,
+        copyFolderContents: Bool,
+        useHashListPrecheck: Bool,
+        hashListPath: String?,
+        fileOrdering: FileOrdering,
+        duplicatePolicy: OrganizationPreset.DuplicatePolicy,
+        duplicateCounterTemplate: String,
+        duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?,
+        verifyMode: VerifyMode,
+        dryRun: Bool,
+        progressHandler: (@Sendable ([DestProgress]) -> Void)?
+    ) async throws -> TransferResult {
+        let startTime = Date()
+        let mhlBasePath = fanOutDestinations.first?.destPath
+
+        let fanOutConfig = FanOutCopier.Configuration(
+            sources: sources,
+            destinations: fanOutDestinations,
+            verifyMode: verifyMode,
+            mhlBasePath: mhlBasePath,
+            dryRun: dryRun,
+            progressHandler: { prog in
+                progressHandler?([prog])
+            }
+        )
+
+        let copier = FanOutCopier(config: fanOutConfig)
+        let destResults = try await copier.run()
+
+        let totalBytes = destResults.reduce(0) { $0 + $1.bytesTransferred }
+        let totalFiles = destResults.reduce(0) { $0 + $1.filesTransferred }
+        let failedCount = destResults.filter { !$0.success }.count
+
+        var warnings: [String] = []
+        for result in destResults where !result.success {
+            if let reason = result.failureReason {
+                warnings.append("\(result.displayName): \(reason.displayMessage)")
+            }
+        }
+
+        return TransferResult(
+            configurationName: configName,
+            destination: fanOutDestinations.first?.destPath ?? "",
+            startTime: startTime,
+            endTime: Date(),
+            success: failedCount == 0,
+            errorMessage: failedCount > 0 ? "\(failedCount) destination(s) failed" : nil,
+            warningMessage: warnings.isEmpty ? nil : warnings.joined(separator: " | "),
+            filesTransferred: totalFiles,
+            bytesTransferred: totalBytes,
+            totalBytes: totalBytes,
+            filesSkipped: 0,
+            errors: warnings,
+            hashListPath: nil,
+            wasVerified: verifyMode == .paranoid && failedCount == 0
+        )
+    }
+
     @MainActor
     private func updateSpeedAndEta() {
         guard let start = transferStartTime else { return }

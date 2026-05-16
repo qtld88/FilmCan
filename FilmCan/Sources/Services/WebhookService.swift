@@ -56,4 +56,30 @@ struct WebhookService {
 
         URLSession.shared.dataTask(with: request).resume()
     }
+
+    /// Send a per-destination result notification
+    static func sendDestNotification(
+        urlString: String,
+        bearerToken: String?,
+        result: DestResult,
+        sourceName: String
+    ) {
+        let icon = result.success ? "✅" : "❌"
+        let title = "\(icon) Copy \(result.success ? "complete" : "failed"): \(sourceName)"
+        let byteStr = ByteCountFormatter.string(fromByteCount: result.bytesTransferred, countStyle: .file)
+        let message = "\(result.filesTransferred) files (\(byteStr)) → \(result.displayName)"
+        sendNtfy(
+            urlString: urlString,
+            bearerToken: bearerToken,
+            title: title,
+            message: message,
+            fields: [
+                "Destination": result.displayName,
+                "Path": result.destinationPath,
+                "Status": result.success ? "OK" : "FAILED",
+                "Bytes": byteStr,
+                "Verify": result.verifyMode.rawValue
+            ]
+        )
+    }
 }
