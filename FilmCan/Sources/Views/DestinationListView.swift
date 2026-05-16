@@ -25,7 +25,7 @@ struct DestinationListView: View {
     var fulfilledDestinations: Set<String> = []
     private let previewDate = Date()
     private var isActiveTransfer: Bool {
-        transferViewModel.activeConfigId == configId
+        transferViewModel.isTransferActive(for: configId)
     }
     
     var body: some View {
@@ -49,7 +49,7 @@ struct DestinationListView: View {
                     driveBlocks
                 }
 
-                if isActiveTransfer && transferViewModel.isTransferring {
+                if isActiveTransfer {
                     transferControls
                 }
                 
@@ -138,7 +138,7 @@ struct DestinationListView: View {
         return VStack(alignment: .leading, spacing: 12) {
             ForEach(indexed, id: \.element.id) { index, summary in
                 let driveRequiredBytes = requiredBytes
-                let backupStoredOnDrive = (!isActiveTransfer || !transferViewModel.isTransferring)
+                let backupStoredOnDrive = !isActiveTransfer
                     ? driveHasStoredBackup(
                         summary: summary,
                         fulfilledDestinations: fulfilled
@@ -311,15 +311,20 @@ struct DestinationListView: View {
                                             .opacity(percentText == nil ? 0 : 1)
                                     }
 
-                                    if shouldShowVerificationRow(for: destination.path, showProgress: showProgress) {
+                                    if shouldShowVerificationRow(
+                                        for: destination.path,
+                                        source: item.source,
+                                        showProgress: showProgress
+                                    ) {
                                         HStack(spacing: 8) {
-                                            Text(verificationLabelText(for: destination.path))
+                                            Text(verificationLabelText(for: destination.path, source: item.source))
                                                 .font(FilmCanFont.label(10))
                                                 .foregroundColor(FilmCanTheme.textSecondary)
                                                 .lineLimit(1)
                                                 .frame(width: progressLabelWidth, alignment: .leading)
                                             ProgressView(value: verificationProgressValue(
                                                 for: destination.path,
+                                                source: item.source,
                                                 showProgress: showProgress
                                             ))
                                                 .progressViewStyle(ThickLinearProgressStyle(
@@ -330,6 +335,7 @@ struct DestinationListView: View {
 
                                             let verifyPercent = verificationPercentText(
                                                 for: destination.path,
+                                                source: item.source,
                                                 showProgress: showProgress
                                             )
                                             Text(verifyPercent ?? "")
@@ -458,8 +464,8 @@ struct DestinationListView: View {
 
     private var transferControls: some View {
         HStack(spacing: 12) {
-            Button(transferViewModel.allDestinations.count > 1 ? "Stop Backups" : "Stop Backup") {
-                transferViewModel.cancelAll()
+            Button(destinations.count > 1 ? "Stop Backups" : "Stop Backup") {
+                transferViewModel.cancelAll(for: configId)
             }
             .buttonStyle(.bordered)
             .tint(.red)
@@ -655,7 +661,7 @@ struct DestinationListView: View {
 
     private func fulfilledDestinationsForCurrentConfig() -> Set<String> {
         var fulfilled = fulfilledDestinations
-        guard transferViewModel.activeConfigId == configId else { return fulfilled }
+        guard isActiveTransfer else { return fulfilled }
         for result in transferViewModel.results where result.success {
             fulfilled.insert(result.destination)
         }
@@ -787,61 +793,86 @@ struct DestinationListView: View {
     }
 
     private func progressPercentText(for destination: String, source: String) -> String? {
-        if transferViewModel.isTransferring && progress.totalBytes <= 0 {
-            return nil
-        }
         let value = progressValue(for: destination, source: source)
         let percent = Int(round(value * 100))
         return "\(percent)%"
     }
 
     private func copyLabelText(for destination: String, source: String) -> String {
-        if destination == transferViewModel.currentDestination, transferViewModel.isTransferring {
-            let total = max(progress.filesTotal, 0)
-            let completed = min(max(progress.filesCompleted, 0), total)
+        let value = progressValue(for: destination, source: source)
+        if value >= 1 {
+            return "Copied"
+        }
+
+        if isActiveTransfer,
+           let activeSource = transferViewModel.activeSource(for: destination),
+           !source.isEmpty,
+           activeSource == source,
+           let live = transferViewModel.liveProgress(for: destination) {
+            let total = max(live.filesTotal, 0)
+            let completed = min(max(live.filesCompleted, 0), total)
             if total > 0, completed < total {
                 let currentIndex = min(completed + 1, total)
                 return "Copying \(currentIndex)/\(total)"
             }
             return "Copying \(completed)/\(total)"
         }
+
+        if isActiveTransfer,
+           !source.isEmpty,
+           let activeSource = transferViewModel.activeSource(for: destination),
+           activeSource != source {
+            return "Waiting"
+        }
+
         if transferResult(for: destination)?.success == true {
-            return "Copied"
+            return value >= 1 ? "Copied" : "Waiting"
         }
         return "Copying"
     }
 
-    private func shouldShowVerificationRow(for destination: String, showProgress: Bool) -> Bool {
-        guard destination == transferViewModel.currentDestination else { return false }
-        let wantsVerificationRow = postVerifyEnabled || progress.verificationHasStarted
+    private func shouldShowVerificationRow(for destination: String, source: String, showProgress: Bool) -> Bool {
+        guard isActiveTransfer else { return false }
+        guard let activeSource = transferViewModel.activeSource(for: destination) else { return false }
+        if !source.isEmpty && activeSource != source {
+            return false
+        }
+        let liveHasStarted = transferViewModel.liveProgress(for: destination)?.verificationHasStarted ?? false
+        let wantsVerificationRow = postVerifyEnabled || liveHasStarted
         guard wantsVerificationRow else { return false }
         return showProgress
     }
 
-    private func verificationProgressValue(for destination: String, showProgress: Bool) -> Double {
-        guard shouldShowVerificationRow(for: destination, showProgress: showProgress) else { return 0 }
-        return min(max(0, progress.verificationWeightedProgress), 1)
+    private func verificationProgressValue(for destination: String, source: String, showProgress: Bool) -> Double {
+        guard shouldShowVerificationRow(for: destination, source: source, showProgress: showProgress) else { return 0 }
+        guard let live = transferViewModel.liveProgress(for: destination) else { return 0 }
+        return min(max(0, live.verificationWeightedProgress), 1)
     }
 
-    private func verificationPercentText(for destination: String, showProgress: Bool) -> String? {
-        guard shouldShowVerificationRow(for: destination, showProgress: showProgress) else { return nil }
-        guard progress.verificationHasStarted else { return nil }
-        guard progress.verificationBytesTotal > 0 || progress.verificationFilesTotal > 0 else { return nil }
-        let percent = Int(round(progress.verificationWeightedProgress * 100))
+    private func verificationPercentText(for destination: String, source: String, showProgress: Bool) -> String? {
+        guard shouldShowVerificationRow(for: destination, source: source, showProgress: showProgress) else { return nil }
+        guard let live = transferViewModel.liveProgress(for: destination) else { return nil }
+        guard live.verificationHasStarted else { return nil }
+        guard live.verificationBytesTotal > 0 || live.verificationFilesTotal > 0 else { return nil }
+        let percent = Int(round(live.verificationWeightedProgress * 100))
         return "\(percent)%"
     }
 
-    private func verificationLabelText(for destination: String) -> String {
-        if !progress.verificationHasStarted {
+    private func verificationLabelText(for destination: String, source: String) -> String {
+        guard shouldShowVerificationRow(for: destination, source: source, showProgress: true),
+              let live = transferViewModel.liveProgress(for: destination) else {
             return "Will verify"
         }
-        let total = max(progress.verificationFilesTotal, 0)
-        let completed = min(max(progress.verificationFilesCompleted, 0), total)
-        if !progress.verificationIsActive && !progress.copyingDone && completed < total {
+        if !live.verificationHasStarted {
+            return "Will verify"
+        }
+        let total = max(live.verificationFilesTotal, 0)
+        let completed = min(max(live.verificationFilesCompleted, 0), total)
+        if !live.verificationIsActive && !live.copyingDone && completed < total {
             let waitingIndex = min(completed + 1, total)
             return "Waiting for \(waitingIndex)/\(total)"
         }
-        let inProgress = (completed == 0 && progress.verificationBytesCompleted > 0) ? 1 : 0
+        let inProgress = (completed == 0 && live.verificationBytesCompleted > 0) ? 1 : 0
         let done = min(completed + inProgress, total)
         return "Verifying \(done)/\(total)"
     }
@@ -956,7 +987,6 @@ struct DestinationListView: View {
             }
 
             if isActiveTransfer,
-               transferViewModel.isTransferring,
                let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
                 total = snapshot.totalBytes
                 available = snapshot.availableBytes
@@ -1201,6 +1231,7 @@ struct DestinationListView: View {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             if index < destinations.count {
@@ -1213,6 +1244,7 @@ struct DestinationListView: View {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             if !destinations.contains(url.path) {

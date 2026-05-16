@@ -103,7 +103,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let transferViewModel = TransferViewModel.shared
         let progress = transferViewModel.progress
-        let isBusy = transferViewModel.isTransferring
+        let isBusy = transferViewModel.hasActiveTransfers()
             || progress.isRunning
             || progress.verificationPhase == .verifying
             || progress.verificationPhase == .generatingHashList

@@ -25,7 +25,7 @@ extension TransferViewModel {
         configId: UUID?,
         progress: TransferProgress
     ) -> DestinationPresentation {
-        let isActiveTransfer = activeConfigId == configId
+        let isActiveTransfer = configId.map { isTransferActive(for: $0) } ?? false
         let result = results.last { $0.destination == destination }
         let shouldShowInfo = isActiveTransfer && (isTransferring || result != nil)
         let status = destinationStatus(for: destination, result: result, progress: progress)
@@ -58,7 +58,16 @@ extension TransferViewModel {
             return result.success ? .done : .failed
         }
         if cancelledDestinations.contains(destination) { return .failed }
-        if destination == currentDestination {
+        if let live = destinationLiveProgress[destination] {
+            if live.isPaused { return .paused }
+            if live.isCancelled { return .failed }
+            if live.isRunning
+                || live.phase == .checksumming
+                || live.phase == .copying
+                || live.phase == .verifying {
+                return .active
+            }
+        } else if destination == currentDestination {
             if progress.isPaused { return .paused }
             if progress.isCancelled { return .failed }
             if progress.phase == .checksumming
@@ -76,7 +85,26 @@ extension TransferViewModel {
         result: TransferResult?,
         progress: TransferProgress
     ) -> (progressText: String, speedText: String, etaText: String) {
-        if destination == currentDestination {
+        if let live = destinationLiveProgress[destination] {
+            let liveIsActive = live.isRunning
+                || live.phase == .checksumming
+                || live.phase == .copying
+                || live.phase == .verifying
+            if live.phase == .verifying {
+                let progressText = live.verificationFilesTotal > 0
+                    ? "\(live.verificationFilesCompleted) / \(live.verificationFilesTotal)"
+                    : "Verifying…"
+                return (progressText, "--", verificationEtaValue(live))
+            }
+            if liveIsActive {
+                let etaText = if let eta = live.estimatedTimeRemaining, eta > 0 {
+                    FilmCanFormatters.durationApprox(eta)
+                } else {
+                    "--:--"
+                }
+                return currentTransferStats(live, etaOverride: etaText)
+            }
+        } else if destination == currentDestination {
             if progress.phase == .verifying {
                 let progressText = progress.verificationFilesTotal > 0
                     ? progress.formattedVerificationProgress
@@ -148,6 +176,23 @@ extension TransferViewModel {
         return (progressText, speedText, etaOverride)
     }
 
+    private func currentTransferStats(
+        _ progress: DestinationLiveProgress,
+        etaOverride: String
+    ) -> (progressText: String, speedText: String, etaText: String) {
+        let progressBytes = progress.cumulativeBytes > 0 ? progress.cumulativeBytes : progress.bytesCompleted
+        let progressText: String
+        if progress.totalBytes > 0 {
+            let done = FilmCanFormatters.bytes(progressBytes, style: .decimal)
+            let total = FilmCanFormatters.bytes(progress.totalBytes, style: .decimal)
+            progressText = "\(done) / \(total)"
+        } else {
+            progressText = FilmCanFormatters.bytes(progressBytes, style: .decimal)
+        }
+        let speedText = FilmCanFormatters.speed(progress.speedBytesPerSecond, style: .decimal)
+        return (progressText, speedText, etaOverride)
+    }
+
     private func cumulativeStats(
         for results: [TransferResult]
     ) -> (progressText: String, speedText: String, etaText: String) {
@@ -199,6 +244,13 @@ extension TransferViewModel {
         let elapsed = Date().timeIntervalSince(start)
         let remaining = max(0, estimate - elapsed)
         return FilmCanFormatters.durationCompact(remaining)
+    }
+
+    private func verificationEtaValue(_ progress: DestinationLiveProgress) -> String {
+        if let eta = progress.estimatedTimeRemaining, eta > 0 {
+            return FilmCanFormatters.durationCompact(eta)
+        }
+        return "--"
     }
 
     private func failureStatus(for result: TransferResult?) -> String? {

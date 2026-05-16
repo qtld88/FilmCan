@@ -96,8 +96,7 @@ extension BackupEditorView {
                     let sourceCenters = anchors.sources.mapValues { geo[$0].midY - frame.minY }
                     let destinationCenters = anchors.destinations.mapValues { geo[$0].midY - frame.minY }
                     let fulfilled = fulfilledDestinationsForCurrentConfig()
-                    let storedDriveIds = (transferViewModel.isTransferring
-                        && transferViewModel.activeConfigId == viewModel.config.id)
+                    let storedDriveIds = transferViewModel.isTransferActive(for: viewModel.config.id)
                         ? []
                         : storedDriveIds(from: fulfilled)
                     FlowLinkView(
@@ -221,8 +220,7 @@ extension BackupEditorView {
                 order.append(summary.id)
                 sizes[summary.id] = 0
                 names[summary.id] = summary.name
-                if transferViewModel.isTransferring,
-                   transferViewModel.activeConfigId == viewModel.config.id,
+                if transferViewModel.isTransferActive(for: viewModel.config.id),
                    let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
                     totals[summary.id] = snapshot.totalBytes ?? 0
                     available[summary.id] = snapshot.availableBytes ?? 0
@@ -260,8 +258,7 @@ extension BackupEditorView {
             let summary = DriveUtilities.summary(for: destination)
             if available[summary.id] == nil {
                 order.append(summary.id)
-                if transferViewModel.isTransferring,
-                   transferViewModel.activeConfigId == viewModel.config.id,
+                if transferViewModel.isTransferActive(for: viewModel.config.id),
                    let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
                     totals[summary.id] = snapshot.totalBytes ?? 0
                     available[summary.id] = snapshot.availableBytes ?? 0
@@ -286,7 +283,7 @@ extension BackupEditorView {
 
     private func fulfilledDestinationsForCurrentConfig() -> Set<String> {
         var fulfilled = transferViewModel.verifiedDestinationsByConfig[viewModel.config.id] ?? []
-        guard transferViewModel.activeConfigId == viewModel.config.id else { return fulfilled }
+        guard transferViewModel.isTransferActive(for: viewModel.config.id) else { return fulfilled }
         for result in transferViewModel.results where result.success {
             fulfilled.insert(result.destination)
         }

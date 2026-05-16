@@ -13,15 +13,83 @@ class ConfigurationStorage: ObservableObject {
     private let configFileURL: URL
     private let presetsFileURL: URL
     private let historyFileURL: URL
+    private let configBackupFileURL: URL
+    private let presetsBackupFileURL: URL
+    private let historyBackupFileURL: URL
     private let totalTransferCountKey = "totalTransferCount"
+    private static let storageFolderName = "FilmCan"
+    private static let legacyStorageFolderNames = ["RushesTransfer"]
     
-    private static func resolveConfigFileURL(fileManager: FileManager) -> URL {
+    private static func resolveStorageFolderURL(fileManager: FileManager) -> URL {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let folder = appSupport.appendingPathComponent("FilmCan", isDirectory: true)
+        let folder = appSupport.appendingPathComponent(storageFolderName, isDirectory: true)
         if !fileManager.fileExists(atPath: folder.path) {
             try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         }
-        return folder.appendingPathComponent("configs.json")
+        return folder
+    }
+
+    private static func migrateLegacyStorageIfNeeded(fileManager: FileManager, targetFolder: URL) {
+        let targetConfig = targetFolder.appendingPathComponent("configs.json")
+        let targetPresets = targetFolder.appendingPathComponent("presets.json")
+        let targetHistory = targetFolder.appendingPathComponent("history.json")
+
+        // Nothing to migrate if all target files already exist.
+        if fileManager.fileExists(atPath: targetConfig.path)
+            && fileManager.fileExists(atPath: targetPresets.path)
+            && fileManager.fileExists(atPath: targetHistory.path) {
+            return
+        }
+
+        let appSupport = targetFolder.deletingLastPathComponent()
+        for legacyName in legacyStorageFolderNames {
+            let legacyFolder = appSupport.appendingPathComponent(legacyName, isDirectory: true)
+            guard fileManager.fileExists(atPath: legacyFolder.path) else { continue }
+
+            copyFirstExisting(
+                fileManager: fileManager,
+                from: legacyFolder,
+                candidates: ["configs.json", "configurations.json"],
+                to: targetConfig
+            )
+            copyFirstExisting(
+                fileManager: fileManager,
+                from: legacyFolder,
+                candidates: ["presets.json", "organizationPresets.json"],
+                to: targetPresets
+            )
+            copyFirstExisting(
+                fileManager: fileManager,
+                from: legacyFolder,
+                candidates: ["history.json", "transferHistory.json"],
+                to: targetHistory
+            )
+
+            if fileManager.fileExists(atPath: targetConfig.path)
+                && fileManager.fileExists(atPath: targetPresets.path)
+                && fileManager.fileExists(atPath: targetHistory.path) {
+                break
+            }
+        }
+    }
+
+    private static func copyFirstExisting(
+        fileManager: FileManager,
+        from folder: URL,
+        candidates: [String],
+        to destination: URL
+    ) {
+        guard !fileManager.fileExists(atPath: destination.path) else { return }
+        for name in candidates {
+            let source = folder.appendingPathComponent(name)
+            guard fileManager.fileExists(atPath: source.path) else { continue }
+            do {
+                try fileManager.copyItem(at: source, to: destination)
+                return
+            } catch {
+                continue
+            }
+        }
     }
     
     private let userDefaults = UserDefaults.standard
@@ -34,9 +102,14 @@ class ConfigurationStorage: ObservableObject {
     }
     
     private init() {
-        configFileURL = Self.resolveConfigFileURL(fileManager: fileManager)
-        presetsFileURL = configFileURL.deletingLastPathComponent().appendingPathComponent("presets.json")
-        historyFileURL = configFileURL.deletingLastPathComponent().appendingPathComponent("history.json")
+        let storageFolder = Self.resolveStorageFolderURL(fileManager: fileManager)
+        Self.migrateLegacyStorageIfNeeded(fileManager: fileManager, targetFolder: storageFolder)
+        configFileURL = storageFolder.appendingPathComponent("configs.json")
+        presetsFileURL = storageFolder.appendingPathComponent("presets.json")
+        historyFileURL = storageFolder.appendingPathComponent("history.json")
+        configBackupFileURL = configFileURL.appendingPathExtension("bak")
+        presetsBackupFileURL = presetsFileURL.appendingPathExtension("bak")
+        historyBackupFileURL = historyFileURL.appendingPathExtension("bak")
         load()
     }
     
@@ -84,11 +157,11 @@ class ConfigurationStorage: ObservableObject {
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(configurations)
-            try data.write(to: configFileURL)
+            try writeWithBackup(data, to: configFileURL, backupURL: configBackupFileURL)
             let presetData = try encoder.encode(organizationPresets)
-            try presetData.write(to: presetsFileURL)
+            try writeWithBackup(presetData, to: presetsFileURL, backupURL: presetsBackupFileURL)
             let historyData = try encoder.encode(transferHistory)
-            try historyData.write(to: historyFileURL)
+            try writeWithBackup(historyData, to: historyFileURL, backupURL: historyBackupFileURL)
         } catch {
             #if DEBUG
             DebugLog.warn("Failed to save configurations: \(error)")
@@ -97,34 +170,42 @@ class ConfigurationStorage: ObservableObject {
     }
     
     func load() {
-        guard fileManager.fileExists(atPath: configFileURL.path) else {
+        let hasConfig = fileManager.fileExists(atPath: configFileURL.path)
+            || fileManager.fileExists(atPath: configBackupFileURL.path)
+        guard hasConfig else {
             configurations = []
             organizationPresets = []
             transferHistory = []
             return
         }
-        
-        do {
-            let data = try Data(contentsOf: configFileURL)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            configurations = try decoder.decode([BackupConfiguration].self, from: data)
-        } catch {
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let loadedConfigs: [BackupConfiguration] = decodeWithFallback(
+            type: [BackupConfiguration].self,
+            primaryURL: configFileURL,
+            backupURL: configBackupFileURL,
+            decoder: decoder
+        ) {
+            configurations = loadedConfigs
+        } else {
             #if DEBUG
-            DebugLog.warn("Failed to load configurations: \(error)")
+            DebugLog.warn("Failed to load configurations from primary and backup files.")
             #endif
             configurations = []
         }
         
-        if fileManager.fileExists(atPath: presetsFileURL.path) {
-            do {
-                let data = try Data(contentsOf: presetsFileURL)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                organizationPresets = try decoder.decode([OrganizationPreset].self, from: data)
-            } catch {
+        if fileManager.fileExists(atPath: presetsFileURL.path) || fileManager.fileExists(atPath: presetsBackupFileURL.path) {
+            if let loadedPresets: [OrganizationPreset] = decodeWithFallback(
+                type: [OrganizationPreset].self,
+                primaryURL: presetsFileURL,
+                backupURL: presetsBackupFileURL,
+                decoder: decoder
+            ) {
+                organizationPresets = loadedPresets
+            } else {
                 #if DEBUG
-                DebugLog.warn("Failed to load presets: \(error)")
+                DebugLog.warn("Failed to load presets from primary and backup files.")
                 #endif
                 organizationPresets = []
             }
@@ -132,15 +213,17 @@ class ConfigurationStorage: ObservableObject {
             organizationPresets = []
         }
 
-        if fileManager.fileExists(atPath: historyFileURL.path) {
-            do {
-                let data = try Data(contentsOf: historyFileURL)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                transferHistory = try decoder.decode([TransferHistoryEntry].self, from: data)
-            } catch {
+        if fileManager.fileExists(atPath: historyFileURL.path) || fileManager.fileExists(atPath: historyBackupFileURL.path) {
+            if let loadedHistory: [TransferHistoryEntry] = decodeWithFallback(
+                type: [TransferHistoryEntry].self,
+                primaryURL: historyFileURL,
+                backupURL: historyBackupFileURL,
+                decoder: decoder
+            ) {
+                transferHistory = loadedHistory
+            } else {
                 #if DEBUG
-                DebugLog.warn("Failed to load history: \(error)")
+                DebugLog.warn("Failed to load history from primary and backup files.")
                 #endif
                 transferHistory = []
             }
@@ -154,6 +237,33 @@ class ConfigurationStorage: ObservableObject {
            let lastUsedId = UUID(uuidString: lastUsedIdString) {
             lastUsedConfigId = lastUsedId
         }
+    }
+
+    private func writeWithBackup(_ data: Data, to destination: URL, backupURL: URL) throws {
+        if fileManager.fileExists(atPath: destination.path) {
+            if fileManager.fileExists(atPath: backupURL.path) {
+                try? fileManager.removeItem(at: backupURL)
+            }
+            try? fileManager.copyItem(at: destination, to: backupURL)
+        }
+        try data.write(to: destination, options: .atomic)
+    }
+
+    private func decodeWithFallback<T: Decodable>(
+        type: T.Type,
+        primaryURL: URL,
+        backupURL: URL,
+        decoder: JSONDecoder
+    ) -> T? {
+        if let data = try? Data(contentsOf: primaryURL),
+           let decoded = try? decoder.decode(T.self, from: data) {
+            return decoded
+        }
+        if let data = try? Data(contentsOf: backupURL),
+           let decoded = try? decoder.decode(T.self, from: data) {
+            return decoded
+        }
+        return nil
     }
     
     func markAsUsed(_ config: BackupConfiguration) {

@@ -1457,7 +1457,7 @@ extension BackupEditorView {
             .buttonStyle(.plain)
             .background(FilmCanTheme.brandYellow)
             .cornerRadius(8)
-            .disabled(transferViewModel.isTransferring)
+            .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
         }
         .frame(maxWidth: .infinity)
     }

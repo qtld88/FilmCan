@@ -176,7 +176,7 @@ struct BackupEditorView: View {
             viewModel.syncFromStorage(updated)
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyRunNow)) { _ in
-            guard !transferViewModel.isTransferring else { return }
+            guard !transferViewModel.isTransferActive(for: viewModel.config.id) else { return }
             startTransfer()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyAddSource)) { _ in

@@ -17,13 +17,12 @@ struct BackupListView: View {
                 HStack(spacing: 6) {
                     ForEach(viewModel.filteredConfigurations) { config in
                         let lastEntry = storage.transferHistory.first { $0.configId == config.id }
-                        let isActive = transferViewModel.isTransferring
-                            && transferViewModel.activeConfigId == config.id
+                        let isActive = transferViewModel.isTransferActive(for: config.id)
                         MovieTabButton(
                             config: config,
                             lastEntry: lastEntry,
                             isActiveTransfer: isActive,
-                            progress: transferViewModel.progress,
+                            progressValue: transferViewModel.tabProgress(for: config.id),
                             isSelected: appState.selectedConfigId == config.id,
                             onSelect: {
                                 NSApp.keyWindow?.makeFirstResponder(nil)
@@ -101,7 +100,7 @@ private struct MovieTabButton: View {
     let config: BackupConfiguration
     let lastEntry: TransferHistoryEntry?
     let isActiveTransfer: Bool
-    @ObservedObject var progress: TransferProgress
+    let progressValue: Double
     let isSelected: Bool
     let onSelect: () -> Void
     let onRun: () -> Void
@@ -238,7 +237,7 @@ private struct MovieTabButton: View {
     }
 
     private var activeTransferProgress: Double {
-        isActiveTransfer ? progress.overallProgress : 0
+        isActiveTransfer ? progressValue : 0
     }
 
     @ViewBuilder

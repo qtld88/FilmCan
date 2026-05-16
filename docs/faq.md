@@ -54,7 +54,13 @@ Use [Smart Date](./features/smart-date.md) to set a custom day boundary.
 Both available. See [Copy Engines](./features/copy-engines.md).
 
 **Config location?**  
-`~/Library/Application Support/FilmCan/configs.json`
+`~/Library/Application Support/FilmCan/configs.json`  
+`~/Library/Application Support/FilmCan/presets.json`  
+`~/Library/Application Support/FilmCan/history.json`
+
+**Will I lose data if I reinstall or upgrade?**  
+No, not in normal reinstall/upgrade flows. FilmCan keeps movies, presets, and history in `~/Library/Application Support/FilmCan/`, outside the app bundle.  
+If you use cleanup tools that remove Application Support, data can be deleted.
 
 **Custom rsync arguments?**  
 Yes. See [Custom rsync](./features/custom-rsync.md).

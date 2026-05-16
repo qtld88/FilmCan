@@ -31,6 +31,7 @@
 		63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A206C11337F2DF884AF7C3C /* StreamingHasher.swift */; };
 		65CBD0FB0B5729A94C62E049 /* LogFileNamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4BE7FDB8F045263D4E2883 /* LogFileNamer.swift */; };
 		69106EFEF4CEB1062A82E122 /* TransferResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C4305DE01CFC043DF8C21A /* TransferResult.swift */; };
+		6A1495C244606EC2E72C29E9 /* TransferProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */; };
 		6F63821DF88A41F7D5728BD6 /* BackupEditorView+Overview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5633209606F4327D6FE158AA /* BackupEditorView+Overview.swift */; };
 		712C89C119B957716D4B9AEB /* PreviewCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40F951445F8238F0B740353 /* PreviewCalculator.swift */; };
 		7191245AD630701955CB29ED /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1146F690162AC3EE569EFBB /* SourceListView.swift */; };
@@ -80,9 +81,20 @@
 		FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		6FF7FD987B80E3C0A11598A0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6B4985DF85DB4767DFBF0845 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4F6473519FA957402211B55;
+			remoteInfo = FilmCan;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		01136E3DBB8977E8B301ACEB /* DriveAnchorPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveAnchorPreferences.swift; sourceTree = "<group>"; };
 		055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupListViewModel.swift; sourceTree = "<group>"; };
+		07A9EC23F618959F4233E19D /* FilmCanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FilmCanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		083A2D2BAD99B47EB86C5386 /* FilmCan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmCan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0874AFE948C474D013C69931 /* LogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSettingsView.swift; sourceTree = "<group>"; };
 		0D4C9259A7AF9ACBC20B9852 /* TransferHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferHistoryView.swift; sourceTree = "<group>"; };
@@ -152,6 +164,7 @@
 		EA563679AEE01B0FF5D12CB7 /* TransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferService.swift; sourceTree = "<group>"; };
 		EB457DCE07BC5C884750E430 /* UIStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStrings.swift; sourceTree = "<group>"; };
 		F40F951445F8238F0B740353 /* PreviewCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCalculator.swift; sourceTree = "<group>"; };
+		F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferProgressTests.swift; sourceTree = "<group>"; };
 		FB8B45E6010E1222A7826DC8 /* WindowTitleSetter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleSetter.swift; sourceTree = "<group>"; };
 		FEAB41177986B7BBED498656 /* CustomCopierService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierService.swift; sourceTree = "<group>"; };
 		FFA8427B4A1254A14DCE35B2 /* TransferResultSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferResultSummary.swift; sourceTree = "<group>"; };
@@ -211,6 +224,7 @@
 			isa = PBXGroup;
 			children = (
 				B22387782A170E938F3D7639 /* Sources */,
+				8A5ED741C11830E24674385D /* Tests */,
 				F62B08885D942632A1AA575D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -223,6 +237,14 @@
 				5633209606F4327D6FE158AA /* BackupEditorView+Overview.swift */,
 			);
 			path = BackupEditor;
+			sourceTree = "<group>";
+		};
+		8A5ED741C11830E24674385D /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		B22387782A170E938F3D7639 /* Sources */ = {
@@ -314,6 +336,7 @@
 			isa = PBXGroup;
 			children = (
 				083A2D2BAD99B47EB86C5386 /* FilmCan.app */,
+				07A9EC23F618959F4233E19D /* FilmCanTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -329,6 +352,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		42D289AA06D4887E518BE169 /* FilmCanTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 80C49A6A968BE749D088DDBA /* Build configuration list for PBXNativeTarget "FilmCanTests" */;
+			buildPhases = (
+				3E5BD4F7D8629943112C2CF9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				20A9DF5396F7D3700BD606C0 /* PBXTargetDependency */,
+			);
+			name = FilmCanTests;
+			packageProductDependencies = (
+			);
+			productName = FilmCanTests;
+			productReference = 07A9EC23F618959F4233E19D /* FilmCanTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		A4F6473519FA957402211B55 /* FilmCan */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8C35359BAF755385EFA5FD74 /* Build configuration list for PBXNativeTarget "FilmCan" */;
@@ -357,6 +398,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					42D289AA06D4887E518BE169 = {
+						ProvisioningStyle = Manual;
+					};
 					A4F6473519FA957402211B55 = {
 						ProvisioningStyle = Manual;
 					};
@@ -377,6 +421,7 @@
 			projectRoot = "";
 			targets = (
 				A4F6473519FA957402211B55 /* FilmCan */,
+				42D289AA06D4887E518BE169 /* FilmCanTests */,
 			);
 		};
 /* End PBXProject section */
@@ -417,6 +462,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3E5BD4F7D8629943112C2CF9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A1495C244606EC2E72C29E9 /* TransferProgressTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B172D70E1C995905FCAF10ED /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -494,6 +547,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		20A9DF5396F7D3700BD606C0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4F6473519FA957402211B55 /* FilmCan */;
+			targetProxy = 6FF7FD987B80E3C0A11598A0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		049D209C2C07BF79DB8BDF6E /* Debug */ = {
@@ -654,9 +715,54 @@
 			};
 			name = Debug;
 		};
+		D9C16DB3BB8B723FCA27BB66 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.filmcan.FilmCanTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FilmCan.app/Contents/MacOS/FilmCan";
+			};
+			name = Debug;
+		};
+		DA07FE9A8FA86D38AF6D5262 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.filmcan.FilmCanTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FilmCan.app/Contents/MacOS/FilmCan";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		80C49A6A968BE749D088DDBA /* Build configuration list for PBXNativeTarget "FilmCanTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D9C16DB3BB8B723FCA27BB66 /* Debug */,
+				DA07FE9A8FA86D38AF6D5262 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		84D29396CB79FE9DEDEBB202 /* Build configuration list for PBXProject "FilmCan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

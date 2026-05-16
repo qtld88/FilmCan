@@ -150,8 +150,11 @@ class TransferProgress: ObservableObject {
             fileWeight = 0.5
         } else if averageFileSize < 10 * 1024 * 1024 {
             fileWeight = 0.3
-        } else {
+        } else if averageFileSize < 1 * 1024 * 1024 * 1024 {
             fileWeight = 0.1
+        } else {
+            // Files ≥ 1 GB: byte progress is the only meaningful signal
+            fileWeight = 0.05
         }
         let combined = (1.0 - fileWeight) * byteProgress + fileWeight * fileProgress
         return min(1.0, max(0, combined))

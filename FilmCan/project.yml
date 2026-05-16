@@ -131,3 +131,17 @@ targets:
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.files.user-selected.read-write: true
+
+  FilmCanTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+    dependencies:
+      - target: FilmCan
+    settings:
+      base:
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/FilmCan.app/Contents/MacOS/FilmCan"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"

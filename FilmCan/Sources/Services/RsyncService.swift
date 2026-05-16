@@ -312,6 +312,7 @@ class RsyncService: ObservableObject {
         let sourcePath: String
         let relativePath: String
         let sourceIsDirectory: Bool
+        let size: Int64
     }
 
     nonisolated private static func sourceEntryKey(sourceRoot: String, relativePath: String) -> String {
@@ -330,7 +331,7 @@ class RsyncService: ObservableObject {
                 if isDir.boolValue {
                     let enumerator = fm.enumerator(
                         at: sourceURL,
-                        includingPropertiesForKeys: [.isDirectoryKey],
+                        includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey],
                         options: [.skipsHiddenFiles, .skipsPackageDescendants]
                     )
                     while let fileURL = enumerator?.nextObject() as? URL {
@@ -351,20 +352,24 @@ class RsyncService: ObservableObject {
                         if relative.isEmpty {
                             relative = fileURL.lastPathComponent
                         }
+                        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize).map { Int64($0) } ?? 0
                         entries.append(SourceFileEntry(
                             sourceRoot: sourceRoot,
                             sourcePath: standardized,
                             relativePath: relative,
-                            sourceIsDirectory: true
+                            sourceIsDirectory: true,
+                            size: fileSize
                         ))
                     }
                 } else {
                     let relative = sourceURL.lastPathComponent
+                    let fileSize = (try? sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize).map { Int64($0) } ?? 0
                     entries.append(SourceFileEntry(
                         sourceRoot: sourceRoot,
                         sourcePath: sourceRoot,
                         relativePath: relative,
-                        sourceIsDirectory: false
+                        sourceIsDirectory: false,
+                        size: fileSize
                     ))
                 }
             }
@@ -441,6 +446,7 @@ class RsyncService: ObservableObject {
             guard let self else { return [] }
             var mismatches: [String] = []
             var completed = 0
+            var completedBytes: Int64 = 0
             for entry in entries {
                 if await MainActor.run(body: { self.isCancelled }) { break }
                 let key = Self.sourceEntryKey(sourceRoot: entry.sourceRoot, relativePath: entry.relativePath)
@@ -456,10 +462,13 @@ class RsyncService: ObservableObject {
                     mismatches.append(entry.relativePath)
                 }
                 completed += 1
+                completedBytes += entry.size
                 let currentCompleted = completed
+                let currentBytes = completedBytes
                 let currentFile = entry.relativePath
                 await MainActor.run {
                     self.progress.verificationFilesCompleted = currentCompleted
+                    self.progress.verificationBytesCompleted = currentBytes
                     self.progress.verificationCurrentFile = currentFile
                 }
             }
@@ -501,12 +510,18 @@ class RsyncService: ObservableObject {
         destination: String,
         options: RsyncOptions,
         logFile: String?,
+        sourceEntryCount: Int,
         finalResult: inout TransferResult
     ) async {
         progress.verificationPhase = .verifying
         progress.verificationFilesCompleted = 0
         progress.verificationFilesTotal = 0
         progress.verificationCurrentFile = ""
+        progress.verificationHasStarted = true
+        progress.verificationIsActive = true
+        if sourceEntryCount > 0 {
+            progress.verificationFilesTotal = sourceEntryCount
+        }
 
         var verifyArgs: [String] = ["--checksum", "--dry-run", "--quiet", "-r", "--out-format=%i"]
         verifyArgs.append("--checksum-choice=xxh128")
@@ -590,12 +605,17 @@ class RsyncService: ObservableObject {
                     lines: lines
                 )
             }
+
+            if diffLines.isEmpty && verifyTask.terminationStatus == 0 {
+                progress.verificationFilesCompleted = progress.verificationFilesTotal
+            }
         } catch {
             #if DEBUG
             DebugLog.warn("Verification error: \(error.localizedDescription)")
             #endif
         }
 
+        progress.verificationIsActive = false
         progress.verificationPhase = .complete
         progress.verificationCurrentFile = ""
     }
@@ -1180,7 +1200,10 @@ class RsyncService: ObservableObject {
                 }
 
                 progress.verificationFilesTotal = entries.count
+                progress.verificationBytesTotal = entries.reduce(Int64(0)) { $0 + $1.size }
                 progress.verificationPhase = .verifying
+                progress.verificationHasStarted = true
+                progress.verificationIsActive = true
 
                 let mismatches = await verifyEntries(
                     entries,
@@ -1204,13 +1227,16 @@ class RsyncService: ObservableObject {
                 }
 
                 progress.verificationPhase = .complete
+                progress.verificationIsActive = false
                 progress.verificationCurrentFile = ""
             } else {
+                let countEntries = await enumerateSourceEntries(sources: sources)
                 await performRsyncVerification(
                     sources: sources,
                     destination: destination,
                     options: options,
                     logFile: logFile,
+                    sourceEntryCount: countEntries.count,
                     finalResult: &finalResult
                 )
             }
