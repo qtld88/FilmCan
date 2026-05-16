@@ -91,4 +91,11 @@ final class DriveSpeedClassifierTests: XCTestCase {
         ]
         XCTAssertEqual(DriveSpeedClassifier.slowestDestClass(infos), .exfat)
     }
+
+    func test_info_forRootVolume_returnsInternal() {
+        let info = DriveSpeedClassifier.info(for: "/")
+        XCTAssertTrue(info.isInternal)
+        XCTAssertEqual(info.filesystem, .apfs)
+        XCTAssertNotNil(info.volumeUUID)
+    }
 }
