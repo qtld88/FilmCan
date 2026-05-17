@@ -7,6 +7,24 @@ struct DryRunReport: Codable, Identifiable {
     let timestamp: Date
     let totalBytes: Int64
     let totalFiles: Int
+    let memoryPeakBytes: UInt64
+    let ringCapBytesPerDest: Int
+    let chunkBytes: Int
+    let blockingErrors: [String]
+    let warnings: [String]
+
+    init(sourceName: String, destinations: [DestReport], timestamp: Date, totalBytes: Int64, totalFiles: Int, memoryPeakBytes: UInt64, ringCapBytesPerDest: Int, chunkBytes: Int, blockingErrors: [String], warnings: [String]) {
+        self.sourceName = sourceName
+        self.destinations = destinations
+        self.timestamp = timestamp
+        self.totalBytes = totalBytes
+        self.totalFiles = totalFiles
+        self.memoryPeakBytes = memoryPeakBytes
+        self.ringCapBytesPerDest = ringCapBytesPerDest
+        self.chunkBytes = chunkBytes
+        self.blockingErrors = blockingErrors
+        self.warnings = warnings
+    }
 
     struct DestReport: Codable, Identifiable {
         var id: String { displayName }
@@ -58,6 +76,20 @@ struct DryRunReport: Codable, Identifiable {
             "Files: \(totalFiles)  Total: \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))",
             ""
         ]
+        if !warnings.isEmpty {
+            lines.append("⚠ Warnings:")
+            for w in warnings {
+                lines.append("  \(w)")
+            }
+            lines.append("")
+        }
+        if !blockingErrors.isEmpty {
+            lines.append("✖ Blocking Errors:")
+            for e in blockingErrors {
+                lines.append("  \(e)")
+            }
+            lines.append("")
+        }
         for dest in destinations {
             let cls = dest.classLabel
             let speed = String(format: "%.0f", dest.estimatedSpeedMBps)

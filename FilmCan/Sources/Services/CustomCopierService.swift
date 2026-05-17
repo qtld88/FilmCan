@@ -829,7 +829,8 @@ class CustomCopierService: ObservableObject, TransferService {
         duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?,
         verifyMode: VerifyMode,
         dryRun: Bool,
-        progressHandler: (@Sendable ([DestProgress]) -> Void)?
+        progressHandler: (@Sendable ([DestProgress]) -> Void)?,
+        webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil
     ) async throws -> TransferResult {
         let startTime = Date()
         let mhlBasePath: String? = nil
@@ -853,6 +854,11 @@ class CustomCopierService: ObservableObject, TransferService {
 
         let copier = FanOutCopier(config: fanOutConfig)
         let destResults = try await copier.run()
+
+        // Fire per-dest webhooks
+        for result in destResults {
+            webhookHandler?(result, configName)
+        }
 
         let totalBytes = destResults.reduce(0) { $0 + $1.bytesTransferred }
         let totalFiles = destResults.reduce(0) { $0 + $1.filesTransferred }
