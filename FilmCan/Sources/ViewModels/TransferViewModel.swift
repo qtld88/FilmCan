@@ -1970,4 +1970,50 @@ class TransferViewModel: ObservableObject {
         }
         return results
     }
+
+    /// User-facing entry-point invoked by `FailedDestRetryPanel`'s onRepair closure.
+    /// Branches on the chosen repair source. Mutates `results` so the UI flips the
+    /// failed dest entry to `.success == true` when every file lands and verifies.
+    /// Returns `true` only when ALL files repaired successfully.
+    @discardableResult
+    func repairFailedDest(
+        failed: DestResult,
+        sibling: DestResult,
+        choice: RetryRepairSheet.RepairChoice
+    ) async -> Bool {
+        switch choice {
+        case .fromSibling:
+            let perFile = await retryFailedDestinationFromSibling(failed: failed, sibling: sibling)
+            let allOK = !perFile.isEmpty && perFile.allSatisfy { $0.success }
+            if allOK {
+                patchDestResultToSuccess(destPath: failed.destinationPath, filesTransferred: perFile.count)
+            }
+            return allOK
+        case .fromSource:
+            // Source-branch repair lands in Task 3. For now, surface a clear "not yet wired" failure
+            // rather than silently doing nothing.
+            return false
+        }
+    }
+
+    /// Find the most recent TransferResult whose `destinationResults` contains the failed
+    /// dest, and flip that DestResult entry's `success` to true. UI re-renders via
+    /// @Published `results`.
+    private func patchDestResultToSuccess(destPath: String, filesTransferred: Int) {
+        for resultIndex in results.indices.reversed() {
+            if let destIdx = results[resultIndex].destinationResults.firstIndex(where: { $0.destinationPath == destPath }) {
+                results[resultIndex].destinationResults[destIdx].success = true
+                results[resultIndex].destinationResults[destIdx].failureReason = nil
+                results[resultIndex].destinationResults[destIdx].filesTransferred = filesTransferred
+                results[resultIndex].destinationResults[destIdx].filesFailedAfterCopy = 0
+                // Recompute parent overall success
+                let stillFailing = results[resultIndex].destinationResults.contains(where: { !$0.success })
+                results[resultIndex].success = !stillFailing
+                if !stillFailing {
+                    results[resultIndex].errorMessage = nil
+                }
+                return
+            }
+        }
+    }
 }
