@@ -36,10 +36,10 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             destinations: [
                 DestWriter.Config(destPath: dest1.path, displayName: "Dest1",
                                  verifyMode: .paranoid, requiresFullFsync: false,
-                                 tempSuffix: ".filmcan-int", chunkSize: 65536),
+                                 chunkSize: 65536),
                 DestWriter.Config(destPath: dest2.path, displayName: "Dest2",
                                  verifyMode: .fast, requiresFullFsync: false,
-                                 tempSuffix: ".filmcan-int", chunkSize: 65536)
+                                 chunkSize: 65536)
             ],
             verifyMode: .paranoid,
             mhlBasePath: tmpDir.path,
@@ -72,12 +72,17 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertFalse(contents1.contains { $0.hasPrefix(".filmcan-") }, "No temp files in dest1")
         XCTAssertFalse(contents2.contains { $0.hasPrefix(".filmcan-") }, "No temp files in dest2")
 
-        // Verify MHL file was created
-        let mhlPath = tmpDir.appendingPathComponent("source.bin.mhl")
-        XCTAssertTrue(fm.fileExists(atPath: mhlPath.path), "MHL file should exist")
-        let mhlEntries = try MHLReader.read(url: mhlPath)
-        XCTAssertEqual(mhlEntries.count, 1)
-        XCTAssertEqual(mhlEntries[0].fileName, "source.bin")
+        // Verify MHL file per destination
+        let mhl1 = dest1.appendingPathComponent(".filmcan/hashlists/source.bin.mhl")
+        let mhl2 = dest2.appendingPathComponent(".filmcan/hashlists/source.bin.mhl")
+        XCTAssertTrue(fm.fileExists(atPath: mhl1.path), "MHL should exist in dest1")
+        XCTAssertTrue(fm.fileExists(atPath: mhl2.path), "MHL should exist in dest2")
+        let entries1 = try MHLReader.read(url: mhl1)
+        XCTAssertEqual(entries1.count, 1)
+        XCTAssertEqual(entries1[0].fileName, "source.bin")
+        let entries2 = try MHLReader.read(url: mhl2)
+        XCTAssertEqual(entries2.count, 1)
+        XCTAssertEqual(entries2[0].fileName, "source.bin")
     }
 
     func test_fanOut_sourceNotFound() async throws {
@@ -86,7 +91,7 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             destinations: [
                 DestWriter.Config(destPath: tmpDir.path, displayName: "Dest",
                                  verifyMode: .paranoid, requiresFullFsync: false,
-                                 tempSuffix: ".filmcan-int", chunkSize: nil)
+                                 chunkSize: nil)
             ],
             verifyMode: .paranoid,
             mhlBasePath: nil,

@@ -28,8 +28,7 @@ struct TotalTransfersEditMode: View {
                             displayName: item.displayName,
                             verifyMode: item.verifyMode,
                             requiresFullFsync: item.requiresFullFsync,
-                            tempSuffix: ".filmcan-tmp",
-                            chunkSize: nil
+                                                        chunkSize: nil
                         )
                     }
                     onSave(updated)

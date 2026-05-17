@@ -28,7 +28,6 @@ final class FanOutCopierTests: XCTestCase {
                     displayName: "TestDest",
                     verifyMode: .paranoid,
                     requiresFullFsync: false,
-                    tempSuffix: ".filmcan-test",
                     chunkSize: 4096
                 )
             ],

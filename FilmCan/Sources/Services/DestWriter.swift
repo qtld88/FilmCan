@@ -1,17 +1,18 @@
 import Foundation
+import Darwin
 
+/// Receives chunks via actor-safe methods, writes to a temp file,
+/// then atomically renames to the final destination on finalize.
 actor DestWriter {
-    enum Error: Swift.Error, LocalizedError {
-        case destSetupFailed(String)
+    enum WriterError: Swift.Error, LocalizedError {
+        case createFailed(String)
         case writeFailed(String)
-        case verifyFailed(String)
         case finalizeFailed(String)
 
         var errorDescription: String? {
             switch self {
-            case .destSetupFailed(let s): return "Destination setup failed: \(s)"
+            case .createFailed(let s): return "Create failed: \(s)"
             case .writeFailed(let s): return "Write failed: \(s)"
-            case .verifyFailed(let s): return "Verify failed: \(s)"
             case .finalizeFailed(let s): return "Finalize failed: \(s)"
             }
         }
@@ -22,29 +23,115 @@ actor DestWriter {
         var displayName: String
         var verifyMode: VerifyMode
         var requiresFullFsync: Bool
-        var tempSuffix: String
         var chunkSize: Int?
     }
 
-    private let config: Config
-    private var copier: FileStreamCopier
+    private let destPath: String
+    private let displayName: String
+    private let verifyMode: VerifyMode
+    private let requiresFullFsync: Bool
+    private let mhlWriter: MHLWriter?
 
-    init(config: Config) async {
-        self.config = config
-        copier = FileStreamCopier()
-        await copier.configure(requiresFullFsync: config.requiresFullFsync, chunkSizeOverride: config.chunkSize)
+    private var tempFileURL: URL?
+    private var writeHandle: FileHandle?
+    private var finalized = false
+
+    private let fm = FileManager.default
+
+    init(
+        destPath: String,
+        displayName: String,
+        verifyMode: VerifyMode,
+        requiresFullFsync: Bool,
+        mhlURL: URL?,
+        sourceName: String
+    ) async throws {
+        self.destPath = destPath
+        self.displayName = displayName
+        self.verifyMode = verifyMode
+        self.requiresFullFsync = requiresFullFsync
+
+        // Set up MHL writer lazily or eagerly? Eager: we know sourceName at init.
+        if let mhlURL {
+            let dir = mhlURL.deletingLastPathComponent()
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            self.mhlWriter = try MHLWriter(url: mhlURL, sourceName: sourceName)
+        } else {
+            self.mhlWriter = nil
+        }
+
+        try setupTempFile()
     }
 
-    func writeChunk(_ chunk: Data, relativePath: String) async throws {
-        // Chunk received — can optionally write to temp file
-        // Actual implementation in fan-out pipeline
+    private func setupTempFile() throws {
+        let destURL = URL(fileURLWithPath: destPath)
+        let parent = destURL.deletingLastPathComponent()
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+
+        let uuid = UUID().uuidString
+        let tempName = ".filmcan-\(uuid)-\(destURL.lastPathComponent)"
+        let tempURL = parent.appendingPathComponent(tempName)
+
+        guard fm.createFile(atPath: tempURL.path, contents: nil) else {
+            throw WriterError.createFailed(tempURL.path)
+        }
+        tempFileURL = tempURL
+
+        let handle = try FileHandle(forWritingTo: tempURL)
+        _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
+        writeHandle = handle
     }
 
-    func finalizeFile(relativePath: String, sourceHash: String) async throws -> DestResult {
-        // Atomic finalize: rename .filmcan-<uuid>-<name> to <name>
-        // Verify if paranoid mode
-        // Return DestResult
-        DestResult(destinationPath: config.destPath, displayName: config.displayName, success: true,
-                   verifyMode: config.verifyMode)
+    /// Append a data chunk to the temp file.
+    func write(data: Data) throws {
+        guard let handle = writeHandle else {
+            throw WriterError.writeFailed("No write handle (already finalized?)")
+        }
+        try handle.write(contentsOf: data)
+    }
+
+    /// Flush, fsync, close, then atomically rename temp → final destination.
+    func finalize(fileHash: String, sourceSize: Int64) throws {
+        guard !finalized, let tempURL = tempFileURL, let handle = writeHandle else { return }
+        finalized = true
+
+        if requiresFullFsync {
+            let fd = handle.fileDescriptor
+            if fcntl(fd, F_FULLFSYNC) == -1 {
+                fsync(fd)
+            }
+        } else {
+            try handle.synchronize()
+        }
+
+        try handle.close()
+        writeHandle = nil
+
+        let destURL = URL(fileURLWithPath: destPath)
+
+        // POSIX rename(2) — atomic within the same volume
+        let ok = tempURL.withUnsafeFileSystemRepresentation { tRep in
+            destURL.withUnsafeFileSystemRepresentation { dRep in
+                guard let t = tRep, let d = dRep else { return false }
+                return Darwin.rename(t, d) == 0
+            }
+        }
+
+        guard ok else {
+            throw WriterError.finalizeFailed("rename(2) failed for \(destURL.path)")
+        }
+    }
+
+    /// Append this file's hash to the per-destination MHL.
+    func appendMHL(hash: String, fileName: String) async throws {
+        try await mhlWriter?.append(hash: hash, fileName: fileName)
+        try await mhlWriter?.flush()
+    }
+
+    deinit {
+        if !finalized, let tempURL = tempFileURL {
+            try? writeHandle?.close()
+            try? fm.removeItem(at: tempURL)
+        }
     }
 }
