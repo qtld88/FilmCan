@@ -117,6 +117,73 @@ final class RepairFailedDestTests: XCTestCase {
         XCTAssertEqual(updated?.success, true, "Failed dest entry should flip to success after repair")
     }
 
+    /// Source branch: when the original source is still mounted, repair should
+    /// re-copy the source into the failed dest using the fan-out engine.
+    func test_repairFailedDest_fromSource_recopiesSourceFile() async throws {
+        let fm = FileManager.default
+
+        // Source file that "still exists" on disk.
+        let sourceURL = tmpDir.appendingPathComponent("clip.bin")
+        let sourceData = Data((0..<128 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try sourceData.write(to: sourceURL)
+
+        let sibling = DestResult(
+            destinationPath: tmpDir.appendingPathComponent("ignored-sibling").path,
+            displayName: "ignored",
+            success: true,
+            filesTransferred: 1,
+            filesSkipped: 0,
+            filesFailedAfterCopy: 0,
+            bytesTransferred: Int64(sourceData.count),
+            failureReason: nil,
+            mhlPath: nil,
+            durationSec: 1,
+            verifyMode: .paranoid
+        )
+        let failedRoot = tmpDir.appendingPathComponent("failed-src")
+        try fm.createDirectory(at: failedRoot, withIntermediateDirectories: true)
+        let failed = DestResult(
+            destinationPath: failedRoot.path,
+            displayName: "failed",
+            success: false,
+            filesTransferred: 0,
+            filesSkipped: 0,
+            filesFailedAfterCopy: 1,
+            bytesTransferred: 0,
+            failureReason: .ioError("simulated"),
+            mhlPath: nil,
+            durationSec: 0,
+            verifyMode: .paranoid
+        )
+
+        let vm = TransferViewModel(isBackgroundWorker: true)
+        vm.currentSources = [sourceURL.path]
+        var parent = TransferResult(
+            configurationName: "test",
+            destination: failedRoot.path,
+            startTime: Date(),
+            endTime: Date(),
+            success: false,
+            errorMessage: "1 destination(s) failed",
+            warningMessage: nil,
+            filesTransferred: 1,
+            bytesTransferred: Int64(sourceData.count),
+            totalBytes: Int64(sourceData.count),
+            filesSkipped: 0,
+            errors: [],
+            hashListPath: nil,
+            wasVerified: true
+        )
+        parent.destinationResults = [sibling, failed]
+        vm.results = [parent]
+
+        let ok = await vm.repairFailedDest(failed: failed, sibling: sibling, choice: .fromSource)
+
+        XCTAssertTrue(ok, "Source repair should succeed when source is reachable")
+        XCTAssertTrue(fm.fileExists(atPath: failedRoot.appendingPathComponent("clip.bin").path))
+        XCTAssertEqual(try Data(contentsOf: failedRoot.appendingPathComponent("clip.bin")), sourceData)
+    }
+
     // Helper: compute xxh128 hex of a file by feeding it through XXH128StreamingHasher in 64KB chunks.
     private func xxh128Hex(of url: URL) async throws -> String {
         let handle = try FileHandle(forReadingFrom: url)

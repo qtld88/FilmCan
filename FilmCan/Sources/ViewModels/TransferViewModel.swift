@@ -1990,9 +1990,51 @@ class TransferViewModel: ObservableObject {
             }
             return allOK
         case .fromSource:
-            // Source-branch repair lands in Task 3. For now, surface a clear "not yet wired" failure
-            // rather than silently doing nothing.
-            return false
+            let sources = currentSources
+            guard !sources.isEmpty else { return false }
+            // Sanity check: every source path must still exist on disk before we attempt re-copy.
+            let fm = FileManager.default
+            for path in sources {
+                if !fm.fileExists(atPath: path) { return false }
+            }
+            let info = DriveSpeedClassifier.info(for: failed.destinationPath)
+            let destCfg = DestWriter.Config(
+                destPath: failed.destinationPath,
+                displayName: failed.displayName,
+                verifyMode: failed.verifyMode,
+                requiresFullFsync: DriveSpeedClassifier.requiresFullFsync(info),
+                chunkSize: nil
+            )
+            let service = CustomCopierService()
+            let recovered: TransferResult
+            do {
+                recovered = try await service.runCopyFanOut(
+                    sources: sources,
+                    fanOutDestinations: [destCfg],
+                    configName: "repair",
+                    organizationPreset: nil,
+                    copyFolderContents: false,
+                    useHashListPrecheck: false,
+                    hashListPath: nil,
+                    fileOrdering: .defaultOrder,
+                    duplicatePolicy: .ask,
+                    duplicateCounterTemplate: "",
+                    duplicateResolver: nil,
+                    verifyMode: failed.verifyMode,
+                    dryRun: false,
+                    progressHandler: nil
+                )
+            } catch {
+                return false
+            }
+            let allOK = recovered.destinationResults.allSatisfy { $0.success }
+            if allOK {
+                patchDestResultToSuccess(
+                    destPath: failed.destinationPath,
+                    filesTransferred: recovered.filesTransferred
+                )
+            }
+            return allOK
         }
     }
 
