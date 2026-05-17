@@ -17,12 +17,13 @@ struct MultiDestSummaryView: View {
 struct DestProgressTile: View {
     let progress: DestProgress
 
-    private var etaFormatter: DateComponentsFormatter {
+    private static let etaFormatter: DateComponentsFormatter = {
         let f = DateComponentsFormatter()
         f.allowedUnits = [.hour, .minute, .second]
         f.unitsStyle = .abbreviated
+        f.zeroFormattingBehavior = .dropAll
         return f
-    }
+    }()
 
     var statusColor: Color {
         switch progress.status {
@@ -92,7 +93,7 @@ struct DestProgressTile: View {
 
             // ETA
             if let eta = progress.estimatedTimeRemaining, eta > 0 {
-                Text("ETA: \(etaFormatter.string(from: eta) ?? "")")
+                    Text("ETA: \(Self.etaFormatter.string(from: eta) ?? "")")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
