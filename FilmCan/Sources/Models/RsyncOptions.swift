@@ -104,8 +104,6 @@ extension RsyncOptions: Codable {
         case parallelCopyEnabled, customVerifyEnabled, verificationMode
     }
 
-    // Memberwise init is synthesized by Swift — no explicit declaration needed.
-
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         copyEngine = try c.decodeIfPresent(CopyEngine.self, forKey: .copyEngine) ?? .rsync

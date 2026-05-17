@@ -5,51 +5,51 @@ enum BoundedChannelError: Error, Equatable {
 }
 
 actor BoundedChannel<Element: Sendable> {
-    private var buffer: [Element]
-    private var receiverContinuation: CheckedContinuation<Void, Never>?
-    private var senderContinuation: CheckedContinuation<Void, Never>?
+    private var buffer: [Element] = []
+    private var senderContinuations: [UnsafeContinuation<Void, Never>] = []
+    private var receiverContinuations: [UnsafeContinuation<Void, Never>] = []
     private var isFinished = false
     private let capacity: Int
 
     init(capacity: Int) {
         self.capacity = Swift.max(capacity, 1)
-        buffer = []
     }
 
     func send(_ element: Element) async {
-        while buffer.count >= capacity && !isFinished {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                senderContinuation = cont
+        if isFinished { return }
+        if buffer.count >= capacity {
+            await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
+                senderContinuations.append(cont)
             }
+            if isFinished { return }
         }
-        // When woken by finish(), the while loop exits.
-        // Append anyway so in-flight sends are not lost.
         buffer.append(element)
-        receiverContinuation?.resume()
-        receiverContinuation = nil
+        if !receiverContinuations.isEmpty {
+            receiverContinuations.removeFirst().resume()
+        }
     }
 
     func receive() async throws -> Element {
-        while buffer.isEmpty && !isFinished {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                receiverContinuation = cont
+        if buffer.isEmpty && isFinished { throw BoundedChannelError.finished }
+        if buffer.isEmpty {
+            await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
+                receiverContinuations.append(cont)
             }
-        }
-        if buffer.isEmpty, isFinished {
-            throw BoundedChannelError.finished
+            if buffer.isEmpty && isFinished { throw BoundedChannelError.finished }
         }
         let val = buffer.removeFirst()
-        senderContinuation?.resume()
-        senderContinuation = nil
+        if !senderContinuations.isEmpty {
+            senderContinuations.removeFirst().resume()
+        }
         return val
     }
 
     func finish() {
         isFinished = true
-        receiverContinuation?.resume()
-        receiverContinuation = nil
-        senderContinuation?.resume()
-        senderContinuation = nil
+        for cont in senderContinuations { cont.resume() }
+        senderContinuations.removeAll()
+        for cont in receiverContinuations { cont.resume() }
+        receiverContinuations.removeAll()
     }
 }
 
@@ -61,9 +61,12 @@ extension BoundedChannel: AsyncSequence {
                 return try await channel.receive()
             } catch BoundedChannelError.finished {
                 return nil
+            } catch {
+                throw error
             }
         }
     }
+
     nonisolated func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(channel: self)
     }

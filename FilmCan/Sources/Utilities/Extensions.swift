@@ -94,18 +94,12 @@ enum FilmCanPaths {
 }
 
 extension FileHandle {
-    func readUpToLengthOrThrow(_ length: Int) throws -> Data {
+    func readUpToLength(_ length: Int) throws -> Data? {
         if #available(macOS 10.15.4, *) {
-            guard let data = try self.read(upToCount: length) else {
-                throw FileCopyError.readFailed
-            }
-            return data
+            return try self.read(upToCount: length)
         } else {
             let data = self.readData(ofLength: length)
-            if data.isEmpty {
-                throw FileCopyError.readFailed
-            }
-            return data
+            return data.isEmpty ? nil : data
         }
     }
 }
@@ -126,9 +120,9 @@ extension Notification.Name {
 extension TransferProgress {
     func incorporate(_ dest: DestProgress) {
         totalBytes = max(totalBytes, dest.bytesTotal)
-        bytesCompleted += dest.bytesCompleted
+        bytesCompleted = dest.bytesCompleted
         filesTotal = max(filesTotal, dest.filesTotal)
-        filesCompleted += dest.filesCompleted
+        filesCompleted = dest.filesCompleted
         // Track worst status
         switch dest.status {
         case .pending: if currentTask.isEmpty { currentTask = dest.displayName }

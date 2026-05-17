@@ -64,6 +64,9 @@ class TransferProgress: ObservableObject {
     @Published var currentTask: String = ""
     @Published var completedFiles: [String] = []
 
+    // Per-destination progress tracking (fan-out copies)
+    @Published var perDestProgress: [DestProgress] = []
+
     // Error tracking
     @Published var currentError: String? = nil
     @Published var hasError: Bool = false
@@ -166,6 +169,14 @@ class TransferProgress: ObservableObject {
         return min(1.0, Double(sourceHashingFilesCompleted) / Double(sourceHashingFilesTotal))
     }
 
+    var aggregateBytesCompleted: Int64 {
+        perDestProgress.reduce(0) { $0 + $1.bytesCompleted }
+    }
+
+    var aggregateEstimatedTimeRemaining: TimeInterval? {
+        perDestProgress.compactMap { $0.estimatedTimeRemaining }.max()
+    }
+
     init() {}
 
     func resetProgress() {
@@ -197,6 +208,7 @@ class TransferProgress: ObservableObject {
         copyingDone = false
         currentFile = ""
         completedFiles = []
+        perDestProgress = []
         currentError = nil
         hasError = false
     }

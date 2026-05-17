@@ -35,7 +35,7 @@ final class BoundedChannelTests: XCTestCase {
     }
 
     func test_iteration_finishes() async throws {
-        let ch = BoundedChannel<Int>(capacity: 4)
+        let ch = BoundedChannel<Int>(capacity: 8)
         async let producer: Void = {
             for i in 0..<5 { await ch.send(i) }
             await ch.finish()
@@ -56,5 +56,21 @@ final class BoundedChannelTests: XCTestCase {
         for try await val in ch { results.append(val) }
         await producer
         XCTAssertEqual(results.sorted(), Array(0..<20))
+    }
+
+    func test_concurrent_multiProducer() async throws {
+        let ch = BoundedChannel<Int>(capacity: 4)
+        async let p1: Void = {
+            for i in 0..<10 { await ch.send(i) }
+        }()
+        async let p2: Void = {
+            for i in 10..<20 { await ch.send(i) }
+        }()
+        async let consumer: Void = try {
+            var results: [Int] = []
+            for try await val in ch { results.append(val) }
+            XCTAssertEqual(results.sorted(), Array(0..<20))
+        }()
+        await p1; await p2; await ch.finish(); try await consumer
     }
 }

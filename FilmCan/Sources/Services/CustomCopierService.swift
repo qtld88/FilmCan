@@ -832,7 +832,13 @@ class CustomCopierService: ObservableObject, TransferService {
         progressHandler: (@Sendable ([DestProgress]) -> Void)?
     ) async throws -> TransferResult {
         let startTime = Date()
-        let mhlBasePath = fanOutDestinations.first?.destPath
+        let mhlBasePath: String? = nil
+
+        let accumulator = ProgressAccumulator { progresses in
+            Task { @MainActor in
+                progressHandler?(progresses)
+            }
+        }
 
         let fanOutConfig = FanOutCopier.Configuration(
             sources: sources,
@@ -840,8 +846,8 @@ class CustomCopierService: ObservableObject, TransferService {
             verifyMode: verifyMode,
             mhlBasePath: mhlBasePath,
             dryRun: dryRun,
-            progressHandler: { prog in
-                progressHandler?([prog])
+            progressHandler: { [accumulator] prog in
+                Task { await accumulator.update(prog) }
             }
         )
 
@@ -859,7 +865,7 @@ class CustomCopierService: ObservableObject, TransferService {
             }
         }
 
-        return TransferResult(
+        var result = TransferResult(
             configurationName: configName,
             destination: fanOutDestinations.first?.destPath ?? "",
             startTime: startTime,
@@ -872,9 +878,11 @@ class CustomCopierService: ObservableObject, TransferService {
             totalBytes: totalBytes,
             filesSkipped: 0,
             errors: warnings,
-            hashListPath: nil,
+            hashListPath: destResults.compactMap(\.mhlPath).first,
             wasVerified: verifyMode == .paranoid && failedCount == 0
         )
+        result.destinationResults = destResults
+        return result
     }
 
     @MainActor
@@ -1227,5 +1235,21 @@ class CustomCopierService: ObservableObject, TransferService {
             return min(2, scaled)
         }
         return 1
+    }
+}
+
+// MARK: - Fan-out progress accumulator
+
+actor ProgressAccumulator {
+    var progresses: [String: DestProgress] = [:]
+    let handler: @Sendable ([DestProgress]) -> Void
+
+    init(handler: @escaping @Sendable ([DestProgress]) -> Void) {
+        self.handler = handler
+    }
+
+    func update(_ prog: DestProgress) {
+        progresses[prog.id] = prog
+        handler(Array(progresses.values))
     }
 }

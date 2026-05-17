@@ -25,6 +25,7 @@ struct TransferResult: Identifiable {
     var sourceHashes: [String: String] = [:]
     var wasPaused: Bool = false
     var wasVerified: Bool = false
+    var destinationResults: [DestResult] = []
     var organizationPresetName: String? = nil
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy? = nil
     var duplicateHits: Int = 0

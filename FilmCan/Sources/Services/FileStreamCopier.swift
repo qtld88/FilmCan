@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import os
 
 struct FileCopyResult {
     let sourcePath: String
@@ -61,11 +62,14 @@ actor FileStreamCopier {
         let fd = handle.fileDescriptor
         let ret = fcntl(fd, F_NOCACHE, 1)
         if ret == -1 {
-            // F_NOCACHE not supported by this filesystem — best-effort, skip
+            #if DEBUG
+            os_log("F_NOCACHE failed for %{public}@ (fd=%d): %{public}s",
+                   path, fd, strerror(errno))
+            #endif
         }
     }
 
-    private func fullFsyncIfNeeded(destHandle: FileHandle, destPath: String) throws {
+    private func fullFsyncIfNeeded(destHandle: FileHandle, destPath: String, requiresFullFsync: Bool) throws {
         guard requiresFullFsync else { return }
         let fd = destHandle.fileDescriptor
         let ret = fcntl(fd, F_FULLFSYNC)
@@ -74,8 +78,8 @@ actor FileStreamCopier {
         }
     }
 
-    /// Copy file with source hashing, return immediately without verifying destination
-    /// Call computeFileHash() later to check destination hash
+    /// Copy file with instance-level fsync/chunk config and source hashing.
+    /// Returns immediately without verifying destination — call computeFileHash() later.
     func copyFile(
         source: String,
         destination: String,
@@ -83,6 +87,53 @@ actor FileStreamCopier {
         hashAlgorithm: FilmCanHashAlgorithm,
         shouldCancel: @Sendable () -> Bool,
         progressCallback: @Sendable (Int64) -> Void
+    ) async throws -> FileCopyResult {
+        return try await copyFileWithConfig(
+            source: source,
+            destination: destination,
+            hashDuringCopy: hashDuringCopy,
+            hashAlgorithm: hashAlgorithm,
+            shouldCancel: shouldCancel,
+            progressCallback: progressCallback,
+            requiresFullFsync: requiresFullFsync,
+            chunkSize: chunkSizeOverride ?? defaultBufferSize
+        )
+    }
+
+    /// Per-call configured copy — safe for concurrent pipelines.
+    /// Accepts fsync and chunk size as parameters instead of relying on mutable actor state.
+    func copyFileConfigured(
+        source: String,
+        destination: String,
+        requiresFullFsync: Bool,
+        chunkSize: Int,
+        hashDuringCopy: Bool = true,
+        hashAlgorithm: FilmCanHashAlgorithm,
+        shouldCancel: @Sendable () -> Bool,
+        progressCallback: @Sendable (Int64) -> Void
+    ) async throws -> FileCopyResult {
+        return try await copyFileWithConfig(
+            source: source,
+            destination: destination,
+            hashDuringCopy: hashDuringCopy,
+            hashAlgorithm: hashAlgorithm,
+            shouldCancel: shouldCancel,
+            progressCallback: progressCallback,
+            requiresFullFsync: requiresFullFsync,
+            chunkSize: chunkSize
+        )
+    }
+
+    /// Shared implementation used by both copyFile and copyFileConfigured.
+    private func copyFileWithConfig(
+        source: String,
+        destination: String,
+        hashDuringCopy: Bool = true,
+        hashAlgorithm: FilmCanHashAlgorithm,
+        shouldCancel: @Sendable () -> Bool,
+        progressCallback: @Sendable (Int64) -> Void,
+        requiresFullFsync: Bool,
+        chunkSize: Int
     ) async throws -> FileCopyResult {
         let fm = FileManager.default
         guard fm.isReadableFile(atPath: source) else {
@@ -131,7 +182,7 @@ actor FileStreamCopier {
         let isExFAT = isExFATFilesystem(path: destination)
         // Handle empty files explicitly
         let sourceSize = Int64((try? fm.attributesOfItem(atPath: source)[.size] as? NSNumber)?.int64Value ?? 0)
-        let bufferSize = chunkSizeOverride ?? (isExFAT ? exfatBufferSize : defaultBufferSize)
+        let bufferSize = isExFAT ? exfatBufferSize : chunkSize
         if sourceSize == 0 {
             let emptyHash: Data? = hashDuringCopy ? sourceHasher?.finalize() : nil
             try? copyFileAttributes(from: source, to: destination)
@@ -195,7 +246,7 @@ actor FileStreamCopier {
             }
         }
 
-        try fullFsyncIfNeeded(destHandle: destHandle, destPath: destination)
+        try fullFsyncIfNeeded(destHandle: destHandle, destPath: destination, requiresFullFsync: requiresFullFsync)
 
         let sourceHash: Data?
         if let hasher = sourceHasher {
@@ -263,6 +314,7 @@ actor FileStreamCopier {
             throw FileCopyError.sourceNotReadable(path)
         }
         defer { try? handle.close() }
+        fcntl(handle.fileDescriptor, F_NOCACHE, 1)
 
         let bufferSize = isExFATFilesystem(path: path) ? exfatBufferSize : defaultBufferSize
         guard let hasher = makeHasher(algorithm: algorithm) else {
