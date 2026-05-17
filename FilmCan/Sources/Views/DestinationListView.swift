@@ -259,7 +259,8 @@ struct DestinationListView: View {
             configId: configId,
             progress: progress
         )
-        let showProgress = presentation.shouldShowInfo
+        let isFanOutActive = !progress.perDestProgress.isEmpty
+        let showProgress = presentation.shouldShowInfo && !isFanOutActive
         let status = presentation.status
         let progressLabelWidth: CGFloat = 120
         let percentLabelWidth: CGFloat = 42

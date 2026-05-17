@@ -143,50 +143,72 @@ class TransferViewModel: ObservableObject {
         let destinations = activeConfig.destinationPaths
         let organizationPreset = resolveOrganizationPreset(for: activeConfig)
         let sources = activeConfig.sourcePaths
-        
-        for source in sources {
-            if isCancellingAll || isPausingAll { break }
-            currentDestinationIndex = 0
-            let sourceList = [source]
-            currentSources = sourceList
-            let sourceResults: [TransferResult]
-            if activeConfig.runInParallel {
-                sourceResults = await runParallel(
-                    destinations: destinations,
-                    sources: sourceList,
-                    config: activeConfig,
-                    organizationPreset: organizationPreset
-                )
-            } else {
-                sourceResults = await runSequential(
-                    destinations: destinations,
-                    sources: sourceList,
-                    config: activeConfig,
-                    organizationPreset: organizationPreset
-                )
-            }
-            if duplicatePromptCancelled {
-                isTransferring = false
-                driveCapacitySnapshot.removeAll()
-                currentService = nil
-                resetDuplicatePromptState()
-                clearLastRun(for: activeConfig.id)
-                if !isBackgroundWorker {
-                    activeTransferConfigIds.remove(activeConfig.id)
-                }
-                return
-            }
+
+        if activeConfig.rsyncOptions.copyEngine == .custom {
+            // Fan-out: all sources → all dests in one pass
+            currentSources = sources
+            let fanOutResult = await runFanOut(
+                destinations: destinations,
+                sources: sources,
+                config: activeConfig,
+                organizationPreset: organizationPreset
+            )
             await recordHistory(
                 config: activeConfig,
-                sources: sourceList,
-                results: sourceResults,
+                sources: sources,
+                results: [fanOutResult],
                 preset: organizationPreset
             )
             await sendSourceNotifications(
-                source: source,
+                source: sources.first ?? "",
                 config: activeConfig,
-                results: sourceResults
+                results: [fanOutResult]
             )
+        } else {
+            for source in sources {
+                if isCancellingAll || isPausingAll { break }
+                currentDestinationIndex = 0
+                let sourceList = [source]
+                currentSources = sourceList
+                let sourceResults: [TransferResult]
+                if activeConfig.runInParallel {
+                    sourceResults = await runParallel(
+                        destinations: destinations,
+                        sources: sourceList,
+                        config: activeConfig,
+                        organizationPreset: organizationPreset
+                    )
+                } else {
+                    sourceResults = await runSequential(
+                        destinations: destinations,
+                        sources: sourceList,
+                        config: activeConfig,
+                        organizationPreset: organizationPreset
+                    )
+                }
+                if duplicatePromptCancelled {
+                    isTransferring = false
+                    driveCapacitySnapshot.removeAll()
+                    currentService = nil
+                    resetDuplicatePromptState()
+                    clearLastRun(for: activeConfig.id)
+                    if !isBackgroundWorker {
+                        activeTransferConfigIds.remove(activeConfig.id)
+                    }
+                    return
+                }
+                await recordHistory(
+                    config: activeConfig,
+                    sources: sourceList,
+                    results: sourceResults,
+                    preset: organizationPreset
+                )
+                await sendSourceNotifications(
+                    source: source,
+                    config: activeConfig,
+                    results: sourceResults
+                )
+            }
         }
         
         isTransferring = false
@@ -979,7 +1001,86 @@ class TransferViewModel: ObservableObject {
         cancelAll()
         submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
     }
-    
+
+    // MARK: - Fan-out engine
+
+    private func runFanOut(
+        destinations: [String],
+        sources: [String],
+        config: BackupConfiguration,
+        organizationPreset: OrganizationPreset?
+    ) async -> TransferResult {
+        let service = CustomCopierService()
+        currentService = service
+        activeServices = [service]
+
+        let verifyMode = config.rsyncOptions.verificationMode
+        let fanOutDests: [DestWriter.Config] = destinations.map { destPath in
+            let info = DriveSpeedClassifier.info(for: destPath)
+            return DestWriter.Config(
+                destPath: destPath,
+                displayName: (destPath as NSString).lastPathComponent,
+                verifyMode: verifyMode,
+                requiresFullFsync: DriveSpeedClassifier.requiresFullFsync(info),
+                chunkSize: nil
+            )
+        }
+
+        do {
+            defer {
+                Task { @MainActor in
+                    self.activeSourceByDestination.removeAll()
+                }
+            }
+            let result = try await service.runCopyFanOut(
+                sources: sources,
+                fanOutDestinations: fanOutDests,
+                configName: config.name,
+                organizationPreset: organizationPreset,
+                copyFolderContents: config.copyFolderContents,
+                useHashListPrecheck: config.rsyncOptions.customVerifyEnabled,
+                hashListPath: nil,
+                fileOrdering: config.rsyncOptions.fileOrdering,
+                duplicatePolicy: config.duplicatePolicy,
+                duplicateCounterTemplate: config.duplicateCounterTemplate,
+                duplicateResolver: nil,
+                verifyMode: verifyMode,
+                dryRun: false,
+                progressHandler: { [weak self] progresses in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.progress.perDestProgress = progresses
+                        self.progress.syncFromPerDest()
+                        if let firstDest = destinations.first {
+                            self.destinationProgress[firstDest] = self.progress.overallProgress
+                        }
+                    }
+                }
+            )
+            results.append(result)
+            return result
+        } catch {
+            let failed = TransferResult(
+                configurationName: config.name,
+                destination: destinations.first ?? "",
+                startTime: transferStartTime ?? Date(),
+                endTime: Date(),
+                success: false,
+                errorMessage: error.localizedDescription,
+                warningMessage: nil,
+                filesTransferred: 0,
+                bytesTransferred: 0,
+                totalBytes: 0,
+                filesSkipped: 0,
+                errors: [error.localizedDescription],
+                hashListPath: nil,
+                wasVerified: false
+            )
+            results.append(failed)
+            return failed
+        }
+    }
+
     private func runSingleTransfer(
         sources: [String],
         destination: String,

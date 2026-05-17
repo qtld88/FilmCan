@@ -403,6 +403,20 @@ actor FanOutCopier {
 
         var corrupted = false
         if config.verifyMode == .paranoid {
+            // Emit verify-start progress for each successful destination
+            for r in writerResults where r.success {
+                var prog = DestProgress(
+                    id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                    status: .active, bytesTotal: sourceSize,
+                    filesTotal: config.sources.count, verifyMode: .paranoid
+                )
+                prog.bytesCompleted = sourceSize
+                prog.filesCompleted = 1
+                prog.verifyBytesTotal = sourceSize
+                prog.verifyBytesCompleted = 0
+                prog.currentFile = "Verifying \(sourceName)…"
+                config.progressHandler?(prog)
+            }
             let sourceHashFromDisk = await rereadHash(url: sourceURL, chunkSz: chunkSz)
             if let diskHash = sourceHashFromDisk, diskHash != verifiedSourceHash {
                 corrupted = true
@@ -422,12 +436,27 @@ actor FanOutCopier {
                         }
                     }
                     for await (destPath, hash) in group {
+                        let hashMatchesExpected = hash == verifiedSourceHash
                         if let h = hash, h != verifiedSourceHash {
                             verifyFailed.insert(destPath)
                             let destFile = URL(fileURLWithPath: destPath).appendingPathComponent(sourceName)
                             try? fm.removeItem(at: destFile)
                         } else if hash == nil {
                             verifyFailed.insert(destPath)
+                        }
+                        if let progDest = writerResults.first(where: { $0.destPath == destPath }) {
+                            var prog = DestProgress(
+                                id: destPath, displayName: (destPath as NSString).lastPathComponent,
+                                status: hashMatchesExpected ? .complete : .failed(.verify),
+                                bytesTotal: sourceSize, filesTotal: config.sources.count,
+                                verifyMode: .paranoid
+                            )
+                            prog.bytesCompleted = sourceSize
+                            prog.filesCompleted = 1
+                            prog.verifyBytesTotal = sourceSize
+                            prog.verifyBytesCompleted = sourceSize
+                            prog.currentFile = hashMatchesExpected ? "✓ \(sourceName)" : "✗ \(sourceName)"
+                            config.progressHandler?(prog)
                         }
                     }
                 }

@@ -26,20 +26,48 @@ struct DestProgressTile: View {
         }
     }
 
+    var verifyProgress: Double {
+        guard progress.verifyBytesTotal > 0 else { return 0 }
+        return min(Double(progress.verifyBytesCompleted) / Double(progress.verifyBytesTotal), 1.0)
+    }
+
+    var isVerifying: Bool { progress.verifyBytesTotal > 0 && progress.verifyBytesCompleted < progress.verifyBytesTotal }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Header row: status dot, name, checkmark
             HStack {
                 Circle().fill(statusColor).frame(width: 8, height: 8)
                 Text(progress.displayName).font(.caption).bold()
                 Spacer()
-                if progress.isActive {
+                if progress.isComplete {
+                    if progress.verifyMode == .paranoid {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                    }
+                } else if progress.isActive {
                     ProgressView()
                         .scaleEffect(0.6)
                         .frame(width: 12, height: 12)
                 }
             }
+
+            // Copy progress bar
             ProgressView(value: progress.progressFraction)
                 .tint(statusColor)
+
+            // Verify progress bar (only when verify is active)
+            if isVerifying {
+                ProgressView(value: verifyProgress)
+                    .tint(.purple)
+            }
+
+            // Stats row: speed + bytes + files
             HStack {
                 Text(progress.speedFormatted)
                     .font(.caption2)
@@ -49,12 +77,37 @@ struct DestProgressTile: View {
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
+
+            // Bytes display
+            if progress.bytesTotal > 0 {
+                Text("\(ByteCountFormatter.string(fromByteCount: progress.bytesCompleted, countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: progress.bytesTotal, countStyle: .file))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            // ETA
+            if let eta = progress.estimatedTimeRemaining, eta > 0 {
+                Text("ETA: \(String(format: "%.0f", eta))s")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            // Current file / status
             if !progress.currentFile.isEmpty {
                 Text(progress.currentFile)
                     .font(.caption2)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundColor(.secondary)
+            }
+
+            // F_FULLFSYNC badge
+            if progress.requiresFullFsync {
+                HStack(spacing: 2) {
+                    Image(systemName: "lock.shield").font(.caption2)
+                    Text("F_FULLFSYNC").font(.caption2)
+                }
+                .foregroundColor(.orange)
             }
         }
         .padding(10)
