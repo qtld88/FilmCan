@@ -110,6 +110,32 @@ actor FanOutCopier {
         }
     }
 
+    /// One file to copy. `rootPath` is the original source entry the user picked
+    /// (file or directory). `relPath` is "" for a flat-file source; otherwise it's
+    /// the path inside the root tree, including subdirs.
+    private struct PlannedFile {
+        let rootPath: String
+        let rootName: String
+        let absPath: String
+        let relPath: String
+        let size: Int64
+    }
+
+    private var completedFilesByDest: [String: Int] = [:]
+    private var verifiedFilesByDest: [String: Int] = [:]
+
+    private func recordFileCompletion(destPath: String, totalFiles: Int) -> Bool {
+        let next = (completedFilesByDest[destPath] ?? 0) + 1
+        completedFilesByDest[destPath] = next
+        return next >= totalFiles
+    }
+
+    private func recordVerifyCompletion(destPath: String, totalFiles: Int) -> Bool {
+        let next = (verifiedFilesByDest[destPath] ?? 0) + 1
+        verifiedFilesByDest[destPath] = next
+        return next >= totalFiles
+    }
+
     nonisolated let config: Configuration
 
     init(config: Configuration) {
@@ -123,6 +149,9 @@ actor FanOutCopier {
         guard !config.destinations.isEmpty else { throw Error.noDestinations }
         guard !config.sources.isEmpty else { throw Error.sourceNotFound("(empty)") }
 
+        completedFilesByDest.removeAll()
+        verifiedFilesByDest.removeAll()
+
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
 
@@ -132,27 +161,43 @@ actor FanOutCopier {
         let ringCapBytes = Constants.ringCapBytesPerDest()
         let channelCapacity = max(2, ringCapBytes / max(1, chunkSz))
 
-        // Pre-compute source sizes for cumulative progress tracking
-        let sourceSizes: [Int64] = try config.sources.map { path in
-            let fm = FileManager.default
-            guard fm.fileExists(atPath: path) else {
+        // Validate roots up-front so caller gets a clear sourceNotFound error.
+        let fmPre = FileManager.default
+        for path in config.sources {
+            guard fmPre.fileExists(atPath: path) else {
                 throw Error.sourceNotFound(path)
             }
-            guard let attrs = try? fm.attributesOfItem(atPath: path),
-                  let size = attrs[.size] as? Int64 else {
-                throw Error.sourceReadFailed(path)
-            }
-            return size
         }
-        let totalBytesAllSources = sourceSizes.reduce(0, +)
 
-        // Pre-compute cumulative bytes before each source
-        var cumulativeBeforeSource: [Int: Int64] = [:]
-        var runningBytes: Int64 = 0
-        for (index, size) in sourceSizes.enumerated() {
-            cumulativeBeforeSource[index] = runningBytes
-            runningBytes += size
+        // Expand every source root into its constituent files. A flat-file root
+        // yields one PlannedFile with relPath == "" and rootName == basename.
+        // A directory root yields one PlannedFile per regular file under it.
+        let entries = await FileEnumerator.enumerateFiles(sources: config.sources, preset: nil)
+        guard !entries.isEmpty else {
+            throw Error.sourceReadFailed(config.sources.first ?? "")
         }
+
+        let plannedFiles: [PlannedFile] = entries.map { entry in
+            let rootName = (entry.sourceRoot as NSString).lastPathComponent
+            return PlannedFile(
+                rootPath: entry.sourceRoot,
+                rootName: rootName,
+                absPath: entry.sourcePath,
+                relPath: entry.sourceIsDirectory ? entry.relativePath : "",
+                size: entry.size
+            )
+        }
+        let totalBytesAllSources = plannedFiles.reduce(Int64(0)) { $0 + $1.size }
+
+        // Pre-compute cumulative bytes before each planned file.
+        var cumulativeBeforeFile: [Int64] = []
+        cumulativeBeforeFile.reserveCapacity(plannedFiles.count)
+        var runningBytes: Int64 = 0
+        for f in plannedFiles {
+            cumulativeBeforeFile.append(runningBytes)
+            runningBytes += f.size
+        }
+        let totalFiles = plannedFiles.count
 
         var builders: [String: DestResultBuilder] = [:]
         for dest in config.destinations {
@@ -163,61 +208,50 @@ actor FanOutCopier {
             )
         }
 
-        let sourceConcurrency = maxConcurrentSources()
-        let sources = config.sources
+        // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
+        let sourceConcurrency = max(1, distinctSourceDriveCount(forPaths: config.sources))
 
         let outcomes: [PerSourceOutcome] = try await withThrowingTaskGroup(of: PerSourceOutcome.self) { group in
-            var iter = sources.enumerated().makeIterator()
+            var iter = plannedFiles.enumerated().makeIterator()
             var inFlight = 0
-            for _ in 0..<min(sourceConcurrency, sources.count) {
-                if let (index, src) = iter.next() {
-                    let url = URL(fileURLWithPath: src)
-                    let name = url.lastPathComponent
-                    let size = sourceSizes[index]
-                    group.addTask { [self] in
-                        try await processSource(
-                            sourceURL: url,
-                            sourceName: name,
-                            sourceSize: size,
-                            cumulativeBytesBeforeSource: cumulativeBeforeSource[index] ?? 0,
-                            totalBytesAllSources: totalBytesAllSources,
-                            sourceIndex: index,
-                            totalSources: sources.count,
-                            channelCapacity: channelCapacity,
-                            chunkSz: chunkSz
-                        )
-                    }
-                    inFlight += 1
+
+            func enqueueNext() -> Bool {
+                guard let (index, file) = iter.next() else { return false }
+                let absURL = URL(fileURLWithPath: file.absPath)
+                let cumBefore = cumulativeBeforeFile[index]
+                group.addTask { [self] in
+                    try await processSource(
+                        sourceURL: absURL,
+                        sourceName: file.relPath.isEmpty ? (file.absPath as NSString).lastPathComponent : file.relPath,
+                        sourceSize: file.size,
+                        cumulativeBytesBeforeSource: cumBefore,
+                        totalBytesAllSources: totalBytesAllSources,
+                        sourceIndex: index,
+                        totalSources: totalFiles,
+                        channelCapacity: channelCapacity,
+                        chunkSz: chunkSz,
+                        rootName: file.rootName,
+                        relPath: file.relPath
+                    )
                 }
+                inFlight += 1
+                return true
             }
+
+            for _ in 0..<min(sourceConcurrency, plannedFiles.count) {
+                _ = enqueueNext()
+            }
+
             var collected: [PerSourceOutcome] = []
             while inFlight > 0 {
-                let outcome = try await group.next()!
+                guard let outcome = try await group.next() else { break }
                 inFlight -= 1
                 collected.append(outcome)
                 if outcome.sourceCorrupted {
                     group.cancelAll()
                     throw Error.sourceCorruption(outcome.sourcePath)
                 }
-                if let (index, src) = iter.next() {
-                    let url = URL(fileURLWithPath: src)
-                    let name = url.lastPathComponent
-                    let size = sourceSizes[index]
-                    group.addTask { [self] in
-                        try await processSource(
-                            sourceURL: url,
-                            sourceName: name,
-                            sourceSize: size,
-                            cumulativeBytesBeforeSource: cumulativeBeforeSource[index] ?? 0,
-                            totalBytesAllSources: totalBytesAllSources,
-                            sourceIndex: index,
-                            totalSources: sources.count,
-                            channelCapacity: channelCapacity,
-                            chunkSz: chunkSz
-                        )
-                    }
-                    inFlight += 1
-                }
+                _ = enqueueNext()
             }
             return collected
         }
@@ -242,6 +276,18 @@ actor FanOutCopier {
         return max(1, min(driveIds.count, config.sources.count))
     }
 
+    /// Distinguish source paths by their volume UUID (falling back to path)
+    /// so files on the same physical drive get the same concurrency slot.
+    private nonisolated func distinctSourceDriveCount(forPaths paths: [String]) -> Int {
+        var seen: Set<String> = []
+        for p in paths {
+            let info = DriveSpeedClassifier.info(for: p)
+            let key = info.volumeUUID ?? p
+            seen.insert(key)
+        }
+        return max(1, seen.count)
+    }
+
     /// Process one source file: open with F_NOCACHE, spawn per-dest writer tasks,
     /// broadcast chunks through bounded channels, then verify per config.verifyMode.
     /// cumulativeBytesBeforeSource is the sum of all earlier source sizes for correct progress tracking.
@@ -256,7 +302,9 @@ actor FanOutCopier {
         sourceIndex: Int,
         totalSources: Int,
         channelCapacity: Int,
-        chunkSz: Int
+        chunkSz: Int,
+        rootName: String,
+        relPath: String
     ) async throws -> PerSourceOutcome {
         let sourcePath = sourceURL.path
         let fm = FileManager.default
@@ -270,12 +318,22 @@ actor FanOutCopier {
 
         for destCfg in config.destinations {
             let channel = channels[destCfg.destPath]!
-            let destFileURL = URL(fileURLWithPath: destCfg.destPath)
-                .appendingPathComponent(sourceName)
+            let destRootURL = URL(fileURLWithPath: destCfg.destPath)
+                .appendingPathComponent(rootName)
+            let destFileURL: URL
+            if relPath.isEmpty {
+                // Flat-file source: write directly under destRoot.
+                destFileURL = destRootURL
+            } else {
+                destFileURL = destRootURL.appendingPathComponent(relPath)
+                // Ensure parent directory exists; ignore "already exists" failures.
+                let parent = destFileURL.deletingLastPathComponent()
+                try? FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+            }
             let mhlURL = URL(fileURLWithPath: destCfg.destPath)
                 .appendingPathComponent(".filmcan")
                 .appendingPathComponent("hashlists")
-                .appendingPathComponent("\(sourceName).mhl")
+                .appendingPathComponent("\(rootName).mhl")
             let progressHandler = config.progressHandler
 
             let task = Task<DestWriterResult, Never> {
@@ -367,7 +425,8 @@ actor FanOutCopier {
                 }
 
                 let duration = Date().timeIntervalSince(startTime)
-                let copyStatus: DestStatus = sourceIndex == totalSources - 1 ? .complete : .active
+                let isLastFile = await self.recordFileCompletion(destPath: destCfg.destPath, totalFiles: totalSources)
+                let copyStatus: DestStatus = isLastFile ? .complete : .active
                 var prog = DestProgress(
                     id: destCfg.destPath, displayName: destCfg.displayName,
                     status: copyStatus, bytesTotal: totalBytesAllSources,
@@ -441,12 +500,16 @@ actor FanOutCopier {
             throw Error.sourceReadFailed(sourcePath)
         }
 
+        func destFilePath(for base: String) -> String {
+            let root = URL(fileURLWithPath: base).appendingPathComponent(rootName)
+            return relPath.isEmpty ? root.path : root.appendingPathComponent(relPath).path
+        }
+
         var verifyFailed: Set<String> = []
         for r in writerResults where r.success {
             if let dh = r.destHashFromStream, dh != verifiedSourceHash {
                 verifyFailed.insert(r.destPath)
-                let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
-                try? fm.removeItem(at: destFile)
+                try? fm.removeItem(atPath: destFilePath(for: r.destPath))
             }
         }
 
@@ -470,17 +533,16 @@ actor FanOutCopier {
             if let diskHash = sourceHashFromDisk, diskHash != verifiedSourceHash {
                 corrupted = true
                 for r in writerResults where r.success {
-                    let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
-                    try? fm.removeItem(at: destFile)
+                    try? fm.removeItem(atPath: destFilePath(for: r.destPath))
                     verifyFailed.insert(r.destPath)
                 }
             } else {
                 await withTaskGroup(of: (String, String?).self) { group in
                     for r in writerResults where r.success && !verifyFailed.contains(r.destPath) {
-                        let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
+                        let destFileURL = URL(fileURLWithPath: destFilePath(for: r.destPath))
                         let destPath = r.destPath
                         group.addTask {
-                            let hash = await Self.rereadHashDetached(url: destFile, chunkSz: chunkSz)
+                            let hash = await Self.rereadHashDetached(url: destFileURL, chunkSz: chunkSz)
                             return (destPath, hash)
                         }
                     }
@@ -488,15 +550,15 @@ actor FanOutCopier {
                         let hashMatchesExpected = hash == verifiedSourceHash
                         if let h = hash, h != verifiedSourceHash {
                             verifyFailed.insert(destPath)
-                            let destFile = URL(fileURLWithPath: destPath).appendingPathComponent(sourceName)
-                            try? fm.removeItem(at: destFile)
+                            try? fm.removeItem(atPath: destFilePath(for: destPath))
                         } else if hash == nil {
                             verifyFailed.insert(destPath)
                         }
-                        if let progDest = writerResults.first(where: { $0.destPath == destPath }) {
+                        if let _ = writerResults.first(where: { $0.destPath == destPath }) {
                             let verifyDestStatus: DestStatus
                             if hashMatchesExpected {
-                                verifyDestStatus = sourceIndex == totalSources - 1 ? .complete : .active
+                                let isLastVerify = await self.recordVerifyCompletion(destPath: destPath, totalFiles: totalSources)
+                                verifyDestStatus = isLastVerify ? .complete : .active
                             } else {
                                 verifyDestStatus = .failed(.verify)
                             }
