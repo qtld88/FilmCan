@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import os
 
 /// Receives chunks via actor-safe methods, writes to a temp file,
 /// then atomically renames to the final destination on finalize.
@@ -98,6 +99,13 @@ actor DestWriter {
         if requiresFullFsync {
             let fd = handle.fileDescriptor
             if fcntl(fd, F_FULLFSYNC) == -1 {
+                os_log(
+                    "F_FULLFSYNC not honored on %{public}@ (errno=%d), falling back to fsync — drive cache flush not guaranteed",
+                    log: OSLog(subsystem: "com.filmcan.app", category: "DestWriter"),
+                    type: .error,
+                    destPath,
+                    errno
+                )
                 fsync(fd)
             }
         } else {

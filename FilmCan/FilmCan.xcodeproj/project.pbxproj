@@ -57,6 +57,7 @@
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
 		8E3A60028B4927FA5CD1C2A2 /* DryRunPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18663FD23B1C73B08D717384 /* DryRunPlanner.swift */; };
 		8EA1BB03FD52EB731E4D533E /* HashListNamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */; };
+		8FA18785A60525202826D859 /* ExFATBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */; };
 		9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0874AFE948C474D013C69931 /* LogSettingsView.swift */; };
 		939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */; };
 		94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01136E3DBB8977E8B301ACEB /* DriveAnchorPreferences.swift */; };
@@ -126,6 +127,7 @@
 		083A2D2BAD99B47EB86C5386 /* FilmCan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmCan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0874AFE948C474D013C69931 /* LogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSettingsView.swift; sourceTree = "<group>"; };
 		0D4C9259A7AF9ACBC20B9852 /* TransferHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferHistoryView.swift; sourceTree = "<group>"; };
+		0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATBanner.swift; sourceTree = "<group>"; };
 		1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransferViewModel+Presentation.swift"; sourceTree = "<group>"; };
 		13273CE3DB6E17D073212DFE /* BoundedChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedChannel.swift; sourceTree = "<group>"; };
 		13D3F43F96E0A035C1266F8F /* TransferViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferViewModel.swift; sourceTree = "<group>"; };
@@ -322,6 +324,14 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
+		AF355A7E1E1C3D2C68701E21 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		B22387782A170E938F3D7639 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
@@ -413,6 +423,7 @@
 				0D4C9259A7AF9ACBC20B9852 /* TransferHistoryView.swift */,
 				FB8B45E6010E1222A7826DC8 /* WindowTitleSetter.swift */,
 				6F0FBB1EB040F572390547E7 /* BackupEditor */,
+				AF355A7E1E1C3D2C68701E21 /* Components */,
 				B72B6ED553F49E64E76F329F /* Sheets */,
 			);
 			path = Views;
@@ -601,6 +612,7 @@
 				3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */,
 				CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */,
 				27F7F97E8A992AEC94CBD902 /* EngineHelpSheet.swift in Sources */,
+				8FA18785A60525202826D859 /* ExFATBanner.swift in Sources */,
 				9A5D1736A87B604795828764 /* Extensions.swift in Sources */,
 				029978F378E16E78F04A2F82 /* FanOutCopier.swift in Sources */,
 				7F628CD5790C2B611BEA65BB /* FileChooserView.swift in Sources */,

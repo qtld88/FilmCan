@@ -21,34 +21,18 @@ actor DryRunPlanner {
         var totalBytes: Int64 = 0
         var totalFiles = 0
         var warnings: [String] = []
+        var blockingErrors: [String] = []
 
         for sourcePath in sourcePaths {
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: sourcePath, isDirectory: &isDir) else {
-                warnings.append("Source not found: \(sourcePath)")
+            guard fm.fileExists(atPath: sourcePath) else {
+                blockingErrors.append("Source not found: \(sourcePath)")
                 continue
             }
-            if isDir.boolValue {
-                guard let enumerator = fm.enumerator(atPath: sourcePath) else {
-                    warnings.append("Cannot enumerate: \(sourcePath)")
-                    continue
-                }
-                for case let file as String in enumerator {
-                    let fullPath = (sourcePath as NSString).appendingPathComponent(file)
-                    if let attrs = try? fm.attributesOfItem(atPath: fullPath),
-                       let size = attrs[.size] as? Int64 {
-                        totalBytes += size
-                        totalFiles += 1
-                    }
-                }
-            } else {
-                if let attrs = try? fm.attributesOfItem(atPath: sourcePath),
-                   let size = attrs[.size] as? Int64 {
-                    totalBytes += size
-                    totalFiles += 1
-                }
-            }
         }
+
+        let entries = await FileEnumerator.enumerateFiles(sources: sourcePaths, preset: nil)
+        totalBytes = entries.reduce(Int64(0)) { $0 + $1.size }
+        totalFiles = entries.count
 
         let physRam = ProcessInfo.processInfo.physicalMemory
         let ringCap = Constants.ringCapBytesPerDest(physRamBytes: physRam)
@@ -76,10 +60,21 @@ actor DryRunPlanner {
             case .unknown: classLabel = "Unknown"
             }
 
-            if let freeBytes = try? fm.attributesOfFileSystem(forPath: dest.destPath)[.systemFreeSize] as? Int64 {
+            let url = URL(fileURLWithPath: dest.destPath)
+            let freeBytes: Int64
+            if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+               let bytes = values.volumeAvailableCapacityForImportantUsage {
+                freeBytes = Int64(bytes)
+            } else {
+                freeBytes = 0
+            }
+
+            if freeBytes == 0 {
+                blockingErrors.append("Destination unreachable or not mounted: \(dest.displayName)")
+            } else {
                 let required = Int64(Double(totalBytes) * Constants.freeSpaceHeadroomMultiplier)
                 if freeBytes < required {
-                    warnings.append("\(dest.displayName): only \(ByteCountFormatter.string(fromByteCount: freeBytes, countStyle: .file)) free, needs \(ByteCountFormatter.string(fromByteCount: required, countStyle: .file))")
+                    blockingErrors.append("\(dest.displayName): only \(ByteCountFormatter.string(fromByteCount: freeBytes, countStyle: .file)) free, needs \(ByteCountFormatter.string(fromByteCount: required, countStyle: .file))")
                 }
             }
 
@@ -120,7 +115,7 @@ actor DryRunPlanner {
             memoryPeakBytes: memoryPeak,
             ringCapBytesPerDest: ringCap,
             chunkBytes: chunkSz,
-            blockingErrors: [],
+            blockingErrors: blockingErrors,
             warnings: warnings
         )
     }

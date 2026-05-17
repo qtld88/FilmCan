@@ -25,6 +25,18 @@ actor MHLWriter {
         try writeAllEntries()
     }
 
+    func seal() async throws {
+        guard !finalized else { return }
+        try writeAllEntries(extraTrailer: "\n  <sealed/>")
+        finalized = true
+    }
+
+    func finalizeAsPartial(reason: String) async throws {
+        guard !finalized else { return }
+        try writeAllEntries(extraTrailer: "\n  <filmcan:partial reason=\"\(escaped(reason))\"/>")
+        finalized = true
+    }
+
     func cancel() {
         finalized = true
         entries.removeAll()
@@ -33,11 +45,12 @@ actor MHLWriter {
 
     // MARK: - Private
 
-    private func writeAllEntries() throws {
+    private func writeAllEntries(extraTrailer: String = "") throws {
         var xml = header()
         for entry in entries {
             xml += entryXml(hash: entry.hash, fileName: entry.fileName)
         }
+        xml += extraTrailer
         xml += trailer()
         try xml.write(to: url, atomically: true, encoding: .utf8)
     }
@@ -51,7 +64,7 @@ actor MHLWriter {
     }
 
     private func header() -> String {
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<hashlist version=\"1.0\" source=\"\(escaped(sourceName))\">"
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<hashlist version=\"1.0\" source=\"\(escaped(sourceName))\" xmlns:filmcan=\"https://filmcan.app/mhl\">"
     }
 
     private func trailer() -> String {
