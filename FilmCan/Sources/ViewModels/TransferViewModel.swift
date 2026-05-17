@@ -1051,7 +1051,20 @@ class TransferViewModel: ObservableObject {
                         self.progress.perDestProgress = progresses
                         self.progress.syncFromPerDest()
                         for prog in progresses {
-                            self.destinationProgress[prog.id] = prog.progressFraction
+                            let copyFraction = prog.progressFraction
+                            let verifyFraction: Double
+                            if prog.verifyBytesTotal > 0 {
+                                verifyFraction = min(Double(prog.verifyBytesCompleted) / Double(prog.verifyBytesTotal), 1.0)
+                            } else {
+                                verifyFraction = 0
+                            }
+                            let blended: Double
+                            if prog.verifyBytesTotal > 0 {
+                                blended = copyFraction * 0.5 + verifyFraction * 0.5
+                            } else {
+                                blended = copyFraction
+                            }
+                            self.destinationProgress[prog.id] = blended
                         }
                     }
                 }
