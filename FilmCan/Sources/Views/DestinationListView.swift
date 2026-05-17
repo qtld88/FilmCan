@@ -463,13 +463,16 @@ struct DestinationListView: View {
     }
 
     private var transferControls: some View {
-        HStack(spacing: 12) {
-            Button(destinations.count > 1 ? "Stop Backups" : "Stop Backup") {
-                transferViewModel.cancelAll(for: configId)
+        VStack(alignment: .leading, spacing: 8) {
+            ExFATBanner(activeDests: progress.perDestProgress)
+            HStack(spacing: 12) {
+                Button(destinations.count > 1 ? "Stop Backups" : "Stop Backup") {
+                    transferViewModel.cancelAll(for: configId)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                Spacer()
             }
-            .buttonStyle(.bordered)
-            .tint(.red)
-            Spacer()
         }
         .padding(.top, 4)
     }
