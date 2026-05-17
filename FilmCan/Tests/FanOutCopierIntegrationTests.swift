@@ -113,6 +113,50 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         }
     }
 
+    func test_fanOut_multipleSources_allCopiedToAllDests() async throws {
+        let fm = FileManager.default
+        let src1 = tmpDir.appendingPathComponent("clip-a.bin")
+        let src2 = tmpDir.appendingPathComponent("clip-b.bin")
+        let src3 = tmpDir.appendingPathComponent("clip-c.bin")
+        let data1 = Data((0..<256 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let data2 = Data((0..<256 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let data3 = Data((0..<256 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try data1.write(to: src1)
+        try data2.write(to: src2)
+        try data3.write(to: src3)
+
+        let dest1 = tmpDir.appendingPathComponent("multi-dest1")
+        let dest2 = tmpDir.appendingPathComponent("multi-dest2")
+        try fm.createDirectory(at: dest1, withIntermediateDirectories: true)
+        try fm.createDirectory(at: dest2, withIntermediateDirectories: true)
+
+        let config = FanOutCopier.Configuration(
+            sources: [src1.path, src2.path, src3.path],
+            destinations: [
+                DestWriter.Config(destPath: dest1.path, displayName: "D1",
+                                  verifyMode: .paranoid, requiresFullFsync: false, chunkSize: 32768),
+                DestWriter.Config(destPath: dest2.path, displayName: "D2",
+                                  verifyMode: .paranoid, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .paranoid,
+            mhlBasePath: nil,
+            dryRun: false,
+            progressHandler: nil
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.allSatisfy { $0.success })
+        XCTAssertTrue(results.allSatisfy { $0.filesTransferred == 3 })
+
+        for (name, expected) in [("clip-a.bin", data1), ("clip-b.bin", data2), ("clip-c.bin", data3)] {
+            let d1 = try Data(contentsOf: dest1.appendingPathComponent(name))
+            let d2 = try Data(contentsOf: dest2.appendingPathComponent(name))
+            XCTAssertEqual(d1, expected, "\(name) at dest1 should match source")
+            XCTAssertEqual(d2, expected, "\(name) at dest2 should match source")
+        }
+    }
+
     func test_fanOut_fastMode_succeedsAndProducesIdenticalBytes() async throws {
         let fm = FileManager.default
         let sourceURL = tmpDir.appendingPathComponent("fast-source.bin")

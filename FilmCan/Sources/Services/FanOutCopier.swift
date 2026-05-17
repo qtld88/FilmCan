@@ -72,10 +72,19 @@ struct DestResultBuilder {
     }
 }
 
+// MARK: - Per-source outcome (returned from concurrent worker)
+
+struct PerSourceOutcome: Sendable {
+    let sourcePath: String
+    let writerResults: [DestWriterResult]
+    let verifyFailedDestPaths: Set<String>
+    let sourceCorrupted: Bool
+}
+
 // MARK: - FanOutCopier
 
 actor FanOutCopier {
-    struct Configuration {
+    struct Configuration: Sendable {
         var sources: [String]
         var destinations: [DestWriter.Config]
         var verifyMode: VerifyMode
@@ -101,22 +110,21 @@ actor FanOutCopier {
         }
     }
 
-    private let config: Configuration
+    nonisolated let config: Configuration
 
     init(config: Configuration) {
         self.config = config
     }
 
-    /// Run the fan-out copy: read each source once, broadcast chunks to all
-    /// destination writers via BoundedChannels, then collect per-dest results.
+    /// Run the fan-out copy. Sources from distinct drives are processed
+    /// concurrently (one worker per source drive); sources from the same
+    /// drive are processed sequentially within their drive's worker.
     func run() async throws -> [DestResult] {
         guard !config.destinations.isEmpty else { throw Error.noDestinations }
         guard !config.sources.isEmpty else { throw Error.sourceNotFound("(empty)") }
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
-
-        let fm = FileManager.default
 
         let destInfos = config.destinations.map { DriveSpeedClassifier.info(for: $0.destPath) }
         let slowest = DriveSpeedClassifier.slowestDestClass(destInfos)
@@ -133,333 +141,312 @@ actor FanOutCopier {
             )
         }
 
-        for sourcePath in config.sources {
-            let sourceURL = URL(fileURLWithPath: sourcePath)
-            let sourceName = sourceURL.lastPathComponent
+        let sourceConcurrency = maxConcurrentSources()
+        let sources = config.sources
 
-            guard fm.fileExists(atPath: sourcePath) else {
-                throw Error.sourceNotFound(sourcePath)
-            }
-
-            guard let attrs = try? fm.attributesOfItem(atPath: sourcePath),
-                  let sourceSize = attrs[.size] as? Int64 else {
-                throw Error.sourceReadFailed(sourcePath)
-            }
-
-            var channels: [String: BoundedChannel<Chunk>] = [:]
-            for dest in config.destinations {
-                channels[dest.destPath] = BoundedChannel<Chunk>(capacity: channelCapacity)
-            }
-
-            var writerTasks: [Task<DestWriterResult, Never>] = []
-
-            for destCfg in config.destinations {
-                let channel = channels[destCfg.destPath]!
-                let destFileURL = URL(fileURLWithPath: destCfg.destPath)
-                    .appendingPathComponent(sourceName)
-
-                let mhlDir = URL(fileURLWithPath: destCfg.destPath)
-                    .appendingPathComponent(".filmcan")
-                    .appendingPathComponent("hashlists")
-                let mhlURL = mhlDir.appendingPathComponent("\(sourceName).mhl")
-
-                let task = Task<DestWriterResult, Never> {
-                    let startTime = Date()
-                    var totalBytes: Int64 = 0
-                    var writeFailed: DestFailureReason? = nil
-
-                    guard let destHasher = XXH128StreamingHasher() else {
-                        await channel.finish()
-                        return DestWriterResult(
-                            destPath: destCfg.destPath,
-                            displayName: destCfg.displayName,
-                            success: false,
-                            bytesTransferred: 0,
-                            filesTransferred: 0,
-                            durationSec: Date().timeIntervalSince(startTime),
-                            mhlPath: nil,
-                            failureReason: .ioError("xxhash unavailable"),
-                            verifyMode: destCfg.verifyMode,
-                            destHashFromStream: nil
-                        )
+        let outcomes: [PerSourceOutcome] = try await withThrowingTaskGroup(of: PerSourceOutcome.self) { group in
+            var iter = sources.makeIterator()
+            var inFlight = 0
+            for _ in 0..<min(sourceConcurrency, sources.count) {
+                if let src = iter.next() {
+                    group.addTask { [self] in
+                        try await processSource(sourcePath: src, channelCapacity: channelCapacity, chunkSz: chunkSz)
                     }
-
-                    let writer: DestWriter
-                    do {
-                        writer = try await DestWriter(
-                            destPath: destFileURL.path,
-                            displayName: destCfg.displayName,
-                            verifyMode: destCfg.verifyMode,
-                            requiresFullFsync: destCfg.requiresFullFsync,
-                            mhlURL: mhlURL,
-                            sourceName: sourceName
-                        )
-                    } catch {
-                        await channel.finish()
-                        return DestWriterResult(
-                            destPath: destCfg.destPath,
-                            displayName: destCfg.displayName,
-                            success: false,
-                            bytesTransferred: 0,
-                            filesTransferred: 0,
-                            durationSec: Date().timeIntervalSince(startTime),
-                            mhlPath: nil,
-                            failureReason: .ioError(error.localizedDescription),
-                            verifyMode: destCfg.verifyMode,
-                            destHashFromStream: nil
-                        )
-                    }
-
-                    do {
-                        for try await chunk in channel {
-                            if writeFailed == nil {
-                                do {
-                                    try await writer.write(data: chunk.data)
-                                    destHasher.update(data: chunk.data)
-                                    totalBytes += Int64(chunk.data.count)
-
-                                    var prog = DestProgress(
-                                        id: destCfg.destPath,
-                                        displayName: destCfg.displayName,
-                                        status: .active,
-                                        bytesTotal: sourceSize,
-                                        filesTotal: config.sources.count,
-                                        verifyMode: destCfg.verifyMode
-                                    )
-                                    prog.bytesCompleted = totalBytes
-                                    prog.currentFile = sourceName
-                                    config.progressHandler?(prog)
-                                } catch {
-                                    writeFailed = .ioError(error.localizedDescription)
-                                    await channel.finish()
-                                }
-                            }
-                        }
-                    } catch {
-                        // Channel finished — expected termination
-                    }
-
-                    if let reason = writeFailed {
-                        return DestWriterResult(
-                            destPath: destCfg.destPath,
-                            displayName: destCfg.displayName,
-                            success: false,
-                            bytesTransferred: totalBytes,
-                            filesTransferred: 0,
-                            durationSec: Date().timeIntervalSince(startTime),
-                            mhlPath: nil,
-                            failureReason: reason,
-                            verifyMode: destCfg.verifyMode,
-                            destHashFromStream: nil
-                        )
-                    }
-
-                    let destHash = destHasher.finalize().hexString
-
-                    do {
-                        try await writer.finalize(fileHash: destHash, sourceSize: sourceSize)
-                        try await writer.appendMHL(hash: destHash, fileName: sourceName)
-                    } catch {
-                        return DestWriterResult(
-                            destPath: destCfg.destPath,
-                            displayName: destCfg.displayName,
-                            success: false,
-                            bytesTransferred: totalBytes,
-                            filesTransferred: 0,
-                            durationSec: Date().timeIntervalSince(startTime),
-                            mhlPath: nil,
-                            failureReason: .ioError(error.localizedDescription),
-                            verifyMode: destCfg.verifyMode,
-                            destHashFromStream: destHash
-                        )
-                    }
-
-                    let duration = Date().timeIntervalSince(startTime)
-
-                    var prog = DestProgress(
-                        id: destCfg.destPath,
-                        displayName: destCfg.displayName,
-                        status: .complete,
-                        bytesTotal: sourceSize,
-                        filesTotal: config.sources.count,
-                        verifyMode: destCfg.verifyMode
-                    )
-                    prog.bytesCompleted = totalBytes
-                    prog.filesCompleted = 1
-                    prog.currentFile = sourceName
-                    config.progressHandler?(prog)
-
-                    return DestWriterResult(
-                        destPath: destCfg.destPath,
-                        displayName: destCfg.displayName,
-                        success: true,
-                        bytesTransferred: totalBytes,
-                        filesTransferred: 1,
-                        durationSec: duration,
-                        mhlPath: mhlURL.path,
-                        failureReason: nil,
-                        verifyMode: destCfg.verifyMode,
-                        destHashFromStream: destHash
-                    )
+                    inFlight += 1
                 }
-                writerTasks.append(task)
             }
-
-            var sourceHash: String?
-            var sourceError: (any Swift.Error)?
-            var deadDests: Set<String> = []
-            do {
-                let sourceHandle = try FileHandle(forReadingFrom: sourceURL)
-                _ = fcntl(sourceHandle.fileDescriptor, F_NOCACHE, 1)
-                defer { try? sourceHandle.close() }
-
-                guard let sourceHasher = XXH128StreamingHasher() else {
-                    throw Error.sourceReadFailed("xxhash unavailable for \(sourcePath)")
+            var collected: [PerSourceOutcome] = []
+            while inFlight > 0 {
+                let outcome = try await group.next()!
+                inFlight -= 1
+                collected.append(outcome)
+                if outcome.sourceCorrupted {
+                    group.cancelAll()
+                    throw Error.sourceCorruption(outcome.sourcePath)
                 }
-
-                while true {
-                    let chunkData: Data
-                    if #available(macOS 10.15.4, *) {
-                        guard let data = try sourceHandle.read(upToCount: chunkSz), !data.isEmpty
-                        else { break }
-                        chunkData = data
-                    } else {
-                        let data = sourceHandle.readData(ofLength: chunkSz)
-                        if data.isEmpty { break }
-                        chunkData = data
+                if let src = iter.next() {
+                    group.addTask { [self] in
+                        try await processSource(sourcePath: src, channelCapacity: channelCapacity, chunkSz: chunkSz)
                     }
-
-                    sourceHasher.update(data: chunkData)
-
-                    let chunk = Chunk(data: chunkData)
-                    for (destPath, channel) in channels where !deadDests.contains(destPath) {
-                        do {
-                            try await channel.send(chunk)
-                        } catch {
-                            deadDests.insert(destPath)
-                        }
-                    }
-                    if deadDests.count == channels.count {
-                        break
-                    }
+                    inFlight += 1
                 }
-
-                sourceHash = sourceHasher.finalize().hexString
-            } catch {
-                sourceError = error
             }
+            return collected
+        }
 
-            for channel in channels.values {
-                await channel.finish()
+        for outcome in outcomes {
+            for w in outcome.writerResults {
+                builders[w.destPath]?.incorporate(w)
             }
-
-            for task in writerTasks {
-                let result = await task.value
-                builders[result.destPath]?.incorporate(result)
+            for dp in outcome.verifyFailedDestPaths {
+                builders[dp]?.markVerificationFailed()
             }
-
-            if let sourceError {
-                throw sourceError
-            }
-
-            guard let verifiedSourceHash = sourceHash else {
-                throw Error.sourceReadFailed(sourcePath)
-            }
-
-            try await verifyDests(
-                sourceName: sourceName,
-                sourceURL: sourceURL,
-                sourceHashFromStream: verifiedSourceHash,
-                chunkSz: chunkSz,
-                writerResults: writerTasks,
-                builders: &builders,
-                fm: fm
-            )
         }
 
         return config.destinations.compactMap { builders[$0.destPath]?.build() }
     }
 
-    /// Verification stage. Fast: compare each dest stream-hash to source stream-hash.
-    /// Paranoid: also re-read source from disk and re-read each dest from disk; both
-    /// must match the stream-hash, and source-stream must equal source-disk (catches
-    /// in-memory bit-flip between source-read and dest-write).
-    private func verifyDests(
-        sourceName: String,
-        sourceURL: URL,
-        sourceHashFromStream: String,
-        chunkSz: Int,
-        writerResults: [Task<DestWriterResult, Never>],
-        builders: inout [String: DestResultBuilder],
-        fm: FileManager
-    ) async throws {
-        var resolvedResults: [DestWriterResult] = []
-        for task in writerResults {
-            resolvedResults.append(await task.value)
-        }
-
-        for r in resolvedResults where r.success {
-            if let dh = r.destHashFromStream, dh != sourceHashFromStream {
-                builders[r.destPath]?.markVerificationFailed()
-                let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
-                try? fm.removeItem(at: destFile)
-            }
-        }
-
-        guard config.verifyMode == .paranoid else { return }
-
-        let sourceHashFromDisk = await rereadSourceHash(url: sourceURL, chunkSz: chunkSz)
-        if let diskHash = sourceHashFromDisk, diskHash != sourceHashFromStream {
-            for r in resolvedResults where r.success {
-                let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
-                try? fm.removeItem(at: destFile)
-                builders[r.destPath]?.markVerificationFailed()
-            }
-            throw Error.sourceCorruption(sourceName)
-        }
-
-        await withTaskGroup(of: (String, String?).self) { group in
-            for r in resolvedResults where r.success && builders[r.destPath]?.success == true {
-                let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
-                let destPath = r.destPath
-                group.addTask {
-                    let hash = await self.rereadDestHash(url: destFile, chunkSz: chunkSz)
-                    return (destPath, hash)
-                }
-            }
-            for await (destPath, hash) in group {
-                if let h = hash, h != sourceHashFromStream {
-                    builders[destPath]?.markVerificationFailed()
-                    let destFile = URL(fileURLWithPath: destPath).appendingPathComponent(sourceName)
-                    try? fm.removeItem(at: destFile)
-                } else if hash == nil {
-                    builders[destPath]?.markVerificationFailed()
-                }
-            }
-        }
+    /// Source concurrency: one worker per distinct source drive, capped at sources.count.
+    /// Multi-card backup → parallel. Single-card with many files → sequential
+    /// (would otherwise thrash the card head).
+    nonisolated private func maxConcurrentSources() -> Int {
+        let driveIds = Set(config.sources.map { DriveUtilities.driveId(for: $0) })
+        return max(1, min(driveIds.count, config.sources.count))
     }
 
-    private func rereadSourceHash(url: URL, chunkSz: Int) async -> String? {
-        await Task.detached(priority: .utility) {
-            guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-            defer { try? handle.close() }
-            _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
-            guard let hasher = XXH128StreamingHasher() else { return nil }
+    /// Process one source file: open with F_NOCACHE, spawn per-dest writer tasks,
+    /// broadcast chunks through bounded channels, then verify per config.verifyMode.
+    nonisolated private func processSource(
+        sourcePath: String,
+        channelCapacity: Int,
+        chunkSz: Int
+    ) async throws -> PerSourceOutcome {
+        let fm = FileManager.default
+        let sourceURL = URL(fileURLWithPath: sourcePath)
+        let sourceName = sourceURL.lastPathComponent
+
+        guard fm.fileExists(atPath: sourcePath) else {
+            throw Error.sourceNotFound(sourcePath)
+        }
+        guard let attrs = try? fm.attributesOfItem(atPath: sourcePath),
+              let sourceSize = attrs[.size] as? Int64 else {
+            throw Error.sourceReadFailed(sourcePath)
+        }
+
+        var channels: [String: BoundedChannel<Chunk>] = [:]
+        for dest in config.destinations {
+            channels[dest.destPath] = BoundedChannel<Chunk>(capacity: channelCapacity)
+        }
+
+        var writerTasks: [Task<DestWriterResult, Never>] = []
+
+        for destCfg in config.destinations {
+            let channel = channels[destCfg.destPath]!
+            let destFileURL = URL(fileURLWithPath: destCfg.destPath)
+                .appendingPathComponent(sourceName)
+            let mhlURL = URL(fileURLWithPath: destCfg.destPath)
+                .appendingPathComponent(".filmcan")
+                .appendingPathComponent("hashlists")
+                .appendingPathComponent("\(sourceName).mhl")
+            let progressHandler = config.progressHandler
+            let totalSources = config.sources.count
+
+            let task = Task<DestWriterResult, Never> {
+                let startTime = Date()
+                var totalBytes: Int64 = 0
+                var writeFailed: DestFailureReason? = nil
+
+                guard let destHasher = XXH128StreamingHasher() else {
+                    await channel.finish()
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: false, bytesTransferred: 0, filesTransferred: 0,
+                        durationSec: Date().timeIntervalSince(startTime),
+                        mhlPath: nil, failureReason: .ioError("xxhash unavailable"),
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil
+                    )
+                }
+
+                let writer: DestWriter
+                do {
+                    writer = try await DestWriter(
+                        destPath: destFileURL.path,
+                        displayName: destCfg.displayName,
+                        verifyMode: destCfg.verifyMode,
+                        requiresFullFsync: destCfg.requiresFullFsync,
+                        mhlURL: mhlURL,
+                        sourceName: sourceName
+                    )
+                } catch {
+                    await channel.finish()
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: false, bytesTransferred: 0, filesTransferred: 0,
+                        durationSec: Date().timeIntervalSince(startTime),
+                        mhlPath: nil, failureReason: .ioError(error.localizedDescription),
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil
+                    )
+                }
+
+                do {
+                    for try await chunk in channel {
+                        if writeFailed == nil {
+                            do {
+                                try await writer.write(data: chunk.data)
+                                destHasher.update(data: chunk.data)
+                                totalBytes += Int64(chunk.data.count)
+
+                                var prog = DestProgress(
+                                    id: destCfg.destPath, displayName: destCfg.displayName,
+                                    status: .active, bytesTotal: sourceSize,
+                                    filesTotal: totalSources, verifyMode: destCfg.verifyMode
+                                )
+                                prog.bytesCompleted = totalBytes
+                                prog.currentFile = sourceName
+                                progressHandler?(prog)
+                            } catch {
+                                writeFailed = .ioError(error.localizedDescription)
+                                await channel.finish()
+                            }
+                        }
+                    }
+                } catch {
+                    // Channel finished — expected termination
+                }
+
+                if let reason = writeFailed {
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: false, bytesTransferred: totalBytes, filesTransferred: 0,
+                        durationSec: Date().timeIntervalSince(startTime),
+                        mhlPath: nil, failureReason: reason,
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil
+                    )
+                }
+
+                let destHash = destHasher.finalize().hexString
+                do {
+                    try await writer.finalize(fileHash: destHash, sourceSize: sourceSize)
+                    try await writer.appendMHL(hash: destHash, fileName: sourceName)
+                } catch {
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: false, bytesTransferred: totalBytes, filesTransferred: 0,
+                        durationSec: Date().timeIntervalSince(startTime),
+                        mhlPath: nil, failureReason: .ioError(error.localizedDescription),
+                        verifyMode: destCfg.verifyMode, destHashFromStream: destHash
+                    )
+                }
+
+                let duration = Date().timeIntervalSince(startTime)
+                var prog = DestProgress(
+                    id: destCfg.destPath, displayName: destCfg.displayName,
+                    status: .complete, bytesTotal: sourceSize,
+                    filesTotal: totalSources, verifyMode: destCfg.verifyMode
+                )
+                prog.bytesCompleted = totalBytes
+                prog.filesCompleted = 1
+                prog.currentFile = sourceName
+                progressHandler?(prog)
+
+                return DestWriterResult(
+                    destPath: destCfg.destPath, displayName: destCfg.displayName,
+                    success: true, bytesTransferred: totalBytes, filesTransferred: 1,
+                    durationSec: duration, mhlPath: mhlURL.path,
+                    failureReason: nil, verifyMode: destCfg.verifyMode,
+                    destHashFromStream: destHash
+                )
+            }
+            writerTasks.append(task)
+        }
+
+        var sourceHash: String?
+        var sourceError: (any Swift.Error)?
+        var deadDests: Set<String> = []
+        do {
+            let sourceHandle = try FileHandle(forReadingFrom: sourceURL)
+            _ = fcntl(sourceHandle.fileDescriptor, F_NOCACHE, 1)
+            defer { try? sourceHandle.close() }
+
+            guard let sourceHasher = XXH128StreamingHasher() else {
+                throw Error.sourceReadFailed("xxhash unavailable for \(sourcePath)")
+            }
+
             while true {
+                let chunkData: Data
                 if #available(macOS 10.15.4, *) {
-                    guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { break }
-                    hasher.update(data: data)
+                    guard let data = try sourceHandle.read(upToCount: chunkSz), !data.isEmpty
+                    else { break }
+                    chunkData = data
                 } else {
-                    let data = handle.readData(ofLength: chunkSz)
+                    let data = sourceHandle.readData(ofLength: chunkSz)
                     if data.isEmpty { break }
-                    hasher.update(data: data)
+                    chunkData = data
+                }
+                sourceHasher.update(data: chunkData)
+
+                let chunk = Chunk(data: chunkData)
+                for (destPath, channel) in channels where !deadDests.contains(destPath) {
+                    do {
+                        try await channel.send(chunk)
+                    } catch {
+                        deadDests.insert(destPath)
+                    }
+                }
+                if deadDests.count == channels.count { break }
+            }
+            sourceHash = sourceHasher.finalize().hexString
+        } catch {
+            sourceError = error
+        }
+
+        for channel in channels.values { await channel.finish() }
+
+        var writerResults: [DestWriterResult] = []
+        for task in writerTasks {
+            writerResults.append(await task.value)
+        }
+
+        if let sourceError { throw sourceError }
+        guard let verifiedSourceHash = sourceHash else {
+            throw Error.sourceReadFailed(sourcePath)
+        }
+
+        var verifyFailed: Set<String> = []
+        for r in writerResults where r.success {
+            if let dh = r.destHashFromStream, dh != verifiedSourceHash {
+                verifyFailed.insert(r.destPath)
+                let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
+                try? fm.removeItem(at: destFile)
+            }
+        }
+
+        var corrupted = false
+        if config.verifyMode == .paranoid {
+            let sourceHashFromDisk = await rereadHash(url: sourceURL, chunkSz: chunkSz)
+            if let diskHash = sourceHashFromDisk, diskHash != verifiedSourceHash {
+                corrupted = true
+                for r in writerResults where r.success {
+                    let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
+                    try? fm.removeItem(at: destFile)
+                    verifyFailed.insert(r.destPath)
+                }
+            } else {
+                await withTaskGroup(of: (String, String?).self) { group in
+                    for r in writerResults where r.success && !verifyFailed.contains(r.destPath) {
+                        let destFile = URL(fileURLWithPath: r.destPath).appendingPathComponent(sourceName)
+                        let destPath = r.destPath
+                        group.addTask {
+                            let hash = await Self.rereadHashDetached(url: destFile, chunkSz: chunkSz)
+                            return (destPath, hash)
+                        }
+                    }
+                    for await (destPath, hash) in group {
+                        if let h = hash, h != verifiedSourceHash {
+                            verifyFailed.insert(destPath)
+                            let destFile = URL(fileURLWithPath: destPath).appendingPathComponent(sourceName)
+                            try? fm.removeItem(at: destFile)
+                        } else if hash == nil {
+                            verifyFailed.insert(destPath)
+                        }
+                    }
                 }
             }
-            return hasher.finalize().hexString
-        }.value
+        }
+
+        return PerSourceOutcome(
+            sourcePath: sourcePath,
+            writerResults: writerResults,
+            verifyFailedDestPaths: verifyFailed,
+            sourceCorrupted: corrupted
+        )
     }
 
-    private func rereadDestHash(url: URL, chunkSz: Int) async -> String? {
+    nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {
+        await Self.rereadHashDetached(url: url, chunkSz: chunkSz)
+    }
+
+    nonisolated private static func rereadHashDetached(url: URL, chunkSz: Int) async -> String? {
         await Task.detached(priority: .utility) {
             guard FileManager.default.fileExists(atPath: url.path),
                   let handle = try? FileHandle(forReadingFrom: url) else { return nil }
