@@ -830,7 +830,8 @@ class CustomCopierService: ObservableObject, TransferService {
         verifyMode: VerifyMode,
         dryRun: Bool,
         progressHandler: (@Sendable ([DestProgress]) -> Void)?,
-        webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil
+        webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
+        aggregatedWebhookHandler: (@Sendable ([DestResult], String) -> Void)? = nil
     ) async throws -> TransferResult {
         let startTime = Date()
         let mhlBasePath: String? = nil
@@ -858,6 +859,12 @@ class CustomCopierService: ObservableObject, TransferService {
         // Fire per-dest webhooks
         for result in destResults {
             webhookHandler?(result, configName)
+        }
+
+        // v2 aggregated event (caller wires either per-dest OR aggregated based on config)
+        if let aggregatedWebhookHandler {
+            let sourceName = sources.first.map { ($0 as NSString).lastPathComponent } ?? ""
+            aggregatedWebhookHandler(destResults, sourceName)
         }
 
         let totalBytes = destResults.reduce(0) { $0 + $1.bytesTransferred }

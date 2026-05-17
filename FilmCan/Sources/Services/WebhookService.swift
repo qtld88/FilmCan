@@ -82,4 +82,40 @@ struct WebhookService {
             ]
         )
     }
+
+    /// Send a single aggregated webhook for a whole multi-destination job (v2 template).
+    static func sendAggregatedNotification(
+        urlString: String,
+        bearerToken: String?,
+        results: [DestResult],
+        sourceName: String,
+        configName: String
+    ) {
+        let anyFailed = results.contains { !$0.success }
+        let allSucceeded = results.allSatisfy { $0.success }
+        let icon = anyFailed ? "⚠️" : "✅"
+        let summary = results.map { r in
+            let mark = r.success ? "✓" : "✗"
+            return "\(r.displayName) \(mark)"
+        }.joined(separator: ", ")
+        let totalBytes = results.reduce(Int64(0)) { $0 + $1.bytesTransferred }
+        let byteStr = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+        let title = "\(icon) \(configName): \(sourceName)"
+        let message = "\(summary) — \(byteStr)"
+        sendNtfy(
+            urlString: urlString,
+            bearerToken: bearerToken,
+            title: title,
+            message: message,
+            fields: [
+                "Source": sourceName,
+                "Config": configName,
+                "DestinationsSummary": summary,
+                "AnyFailed": anyFailed ? "true" : "false",
+                "AllSucceeded": allSucceeded ? "true" : "false",
+                "TotalBytes": byteStr,
+                "DestinationCount": "\(results.count)"
+            ]
+        )
+    }
 }

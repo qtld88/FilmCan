@@ -43,7 +43,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var offOrganizationCustomDate: Date = Date()
     var createdAt: Date = Date()
     var lastUsedAt: Date?
-    
+    var webhookTemplateFormatVersion: Int = 1
+
     enum LogLocation: String, Codable, CaseIterable {
         case sameAsDestination = "same"
         case custom = "custom"
@@ -95,6 +96,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         offOrganizationCustomDate = try c.decodeIfPresent(Date.self, forKey: .offOrganizationCustomDate) ?? organizationCustomDate
         createdAt    = try c.decodeIfPresent(Date.self,   forKey: .createdAt)    ?? Date()
         lastUsedAt   = try c.decodeIfPresent(Date.self,   forKey: .lastUsedAt)
+        webhookTemplateFormatVersion = try c.decodeIfPresent(Int.self, forKey: .webhookTemplateFormatVersion) ?? 1
         sourcePaths = try c.decodeIfPresent([String].self, forKey: .sourcePaths) ?? []
     }
     
@@ -145,11 +147,12 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(offOrganizationCustomDate, forKey: .offOrganizationCustomDate)
         try c.encode(createdAt,        forKey: .createdAt)
         try c.encodeIfPresent(lastUsedAt, forKey: .lastUsedAt)
+        try c.encode(webhookTemplateFormatVersion, forKey: .webhookTemplateFormatVersion)
     }
-    
+
     private enum CodingKeys: String, CodingKey {
         case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
-        case logEnabled, logLocation, customLogPath, runInParallel, createdAt, lastUsedAt
+        case logEnabled, logLocation, customLogPath, runInParallel, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate
