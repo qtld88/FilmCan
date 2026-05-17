@@ -15,9 +15,10 @@ struct FailedDestRetryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(results, id: \.destinationPath) { result in
+                let hasSibling = !result.success && pickFastestSurvivingSibling(failed: result) != nil
                 DestResultRow(
                     result: result,
-                    onRetry: result.success ? nil : { presentRetry(for: result) }
+                    onRetry: hasSibling ? { presentRetry(for: result) } : nil
                 )
             }
         }

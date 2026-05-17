@@ -469,6 +469,17 @@ struct DestinationListView: View {
             if !progress.perDestProgress.isEmpty {
                 MultiDestSummaryView(progresses: progress.perDestProgress)
             }
+            if !isActiveTransfer, let fanOutResult = latestFanOutResult, fanOutResult.destinationResults.contains(where: { !$0.success }) {
+                FailedDestRetryPanel(
+                    results: fanOutResult.destinationResults,
+                    sourcePaths: transferViewModel.currentSources,
+                    onRepair: { failed, sibling, choice in
+                        Task { @MainActor in
+                            _ = await transferViewModel.repairFailedDest(failed: failed, sibling: sibling, choice: choice)
+                        }
+                    }
+                )
+            }
             HStack(spacing: 12) {
                 Button(destinations.count > 1 ? "Stop Backups" : "Stop Backup") {
                     transferViewModel.cancelAll(for: configId)
@@ -479,6 +490,12 @@ struct DestinationListView: View {
             }
         }
         .padding(.top, 4)
+    }
+
+    /// Most-recent `TransferResult` whose `destinationResults` is non-empty
+    /// (i.e. produced by the fan-out engine, which populates that field).
+    private var latestFanOutResult: TransferResult? {
+        transferViewModel.results.last(where: { !$0.destinationResults.isEmpty })
     }
 
     private func capacityBar(
