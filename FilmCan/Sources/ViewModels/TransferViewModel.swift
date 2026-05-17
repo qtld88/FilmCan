@@ -1013,6 +1013,7 @@ class TransferViewModel: ObservableObject {
         let service = CustomCopierService()
         currentService = service
         activeServices = [service]
+        defer { activeServices = [] }
 
         let verifyMode = config.rsyncOptions.verificationMode
         let fanOutDests: [DestWriter.Config] = destinations.map { destPath in
@@ -1028,9 +1029,7 @@ class TransferViewModel: ObservableObject {
 
         do {
             defer {
-                Task { @MainActor in
-                    self.activeSourceByDestination.removeAll()
-                }
+                self.activeSourceByDestination.removeAll()
             }
             let result = try await service.runCopyFanOut(
                 sources: sources,
@@ -1051,8 +1050,8 @@ class TransferViewModel: ObservableObject {
                     Task { @MainActor in
                         self.progress.perDestProgress = progresses
                         self.progress.syncFromPerDest()
-                        if let firstDest = destinations.first {
-                            self.destinationProgress[firstDest] = self.progress.overallProgress
+                        for prog in progresses {
+                            self.destinationProgress[prog.id] = prog.progressFraction
                         }
                     }
                 }
