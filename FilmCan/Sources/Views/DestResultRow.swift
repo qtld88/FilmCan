@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DestResultRow: View {
     let result: DestResult
+    var onRetry: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -52,6 +53,12 @@ struct DestResultRow: View {
                 Text(String(format: "%.1fs", result.durationSec))
                     .font(.caption2)
                     .foregroundColor(.secondary)
+            }
+
+            if !result.success, let onRetry {
+                Button("Retry", action: onRetry)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
             }
         }
         .padding(8)

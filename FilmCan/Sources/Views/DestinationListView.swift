@@ -465,6 +465,9 @@ struct DestinationListView: View {
     private var transferControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             ExFATBanner(activeDests: progress.perDestProgress)
+            if !progress.perDestProgress.isEmpty {
+                MultiDestSummaryView(progresses: progress.perDestProgress)
+            }
             HStack(spacing: 12) {
                 Button(destinations.count > 1 ? "Stop Backups" : "Stop Backup") {
                     transferViewModel.cancelAll(for: configId)

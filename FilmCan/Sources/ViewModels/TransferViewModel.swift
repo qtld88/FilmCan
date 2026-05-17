@@ -550,6 +550,10 @@ class TransferViewModel: ObservableObject {
         config: BackupConfiguration,
         results: [TransferResult]
     ) async {
+        if config.webhookTemplateFormatVersion >= 2 {
+            await sendAggregatedNotifications(source: source, config: config, results: results)
+            return
+        }
         for result in results {
             let summary = await destinationNotificationSummary(
                 source: source,
@@ -576,6 +580,82 @@ class TransferViewModel: ObservableObject {
             if webhookEnabled, !webhookURL.isEmpty {
                 sendWebhookSummary(summary: summary)
             }
+        }
+    }
+
+    /// v2: one aggregated event per backup-run covering ALL destinations.
+    private func sendAggregatedNotifications(
+        source: String,
+        config: BackupConfiguration,
+        results: [TransferResult]
+    ) async {
+        guard !results.isEmpty else { return }
+        let wasPaused = results.contains { $0.wasPaused }
+        if wasPaused { return }
+
+        let anyFailed = results.contains { !$0.success }
+        let allSuccess = !anyFailed
+        let sourceName = (source as NSString).lastPathComponent
+        let totalBytes = results.reduce(Int64(0)) { $0 + $1.bytesTransferred }
+        let bytesText = FilmCanFormatters.bytes(totalBytes, style: .decimal)
+        let destSummary = results.map { r in
+            let mark = r.success ? "✓" : "✗"
+            let name = (r.destination as NSString).lastPathComponent
+            return "\(name) \(mark)"
+        }.joined(separator: ", ")
+        let status = anyFailed ? "Done with failures" : "Done"
+        let title = "\(sourceName) → \(config.name): \(status)"
+        let body = "\(destSummary) — \(bytesText)"
+
+        if allSuccess && notifyOnComplete {
+            NotificationService.shared.notify(title: title, body: body)
+        } else if !allSuccess && notifyOnError {
+            NotificationService.shared.notify(title: title, body: body)
+        }
+        if ntfyEnabled, !ntfyURL.isEmpty {
+            WebhookService.sendNtfy(
+                urlString: ntfyURL,
+                bearerToken: ntfyBearerToken,
+                title: title,
+                message: body,
+                fields: [
+                    "Source": sourceName,
+                    "Config": config.name,
+                    "DestinationsSummary": destSummary,
+                    "AnyFailed": anyFailed ? "true" : "false",
+                    "AllSucceeded": allSuccess ? "true" : "false",
+                    "TotalBytes": bytesText,
+                    "DestinationCount": "\(results.count)"
+                ]
+            )
+        }
+        if webhookEnabled, !webhookURL.isEmpty {
+            WebhookService.sendJSON(
+                urlString: webhookURL,
+                headers: WebhookService.parseHeaders(from: webhookHeaders),
+                payload: [
+                    "title": title,
+                    "message": body,
+                    "templateFormatVersion": 2,
+                    "source": sourceName,
+                    "config": config.name,
+                    "destinationCount": results.count,
+                    "anyFailed": anyFailed,
+                    "allSucceeded": allSuccess,
+                    "totalBytes": totalBytes,
+                    "destinations": results.map { r in
+                        [
+                            "name": (r.destination as NSString).lastPathComponent,
+                            "path": r.destination,
+                            "success": r.success,
+                            "bytesTransferred": r.bytesTransferred,
+                            "filesTransferred": r.filesTransferred,
+                            "errorMessage": r.errorMessage ?? "",
+                            "wasVerified": r.wasVerified
+                        ] as [String: Any]
+                    }
+                ]
+            )
         }
     }
 
@@ -1735,5 +1815,46 @@ class TransferViewModel: ObservableObject {
             activeTransferConfigIds.remove(configId)
             tabProgressByConfig.removeValue(forKey: configId)
         }
+    }
+
+    /// Repair a failed destination by copying each file from a verified
+    /// sibling destination's MHL hash list. Caller picks the sibling
+    /// (typically the fastest surviving dest, via FailedDestRetryPanel).
+    /// Returns a per-file result: (fileName, success).
+    @discardableResult
+    func retryFailedDestinationFromSibling(
+        failed: DestResult,
+        sibling: DestResult
+    ) async -> [(fileName: String, success: Bool)] {
+        guard let siblingMHL = sibling.mhlPath else { return [] }
+        let mhlURL = URL(fileURLWithPath: siblingMHL)
+        let siblingRoot = sibling.destinationPath
+        let failedRoot = failed.destinationPath
+
+        let entries: [MHLReader.Entry]
+        do {
+            entries = try MHLReader.read(url: mhlURL)
+        } catch {
+            return []
+        }
+
+        let source = SiblingDestSource()
+        var results: [(fileName: String, success: Bool)] = []
+        for entry in entries {
+            let siblingFilePath = (siblingRoot as NSString).appendingPathComponent(entry.fileName)
+            let failedFilePath = (failedRoot as NSString).appendingPathComponent(entry.fileName)
+            do {
+                try await source.copyFromSibling(
+                    fileName: entry.fileName,
+                    from: siblingFilePath,
+                    to: failedFilePath,
+                    expectedHash: entry.hash
+                )
+                results.append((entry.fileName, true))
+            } catch {
+                results.append((entry.fileName, false))
+            }
+        }
+        return results
     }
 }
