@@ -32,6 +32,9 @@ struct FailedDestRetryPanel: View {
                     siblingDest: sibling,
                     sourceAvailable: pendingSourceAvailable,
                     onPick: { choice in
+                        // Hand back to caller; caller will run async and update @Published results.
+                        // We close the sheet immediately so the row's spinner + status badge
+                        // (driven by the published results) becomes visible.
                         onRepair(failed, sibling, choice)
                         pending = nil
                         pendingSibling = nil
