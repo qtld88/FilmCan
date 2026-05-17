@@ -64,6 +64,25 @@ actor DestWriter {
         try setupTempFile()
     }
 
+    /// Variant that accepts a pre-built MHLWriter so multiple DestWriter instances
+    /// writing into the same source root can share one MHL aggregator and avoid
+    /// the last-writer-wins race over a single CARD.mhl file.
+    init(
+        destPath: String,
+        displayName: String,
+        verifyMode: VerifyMode,
+        requiresFullFsync: Bool,
+        sharedMHLWriter: MHLWriter?
+    ) async throws {
+        self.destPath = destPath
+        self.displayName = displayName
+        self.verifyMode = verifyMode
+        self.requiresFullFsync = requiresFullFsync
+        self.mhlWriter = sharedMHLWriter
+
+        try setupTempFile()
+    }
+
     private func setupTempFile() throws {
         let destURL = URL(fileURLWithPath: destPath)
         let parent = destURL.deletingLastPathComponent()

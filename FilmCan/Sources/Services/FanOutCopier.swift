@@ -136,6 +136,23 @@ actor FanOutCopier {
         return next >= totalFiles
     }
 
+    private func buildSharedMHLs(forRootNames rootNames: Set<String>) throws -> [String: [String: MHLWriter]] {
+        var result: [String: [String: MHLWriter]] = [:]
+        for destCfg in config.destinations {
+            var byRoot: [String: MHLWriter] = [:]
+            for rootName in rootNames {
+                let mhlURL = URL(fileURLWithPath: destCfg.destPath)
+                    .appendingPathComponent(".filmcan")
+                    .appendingPathComponent("hashlists")
+                    .appendingPathComponent("\(rootName).mhl")
+                let writer = try MHLWriter(url: mhlURL, sourceName: rootName)
+                byRoot[rootName] = writer
+            }
+            result[destCfg.destPath] = byRoot
+        }
+        return result
+    }
+
     nonisolated let config: Configuration
 
     init(config: Configuration) {
@@ -208,6 +225,10 @@ actor FanOutCopier {
             )
         }
 
+        // Build all shared MHL writers upfront, grouped by dest and rootName
+        let uniqueRootNames = Set(plannedFiles.map { $0.rootName })
+        let sharedMHLsByDest = try buildSharedMHLs(forRootNames: uniqueRootNames)
+
         // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
         let sourceConcurrency = max(1, distinctSourceDriveCount(forPaths: config.sources))
 
@@ -231,7 +252,8 @@ actor FanOutCopier {
                         channelCapacity: channelCapacity,
                         chunkSz: chunkSz,
                         rootName: file.rootName,
-                        relPath: file.relPath
+                        relPath: file.relPath,
+                        sharedMHLsByDest: sharedMHLsByDest
                     )
                 }
                 inFlight += 1
@@ -262,6 +284,13 @@ actor FanOutCopier {
             }
             for dp in outcome.verifyFailedDestPaths {
                 builders[dp]?.markVerificationFailed()
+            }
+        }
+
+        // Seal each shared MHL so it gets the <sealed/> trailer.
+        for destMHLs in sharedMHLsByDest.values {
+            for writer in destMHLs.values {
+                try? await writer.seal()
             }
         }
 
@@ -304,7 +333,8 @@ actor FanOutCopier {
         channelCapacity: Int,
         chunkSz: Int,
         rootName: String,
-        relPath: String
+        relPath: String,
+        sharedMHLsByDest: [String: [String: MHLWriter]]
     ) async throws -> PerSourceOutcome {
         let sourcePath = sourceURL.path
         let fm = FileManager.default
@@ -330,10 +360,6 @@ actor FanOutCopier {
                 let parent = destFileURL.deletingLastPathComponent()
                 try? FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
             }
-            let mhlURL = URL(fileURLWithPath: destCfg.destPath)
-                .appendingPathComponent(".filmcan")
-                .appendingPathComponent("hashlists")
-                .appendingPathComponent("\(rootName).mhl")
             let progressHandler = config.progressHandler
 
             let task = Task<DestWriterResult, Never> {
@@ -354,13 +380,13 @@ actor FanOutCopier {
 
                 let writer: DestWriter
                 do {
+                    let sharedMHL = sharedMHLsByDest[destCfg.destPath]?[rootName]
                     writer = try await DestWriter(
                         destPath: destFileURL.path,
                         displayName: destCfg.displayName,
                         verifyMode: destCfg.verifyMode,
                         requiresFullFsync: destCfg.requiresFullFsync,
-                        mhlURL: mhlURL,
-                        sourceName: sourceName
+                        sharedMHLWriter: sharedMHL
                     )
                 } catch {
                     await channel.finish()
@@ -437,10 +463,16 @@ actor FanOutCopier {
                 prog.currentFile = sourceName
                 progressHandler?(prog)
 
+                let mhlPath = URL(fileURLWithPath: destCfg.destPath)
+                    .appendingPathComponent(".filmcan")
+                    .appendingPathComponent("hashlists")
+                    .appendingPathComponent("\(rootName).mhl")
+                    .path
+
                 return DestWriterResult(
                     destPath: destCfg.destPath, displayName: destCfg.displayName,
                     success: true, bytesTransferred: totalBytes, filesTransferred: 1,
-                    durationSec: duration, mhlPath: mhlURL.path,
+                    durationSec: duration, mhlPath: mhlPath,
                     failureReason: nil, verifyMode: destCfg.verifyMode,
                     destHashFromStream: destHash
                 )

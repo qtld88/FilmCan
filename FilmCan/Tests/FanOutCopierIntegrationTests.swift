@@ -268,10 +268,12 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             XCTAssertEqual(try Data(contentsOf: f3), data3)
         }
 
-        // One MHL per source root per dest
+        // One MHL per source root per dest, with all 3 files aggregated
         for dest in [dest1, dest2] {
             let mhl = dest.appendingPathComponent(".filmcan/hashlists/CARD.mhl")
             XCTAssertTrue(fm.fileExists(atPath: mhl.path), "Missing MHL at \(mhl.path)")
+            let entries = try MHLReader.read(url: mhl)
+            XCTAssertEqual(entries.count, 3, "MHL should aggregate all 3 files in the source root")
         }
     }
 
@@ -321,5 +323,10 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         // Two MHLs: one per source root
         XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent(".filmcan/hashlists/loose.bin.mhl").path))
         XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent(".filmcan/hashlists/CARD2.mhl").path))
+
+        let looseEntries = try MHLReader.read(url: dest.appendingPathComponent(".filmcan/hashlists/loose.bin.mhl"))
+        XCTAssertEqual(looseEntries.count, 1)
+        let cardEntries = try MHLReader.read(url: dest.appendingPathComponent(".filmcan/hashlists/CARD2.mhl"))
+        XCTAssertEqual(cardEntries.count, 2)
     }
 }
