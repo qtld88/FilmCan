@@ -113,6 +113,41 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         }
     }
 
+    func test_fanOut_fastMode_succeedsAndProducesIdenticalBytes() async throws {
+        let fm = FileManager.default
+        let sourceURL = tmpDir.appendingPathComponent("fast-source.bin")
+        let sourceData = Data((0..<512 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try sourceData.write(to: sourceURL)
+
+        let dest1 = tmpDir.appendingPathComponent("fast-dest1")
+        let dest2 = tmpDir.appendingPathComponent("fast-dest2")
+        try fm.createDirectory(at: dest1, withIntermediateDirectories: true)
+        try fm.createDirectory(at: dest2, withIntermediateDirectories: true)
+
+        let config = FanOutCopier.Configuration(
+            sources: [sourceURL.path],
+            destinations: [
+                DestWriter.Config(destPath: dest1.path, displayName: "D1",
+                                  verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768),
+                DestWriter.Config(destPath: dest2.path, displayName: "D2",
+                                  verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .fast,
+            mhlBasePath: nil,
+            dryRun: false,
+            progressHandler: nil
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.allSatisfy { $0.success })
+
+        let f1 = try Data(contentsOf: dest1.appendingPathComponent("fast-source.bin"))
+        let f2 = try Data(contentsOf: dest2.appendingPathComponent("fast-source.bin"))
+        XCTAssertEqual(f1, sourceData)
+        XCTAssertEqual(f2, sourceData)
+    }
+
     func test_fanOut_noDestinations() async throws {
         let config = FanOutCopier.Configuration(
             sources: ["/some/file.bin"],

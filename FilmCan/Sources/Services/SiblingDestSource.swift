@@ -54,10 +54,6 @@ actor SiblingDestSource {
         let destURL = URL(fileURLWithPath: destPath)
         try fm.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
-        if fm.fileExists(atPath: destPath) {
-            try fm.removeItem(at: destURL)
-        }
-
         let srcHandle = try FileHandle(forReadingFrom: srcURL)
         defer { try? srcHandle.close() }
         fcntl(srcHandle.fileDescriptor, F_NOCACHE, 1)
@@ -87,12 +83,15 @@ actor SiblingDestSource {
             throw Error.hashMismatch(fileName, expectedHash, actualHash)
         }
 
-        _ = tempURL.withUnsafeFileSystemRepresentation { tempPath in
-            destURL.withUnsafeFileSystemRepresentation { destPath in
-                if let t = tempPath, let d = destPath {
-                    Darwin.rename(t, d)
-                }
+        let renamed = tempURL.withUnsafeFileSystemRepresentation { tempPath -> Int32 in
+            destURL.withUnsafeFileSystemRepresentation { destPathRep in
+                guard let t = tempPath, let d = destPathRep else { return -1 }
+                return Darwin.rename(t, d)
             }
+        }
+        guard renamed == 0 else {
+            try? fm.removeItem(at: tempURL)
+            throw Error.readFailed("rename(2) failed for \(destURL.path) (errno=\(errno))")
         }
     }
 }

@@ -118,17 +118,17 @@ extension Notification.Name {
 // MARK: - TransferProgress + fan-out
 
 extension TransferProgress {
-    func incorporate(_ dest: DestProgress) {
-        totalBytes = max(totalBytes, dest.bytesTotal)
-        bytesCompleted = dest.bytesCompleted
-        filesTotal = max(filesTotal, dest.filesTotal)
-        filesCompleted = dest.filesCompleted
-        // Track worst status
-        switch dest.status {
-        case .pending: if currentTask.isEmpty { currentTask = dest.displayName }
-        case .active: currentTask = dest.displayName
-        case .complete: break
-        case .failed: currentTask = "⚠ \(dest.displayName)"
+    func syncFromPerDest() {
+        bytesCompleted = aggregateBytesCompleted
+        totalBytes = perDestProgress.map { $0.bytesTotal }.max() ?? totalBytes
+        filesCompleted = perDestProgress.map { $0.filesCompleted }.max() ?? filesCompleted
+        filesTotal = perDestProgress.map { $0.filesTotal }.max() ?? filesTotal
+        let active = perDestProgress.first { if case .active = $0.status { return true } else { return false } }
+        let failed = perDestProgress.first { if case .failed = $0.status { return true } else { return false } }
+        if let f = failed {
+            currentTask = "⚠ \(f.displayName)"
+        } else if let a = active {
+            currentTask = a.displayName
         }
     }
 }

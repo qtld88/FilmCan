@@ -6,8 +6,8 @@ enum BoundedChannelError: Error, Equatable {
 
 actor BoundedChannel<Element: Sendable> {
     private var buffer: [Element] = []
-    private var senderContinuations: [UnsafeContinuation<Void, Never>] = []
-    private var receiverContinuations: [UnsafeContinuation<Void, Never>] = []
+    private var senderContinuations: [CheckedContinuation<Void, Never>] = []
+    private var receiverContinuations: [CheckedContinuation<Void, Never>] = []
     private var isFinished = false
     private let capacity: Int
 
@@ -15,13 +15,13 @@ actor BoundedChannel<Element: Sendable> {
         self.capacity = Swift.max(capacity, 1)
     }
 
-    func send(_ element: Element) async {
-        if isFinished { return }
+    func send(_ element: Element) async throws {
+        if isFinished { throw BoundedChannelError.finished }
         if buffer.count >= capacity {
-            await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                 senderContinuations.append(cont)
             }
-            if isFinished { return }
+            if isFinished { throw BoundedChannelError.finished }
         }
         buffer.append(element)
         if !receiverContinuations.isEmpty {
@@ -32,7 +32,7 @@ actor BoundedChannel<Element: Sendable> {
     func receive() async throws -> Element {
         if buffer.isEmpty && isFinished { throw BoundedChannelError.finished }
         if buffer.isEmpty {
-            await withUnsafeContinuation { (cont: UnsafeContinuation<Void, Never>) in
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                 receiverContinuations.append(cont)
             }
             if buffer.isEmpty && isFinished { throw BoundedChannelError.finished }
