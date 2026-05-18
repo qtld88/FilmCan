@@ -4,10 +4,10 @@
 
 ## Core Features
 
-- [Copy Engines](./copy-engines.md) — rsync or FilmCan Engine
+- [Copy Engines](./copy-engines.md) — rsync or FilmCan Engine (fan-out, paranoid verify, sibling repair)
 - [Smart Date](./smart-date.md) — custom day boundaries for overnight shoots
 - [Source Selection](./source-selection.md) — drives, folders, or individual files
-- [Multi-Destination](./multi-destination.md) — copy to multiple drives
+- [Multi-Destination](./multi-destination.md) — fan-out copy to multiple drives, with one-click sibling repair on failure
 - [Destination Presets](./destination-presets.md) — organize by date/source
 - [Options](./options.md) — hash verification, duplicates
 - [Hash Lists](./hash-lists.md) — hash files for later verification

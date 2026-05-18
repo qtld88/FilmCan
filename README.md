@@ -16,13 +16,17 @@
 
 ## What It Does
 
-FilmCan backs up camera cards, rushes, folders, or files to multiple destinations with verification and organization presets—giving DITs, ACs, and cinematographers peace of mind through battle‑tested rsync.
+FilmCan backs up camera cards, rushes, folders, or files to multiple destinations with verification and organization presets—giving DITs, ACs, and cinematographers peace of mind through battle‑tested rsync and a purpose‑built fan‑out copy engine.
 
-- Copies multiple sources to multiples destinations
-- Verifies every byte copied
-- Auto-detect drives or folders
-- Organizes files with custom folders presets
-- Creates checksums for later verification
+- Copies multiple sources to multiple destinations in one pass (fan-out: source read once, broadcast to every drive)
+- Two verify modes: **fast** (stream hash during copy) and **paranoid** (post-copy re-read from disk, bypassing OS cache)
+- Honest writes on external/exFAT drives via `F_FULLFSYNC` (forces drive cache flush, not just OS buffers)
+- Per-destination ASC MHL hash lists, sealed at job end (cinema standard)
+- Auto-detect drives, folders, files — handles cinema card directory trees (RDC, RDM, BRAW, .ari, R3D)
+- Live per-destination progress, "DO NOT UNPLUG" banner on slow-flush drives
+- One-click **Retry from sibling**: a failed drive rebuilds from a verified neighbor's MHL — no need to re-mount the card
+- Organizes files with custom folder presets
+- Aggregated webhooks and ntfy push notifications
 
 ---
 
