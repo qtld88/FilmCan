@@ -356,7 +356,12 @@ struct DestinationListView: View {
                 Spacer()
             }
 
-            if showProgress {
+            if isFanOutActive {
+                if let destProg = progress.perDestProgress.first(where: { $0.id == destination.path }) {
+                    InlineFanOutProgress(progress: destProg, showPill: true)
+                        .padding(.leading, 28)
+                }
+            } else if showProgress {
                 transferInfoRow(for: destination.path, presentation: presentation)
                     .padding(.leading, 28)
             }
@@ -467,11 +472,19 @@ struct DestinationListView: View {
         VStack(alignment: .leading, spacing: 8) {
             ExFATBanner(activeDests: progress.perDestProgress)
             if !progress.perDestProgress.isEmpty {
-                MultiDestSummaryView(progresses: progress.perDestProgress)
+                ForEach(Array(progress.perDestProgress.enumerated()), id: \.element.id) { index, destProg in
+                    HStack(spacing: 8) {
+                        Text("\(index + 1)")
+                            .font(FilmCanFont.label(11))
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                            .frame(width: 20)
+                        InlineFanOutProgress(progress: destProg, showPill: true)
+                    }
+                }
             }
-            if !isActiveTransfer, let fanOutResult = latestFanOutResult, fanOutResult.destinationResults.contains(where: { !$0.success }) {
+            if !isActiveTransfer, !latestFanOutDestResults.isEmpty, latestFanOutDestResults.contains(where: { !$0.success }) {
                 FailedDestRetryPanel(
-                    results: fanOutResult.destinationResults,
+                    results: latestFanOutDestResults,
                     sourcePaths: transferViewModel.currentSources,
                     onRepair: { failed, sibling, choice in
                         Task { @MainActor in
@@ -492,10 +505,9 @@ struct DestinationListView: View {
         .padding(.top, 4)
     }
 
-    /// Most-recent `TransferResult` whose `destinationResults` is non-empty
-    /// (i.e. produced by the fan-out engine, which populates that field).
-    private var latestFanOutResult: TransferResult? {
-        transferViewModel.results.last(where: { !$0.destinationResults.isEmpty })
+    /// Most-recent per-destination results from the fan-out engine.
+    private var latestFanOutDestResults: [DestResult] {
+        transferViewModel.results.last(where: { !$0.destinationResults.isEmpty })?.destinationResults ?? []
     }
 
     private func capacityBar(

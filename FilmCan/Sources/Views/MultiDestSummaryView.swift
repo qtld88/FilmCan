@@ -1,3 +1,4 @@
+// Deprecated: use per-row inline fan-out progress via InlineFanOutProgress
 import SwiftUI
 
 struct MultiDestSummaryView: View {
