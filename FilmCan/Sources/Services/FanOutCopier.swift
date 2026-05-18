@@ -169,6 +169,7 @@ actor FanOutCopier {
         guard !config.destinations.isEmpty else { throw Error.noDestinations }
         guard !config.sources.isEmpty else { throw Error.sourceNotFound("(empty)") }
 
+
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
@@ -582,6 +583,14 @@ actor FanOutCopier {
                 verifyFailed.insert(r.destPath)
                 try? fm.removeItem(atPath: destFilePath(for: r.destPath))
             }
+        }
+
+        // Give drives that don't reliably honor F_FULLFSYNC time to flush their
+        // write cache before the paranoid re-read. Without this, the re-read can
+        // return stale data and produce a false hash mismatch.
+        let hasFullFsyncDest = config.destinations.contains { $0.requiresFullFsync }
+        if config.verifyMode == .paranoid && hasFullFsyncDest {
+            try await Task.sleep(for: .seconds(1))
         }
 
         var corrupted = false
