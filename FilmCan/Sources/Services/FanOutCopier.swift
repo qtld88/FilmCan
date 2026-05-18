@@ -91,6 +91,8 @@ actor FanOutCopier {
         var mhlBasePath: String?
         var dryRun: Bool
         var progressHandler: (@Sendable (DestProgress) -> Void)?
+        var organizationPreset: OrganizationPreset?
+        var copyFolderContents: Bool = false
     }
 
     enum Error: Swift.Error, LocalizedError {
@@ -191,7 +193,7 @@ actor FanOutCopier {
         // Expand every source root into its constituent files. A flat-file root
         // yields one PlannedFile with relPath == "" and rootName == basename.
         // A directory root yields one PlannedFile per regular file under it.
-        let entries = await FileEnumerator.enumerateFiles(sources: config.sources, preset: nil)
+        let entries = await FileEnumerator.enumerateFiles(sources: config.sources, preset: config.organizationPreset)
         guard !entries.isEmpty else {
             throw Error.sourceReadFailed(config.sources.first ?? "")
         }
@@ -254,6 +256,7 @@ actor FanOutCopier {
                         channelCapacity: channelCapacity,
                         chunkSz: chunkSz,
                         rootName: file.rootName,
+                        rootPath: file.rootPath,
                         relPath: file.relPath,
                         sharedMHLsByDest: sharedMHLsByDest
                     )
@@ -335,6 +338,7 @@ actor FanOutCopier {
         channelCapacity: Int,
         chunkSz: Int,
         rootName: String,
+        rootPath: String,
         relPath: String,
         sharedMHLsByDest: [String: [String: MHLWriter]]
     ) async throws -> PerSourceOutcome {
@@ -350,17 +354,50 @@ actor FanOutCopier {
 
         for destCfg in config.destinations {
             let channel = channels[destCfg.destPath]!
-            let destRootURL = URL(fileURLWithPath: destCfg.destPath)
-                .appendingPathComponent(rootName)
             let destFileURL: URL
-            if relPath.isEmpty {
-                // Flat-file source: write directly under destRoot.
-                destFileURL = destRootURL
+            let destRootPath = destCfg.destPath
+            if let preset = config.organizationPreset {
+                let resolved = OrganizationTemplate.resolve(
+                    preset: preset,
+                    sourcePath: rootPath,
+                    destinationRoot: destRootPath,
+                    counter: 0,
+                    date: Date()
+                )
+                let folderBase = resolved.folderPath.isEmpty
+                    ? destRootPath
+                    : (destRootPath as NSString).appendingPathComponent(resolved.folderPath)
+                let baseTarget: String
+                if relPath.isEmpty {
+                    // Flat file: dest = folderBase / renamedItem
+                    baseTarget = (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
+                } else if config.copyFolderContents {
+                    // Directory, content-only: dest = folderBase / relPath
+                    baseTarget = (folderBase as NSString).appendingPathComponent(relPath)
+                } else {
+                    // Directory, include folder: dest = folderBase / renamedItem / relPath
+                    let namedFolder = (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
+                    baseTarget = (namedFolder as NSString).appendingPathComponent(relPath)
+                }
+                let parent = (baseTarget as NSString).deletingLastPathComponent
+                try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
+                destFileURL = URL(fileURLWithPath: baseTarget)
+            } else if relPath.isEmpty {
+                // Flat file, no preset: dest = destRoot / rootName
+                destFileURL = URL(fileURLWithPath: (destRootPath as NSString).appendingPathComponent(rootName))
+            } else if config.copyFolderContents {
+                // Directory, content-only, no preset: dest = destRoot / relPath
+                let target = (destRootPath as NSString).appendingPathComponent(relPath)
+                let parent = (target as NSString).deletingLastPathComponent
+                try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
+                destFileURL = URL(fileURLWithPath: target)
             } else {
-                destFileURL = destRootURL.appendingPathComponent(relPath)
-                // Ensure parent directory exists; ignore "already exists" failures.
-                let parent = destFileURL.deletingLastPathComponent()
-                try? FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+                // Directory, include folder, no preset: dest = destRoot / rootName / relPath
+                let namedFolder = (destRootPath as NSString).appendingPathComponent(rootName)
+                let target = (namedFolder as NSString).appendingPathComponent(relPath)
+                let parent = (target as NSString).deletingLastPathComponent
+                try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
+                destFileURL = URL(fileURLWithPath: target)
             }
             let progressHandler = config.progressHandler
 

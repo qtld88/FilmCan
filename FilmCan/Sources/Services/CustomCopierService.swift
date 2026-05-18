@@ -850,7 +850,9 @@ class CustomCopierService: ObservableObject, TransferService {
             dryRun: dryRun,
             progressHandler: { [accumulator] prog in
                 Task { await accumulator.update(prog) }
-            }
+            },
+            organizationPreset: organizationPreset,
+            copyFolderContents: copyFolderContents
         )
 
         let copier = FanOutCopier(config: fanOutConfig)
