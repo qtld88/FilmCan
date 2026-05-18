@@ -507,7 +507,12 @@ struct DestinationListView: View {
 
     /// Most-recent per-destination results from the fan-out engine.
     private var latestFanOutDestResults: [DestResult] {
-        transferViewModel.results.last(where: { !$0.destinationResults.isEmpty })?.destinationResults ?? []
+        guard let mostRecent = transferViewModel.results.last(where: { !$0.destinationResults.isEmpty }) else { return [] }
+        let start = mostRecent.startTime
+        let end = mostRecent.endTime
+        return transferViewModel.results
+            .filter { $0.startTime == start && $0.endTime == end && !$0.destinationResults.isEmpty }
+            .flatMap { $0.destinationResults }
     }
 
     private func capacityBar(

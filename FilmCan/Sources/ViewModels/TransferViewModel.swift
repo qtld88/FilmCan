@@ -153,16 +153,19 @@ class TransferViewModel: ObservableObject {
                 config: activeConfig,
                 organizationPreset: organizationPreset
             )
+            let perDestResults = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
+            results.removeAll(where: { $0.id == fanOutResult.id })
+            results.append(contentsOf: perDestResults)
             await recordHistory(
                 config: activeConfig,
                 sources: sources,
-                results: [fanOutResult],
+                results: perDestResults,
                 preset: organizationPreset
             )
             await sendSourceNotifications(
                 source: sources.first ?? "",
                 config: activeConfig,
-                results: [fanOutResult]
+                results: perDestResults
             )
         } else {
             for source in sources {
@@ -1000,6 +1003,29 @@ class TransferViewModel: ObservableObject {
         duplicatePromptCancelled = true
         cancelAll()
         submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
+    }
+
+    func explodeFanOutResult(_ fanOut: TransferResult, configName: String) -> [TransferResult] {
+        fanOut.destinationResults.map { dr in
+            var r = TransferResult(
+                configurationName: configName,
+                destination: dr.destinationPath,
+                startTime: fanOut.startTime,
+                endTime: fanOut.endTime,
+                success: dr.success,
+                errorMessage: dr.success ? nil : dr.failureReason?.displayMessage,
+                warningMessage: nil,
+                filesTransferred: dr.filesTransferred,
+                bytesTransferred: dr.bytesTransferred,
+                totalBytes: dr.bytesTransferred,
+                filesSkipped: dr.filesSkipped,
+                errors: dr.success ? [] : [dr.failureReason?.displayMessage ?? "Failed"],
+                hashListPath: dr.mhlPath,
+                wasVerified: dr.success && dr.verifyMode == .paranoid
+            )
+            r.destinationResults = [dr]
+            return r
+        }
     }
 
     // MARK: - Fan-out engine
