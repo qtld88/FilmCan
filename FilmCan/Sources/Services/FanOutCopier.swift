@@ -139,6 +139,17 @@ actor FanOutCopier {
         return next >= totalFiles
     }
 
+    /// Adds `bytes` to the per-dest cumulative verified total and returns the new value.
+    private func recordVerifyBytes(destPath: String, adding bytes: Int64) -> Int64 {
+        let next = (verifiedBytesByDest[destPath] ?? 0) + bytes
+        verifiedBytesByDest[destPath] = next
+        return next
+    }
+
+    private func verifiedBytesForDest(_ destPath: String) -> Int64 {
+        verifiedBytesByDest[destPath] ?? 0
+    }
+
     private func buildSharedMHLs(forRootNames rootNames: Set<String>) throws -> [String: [String: MHLWriter]] {
         var result: [String: [String: MHLWriter]] = [:]
         for destCfg in config.destinations {
@@ -406,6 +417,9 @@ actor FanOutCopier {
                 let startTime = Date()
                 var totalBytes: Int64 = 0
                 var writeFailed: DestFailureReason? = nil
+                // Snapshot verified bytes at the start of this source so copy-phase
+                // progress emits keep the verify bar frozen at the right position.
+                let verifiedAtStart = await self.verifiedBytesForDest(destCfg.destPath)
 
                 guard let destHasher = XXH128StreamingHasher() else {
                     await channel.finish()
@@ -455,6 +469,8 @@ actor FanOutCopier {
                                 prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
                                 prog.filesCompleted = sourceIndex
                                 prog.currentFile = sourceName
+                                prog.verifyBytesTotal = totalBytesAllSources
+                                prog.verifyBytesCompleted = verifiedAtStart
                                 progressHandler?(prog)
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
@@ -501,6 +517,8 @@ actor FanOutCopier {
                 prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
                 prog.filesCompleted = sourceIndex + 1
                 prog.currentFile = sourceName
+                prog.verifyBytesTotal = totalBytesAllSources
+                prog.verifyBytesCompleted = verifiedAtStart
                 progressHandler?(prog)
 
                 let mhlPath = URL(fileURLWithPath: destCfg.destPath)
@@ -605,7 +623,7 @@ actor FanOutCopier {
                 prog.bytesCompleted = cumulativeBytesBeforeSource + sourceSize
                 prog.filesCompleted = sourceIndex + 1
                 prog.verifyBytesTotal = totalBytesAllSources
-                prog.verifyBytesCompleted = cumulativeBytesBeforeSource
+                prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
                 prog.currentFile = "Verifying \(sourceName)…"
                 config.progressHandler?(prog)
             }
@@ -636,10 +654,13 @@ actor FanOutCopier {
                         }
                         if let _ = writerResults.first(where: { $0.destPath == destPath }) {
                             let verifyDestStatus: DestStatus
+                            let newVerifiedBytes: Int64
                             if hashMatchesExpected {
                                 let isLastVerify = await self.recordVerifyCompletion(destPath: destPath, totalFiles: totalSources)
+                                newVerifiedBytes = await self.recordVerifyBytes(destPath: destPath, adding: sourceSize)
                                 verifyDestStatus = isLastVerify ? .complete : .active
                             } else {
+                                newVerifiedBytes = await self.verifiedBytesForDest(destPath)
                                 verifyDestStatus = .failed(.verify)
                             }
                             var prog = DestProgress(
@@ -651,7 +672,7 @@ actor FanOutCopier {
                             prog.bytesCompleted = cumulativeBytesBeforeSource + sourceSize
                             prog.filesCompleted = sourceIndex + 1
                             prog.verifyBytesTotal = totalBytesAllSources
-                            prog.verifyBytesCompleted = cumulativeBytesBeforeSource + sourceSize
+                            prog.verifyBytesCompleted = newVerifiedBytes
                             prog.currentFile = hashMatchesExpected ? "✓ \(sourceName)" : "✗ \(sourceName)"
                             config.progressHandler?(prog)
                         }

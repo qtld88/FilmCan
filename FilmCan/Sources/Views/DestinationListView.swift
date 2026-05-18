@@ -471,17 +471,6 @@ struct DestinationListView: View {
     private var transferControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             ExFATBanner(activeDests: progress.perDestProgress)
-            if !progress.perDestProgress.isEmpty {
-                ForEach(Array(progress.perDestProgress.enumerated()), id: \.element.id) { index, destProg in
-                    HStack(spacing: 8) {
-                        Text("\(index + 1)")
-                            .font(FilmCanFont.label(11))
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                            .frame(width: 20)
-                        InlineFanOutProgress(progress: destProg, showPill: true)
-                    }
-                }
-            }
             if !isActiveTransfer, !latestFanOutDestResults.isEmpty, latestFanOutDestResults.contains(where: { !$0.success }) {
                 FailedDestRetryPanel(
                     results: latestFanOutDestResults,
