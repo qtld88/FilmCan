@@ -329,4 +329,61 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let cardEntries = try MHLReader.read(url: dest.appendingPathComponent(".filmcan/hashlists/CARD2.mhl"))
         XCTAssertEqual(cardEntries.count, 2)
     }
+
+    func test_verifyBytesCompleted_isMonotonicAcrossFiles() async throws {
+        let fm = FileManager.default
+
+        // Create 3 source files of increasing size
+        let src1 = tmpDir.appendingPathComponent("clip-a.bin")
+        let src2 = tmpDir.appendingPathComponent("clip-b.bin")
+        let src3 = tmpDir.appendingPathComponent("clip-c.bin")
+        let data1 = Data((0..<256 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let data2 = Data((0..<384 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let data3 = Data((0..<128 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try data1.write(to: src1)
+        try data2.write(to: src2)
+        try data3.write(to: src3)
+
+        let dest = tmpDir.appendingPathComponent("mono-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        var capturedProgresses: [DestProgress] = []
+        let progressHandler: @Sendable (DestProgress) -> Void = { prog in
+            // Only capture verify-related progress for the dest we care about
+            if prog.verifyBytesTotal > 0 {
+                capturedProgresses.append(prog)
+            }
+        }
+
+        let config = FanOutCopier.Configuration(
+            sources: [src1.path, src2.path, src3.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: "Mono",
+                                  verifyMode: .paranoid, requiresFullFsync: false,
+                                  chunkSize: 65536)
+            ],
+            verifyMode: .paranoid,
+            mhlBasePath: nil,
+            dryRun: false,
+            progressHandler: progressHandler
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertEqual(results.count, 1)
+        XCTAssertTrue(results[0].success)
+        XCTAssertEqual(results[0].filesTransferred, 3)
+
+        // Verify monotonicity: verifyBytesCompleted must never decrease
+        var lastVerified: Int64 = -1
+        for prog in capturedProgresses {
+            XCTAssertGreaterThanOrEqual(prog.verifyBytesCompleted, lastVerified,
+                                        "verifyBytesCompleted decreased from \(lastVerified) to \(prog.verifyBytesCompleted)")
+            lastVerified = prog.verifyBytesCompleted
+        }
+
+        // Final value should equal total bytes of all sources
+        let totalBytes = Int64(data1.count + data2.count + data3.count)
+        XCTAssertEqual(lastVerified, totalBytes,
+                       "Final verifyBytesCompleted should equal total bytes of all sources")
+    }
 }

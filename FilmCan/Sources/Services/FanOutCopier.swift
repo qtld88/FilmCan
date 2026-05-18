@@ -123,6 +123,7 @@ actor FanOutCopier {
 
     private var completedFilesByDest: [String: Int] = [:]
     private var verifiedFilesByDest: [String: Int] = [:]
+    private var verifiedBytesByDest: [String: Int64] = [:]
 
     private func recordFileCompletion(destPath: String, totalFiles: Int) -> Bool {
         let next = (completedFilesByDest[destPath] ?? 0) + 1
@@ -168,6 +169,7 @@ actor FanOutCopier {
 
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
+        verifiedBytesByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
@@ -556,8 +558,8 @@ actor FanOutCopier {
                 )
                 prog.bytesCompleted = cumulativeBytesBeforeSource + sourceSize
                 prog.filesCompleted = sourceIndex + 1
-                prog.verifyBytesTotal = sourceSize
-                prog.verifyBytesCompleted = 0
+                prog.verifyBytesTotal = totalBytesAllSources
+                prog.verifyBytesCompleted = cumulativeBytesBeforeSource
                 prog.currentFile = "Verifying \(sourceName)…"
                 config.progressHandler?(prog)
             }
@@ -602,8 +604,8 @@ actor FanOutCopier {
                             )
                             prog.bytesCompleted = cumulativeBytesBeforeSource + sourceSize
                             prog.filesCompleted = sourceIndex + 1
-                            prog.verifyBytesTotal = sourceSize
-                            prog.verifyBytesCompleted = sourceSize
+                            prog.verifyBytesTotal = totalBytesAllSources
+                            prog.verifyBytesCompleted = cumulativeBytesBeforeSource + sourceSize
                             prog.currentFile = hashMatchesExpected ? "✓ \(sourceName)" : "✗ \(sourceName)"
                             config.progressHandler?(prog)
                         }
