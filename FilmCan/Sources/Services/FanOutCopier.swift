@@ -19,6 +19,8 @@ struct DestWriterResult: Sendable {
     let failureReason: DestFailureReason?
     let verifyMode: VerifyMode
     let destHashFromStream: String?
+    /// The exact path the file was written to (accounts for organization presets).
+    let writtenFilePath: String
 }
 
 // MARK: - Accumulator across sources for one destination
@@ -100,6 +102,7 @@ actor FanOutCopier {
         case sourceReadFailed(String)
         case noDestinations
         case sourceCorruption(String)
+        case insufficientSpace(destPath: String, available: Int64, required: Int64)
 
         var errorDescription: String? {
             switch self {
@@ -108,6 +111,11 @@ actor FanOutCopier {
             case .noDestinations: return "No destinations configured"
             case .sourceCorruption(let s):
                 return "Source corruption detected during copy — RAM or source drive issue. Retry recommended. (\(s))"
+            case .insufficientSpace(let path, let available, let required):
+                let dest = (path as NSString).lastPathComponent
+                let avMB = available / (1024 * 1024)
+                let reqMB = required / (1024 * 1024)
+                return "Not enough space on \"\(dest)\" — \(reqMB) MB needed, \(avMB) MB available. Free space before backing up."
             }
         }
     }
@@ -221,6 +229,19 @@ actor FanOutCopier {
             )
         }
         let totalBytesAllSources = plannedFiles.reduce(Int64(0)) { $0 + $1.size }
+
+        // Pre-flight: ensure every destination has enough free space before we start.
+        for dest in config.destinations {
+            let url = URL(fileURLWithPath: dest.destPath)
+            let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            if let available = values?.volumeAvailableCapacityForImportantUsage, available < totalBytesAllSources {
+                throw Error.insufficientSpace(
+                    destPath: dest.destPath,
+                    available: available,
+                    required: totalBytesAllSources
+                )
+            }
+        }
 
         // Pre-compute cumulative bytes before each planned file.
         var cumulativeBeforeFile: [Int64] = []
@@ -428,7 +449,8 @@ actor FanOutCopier {
                         success: false, bytesTransferred: 0, filesTransferred: 0,
                         durationSec: Date().timeIntervalSince(startTime),
                         mhlPath: nil, failureReason: .ioError("xxhash unavailable"),
-                        verifyMode: destCfg.verifyMode, destHashFromStream: nil
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                        writtenFilePath: destFileURL.path
                     )
                 }
 
@@ -449,7 +471,8 @@ actor FanOutCopier {
                         success: false, bytesTransferred: 0, filesTransferred: 0,
                         durationSec: Date().timeIntervalSince(startTime),
                         mhlPath: nil, failureReason: .ioError(error.localizedDescription),
-                        verifyMode: destCfg.verifyMode, destHashFromStream: nil
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                        writtenFilePath: destFileURL.path
                     )
                 }
 
@@ -488,7 +511,8 @@ actor FanOutCopier {
                         success: false, bytesTransferred: totalBytes, filesTransferred: 0,
                         durationSec: Date().timeIntervalSince(startTime),
                         mhlPath: nil, failureReason: reason,
-                        verifyMode: destCfg.verifyMode, destHashFromStream: nil
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                        writtenFilePath: destFileURL.path
                     )
                 }
 
@@ -502,7 +526,8 @@ actor FanOutCopier {
                         success: false, bytesTransferred: totalBytes, filesTransferred: 0,
                         durationSec: Date().timeIntervalSince(startTime),
                         mhlPath: nil, failureReason: .ioError(error.localizedDescription),
-                        verifyMode: destCfg.verifyMode, destHashFromStream: destHash
+                        verifyMode: destCfg.verifyMode, destHashFromStream: destHash,
+                        writtenFilePath: destFileURL.path
                     )
                 }
 
@@ -532,7 +557,8 @@ actor FanOutCopier {
                     success: true, bytesTransferred: totalBytes, filesTransferred: 1,
                     durationSec: duration, mhlPath: mhlPath,
                     failureReason: nil, verifyMode: destCfg.verifyMode,
-                    destHashFromStream: destHash
+                    destHashFromStream: destHash,
+                    writtenFilePath: destFileURL.path
                 )
             }
             writerTasks.append(task)
@@ -590,16 +616,11 @@ actor FanOutCopier {
             throw Error.sourceReadFailed(sourcePath)
         }
 
-        func destFilePath(for base: String) -> String {
-            let root = URL(fileURLWithPath: base).appendingPathComponent(rootName)
-            return relPath.isEmpty ? root.path : root.appendingPathComponent(relPath).path
-        }
-
         var verifyFailed: Set<String> = []
         for r in writerResults where r.success {
             if let dh = r.destHashFromStream, dh != verifiedSourceHash {
                 verifyFailed.insert(r.destPath)
-                try? fm.removeItem(atPath: destFilePath(for: r.destPath))
+                try? fm.removeItem(atPath: r.writtenFilePath)
             }
         }
 
@@ -631,13 +652,17 @@ actor FanOutCopier {
             if let diskHash = sourceHashFromDisk, diskHash != verifiedSourceHash {
                 corrupted = true
                 for r in writerResults where r.success {
-                    try? fm.removeItem(atPath: destFilePath(for: r.destPath))
+                    try? fm.removeItem(atPath: r.writtenFilePath)
                     verifyFailed.insert(r.destPath)
                 }
             } else {
+                // Build lookup so the task group can resolve writtenFilePath by destPath.
+                let writtenPathByDest: [String: String] = Dictionary(
+                    uniqueKeysWithValues: writerResults.map { ($0.destPath, $0.writtenFilePath) }
+                )
                 await withTaskGroup(of: (String, String?).self) { group in
                     for r in writerResults where r.success && !verifyFailed.contains(r.destPath) {
-                        let destFileURL = URL(fileURLWithPath: destFilePath(for: r.destPath))
+                        let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
                         let destPath = r.destPath
                         group.addTask {
                             let hash = await Self.rereadHashDetached(url: destFileURL, chunkSz: chunkSz)
@@ -648,7 +673,9 @@ actor FanOutCopier {
                         let hashMatchesExpected = hash == verifiedSourceHash
                         if let h = hash, h != verifiedSourceHash {
                             verifyFailed.insert(destPath)
-                            try? fm.removeItem(atPath: destFilePath(for: destPath))
+                            if let wp = writtenPathByDest[destPath] {
+                                try? fm.removeItem(atPath: wp)
+                            }
                         } else if hash == nil {
                             verifyFailed.insert(destPath)
                         }

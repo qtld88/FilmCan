@@ -153,7 +153,11 @@ class TransferViewModel: ObservableObject {
                 config: activeConfig,
                 organizationPreset: organizationPreset
             )
-            let perDestResults = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
+            let exploded = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
+            // If exploded is empty the fan-out threw before producing per-dest results
+            // (e.g. insufficient disk space). Fall back to the aggregate result so the
+            // error surfaces in history and triggers a notification.
+            let perDestResults: [TransferResult] = exploded.isEmpty ? [fanOutResult] : exploded
             results.removeAll(where: { $0.id == fanOutResult.id })
             results.append(contentsOf: perDestResults)
             await recordHistory(
