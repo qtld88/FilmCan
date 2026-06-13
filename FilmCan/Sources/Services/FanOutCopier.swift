@@ -505,7 +505,7 @@ actor FanOutCopier {
                                 prog.currentFile = sourceName
                                 prog.verifyBytesTotal = totalBytesAllSources
                                 prog.verifyBytesCompleted = verifiedAtStart
-                                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
+                                Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
                                 progressHandler?(prog)
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
@@ -569,7 +569,7 @@ actor FanOutCopier {
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = totalBytesAllSources
                 prog.verifyBytesCompleted = verifiedAtStart
-                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
+                Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
                 progressHandler?(prog)
 
                 let mhlPath = URL(fileURLWithPath: destCfg.destPath)
@@ -690,6 +690,7 @@ actor FanOutCopier {
                 prog.verifyBytesTotal = totalBytesAllSources
                 prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
                 prog.currentFile = "Verifying \(sourceName)…"
+                Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
                 config.progressHandler?(prog)
             }
             let sourceHashFromDisk = await rereadHash(url: sourceURL, chunkSz: chunkSz)
@@ -745,6 +746,7 @@ actor FanOutCopier {
                             prog.verifyBytesTotal = totalBytesAllSources
                             prog.verifyBytesCompleted = newVerifiedBytes
                             prog.currentFile = hashMatchesExpected ? "✓ \(sourceName)" : "✗ \(sourceName)"
+                            Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
                             config.progressHandler?(prog)
                         }
                     }
@@ -760,22 +762,22 @@ actor FanOutCopier {
         )
     }
 
-    /// Fill in average copy speed and ETA from job-wide bytes copied so far.
-    /// Average (not instantaneous) keeps the number stable; only meaningful once
-    /// a little time has elapsed, so it stays 0 for the first 0.5s (UI hides the
-    /// pill while speed == 0, avoiding a misleading spike at start).
-    nonisolated private static func applyCopySpeedETA(_ prog: inout DestProgress, jobStartTime: Date) {
+    /// Fill in average speed and ETA over the *combined* copy+verify workload so
+    /// the numbers stay alive (and honest) through the verify phase instead of
+    /// vanishing once copying finishes. Work = copy bytes + verify bytes; the ETA
+    /// therefore includes the time the verify phase will still take. Average (not
+    /// instantaneous) keeps it stable; stays 0 for the first 0.5s so the UI can
+    /// hide it instead of showing a misleading startup spike.
+    nonisolated private static func applyCombinedSpeedETA(_ prog: inout DestProgress, jobStartTime: Date) {
         let elapsed = Date().timeIntervalSince(jobStartTime)
-        guard elapsed >= 0.5, prog.bytesCompleted > 0 else { return }
-        let speed = Double(prog.bytesCompleted) / elapsed
+        let done = prog.bytesCompleted + prog.verifyBytesCompleted
+        guard elapsed >= 0.5, done > 0 else { return }
+        let speed = Double(done) / elapsed
         guard speed > 0 else { return }
         prog.speedBytesPerSecond = speed
-        let remaining = prog.bytesTotal - prog.bytesCompleted
-        if remaining > 0 {
-            prog.estimatedTimeRemaining = Double(remaining) / speed
-        } else {
-            prog.estimatedTimeRemaining = nil
-        }
+        let totalWork = prog.bytesTotal + prog.verifyBytesTotal
+        let remaining = totalWork - done
+        prog.estimatedTimeRemaining = remaining > 0 ? Double(remaining) / speed : nil
     }
 
     nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {

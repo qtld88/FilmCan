@@ -14,6 +14,17 @@ struct InlineFanOutProgress: View {
         return Double(progress.verifyBytesCompleted) / Double(progress.verifyBytesTotal)
     }
 
+    private static let byteFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        f.allowedUnits = [.useGB, .useMB]
+        return f
+    }()
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        Self.byteFormatter.string(fromByteCount: max(bytes, 0))
+    }
+
     private func formattedSpeed(_ bytesPerSec: Double) -> String {
         let mb = bytesPerSec / 1_000_000
         if mb < 1 { return String(format: "%.0f KB/s", bytesPerSec / 1_000) }
@@ -28,18 +39,6 @@ struct InlineFanOutProgress: View {
         return "\(s / 3600)h \((s % 3600) / 60)m left"
     }
 
-    private var pillText: String {
-        var parts: [String] = [formattedSpeed(progress.speedBytesPerSecond)]
-        if let eta = progress.estimatedTimeRemaining, eta > 0 {
-            parts.append(formattedETA(eta))
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private var displayFile: String {
-        progress.currentFile.isEmpty ? "Copying…" : progress.currentFile.fileName
-    }
-
     var body: some View {
         HStack(spacing: 8) {
             FanOutProgressBar(copyFraction: copyFraction,
@@ -49,7 +48,6 @@ struct InlineFanOutProgress: View {
                 .layoutPriority(0)
 
             statusInfo
-                .frame(width: 120, alignment: .trailing)
                 .layoutPriority(1)
 
             if showPill {
@@ -63,17 +61,7 @@ struct InlineFanOutProgress: View {
     private var statusInfo: some View {
         switch progress.status {
         case .active:
-            HStack(spacing: 4) {
-                Image(systemName: "bolt.fill")
-                    .font(FilmCanFont.label(10))
-                    .foregroundColor(FilmCanTheme.brandYellow)
-                Text(displayFile)
-                    .font(FilmCanFont.label(10))
-                    .foregroundColor(FilmCanTheme.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
+            statsRow
         case .complete:
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
@@ -83,12 +71,10 @@ struct InlineFanOutProgress: View {
                     .font(FilmCanFont.label(10))
                     .foregroundColor(FilmCanTheme.brandGreen)
             }
-
         case .pending:
             Text("Waiting…")
                 .font(FilmCanFont.label(10))
                 .foregroundColor(FilmCanTheme.textTertiary)
-
         case .failed(let reason):
             HStack(spacing: 4) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -102,26 +88,35 @@ struct InlineFanOutProgress: View {
         }
     }
 
-    @ViewBuilder
-    private var pillBadge: some View {
-        switch progress.status {
-        case .active where progress.speedBytesPerSecond > 0:
-            Text(pillText)
+    /// Data row styled like the reference: bytes copied/total · speed · ETA.
+    private var statsRow: some View {
+        HStack(spacing: 12) {
+            stat(icon: "externaldrive",
+                 text: "\(formattedBytes(progress.bytesCompleted)) / \(formattedBytes(progress.bytesTotal))")
+            if progress.speedBytesPerSecond > 0 {
+                stat(icon: "speedometer", text: formattedSpeed(progress.speedBytesPerSecond))
+            }
+            if let eta = progress.estimatedTimeRemaining, eta > 0 {
+                stat(icon: "clock", text: formattedETA(eta))
+            }
+        }
+        .fixedSize()
+    }
+
+    private func stat(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
                 .font(FilmCanFont.label(10))
                 .foregroundColor(FilmCanTheme.textTertiary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(FilmCanTheme.panel)
-                .cornerRadius(4)
-                .fixedSize()
-        case .active, .complete, .failed, .pending:
-            EmptyView()
+            Text(text)
+                .font(FilmCanFont.label(10))
+                .foregroundColor(FilmCanTheme.textSecondary)
+                .monospacedDigit()
         }
     }
-}
 
-private extension String {
-    var fileName: String {
-        split(separator: "/").last.map(String.init) ?? self
+    @ViewBuilder
+    private var pillBadge: some View {
+        EmptyView()
     }
 }
