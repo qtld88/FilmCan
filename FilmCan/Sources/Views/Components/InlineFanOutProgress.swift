@@ -19,6 +19,15 @@ struct InlineFanOutProgress: View {
         return Double(progress.verifyBytesCompleted) / Double(progress.verifyBytesTotal)
     }
 
+    /// Copy for this dest is done but verification is still running (no copy to
+    /// show alongside — e.g. the final file's verify pass).
+    private var isVerifyOnly: Bool {
+        progress.bytesTotal > 0
+            && progress.bytesCompleted >= progress.bytesTotal
+            && progress.verifyBytesTotal > 0
+            && progress.verifyBytesCompleted < progress.verifyBytesTotal
+    }
+
     // MARK: Formatting (stable: integer units, fixed-width pills)
 
     /// Whole GB only (decimal GB, matching Finder). No sub-GB churn.
@@ -58,6 +67,16 @@ struct InlineFanOutProgress: View {
             }
             if case .active = progress.status {
                 pillsRow
+                if isVerifyOnly {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.shield")
+                            .font(FilmCanFont.label(9))
+                            .foregroundColor(FilmCanTheme.brandGreen)
+                        Text("Verifying…")
+                            .font(FilmCanFont.label(9))
+                            .foregroundColor(FilmCanTheme.textTertiary)
+                    }
+                }
             }
         }
         .onChange(of: progress.estimatedTimeRemaining) { eta in

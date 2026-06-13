@@ -1127,8 +1127,21 @@ class TransferViewModel: ObservableObject {
                         // each runFanOut call only reports its own destination, and
                         // a wholesale replace would drop the already-finished dests'
                         // rows (losing their completed state in the UI).
-                        for prog in progresses {
+                        for incoming in progresses {
+                            var prog = incoming
                             if let idx = self.progress.perDestProgress.firstIndex(where: { $0.id == prog.id }) {
+                                // Clamp copy/verify bytes to a per-dest running max so the
+                                // bars never visibly step backward. With the copy/verify
+                                // pipeline, emits arrive from concurrent producers and can
+                                // be delivered slightly out of order; a stale copy-phase
+                                // emit must not reset the verify bar a completed verify
+                                // already advanced. Terminal states (failed) bypass the
+                                // clamp so a cancel/verify failure can still surface.
+                                let prev = self.progress.perDestProgress[idx]
+                                if case .failed = prog.status {} else {
+                                    prog.bytesCompleted = max(prog.bytesCompleted, prev.bytesCompleted)
+                                    prog.verifyBytesCompleted = max(prog.verifyBytesCompleted, prev.verifyBytesCompleted)
+                                }
                                 self.progress.perDestProgress[idx] = prog
                             } else {
                                 self.progress.perDestProgress.append(prog)

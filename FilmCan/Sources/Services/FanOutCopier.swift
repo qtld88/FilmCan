@@ -83,6 +83,25 @@ struct PerSourceOutcome: Sendable {
     let sourceCorrupted: Bool
 }
 
+/// Result of the copy phase for one source file, handed to the verify lane so
+/// verification of file N can run while file N+1 is still being copied.
+struct CopyResult: Sendable {
+    let sourcePath: String
+    let sourceURL: URL
+    let sourceName: String
+    let chunkSz: Int
+    let writerResults: [DestWriterResult]
+    let verifiedSourceHash: String
+    let cumulativeBytesBeforeSource: Int64
+    let sourceSize: Int64
+    let sourceIndex: Int
+    let totalSources: Int
+    let totalBytesAllSources: Int64
+    let jobStartTime: Date
+    /// The copy was aborted mid-file by the user — skip verification entirely.
+    let cancelledEarly: Bool
+}
+
 // MARK: - FanOutCopier
 
 actor FanOutCopier {
@@ -275,54 +294,70 @@ actor FanOutCopier {
         // Wall-clock start for live copy speed / ETA reporting.
         let jobStartTime = Date()
 
-        let outcomes: [PerSourceOutcome] = try await withThrowingTaskGroup(of: PerSourceOutcome.self) { group in
-            var iter = plannedFiles.enumerated().makeIterator()
-            var inFlight = 0
+        // Pipeline: the copy task group produces CopyResults; a single verify
+        // lane (drainVerifies) consumes them, so file N is verified while file
+        // N+1 is still copying. The lane is serial → the verify bar stays
+        // monotonic.
+        let verifyChannel = BoundedChannel<CopyResult>(capacity: 64)
+        async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(verifyChannel)
 
-            func enqueueNext() -> Bool {
-                // Stop starting new files once the user cancels.
-                if config.shouldCancel?() == true { return false }
-                guard let (index, file) = iter.next() else { return false }
-                let absURL = URL(fileURLWithPath: file.absPath)
-                let cumBefore = cumulativeBeforeFile[index]
-                group.addTask { [self] in
-                    try await processSource(
-                        sourceURL: absURL,
-                        sourceName: file.relPath.isEmpty ? (file.absPath as NSString).lastPathComponent : file.relPath,
-                        sourceSize: file.size,
-                        cumulativeBytesBeforeSource: cumBefore,
-                        totalBytesAllSources: totalBytesAllSources,
-                        sourceIndex: index,
-                        totalSources: totalFiles,
-                        channelCapacity: channelCapacity,
-                        chunkSz: chunkSz,
-                        rootName: file.rootName,
-                        rootPath: file.rootPath,
-                        relPath: file.relPath,
-                        sharedMHLsByDest: sharedMHLsByDest,
-                        jobStartTime: jobStartTime
-                    )
+        var copyError: (any Swift.Error)?
+        do {
+            try await withThrowingTaskGroup(of: CopyResult.self) { group in
+                var iter = plannedFiles.enumerated().makeIterator()
+                var inFlight = 0
+
+                func enqueueNext() -> Bool {
+                    // Stop starting new files once the user cancels.
+                    if config.shouldCancel?() == true { return false }
+                    guard let (index, file) = iter.next() else { return false }
+                    let absURL = URL(fileURLWithPath: file.absPath)
+                    let cumBefore = cumulativeBeforeFile[index]
+                    group.addTask { [self] in
+                        try await copySource(
+                            sourceURL: absURL,
+                            sourceName: file.relPath.isEmpty ? (file.absPath as NSString).lastPathComponent : file.relPath,
+                            sourceSize: file.size,
+                            cumulativeBytesBeforeSource: cumBefore,
+                            totalBytesAllSources: totalBytesAllSources,
+                            sourceIndex: index,
+                            totalSources: totalFiles,
+                            channelCapacity: channelCapacity,
+                            chunkSz: chunkSz,
+                            rootName: file.rootName,
+                            rootPath: file.rootPath,
+                            relPath: file.relPath,
+                            sharedMHLsByDest: sharedMHLsByDest,
+                            jobStartTime: jobStartTime
+                        )
+                    }
+                    inFlight += 1
+                    return true
                 }
-                inFlight += 1
-                return true
-            }
 
-            for _ in 0..<min(sourceConcurrency, plannedFiles.count) {
-                _ = enqueueNext()
-            }
-
-            var collected: [PerSourceOutcome] = []
-            while inFlight > 0 {
-                guard let outcome = try await group.next() else { break }
-                inFlight -= 1
-                collected.append(outcome)
-                if outcome.sourceCorrupted {
-                    group.cancelAll()
-                    throw Error.sourceCorruption(outcome.sourcePath)
+                for _ in 0..<min(sourceConcurrency, plannedFiles.count) {
+                    _ = enqueueNext()
                 }
-                _ = enqueueNext()
+
+                while inFlight > 0 {
+                    guard let copyResult = try await group.next() else { break }
+                    inFlight -= 1
+                    try? await verifyChannel.send(copyResult)
+                    _ = enqueueNext()
+                }
             }
-            return collected
+        } catch {
+            copyError = error
+        }
+
+        // Always close the lane and drain it, whether copy succeeded or threw,
+        // so the consumer task can't deadlock on a pending receive.
+        await verifyChannel.finish()
+        let outcomes = await verifyOutcomes
+        if let copyError { throw copyError }
+
+        if let corrupt = outcomes.first(where: { $0.sourceCorrupted }) {
+            throw Error.sourceCorruption(corrupt.sourcePath)
         }
 
         for outcome in outcomes {
@@ -342,6 +377,17 @@ actor FanOutCopier {
         }
 
         return config.destinations.compactMap { builders[$0.destPath]?.build() }
+    }
+
+    /// Single serial verify lane: pulls copied files in order and verifies each,
+    /// running concurrently with the copy of later files.
+    private func drainVerifies(_ channel: BoundedChannel<CopyResult>) async -> [PerSourceOutcome] {
+        var out: [PerSourceOutcome] = []
+        var it = channel.makeAsyncIterator()
+        while let copyResult = try? await it.next() {
+            out.append(await verifySource(copyResult))
+        }
+        return out
     }
 
     /// Source concurrency: one worker per distinct source drive, capped at sources.count.
@@ -364,13 +410,13 @@ actor FanOutCopier {
         return max(1, seen.count)
     }
 
-    /// Process one source file: read sequentially (cached, with readahead),
-    /// spawn per-dest writer tasks, broadcast chunks through bounded channels,
-    /// then verify per config.verifyMode (paranoid re-reads use F_NOCACHE).
+    /// Copy phase for one source file: read sequentially (cached, with readahead),
+    /// spawn per-dest writer tasks, broadcast chunks through bounded channels.
+    /// Verification is performed separately in `verifySource` so it can overlap
+    /// the next file's copy.
     /// cumulativeBytesBeforeSource is the sum of all earlier source sizes for correct progress tracking.
     /// totalBytesAllSources is the sum of ALL source sizes (full job).
-    /// Only emits .complete status when sourceIndex == totalSources - 1 (last source).
-    nonisolated private func processSource(
+    nonisolated private func copySource(
         sourceURL: URL,
         sourceName: String,
         sourceSize: Int64,
@@ -385,9 +431,8 @@ actor FanOutCopier {
         relPath: String,
         sharedMHLsByDest: [String: [String: MHLWriter]],
         jobStartTime: Date
-    ) async throws -> PerSourceOutcome {
+    ) async throws -> CopyResult {
         let sourcePath = sourceURL.path
-        let fm = FileManager.default
 
         var channels: [String: BoundedChannel<Chunk>] = [:]
         for dest in config.destinations {
@@ -649,114 +694,165 @@ actor FanOutCopier {
             throw Error.sourceReadFailed(sourcePath)
         }
 
-        // Cancelled: skip the verify phase entirely (settle delay + re-reads) so
-        // Stop is responsive. Writers that were aborted already report .userCancel.
-        if config.shouldCancel?() == true {
+        return CopyResult(
+            sourcePath: sourcePath,
+            sourceURL: sourceURL,
+            sourceName: sourceName,
+            chunkSz: chunkSz,
+            writerResults: writerResults,
+            verifiedSourceHash: verifiedSourceHash,
+            cumulativeBytesBeforeSource: cumulativeBytesBeforeSource,
+            sourceSize: sourceSize,
+            sourceIndex: sourceIndex,
+            totalSources: totalSources,
+            totalBytesAllSources: totalBytesAllSources,
+            jobStartTime: jobStartTime,
+            cancelledEarly: config.shouldCancel?() == true
+        )
+    }
+
+    /// Verify one already-copied file. Runs on a single serial lane concurrently
+    /// with the copy of later files, so paranoid re-reads don't block copying.
+    nonisolated private func verifySource(_ c: CopyResult) async -> PerSourceOutcome {
+        let fm = FileManager.default
+        let successDests = c.writerResults.filter { $0.success }.map { $0.destPath }
+
+        // Emit a terminal failed(.userCancel) for each in-progress destination so
+        // the UI shows red crosses and the live pills/ETA stop. Returns the dest
+        // set marked as failed so the per-dest result is not a success.
+        func emitCancelled() async -> Set<String> {
+            for r in c.writerResults where r.success {
+                var prog = DestProgress(
+                    id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                    status: .failed(.userCancel), bytesTotal: c.totalBytesAllSources,
+                    filesTotal: c.totalSources, verifyMode: c.writerResults.first?.verifyMode ?? .paranoid
+                )
+                prog.bytesCompleted = c.cumulativeBytesBeforeSource + c.sourceSize
+                prog.filesCompleted = c.sourceIndex + 1
+                prog.verifyBytesTotal = c.totalBytesAllSources
+                prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
+                prog.currentFile = "Cancelled"
+                config.progressHandler?(prog)
+            }
+            return Set(successDests)
+        }
+
+        // Cancelled before or during verification: mark cancelled, don't verify.
+        if c.cancelledEarly || config.shouldCancel?() == true {
+            let cancelled = await emitCancelled()
             return PerSourceOutcome(
-                sourcePath: sourcePath,
-                writerResults: writerResults,
-                verifyFailedDestPaths: [],
-                sourceCorrupted: false
+                sourcePath: c.sourcePath, writerResults: c.writerResults,
+                verifyFailedDestPaths: cancelled, sourceCorrupted: false
             )
         }
 
         var verifyFailed: Set<String> = []
-        for r in writerResults where r.success {
-            if let dh = r.destHashFromStream, dh != verifiedSourceHash {
+        for r in c.writerResults where r.success {
+            if let dh = r.destHashFromStream, dh != c.verifiedSourceHash {
                 verifyFailed.insert(r.destPath)
                 try? fm.removeItem(atPath: r.writtenFilePath)
             }
+        }
+
+        guard config.verifyMode == .paranoid else {
+            return PerSourceOutcome(
+                sourcePath: c.sourcePath, writerResults: c.writerResults,
+                verifyFailedDestPaths: verifyFailed, sourceCorrupted: false
+            )
         }
 
         // Give drives that don't reliably honor F_FULLFSYNC time to flush their
         // write cache before the paranoid re-read. Without this, the re-read can
         // return stale data and produce a false hash mismatch.
         let hasFullFsyncDest = config.destinations.contains { $0.requiresFullFsync }
-        if config.verifyMode == .paranoid && hasFullFsyncDest {
-            try await Task.sleep(for: .seconds(1))
+        if hasFullFsyncDest {
+            try? await Task.sleep(for: .seconds(1))
+        }
+
+        // Cancel can land during the settle delay.
+        if config.shouldCancel?() == true {
+            let cancelled = await emitCancelled()
+            return PerSourceOutcome(
+                sourcePath: c.sourcePath, writerResults: c.writerResults,
+                verifyFailedDestPaths: verifyFailed.union(cancelled), sourceCorrupted: false
+            )
+        }
+
+        // Emit verify-start progress for each successful destination.
+        for r in c.writerResults where r.success {
+            var prog = DestProgress(
+                id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                status: .active, bytesTotal: c.totalBytesAllSources,
+                filesTotal: c.totalSources, verifyMode: .paranoid
+            )
+            prog.bytesCompleted = c.cumulativeBytesBeforeSource + c.sourceSize
+            prog.filesCompleted = c.sourceIndex + 1
+            prog.verifyBytesTotal = c.totalBytesAllSources
+            prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
+            prog.currentFile = "Verifying \(c.sourceName)…"
+            Self.applyCombinedSpeedETA(&prog, jobStartTime: c.jobStartTime)
+            config.progressHandler?(prog)
         }
 
         var corrupted = false
-        if config.verifyMode == .paranoid {
-            // Emit verify-start progress for each successful destination
-            for r in writerResults where r.success {
-                var prog = DestProgress(
-                    id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
-                    status: .active, bytesTotal: totalBytesAllSources,
-                    filesTotal: totalSources, verifyMode: .paranoid
-                )
-                prog.bytesCompleted = cumulativeBytesBeforeSource + sourceSize
-                prog.filesCompleted = sourceIndex + 1
-                prog.verifyBytesTotal = totalBytesAllSources
-                prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
-                prog.currentFile = "Verifying \(sourceName)…"
-                Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
-                config.progressHandler?(prog)
+        let sourceHashFromDisk = await rereadHash(url: c.sourceURL, chunkSz: c.chunkSz)
+        if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
+            corrupted = true
+            for r in c.writerResults where r.success {
+                try? fm.removeItem(atPath: r.writtenFilePath)
+                verifyFailed.insert(r.destPath)
             }
-            let sourceHashFromDisk = await rereadHash(url: sourceURL, chunkSz: chunkSz)
-            if let diskHash = sourceHashFromDisk, diskHash != verifiedSourceHash {
-                corrupted = true
-                for r in writerResults where r.success {
-                    try? fm.removeItem(atPath: r.writtenFilePath)
-                    verifyFailed.insert(r.destPath)
+        } else {
+            let writtenPathByDest: [String: String] = Dictionary(
+                uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.writtenFilePath) }
+            )
+            await withTaskGroup(of: (String, String?).self) { group in
+                for r in c.writerResults where r.success && !verifyFailed.contains(r.destPath) {
+                    let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
+                    let destPath = r.destPath
+                    group.addTask {
+                        let hash = await Self.rereadHashDetached(url: destFileURL, chunkSz: c.chunkSz)
+                        return (destPath, hash)
+                    }
                 }
-            } else {
-                // Build lookup so the task group can resolve writtenFilePath by destPath.
-                let writtenPathByDest: [String: String] = Dictionary(
-                    uniqueKeysWithValues: writerResults.map { ($0.destPath, $0.writtenFilePath) }
-                )
-                await withTaskGroup(of: (String, String?).self) { group in
-                    for r in writerResults where r.success && !verifyFailed.contains(r.destPath) {
-                        let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
-                        let destPath = r.destPath
-                        group.addTask {
-                            let hash = await Self.rereadHashDetached(url: destFileURL, chunkSz: chunkSz)
-                            return (destPath, hash)
-                        }
+                for await (destPath, hash) in group {
+                    let hashMatchesExpected = hash == c.verifiedSourceHash
+                    if let h = hash, h != c.verifiedSourceHash {
+                        verifyFailed.insert(destPath)
+                        if let wp = writtenPathByDest[destPath] { try? fm.removeItem(atPath: wp) }
+                    } else if hash == nil {
+                        verifyFailed.insert(destPath)
                     }
-                    for await (destPath, hash) in group {
-                        let hashMatchesExpected = hash == verifiedSourceHash
-                        if let h = hash, h != verifiedSourceHash {
-                            verifyFailed.insert(destPath)
-                            if let wp = writtenPathByDest[destPath] {
-                                try? fm.removeItem(atPath: wp)
-                            }
-                        } else if hash == nil {
-                            verifyFailed.insert(destPath)
-                        }
-                        if let _ = writerResults.first(where: { $0.destPath == destPath }) {
-                            let verifyDestStatus: DestStatus
-                            let newVerifiedBytes: Int64
-                            if hashMatchesExpected {
-                                let isLastVerify = await self.recordVerifyCompletion(destPath: destPath, totalFiles: totalSources)
-                                newVerifiedBytes = await self.recordVerifyBytes(destPath: destPath, adding: sourceSize)
-                                verifyDestStatus = isLastVerify ? .complete : .active
-                            } else {
-                                newVerifiedBytes = await self.verifiedBytesForDest(destPath)
-                                verifyDestStatus = .failed(.verify)
-                            }
-                            var prog = DestProgress(
-                                id: destPath, displayName: (destPath as NSString).lastPathComponent,
-                                status: verifyDestStatus,
-                                bytesTotal: totalBytesAllSources, filesTotal: totalSources,
-                                verifyMode: .paranoid
-                            )
-                            prog.bytesCompleted = cumulativeBytesBeforeSource + sourceSize
-                            prog.filesCompleted = sourceIndex + 1
-                            prog.verifyBytesTotal = totalBytesAllSources
-                            prog.verifyBytesCompleted = newVerifiedBytes
-                            prog.currentFile = hashMatchesExpected ? "✓ \(sourceName)" : "✗ \(sourceName)"
-                            Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
-                            config.progressHandler?(prog)
-                        }
+                    let verifyDestStatus: DestStatus
+                    let newVerifiedBytes: Int64
+                    if hashMatchesExpected {
+                        let isLastVerify = await self.recordVerifyCompletion(destPath: destPath, totalFiles: c.totalSources)
+                        newVerifiedBytes = await self.recordVerifyBytes(destPath: destPath, adding: c.sourceSize)
+                        verifyDestStatus = isLastVerify ? .complete : .active
+                    } else {
+                        newVerifiedBytes = await self.verifiedBytesForDest(destPath)
+                        verifyDestStatus = .failed(.verify)
                     }
+                    var prog = DestProgress(
+                        id: destPath, displayName: (destPath as NSString).lastPathComponent,
+                        status: verifyDestStatus,
+                        bytesTotal: c.totalBytesAllSources, filesTotal: c.totalSources,
+                        verifyMode: .paranoid
+                    )
+                    prog.bytesCompleted = c.cumulativeBytesBeforeSource + c.sourceSize
+                    prog.filesCompleted = c.sourceIndex + 1
+                    prog.verifyBytesTotal = c.totalBytesAllSources
+                    prog.verifyBytesCompleted = newVerifiedBytes
+                    prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
+                    Self.applyCombinedSpeedETA(&prog, jobStartTime: c.jobStartTime)
+                    config.progressHandler?(prog)
                 }
             }
         }
 
         return PerSourceOutcome(
-            sourcePath: sourcePath,
-            writerResults: writerResults,
+            sourcePath: c.sourcePath,
+            writerResults: c.writerResults,
             verifyFailedDestPaths: verifyFailed,
             sourceCorrupted: corrupted
         )

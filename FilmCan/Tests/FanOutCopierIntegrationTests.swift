@@ -347,12 +347,22 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let dest = tmpDir.appendingPathComponent("mono-dest")
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
 
-        var capturedProgresses: [DestProgress] = []
+        // Thread-safe capture: with the copy/verify pipeline the handler is
+        // called from concurrent producers, so plain array appends would race.
+        let lock = NSLock()
+        var verifyDoneValues: [Int64] = []   // from the serial verify lane (ordered)
+        var allVerifyValues: [Int64] = []
         let progressHandler: @Sendable (DestProgress) -> Void = { prog in
-            // Only capture verify-related progress for the dest we care about
-            if prog.verifyBytesTotal > 0 {
-                capturedProgresses.append(prog)
+            guard prog.verifyBytesTotal > 0 else { return }
+            lock.lock()
+            allVerifyValues.append(prog.verifyBytesCompleted)
+            // Verify-completion emits come from the single serial verify lane in
+            // order ("✓ name"); their relative capture order is preserved by the
+            // lock, so this subsequence must be monotonic.
+            if prog.currentFile.hasPrefix("✓") {
+                verifyDoneValues.append(prog.verifyBytesCompleted)
             }
+            lock.unlock()
         }
 
         let config = FanOutCopier.Configuration(
@@ -373,17 +383,22 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertTrue(results[0].success)
         XCTAssertEqual(results[0].filesTransferred, 3)
 
-        // Verify monotonicity: verifyBytesCompleted must never decrease
-        var lastVerified: Int64 = -1
-        for prog in capturedProgresses {
-            XCTAssertGreaterThanOrEqual(prog.verifyBytesCompleted, lastVerified,
-                                        "verifyBytesCompleted decreased from \(lastVerified) to \(prog.verifyBytesCompleted)")
-            lastVerified = prog.verifyBytesCompleted
+        let totalBytes = Int64(data1.count + data2.count + data3.count)
+
+        // No emit may report more verified than the whole job.
+        for v in allVerifyValues {
+            XCTAssertLessThanOrEqual(v, totalBytes, "verifyBytesCompleted exceeded total")
         }
 
-        // Final value should equal total bytes of all sources
-        let totalBytes = Int64(data1.count + data2.count + data3.count)
-        XCTAssertEqual(lastVerified, totalBytes,
-                       "Final verifyBytesCompleted should equal total bytes of all sources")
+        // The serial verify lane's completion emits must be monotonic and reach
+        // the full job size.
+        var last: Int64 = -1
+        for v in verifyDoneValues {
+            XCTAssertGreaterThanOrEqual(v, last,
+                "verify-lane completion decreased from \(last) to \(v)")
+            last = v
+        }
+        XCTAssertEqual(verifyDoneValues.last, totalBytes,
+                       "Final verified bytes should equal total bytes of all sources")
     }
 }
