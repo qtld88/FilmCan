@@ -111,12 +111,9 @@ enum DriveUtilities {
     static func capacity(for path: String) -> (total: Int64?, available: Int64?) {
         let url = URL(fileURLWithPath: path)
         let values = try? url.resourceValues(forKeys: [
-            .volumeTotalCapacityKey,
-            .volumeAvailableCapacityKey,
-            .volumeAvailableCapacityForImportantUsageKey
+            .volumeTotalCapacityKey
         ])
         var total: Int64? = nil
-        var available: Int64? = nil
 
         if let values,
            let cap = values.volumeTotalCapacity,
@@ -128,18 +125,35 @@ enum DriveUtilities {
             total = cap
         }
 
-        if let values,
-           let cap = values.volumeAvailableCapacity {
-            available = max(Int64(cap), 0)
-        } else if let values,
-                  let cap = values.volumeAvailableCapacityForImportantUsage {
-            available = max(Int64(cap), 0)
-        } else if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
-                  let cap = attrs[.systemFreeSize] as? Int64 {
-            available = max(cap, 0)
-        }
+        return (total, liveAvailableBytes(for: path))
+    }
 
-        return (total, available)
+    /// Free space that reflects deletions and Trash emptying *immediately*.
+    ///
+    /// `statfs` (via `attributesOfFileSystem`) reads the live free-block count
+    /// from the mounted filesystem. `volumeAvailableCapacityForImportantUsage`
+    /// is intentionally last: it is a cached/laggy macOS metric that factors in
+    /// purgeable space and OS reservations, so it keeps reporting a drive as
+    /// "full" for a while after the user frees space. Preferring statfs fixes the
+    /// "emptied the drive but FilmCan still shows it full" report.
+    static func liveAvailableBytes(for path: String) -> Int64? {
+        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
+           let cap = attrs[.systemFreeSize] as? Int64,
+           cap > 0 {
+            return cap
+        }
+        let url = URL(fileURLWithPath: path)
+        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
+           let cap = values.volumeAvailableCapacity,
+           cap > 0 {
+            return Int64(cap)
+        }
+        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+           let cap = values.volumeAvailableCapacityForImportantUsage,
+           cap > 0 {
+            return Int64(cap)
+        }
+        return nil
     }
 
     static func isExFAT(path: String) -> Bool {

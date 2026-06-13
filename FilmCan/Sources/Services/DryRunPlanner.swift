@@ -60,14 +60,7 @@ actor DryRunPlanner {
             case .unknown: classLabel = "Unknown"
             }
 
-            let url = URL(fileURLWithPath: dest.destPath)
-            let freeBytes: Int64
-            if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
-               let bytes = values.volumeAvailableCapacityForImportantUsage {
-                freeBytes = Int64(bytes)
-            } else {
-                freeBytes = 0
-            }
+            let freeBytes = DriveUtilities.liveAvailableBytes(for: dest.destPath) ?? 0
 
             if freeBytes == 0 {
                 blockingErrors.append("Destination unreachable or not mounted: \(dest.displayName)")

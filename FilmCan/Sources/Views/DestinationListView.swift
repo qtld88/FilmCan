@@ -981,20 +981,13 @@ struct DestinationListView: View {
         for path in destinations {
             let url = URL(fileURLWithPath: path)
             let values = try? url.resourceValues(forKeys: [
-                .volumeUUIDStringKey,
-                .volumeNameKey,
-                .volumeIsInternalKey,
-                .volumeIsRemovableKey,
-                .volumeTotalCapacityKey,
-                .volumeAvailableCapacityForImportantUsageKey,
-                .volumeAvailableCapacityKey
+                .volumeTotalCapacityKey
             ])
             let summary = DriveUtilities.summary(for: path)
             let volumeId = summary.id
             let name = summary.name
             let isExternal = summary.isExternal
             var total: Int64? = nil
-            var available: Int64? = nil
             if let values,
                let cap = values.volumeTotalCapacity,
                cap > 0 {
@@ -1004,17 +997,9 @@ struct DestinationListView: View {
                       cap > 0 {
                 total = cap
             }
-            if let values,
-               let cap = values.volumeAvailableCapacityForImportantUsage,
-               cap > 0 {
-                available = Int64(cap)
-            } else if let values,
-                      let cap = values.volumeAvailableCapacity,
-                      cap > 0 {
-                available = Int64(cap)
-            } else if let cap = availableSpace(at: path) {
-                available = cap
-            }
+            // Live free space (statfs-first) so emptying the drive's Trash is
+            // reflected on refresh, not the cached ImportantUsage value.
+            var available: Int64? = DriveUtilities.liveAvailableBytes(for: path)
 
             if isActiveTransfer,
                let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
@@ -1238,23 +1223,7 @@ struct DestinationListView: View {
     }
 
     private func availableSpace(at path: String) -> Int64? {
-        let url = URL(fileURLWithPath: path)
-        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
-           let cap = values.volumeAvailableCapacityForImportantUsage,
-           cap > 0 {
-            return Int64(cap)
-        }
-        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
-           let cap = values.volumeAvailableCapacity,
-           cap > 0 {
-            return Int64(cap)
-        }
-        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
-           let cap = attrs[.systemFreeSize] as? Int64,
-           cap > 0 {
-            return cap
-        }
-        return nil
+        DriveUtilities.liveAvailableBytes(for: path)
     }
     
     private func selectDestination(at index: Int) {

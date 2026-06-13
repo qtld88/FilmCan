@@ -231,10 +231,11 @@ actor FanOutCopier {
         let totalBytesAllSources = plannedFiles.reduce(Int64(0)) { $0 + $1.size }
 
         // Pre-flight: ensure every destination has enough free space before we start.
+        // Use live statfs free space (not the cached ImportantUsage metric) so a
+        // drive the user just cleared isn't falsely reported as full.
         for dest in config.destinations {
-            let url = URL(fileURLWithPath: dest.destPath)
-            let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            if let available = values?.volumeAvailableCapacityForImportantUsage, available < totalBytesAllSources {
+            if let available = DriveUtilities.liveAvailableBytes(for: dest.destPath),
+               available < totalBytesAllSources {
                 throw Error.insufficientSpace(
                     destPath: dest.destPath,
                     available: available,
