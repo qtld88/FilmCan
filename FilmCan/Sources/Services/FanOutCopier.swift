@@ -95,6 +95,8 @@ actor FanOutCopier {
         var progressHandler: (@Sendable (DestProgress) -> Void)?
         var organizationPreset: OrganizationPreset?
         var copyFolderContents: Bool = false
+        /// Polled cooperatively to abort the run when the user hits Stop.
+        var shouldCancel: (@Sendable () -> Bool)?
     }
 
     enum Error: Swift.Error, LocalizedError {
@@ -278,6 +280,8 @@ actor FanOutCopier {
             var inFlight = 0
 
             func enqueueNext() -> Bool {
+                // Stop starting new files once the user cancels.
+                if config.shouldCancel?() == true { return false }
                 guard let (index, file) = iter.next() else { return false }
                 let absURL = URL(fileURLWithPath: file.absPath)
                 let cumBefore = cumulativeBeforeFile[index]
@@ -513,6 +517,19 @@ actor FanOutCopier {
                     // Channel finished — expected termination
                 }
 
+                // User cancel: return before finalize so the temp file is never
+                // renamed to its final path. DestWriter.deinit removes the temp.
+                if config.shouldCancel?() == true {
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: false, bytesTransferred: totalBytes, filesTransferred: 0,
+                        durationSec: Date().timeIntervalSince(startTime),
+                        mhlPath: nil, failureReason: .userCancel,
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                        writtenFilePath: destFileURL.path
+                    )
+                }
+
                 if let reason = writeFailed {
                     return DestWriterResult(
                         destPath: destCfg.destPath, displayName: destCfg.displayName,
@@ -590,6 +607,9 @@ actor FanOutCopier {
             }
 
             while true {
+                // User cancel: stop reading; channels are finished below so the
+                // writer tasks drain and abort before finalizing (no partial file).
+                if config.shouldCancel?() == true { break }
                 let chunkData: Data
                 if #available(macOS 10.15.4, *) {
                     guard let data = try sourceHandle.read(upToCount: chunkSz), !data.isEmpty
@@ -627,6 +647,17 @@ actor FanOutCopier {
         if let sourceError { throw sourceError }
         guard let verifiedSourceHash = sourceHash else {
             throw Error.sourceReadFailed(sourcePath)
+        }
+
+        // Cancelled: skip the verify phase entirely (settle delay + re-reads) so
+        // Stop is responsive. Writers that were aborted already report .userCancel.
+        if config.shouldCancel?() == true {
+            return PerSourceOutcome(
+                sourcePath: sourcePath,
+                writerResults: writerResults,
+                verifyFailedDestPaths: [],
+                sourceCorrupted: false
+            )
         }
 
         var verifyFailed: Set<String> = []

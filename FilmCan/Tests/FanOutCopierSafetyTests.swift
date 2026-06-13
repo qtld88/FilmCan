@@ -1,6 +1,14 @@
 import XCTest
 @testable import FilmCan
 
+/// Thread-safe cancel flag for driving FanOutCopier.Configuration.shouldCancel.
+private final class CancelBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    func set() { lock.lock(); cancelled = true; lock.unlock() }
+    func get() -> Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+}
+
 /// Deliberate-fault and performance tests for the fan-out engine.
 /// These hit real temp dirs (and, where noted, a real small disk image) and
 /// inject errors to prove the safety contracts hold and that copy throughput
@@ -121,6 +129,45 @@ final class FanOutCopierSafetyTests: XCTestCase {
             XCTAssertFalse(items.contains { $0.hasPrefix(".filmcan-") },
                            "No leftover temp files at good dest")
         }
+    }
+
+    // MARK: - Safety: cancellation
+
+    /// Cancelling mid-copy must abort promptly and leave NO final file and NO
+    /// orphaned temp file at the destination. The cancel flag is flipped on the
+    /// first progress emit (called synchronously from the writer), so the writer
+    /// hits its pre-finalize cancel check before renaming temp → final.
+    func test_cancel_midCopy_abortsWithoutFinalFileOrTemp() async throws {
+        let fm = FileManager.default
+        let sourceURL = tmpDir.appendingPathComponent("cancel-src.bin")
+        try randomData(64 * 1024 * 1024).write(to: sourceURL)
+
+        let dest = tmpDir.appendingPathComponent("cancel-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let box = CancelBox()
+        let config = FanOutCopier.Configuration(
+            sources: [sourceURL.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: "C",
+                                  verifyMode: .paranoid, requiresFullFsync: false, chunkSize: 65536)
+            ],
+            verifyMode: .paranoid,
+            mhlBasePath: nil,
+            dryRun: false,
+            progressHandler: { _ in box.set() },
+            shouldCancel: { box.get() }
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("cancel-src.bin").path),
+                       "Cancelled copy must not leave a finalized file")
+        let items = (try? fm.contentsOfDirectory(atPath: dest.path)) ?? []
+        XCTAssertFalse(items.contains { $0.hasPrefix(".filmcan-") },
+                       "Cancelled copy must not leave a temp file (DestWriter.deinit cleans it)")
+        XCTAssertTrue(results.allSatisfy { !$0.success },
+                      "A cancelled destination must not report success")
     }
 
     // MARK: - Safety: insufficient space (real small disk image)

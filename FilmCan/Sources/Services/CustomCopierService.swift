@@ -842,6 +842,7 @@ class CustomCopierService: ObservableObject, TransferService {
             }
         }
 
+        let cancellationState = self.cancellationState
         let fanOutConfig = FanOutCopier.Configuration(
             sources: sources,
             destinations: fanOutDestinations,
@@ -852,7 +853,8 @@ class CustomCopierService: ObservableObject, TransferService {
                 Task { await accumulator.update(prog) }
             },
             organizationPreset: organizationPreset,
-            copyFolderContents: copyFolderContents
+            copyFolderContents: copyFolderContents,
+            shouldCancel: { cancellationState.isCancelledNow() }
         )
 
         let copier = FanOutCopier(config: fanOutConfig)

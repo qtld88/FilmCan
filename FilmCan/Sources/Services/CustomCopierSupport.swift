@@ -18,6 +18,15 @@ final class CancellationState: @unchecked Sendable {
         lock.unlock()
         return result
     }
+
+    /// Cancel only (ignores pause). The fan-out engine has no pause support, so
+    /// it must abort on a real cancel but must NOT abort merely because paused.
+    func isCancelledNow() -> Bool {
+        lock.lock()
+        let result = isCancelled
+        lock.unlock()
+        return result
+    }
 }
 
 final class ProgressThrottle {
