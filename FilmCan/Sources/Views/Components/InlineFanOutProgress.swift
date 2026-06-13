@@ -21,6 +21,21 @@ struct InlineFanOutProgress: View {
         return String(format: "%.2f GB/s", bytesPerSec / 1_000_000_000)
     }
 
+    private func formattedETA(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds.rounded())
+        if s < 60 { return "\(s)s left" }
+        if s < 3600 { return "\(s / 60)m \(s % 60)s left" }
+        return "\(s / 3600)h \((s % 3600) / 60)m left"
+    }
+
+    private var pillText: String {
+        var parts: [String] = [formattedSpeed(progress.speedBytesPerSecond)]
+        if let eta = progress.estimatedTimeRemaining, eta > 0 {
+            parts.append(formattedETA(eta))
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private var displayFile: String {
         progress.currentFile.isEmpty ? "Copying…" : progress.currentFile.fileName
     }
@@ -90,15 +105,16 @@ struct InlineFanOutProgress: View {
     @ViewBuilder
     private var pillBadge: some View {
         switch progress.status {
-        case .active:
-            Text(formattedSpeed(progress.speedBytesPerSecond))
+        case .active where progress.speedBytesPerSecond > 0:
+            Text(pillText)
                 .font(FilmCanFont.label(10))
                 .foregroundColor(FilmCanTheme.textTertiary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(FilmCanTheme.panel)
                 .cornerRadius(4)
-        case .complete, .failed, .pending:
+                .fixedSize()
+        case .active, .complete, .failed, .pending:
             EmptyView()
         }
     }

@@ -270,6 +270,9 @@ actor FanOutCopier {
         // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
         let sourceConcurrency = max(1, distinctSourceDriveCount(forPaths: config.sources))
 
+        // Wall-clock start for live copy speed / ETA reporting.
+        let jobStartTime = Date()
+
         let outcomes: [PerSourceOutcome] = try await withThrowingTaskGroup(of: PerSourceOutcome.self) { group in
             var iter = plannedFiles.enumerated().makeIterator()
             var inFlight = 0
@@ -292,7 +295,8 @@ actor FanOutCopier {
                         rootName: file.rootName,
                         rootPath: file.rootPath,
                         relPath: file.relPath,
-                        sharedMHLsByDest: sharedMHLsByDest
+                        sharedMHLsByDest: sharedMHLsByDest,
+                        jobStartTime: jobStartTime
                     )
                 }
                 inFlight += 1
@@ -375,7 +379,8 @@ actor FanOutCopier {
         rootName: String,
         rootPath: String,
         relPath: String,
-        sharedMHLsByDest: [String: [String: MHLWriter]]
+        sharedMHLsByDest: [String: [String: MHLWriter]],
+        jobStartTime: Date
     ) async throws -> PerSourceOutcome {
         let sourcePath = sourceURL.path
         let fm = FileManager.default
@@ -496,6 +501,7 @@ actor FanOutCopier {
                                 prog.currentFile = sourceName
                                 prog.verifyBytesTotal = totalBytesAllSources
                                 prog.verifyBytesCompleted = verifiedAtStart
+                                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
                                 progressHandler?(prog)
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
@@ -546,6 +552,7 @@ actor FanOutCopier {
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = totalBytesAllSources
                 prog.verifyBytesCompleted = verifiedAtStart
+                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
                 progressHandler?(prog)
 
                 let mhlPath = URL(fileURLWithPath: destCfg.destPath)
@@ -720,6 +727,24 @@ actor FanOutCopier {
             verifyFailedDestPaths: verifyFailed,
             sourceCorrupted: corrupted
         )
+    }
+
+    /// Fill in average copy speed and ETA from job-wide bytes copied so far.
+    /// Average (not instantaneous) keeps the number stable; only meaningful once
+    /// a little time has elapsed, so it stays 0 for the first 0.5s (UI hides the
+    /// pill while speed == 0, avoiding a misleading spike at start).
+    nonisolated private static func applyCopySpeedETA(_ prog: inout DestProgress, jobStartTime: Date) {
+        let elapsed = Date().timeIntervalSince(jobStartTime)
+        guard elapsed >= 0.5, prog.bytesCompleted > 0 else { return }
+        let speed = Double(prog.bytesCompleted) / elapsed
+        guard speed > 0 else { return }
+        prog.speedBytesPerSecond = speed
+        let remaining = prog.bytesTotal - prog.bytesCompleted
+        if remaining > 0 {
+            prog.estimatedTimeRemaining = Double(remaining) / speed
+        } else {
+            prog.estimatedTimeRemaining = nil
+        }
     }
 
     nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {
