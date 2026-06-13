@@ -21,13 +21,22 @@ enum Constants {
     static func ringCapBytesPerDest(
         physRamBytes: UInt64 = ProcessInfo.processInfo.physicalMemory
     ) -> Int {
-        let scaled = Int(physRamBytes / 32)
-        let max = 256 * 1024 * 1024
-        let min = 64 * 1024 * 1024
+        // Buffer only needs to smooth read/write I/O jitter; a few tens of MB is
+        // plenty. Capped low to keep the in-flight footprint small (this is per
+        // destination, so it multiplies in parallel fan-out).
+        let scaled = Int(physRamBytes / 128)
+        let max = 96 * 1024 * 1024
+        let min = 32 * 1024 * 1024
         if scaled > max { return max }
         if scaled < min { return min }
         return scaled
     }
+
+    /// Flush the destination's dirty pages to the device every this many bytes
+    /// during a large copy. Cached writes are fast but accumulate dirty pages in
+    /// RAM; without periodic flushing a multi-hundred-GB copy creates system-wide
+    /// memory pressure. Plain fsync (not F_FULLFSYNC) keeps this cheap.
+    static let writeFlushEveryBytes: Int64 = 256 * 1024 * 1024
 
     static func chunkBytes(forSlowestDest dest: SlowestDestClass) -> Int {
         switch dest {

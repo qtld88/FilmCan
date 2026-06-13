@@ -106,12 +106,21 @@ actor DestWriter {
         writeHandle = handle
     }
 
+    private var bytesSinceFlush: Int64 = 0
+
     /// Append a data chunk to the temp file.
     func write(data: Data) throws {
         guard let handle = writeHandle else {
             throw WriterError.writeFailed("No write handle (already finalized?)")
         }
         try handle.write(contentsOf: data)
+        // Periodically flush dirty pages to the device so a large cached copy
+        // doesn't pile up in RAM and cause system-wide memory pressure.
+        bytesSinceFlush += Int64(data.count)
+        if bytesSinceFlush >= Constants.writeFlushEveryBytes {
+            fsync(handle.fileDescriptor)
+            bytesSinceFlush = 0
+        }
     }
 
     /// Flush, fsync, close, then atomically rename temp → final destination.
