@@ -560,32 +560,8 @@ extension BackupEditorView {
     private var basicOptionsContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Copy-engine picker removed: rsync retired, FilmCan is the only engine.
-
-            let parallelCopyInfo = InfoPopoverContent(
-                title: "Automatic parallel copy",
-                description: "Let FilmCan decide when to copy multiple files in parallel.",
-                pros: [
-                    "Faster on SSDs with many small files",
-                    "Better use of SSD bandwidth"
-                ],
-                cons: [
-                    "Disabled for large files to avoid slowdowns",
-                    "More disk activity during copy when enabled"
-                ],
-                notes: ["FilmCan only enables parallel copy when both source and destination are SSDs and files are small enough."]
-            )
-
-            optionRow(
-                icon: "square.2.layers.3d.top.filled",
-                iconColor: FilmCanTheme.textSecondary,
-                title: "Automatic parallel copy",
-                subtitle: "",
-                isOn: $viewModel.rsyncOptions.parallelCopyEnabled,
-                textWidth: basicOptionTextWidth,
-                info: parallelCopyInfo
-            )
-            .disabled(!isCustomEngine)
-            .opacity(isCustomEngine ? 1 : 0.5)
+            // "Automatic parallel copy" toggle removed: destination parallelism is
+            // now controlled by the Copy mode picker below.
 
             let verificationInfo = InfoPopoverContent(
                 title: "Hash verification",

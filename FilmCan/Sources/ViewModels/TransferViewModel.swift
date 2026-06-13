@@ -1052,11 +1052,15 @@ class TransferViewModel: ObservableObject {
 
     // MARK: - Fan-out engine
 
-    /// Decide whether destinations are written one at a time. `.automatic`
-    /// fans out in parallel only when every destination is an SSD; any spinning
-    /// disk / network volume (or undetectable drive) falls back to sequential to
-    /// avoid head thrashing and bus contention. A single destination is always
-    /// "parallel" (one group), since there is nothing to serialize.
+    /// Decide whether destinations are written one at a time.
+    ///
+    /// `.automatic` defaults to parallel fan-out (the fast path) and only falls
+    /// back to sequential for concrete reasons: a network destination, or two
+    /// destinations that live on the *same physical volume* (parallel writes to
+    /// one drive thrash it). It deliberately does NOT gate on the "solid state"
+    /// volume flag — macOS reports that unreliably for external USB/Thunderbolt
+    /// SSDs (often false), which previously forced fast SSDs into slow sequential
+    /// copies. A single destination is always one group (nothing to serialize).
     private func shouldCopyDestinationsSequentially(
         mode: DestinationCopyMode,
         destinations: [String]
@@ -1066,7 +1070,12 @@ class TransferViewModel: ObservableObject {
         case .parallel:   return false
         case .sequential: return true
         case .automatic:
-            return !destinations.allSatisfy { DriveSpeedClassifier.info(for: $0).isSSD }
+            let infos = destinations.map { DriveSpeedClassifier.info(for: $0) }
+            if infos.contains(where: { $0.isNetwork }) { return true }
+            // Two+ destinations sharing one physical volume → serialize.
+            let uuids = infos.compactMap { $0.volumeUUID }
+            if Set(uuids).count < uuids.count { return true }
+            return false
         }
     }
 
