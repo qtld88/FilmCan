@@ -550,7 +550,7 @@ actor FanOutCopier {
                                 prog.currentFile = sourceName
                                 prog.verifyBytesTotal = totalBytesAllSources
                                 prog.verifyBytesCompleted = verifiedAtStart
-                                Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
+                                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
                                 progressHandler?(prog)
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
@@ -614,7 +614,7 @@ actor FanOutCopier {
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = totalBytesAllSources
                 prog.verifyBytesCompleted = verifiedAtStart
-                Self.applyCombinedSpeedETA(&prog, jobStartTime: jobStartTime)
+                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
                 progressHandler?(prog)
 
                 let mhlPath = URL(fileURLWithPath: destCfg.destPath)
@@ -790,7 +790,8 @@ actor FanOutCopier {
             prog.verifyBytesTotal = c.totalBytesAllSources
             prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
             prog.currentFile = "Verifying \(c.sourceName)…"
-            Self.applyCombinedSpeedETA(&prog, jobStartTime: c.jobStartTime)
+            // Speed/ETA are copy-only (verify overlaps copy via the pipeline, so
+            // it no longer adds to the timeline). Don't touch them on verify emits.
             config.progressHandler?(prog)
         }
 
@@ -844,7 +845,7 @@ actor FanOutCopier {
                     prog.verifyBytesTotal = c.totalBytesAllSources
                     prog.verifyBytesCompleted = newVerifiedBytes
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
-                    Self.applyCombinedSpeedETA(&prog, jobStartTime: c.jobStartTime)
+                    // Copy-only speed/ETA — left untouched on verify emits.
                     config.progressHandler?(prog)
                 }
             }
@@ -858,21 +859,21 @@ actor FanOutCopier {
         )
     }
 
-    /// Fill in average speed and ETA over the *combined* copy+verify workload so
-    /// the numbers stay alive (and honest) through the verify phase instead of
-    /// vanishing once copying finishes. Work = copy bytes + verify bytes; the ETA
-    /// therefore includes the time the verify phase will still take. Average (not
-    /// instantaneous) keeps it stable; stays 0 for the first 0.5s so the UI can
-    /// hide it instead of showing a misleading startup spike.
-    nonisolated private static func applyCombinedSpeedETA(_ prog: inout DestProgress, jobStartTime: Date) {
+    /// Fill in average copy speed and ETA from copy bytes only. Verification now
+    /// overlaps copying (the pipeline), so it no longer adds to the timeline and
+    /// must NOT be folded into speed/ETA — doing so made parallel destinations
+    /// (which copy in lockstep, gated by the slowest drive, so their copied bytes
+    /// are equal) show different speeds purely from diverging verify progress.
+    /// Copy-only keeps speed/ETA consistent with the bytes-copied figure. Average
+    /// (not instantaneous) keeps it stable; stays 0 for the first 0.5s so the UI
+    /// can hide it instead of showing a misleading startup spike.
+    nonisolated private static func applyCopySpeedETA(_ prog: inout DestProgress, jobStartTime: Date) {
         let elapsed = Date().timeIntervalSince(jobStartTime)
-        let done = prog.bytesCompleted + prog.verifyBytesCompleted
-        guard elapsed >= 0.5, done > 0 else { return }
-        let speed = Double(done) / elapsed
+        guard elapsed >= 0.5, prog.bytesCompleted > 0 else { return }
+        let speed = Double(prog.bytesCompleted) / elapsed
         guard speed > 0 else { return }
         prog.speedBytesPerSecond = speed
-        let totalWork = prog.bytesTotal + prog.verifyBytesTotal
-        let remaining = totalWork - done
+        let remaining = prog.bytesTotal - prog.bytesCompleted
         prog.estimatedTimeRemaining = remaining > 0 ? Double(remaining) / speed : nil
     }
 
