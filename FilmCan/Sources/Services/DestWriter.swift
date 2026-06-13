@@ -98,7 +98,11 @@ actor DestWriter {
         tempFileURL = tempURL
 
         let handle = try FileHandle(forWritingTo: tempURL)
-        _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
+        // NOTE: deliberately do NOT set F_NOCACHE on the write path. Uncached
+        // writes bypass the OS write-back cache and cripple SSD throughput
+        // (no coalescing/buffering — observed ~160 MB/s SSD→SSD). Durability is
+        // still guaranteed by F_FULLFSYNC / synchronize() in finalize(), and
+        // integrity by the paranoid re-read which opens its own F_NOCACHE handle.
         writeHandle = handle
     }
 

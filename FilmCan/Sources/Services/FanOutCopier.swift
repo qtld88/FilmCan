@@ -356,8 +356,9 @@ actor FanOutCopier {
         return max(1, seen.count)
     }
 
-    /// Process one source file: open with F_NOCACHE, spawn per-dest writer tasks,
-    /// broadcast chunks through bounded channels, then verify per config.verifyMode.
+    /// Process one source file: read sequentially (cached, with readahead),
+    /// spawn per-dest writer tasks, broadcast chunks through bounded channels,
+    /// then verify per config.verifyMode (paranoid re-reads use F_NOCACHE).
     /// cumulativeBytesBeforeSource is the sum of all earlier source sizes for correct progress tracking.
     /// totalBytesAllSources is the sum of ALL source sizes (full job).
     /// Only emits .complete status when sourceIndex == totalSources - 1 (last source).
@@ -570,7 +571,11 @@ actor FanOutCopier {
         var deadDests: Set<String> = []
         do {
             let sourceHandle = try FileHandle(forReadingFrom: sourceURL)
-            _ = fcntl(sourceHandle.fileDescriptor, F_NOCACHE, 1)
+            // No F_NOCACHE here: the copy pass reads sequentially and benefits
+            // from kernel readahead/prefetch. The hashed bytes are identical
+            // whether cached or not; the paranoid verify uses its own F_NOCACHE
+            // handle to re-read real device content. F_NOCACHE on this hot path
+            // disables prefetch and slows large sequential reads.
             defer { try? sourceHandle.close() }
 
             guard let sourceHasher = XXH128StreamingHasher() else {
