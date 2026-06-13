@@ -1199,7 +1199,7 @@ struct TransferHistoryView: View {
         config.duplicateCounterTemplate = entry.options.duplicateCounterTemplate
 
         var options = RsyncOptions()
-        options.copyEngine = CopyEngine(rawValue: entry.options.copyEngine) ?? .rsync
+        options.copyEngine = .custom // rsync retired — always FilmCan engine
         options.useChecksum = entry.options.useChecksum
         options.postVerify = entry.options.postVerify
         options.onlyCopyChanged = entry.options.onlyCopyChanged

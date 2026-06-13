@@ -559,7 +559,7 @@ extension BackupEditorView {
 
     private var basicOptionsContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            copyEnginePicker()
+            // Copy-engine picker removed: rsync retired, FilmCan is the only engine.
 
             let parallelCopyInfo = InfoPopoverContent(
                 title: "Automatic parallel copy",

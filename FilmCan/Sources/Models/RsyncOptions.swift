@@ -1,7 +1,8 @@
 import Foundation
 
 struct RsyncOptions: Equatable {
-    var copyEngine: CopyEngine = .rsync
+    // The rsync engine has been retired from the UI; FilmCan is the only engine.
+    var copyEngine: CopyEngine = .custom
     var useChecksum: Bool = false         // -c flag
     var verbose: Bool = true               // -v
     var showProgress: Bool = true         // --progress
@@ -106,7 +107,10 @@ extension RsyncOptions: Codable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        copyEngine = try c.decodeIfPresent(CopyEngine.self, forKey: .copyEngine) ?? .rsync
+        // rsync retired: coerce any previously-saved engine to FilmCan so old
+        // configs and the runtime stay consistent (UI no longer offers a choice).
+        _ = try c.decodeIfPresent(CopyEngine.self, forKey: .copyEngine)
+        copyEngine = .custom
         useChecksum = try c.decodeIfPresent(Bool.self, forKey: .useChecksum) ?? false
         verbose = try c.decodeIfPresent(Bool.self, forKey: .verbose) ?? true
         showProgress = try c.decodeIfPresent(Bool.self, forKey: .showProgress) ?? true
