@@ -452,10 +452,13 @@ struct FlowLinkView: View {
             for (dIndex, destination) in destinations.enumerated() {
                 let destTotal = layout.destTotalThicknesses[destination.id] ?? maxThickness * 0.2
                 let fallbackDestThickness = clamp(destTotal * CGFloat(sourceRatio), minThickness, maxThickness)
+                // No maxThickness cap here: the ribbon end must line up with the
+                // destination bar's green "backup" block. Capping it would make the
+                // ribbon end visibly thinner than the bar segment it connects to.
                 let destThickness = layout.destinationBars[destination.id]
                     .map { info in
                         let slice = info.backupHeight / CGFloat(max(sources.count, 1))
-                        return clamp(slice, minThickness, maxThickness)
+                        return max(slice, minThickness)
                     }
                     ?? fallbackDestThickness
                 let fallbackEnd = destinationCenters[destination.id] ?? layout.destinationPositions[safe: dIndex] ?? size.height / 2

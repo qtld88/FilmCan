@@ -230,10 +230,18 @@ extension BackupEditorView {
                     available[summary.id] = capacity.available ?? 0
                 }
             }
-            if summary.isRoot, let total = totals[summary.id], let avail = available[summary.id] {
+            // Green "to copy" amount must reflect the actual enumerated content
+            // (excludes Trash, other files on the volume), not the whole-drive
+            // used space. Fall back to drive-used only if content hasn't been
+            // measured yet (e.g. preview still loading on a root volume).
+            let contentSize = previewInfo.sourceSizes[source] ?? 0
+            if contentSize > 0 {
+                sizes[summary.id] = (sizes[summary.id] ?? 0) + contentSize
+            } else if summary.isRoot,
+                      (sizes[summary.id] ?? 0) == 0,
+                      let total = totals[summary.id],
+                      let avail = available[summary.id] {
                 sizes[summary.id] = max(total - avail, 0)
-            } else {
-                sizes[summary.id] = (sizes[summary.id] ?? 0) + (previewInfo.sourceSizes[source] ?? 0)
             }
         }
         let nodes = order.map { id in
