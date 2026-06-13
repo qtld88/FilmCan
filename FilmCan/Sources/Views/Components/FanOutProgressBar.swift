@@ -30,22 +30,22 @@ struct FanOutProgressBar: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 // Track
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(Color(.controlBackgroundColor).opacity(0.4))
-                    .frame(height: 8)
+                    .frame(height: 12)
                 // Copy fill
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(copyColor)
-                    .frame(width: geo.size.width * safeCopy, height: 8)
+                    .frame(width: geo.size.width * safeCopy, height: 12)
                     .animation(.easeOut(duration: 0.25), value: safeCopy)
                 // Verify fill (drawn on top)
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(verifyColor)
-                    .frame(width: geo.size.width * safeVerify, height: 8)
+                    .frame(width: geo.size.width * safeVerify, height: 12)
                     .animation(.easeOut(duration: 0.25), value: safeVerify)
             }
         }
-        .frame(height: 8)
+        .frame(height: 12)
     }
 }
 

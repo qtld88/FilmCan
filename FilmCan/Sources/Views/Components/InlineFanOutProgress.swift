@@ -63,6 +63,11 @@ struct InlineFanOutProgress: View {
                                   verifyFraction: verifyFraction,
                                   status: progress.status)
                     .frame(maxWidth: .infinity)
+                Text("\(Int((copyFraction * 100).rounded(.towardZero)))%")
+                    .font(FilmCanFont.label(15))
+                    .foregroundColor(FilmCanTheme.textPrimary)
+                    .monospacedDigit()
+                    .frame(width: 44, alignment: .trailing)
                 trailingBadge
             }
             if case .active = progress.status {

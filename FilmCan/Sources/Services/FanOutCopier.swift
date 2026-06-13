@@ -213,6 +213,7 @@ actor FanOutCopier {
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
+        copySamplesByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
@@ -550,7 +551,12 @@ actor FanOutCopier {
                                 prog.currentFile = sourceName
                                 prog.verifyBytesTotal = totalBytesAllSources
                                 prog.verifyBytesCompleted = verifiedAtStart
-                                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
+                                let se = await self.windowedCopySpeed(
+                                    destPath: destCfg.destPath,
+                                    bytesCompleted: prog.bytesCompleted,
+                                    bytesTotal: prog.bytesTotal)
+                                prog.speedBytesPerSecond = se.speed
+                                prog.estimatedTimeRemaining = se.eta
                                 progressHandler?(prog)
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
@@ -614,7 +620,12 @@ actor FanOutCopier {
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = totalBytesAllSources
                 prog.verifyBytesCompleted = verifiedAtStart
-                Self.applyCopySpeedETA(&prog, jobStartTime: jobStartTime)
+                let se = await self.windowedCopySpeed(
+                    destPath: destCfg.destPath,
+                    bytesCompleted: prog.bytesCompleted,
+                    bytesTotal: prog.bytesTotal)
+                prog.speedBytesPerSecond = se.speed
+                prog.estimatedTimeRemaining = se.eta
                 progressHandler?(prog)
 
                 let mhlPath = URL(fileURLWithPath: destCfg.destPath)
@@ -859,22 +870,37 @@ actor FanOutCopier {
         )
     }
 
-    /// Fill in average copy speed and ETA from copy bytes only. Verification now
-    /// overlaps copying (the pipeline), so it no longer adds to the timeline and
-    /// must NOT be folded into speed/ETA — doing so made parallel destinations
-    /// (which copy in lockstep, gated by the slowest drive, so their copied bytes
-    /// are equal) show different speeds purely from diverging verify progress.
-    /// Copy-only keeps speed/ETA consistent with the bytes-copied figure. Average
-    /// (not instantaneous) keeps it stable; stays 0 for the first 0.5s so the UI
-    /// can hide it instead of showing a misleading startup spike.
-    nonisolated private static func applyCopySpeedETA(_ prog: inout DestProgress, jobStartTime: Date) {
-        let elapsed = Date().timeIntervalSince(jobStartTime)
-        guard elapsed >= 0.5, prog.bytesCompleted > 0 else { return }
-        let speed = Double(prog.bytesCompleted) / elapsed
-        guard speed > 0 else { return }
-        prog.speedBytesPerSecond = speed
-        let remaining = prog.bytesTotal - prog.bytesCompleted
-        prog.estimatedTimeRemaining = remaining > 0 ? Double(remaining) / speed : nil
+    /// Sliding-window (≈5s) copy throughput samples per destination, used to
+    /// compute a *current-rate* speed and ETA. A cumulative average is misleading
+    /// here: early writes are absorbed fast by the OS write cache (inflated speed
+    /// → ETA far too low), then settle to the real disk rate, so a cumulative ETA
+    /// keeps climbing. A recent window reflects the sustained rate and stabilizes.
+    private var copySamplesByDest: [String: [(t: Date, bytes: Int64)]] = [:]
+    private let copySpeedWindow: TimeInterval = 5.0
+
+    /// Verify overlaps copy (the pipeline), so it no longer adds to the timeline
+    /// and is excluded from speed/ETA — keeping them consistent with bytes-copied
+    /// and identical across lockstep parallel destinations.
+    private func windowedCopySpeed(
+        destPath: String, bytesCompleted: Int64, bytesTotal: Int64
+    ) -> (speed: Double, eta: TimeInterval?) {
+        let now = Date()
+        var samples = copySamplesByDest[destPath] ?? []
+        samples.append((now, bytesCompleted))
+        let cutoff = now.addingTimeInterval(-copySpeedWindow)
+        if let keepFrom = samples.firstIndex(where: { $0.t >= cutoff }), keepFrom > 0 {
+            samples.removeFirst(keepFrom)
+        }
+        copySamplesByDest[destPath] = samples
+
+        guard let oldest = samples.first, samples.count >= 2 else { return (0, nil) }
+        let dt = now.timeIntervalSince(oldest.t)
+        let db = bytesCompleted - oldest.bytes
+        guard dt >= 0.5, db > 0 else { return (0, nil) }
+        let speed = Double(db) / dt
+        let remaining = bytesTotal - bytesCompleted
+        let eta = (remaining > 0 && speed > 0) ? Double(remaining) / speed : nil
+        return (speed, eta)
     }
 
     nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {

@@ -488,6 +488,18 @@ struct DestinationListView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.red)
+                .disabled(transferViewModel.isCancellingAll)
+                if transferViewModel.isCancellingAll, isActiveTransfer {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(destinations.count > 1
+                             ? "Stopping the backups properly…"
+                             : "Stopping the backup properly…")
+                            .font(FilmCanFont.label(11))
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                    }
+                }
                 Spacer()
             }
         }
