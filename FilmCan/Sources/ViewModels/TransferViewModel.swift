@@ -145,21 +145,39 @@ class TransferViewModel: ObservableObject {
         let sources = activeConfig.sourcePaths
 
         if activeConfig.rsyncOptions.copyEngine == .custom {
-            // Fan-out: all sources → all dests in one pass
             currentSources = sources
-            let fanOutResult = await runFanOut(
-                destinations: destinations,
-                sources: sources,
-                config: activeConfig,
-                organizationPreset: organizationPreset
+
+            // Decide whether to fan out to all destinations at once or copy them
+            // one at a time, per the configured destination copy mode.
+            let copySequentially = shouldCopyDestinationsSequentially(
+                mode: activeConfig.destinationCopyMode,
+                destinations: destinations
             )
-            let exploded = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
-            // If exploded is empty the fan-out threw before producing per-dest results
-            // (e.g. insufficient disk space). Fall back to the aggregate result so the
-            // error surfaces in history and triggers a notification.
-            let perDestResults: [TransferResult] = exploded.isEmpty ? [fanOutResult] : exploded
-            results.removeAll(where: { $0.id == fanOutResult.id })
-            results.append(contentsOf: perDestResults)
+
+            // Run the fan-out engine either once (all dests) or once per dest.
+            let destinationGroups: [[String]] = copySequentially
+                ? destinations.map { [$0] }
+                : [destinations]
+
+            var perDestResults: [TransferResult] = []
+            for group in destinationGroups {
+                if isCancellingAll { break }
+                let fanOutResult = await runFanOut(
+                    destinations: group,
+                    sources: sources,
+                    config: activeConfig,
+                    organizationPreset: organizationPreset
+                )
+                let exploded = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
+                // If exploded is empty the fan-out threw before producing per-dest
+                // results (e.g. insufficient disk space). Fall back to the aggregate
+                // result so the error surfaces in history and triggers a notification.
+                let groupResults: [TransferResult] = exploded.isEmpty ? [fanOutResult] : exploded
+                results.removeAll(where: { $0.id == fanOutResult.id })
+                results.append(contentsOf: groupResults)
+                perDestResults.append(contentsOf: groupResults)
+            }
+
             await recordHistory(
                 config: activeConfig,
                 sources: sources,
@@ -1034,6 +1052,24 @@ class TransferViewModel: ObservableObject {
 
     // MARK: - Fan-out engine
 
+    /// Decide whether destinations are written one at a time. `.automatic`
+    /// fans out in parallel only when every destination is an SSD; any spinning
+    /// disk / network volume (or undetectable drive) falls back to sequential to
+    /// avoid head thrashing and bus contention. A single destination is always
+    /// "parallel" (one group), since there is nothing to serialize.
+    private func shouldCopyDestinationsSequentially(
+        mode: DestinationCopyMode,
+        destinations: [String]
+    ) -> Bool {
+        guard destinations.count > 1 else { return false }
+        switch mode {
+        case .parallel:   return false
+        case .sequential: return true
+        case .automatic:
+            return !destinations.allSatisfy { DriveSpeedClassifier.info(for: $0).isSSD }
+        }
+    }
+
     private func runFanOut(
         destinations: [String],
         sources: [String],
@@ -1078,7 +1114,17 @@ class TransferViewModel: ObservableObject {
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
                     Task { @MainActor in
-                        self.progress.perDestProgress = progresses
+                        // Merge by id rather than replace: in sequential copy mode
+                        // each runFanOut call only reports its own destination, and
+                        // a wholesale replace would drop the already-finished dests'
+                        // rows (losing their completed state in the UI).
+                        for prog in progresses {
+                            if let idx = self.progress.perDestProgress.firstIndex(where: { $0.id == prog.id }) {
+                                self.progress.perDestProgress[idx] = prog
+                            } else {
+                                self.progress.perDestProgress.append(prog)
+                            }
+                        }
                         self.progress.syncFromPerDest()
                         for prog in progresses {
                             let copyFraction = prog.progressFraction

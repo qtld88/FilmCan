@@ -696,15 +696,17 @@ extension BackupEditorView {
 
             let copyModeInfo = InfoPopoverContent(
                 title: "Copy mode",
-                description: "Choose whether destinations run one at a time or in parallel.",
+                description: "How FilmCan writes to multiple destinations.",
                 pros: [
-                    "Parallel can reduce total time with multiple destinations",
-                    "Sequential is gentler on drives and CPU"
+                    "Automatic picks parallel for SSDs, sequential for hard drives",
+                    "Parallel reads the source once and writes everywhere at once",
+                    "Sequential is gentler on shared buses and drives"
                 ],
                 cons: [
-                    "Parallel uses more bandwidth and CPU",
-                    "Sequential can be slower overall"
-                ]
+                    "Parallel uses more bandwidth and disk activity",
+                    "Sequential re-reads the source for each destination"
+                ],
+                notes: ["With one destination this setting has no effect."]
             )
 
             HStack(spacing: optionSpacing) {
@@ -722,11 +724,19 @@ extension BackupEditorView {
                 }
                 .frame(width: resolvedTextWidth(basicOptionTextWidth), alignment: .leading)
                 Menu {
-                    Button("One destination at a time") { viewModel.runInParallel = false }
-                    Button("All destinations at once") { viewModel.runInParallel = true }
+                    ForEach(DestinationCopyMode.allCases) { mode in
+                        Button(action: { viewModel.destinationCopyMode = mode }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.displayName)
+                                Text(mode.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(viewModel.runInParallel ? "All destinations at once" : "One destination at a time")
+                        Text(viewModel.destinationCopyMode.displayName)
                         Image(systemName: "chevron.down")
                             .font(.caption)
                     }

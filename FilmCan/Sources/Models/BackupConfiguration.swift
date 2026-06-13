@@ -15,6 +15,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var organizationReuseByDestination: [String: OrganizationReuseInfo] = [:]
     var copyFolderContents: Bool = false
     var runInParallel: Bool = false
+    /// How the FilmCan fan-out engine writes to multiple destinations.
+    var destinationCopyMode: DestinationCopyMode = .automatic
     var sourceAutoDetectEnabled: Bool = false
     var sourceAutoDetectPatterns: [String] = []
     var destinationAutoDetectEnabled: Bool = false
@@ -66,6 +68,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         organizationReuseByDestination = try c.decodeIfPresent([String: OrganizationReuseInfo].self, forKey: .organizationReuseByDestination) ?? [:]
         copyFolderContents = try c.decodeIfPresent(Bool.self, forKey: .copyFolderContents) ?? false
         runInParallel = try c.decodeIfPresent(Bool.self,   forKey: .runInParallel) ?? false
+        destinationCopyMode = try c.decodeIfPresent(DestinationCopyMode.self, forKey: .destinationCopyMode) ?? .automatic
         sourceAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .sourceAutoDetectEnabled) ?? false
         sourceAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .sourceAutoDetectPatterns) ?? []
         destinationAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .destinationAutoDetectEnabled) ?? false
@@ -119,6 +122,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(organizationReuseByDestination, forKey: .organizationReuseByDestination)
         try c.encode(copyFolderContents, forKey: .copyFolderContents)
         try c.encode(runInParallel,    forKey: .runInParallel)
+        try c.encode(destinationCopyMode, forKey: .destinationCopyMode)
         try c.encode(sourceAutoDetectEnabled, forKey: .sourceAutoDetectEnabled)
         try c.encode(sourceAutoDetectPatterns, forKey: .sourceAutoDetectPatterns)
         try c.encode(destinationAutoDetectEnabled, forKey: .destinationAutoDetectEnabled)
@@ -152,7 +156,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
-        case logEnabled, logLocation, customLogPath, runInParallel, createdAt, lastUsedAt, webhookTemplateFormatVersion
+        case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate
@@ -194,4 +198,35 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
 struct OrganizationReuseInfo: Codable, Equatable {
     var presetId: UUID?
     var sourceRoots: [String: String] = [:]
+}
+
+/// How the FilmCan fan-out engine writes to multiple destinations.
+enum DestinationCopyMode: String, Codable, CaseIterable, Identifiable {
+    /// Decide per run from drive type: parallel fan-out when every destination
+    /// is an SSD, sequential (one at a time) when any destination is a spinning
+    /// disk / network volume.
+    case automatic
+    /// Always read the source once and write to all destinations at the same time.
+    case parallel
+    /// Copy to one destination fully before starting the next (gentler on a
+    /// shared bus or HDDs; re-reads the source per destination).
+    case sequential
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic:  return "Automatic (by drive type)"
+        case .parallel:   return "All destinations at once"
+        case .sequential: return "One destination at a time"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .automatic:  return "Parallel for SSDs, sequential for hard drives"
+        case .parallel:   return "Fastest with multiple SSDs — reads the source once"
+        case .sequential: return "Gentler on shared buses and hard drives"
+        }
+    }
 }

@@ -183,6 +183,14 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    var destinationCopyMode: DestinationCopyMode {
+        get { config.destinationCopyMode }
+        set {
+            config.destinationCopyMode = newValue
+            save()
+        }
+    }
+
     var copyFolderContents: Bool {
         get { config.copyFolderContents }
         set {
