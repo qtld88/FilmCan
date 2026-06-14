@@ -566,14 +566,19 @@ extension BackupEditorView {
             let verificationInfo = InfoPopoverContent(
                 title: "Verification",
                 description: "How thoroughly FilmCan confirms each file landed correctly.",
-                pros: [
-                    "Paranoid: re-reads from disk, catches in-memory & write errors",
-                    "Fast: checks the hash computed during copy (no re-read)",
-                    "Off: no checks, fastest"
-                ],
-                cons: [
-                    "Paranoid roughly doubles disk I/O (re-read pass)",
-                    "Off won't detect a write error or corruption"
+                options: [
+                    .init("Paranoid",
+                          good: ["Re-reads every file from disk and compares",
+                                 "Catches write errors and in-memory corruption"],
+                          bad: ["Roughly doubles disk I/O (the re-read pass)"]),
+                    .init("Fast",
+                          good: ["Verifies against the hash computed during the copy",
+                                 "No re-read — about twice as fast as Paranoid"],
+                          bad: ["Doesn't catch a bad write that the OS reported as OK",
+                                "Trusts the data already in memory wasn't corrupted"]),
+                    .init("Off",
+                          good: ["Fastest — no hashing or checking"],
+                          bad: ["A write error or corruption goes undetected"])
                 ],
                 notes: ["Paranoid is recommended for safety-critical backups."]
             )
@@ -628,13 +633,17 @@ extension BackupEditorView {
                 textWidth: basicOptionTextWidth,
                 info: InfoPopoverContent(
                     title: "Force re-copy",
-                    description: "Re-copy every file even if it was already backed up.",
-                    pros: ["Guarantees a fresh copy of everything"],
-                    cons: ["Slower — disables resume skip"],
-                    notes: [
-                        "Off: files already recorded in every destination's hash list and still present are skipped on a re-run.",
-                        "With a {date} folder template, resuming on a different day re-copies into that day's folder (the earlier files aren't matched). Turn this on to always re-copy regardless."
-                    ]
+                    description: "Whether a re-run copies files that are already backed up.",
+                    options: [
+                        .init("Off (resume skip)",
+                              good: ["Skips files already in every destination's hash list and still present",
+                                     "Fast re-runs — only new/changed files are copied"],
+                              bad: ["A file deleted from a destination is re-copied (presence is checked)"]),
+                        .init("On (force re-copy)",
+                              good: ["Re-copies every file — guarantees a fresh copy"],
+                              bad: ["Slower — ignores the hash list entirely"])
+                    ],
+                    notes: ["With a {date} folder template, resuming on a different day re-copies into that day's folder (earlier files aren't matched)."]
                 )
             )
             .disabled(!isCustomEngine)
@@ -653,16 +662,20 @@ extension BackupEditorView {
                         InfoPopoverButton(
                             content: InfoPopoverContent(
                                 title: "Duplicate policy",
-                                description: "Controls how FilmCan handles a file or folder that already exists at the destination.",
-                                pros: [
-                                    "Skip keeps existing files untouched",
-                                    "Overwrite ensures destination matches source",
-                                    "Increment preserves both versions"
-                                ],
-                                cons: [
-                                    "Overwrite can destroy destination-only data",
-                                    "Increment can create lots of duplicates",
-                                    "Ask each time interrupts unattended runs"
+                                description: "What FilmCan does with a file or folder that already exists at the destination.",
+                                options: [
+                                    .init("Skip",
+                                          good: ["Keeps existing destination files untouched"],
+                                          bad: ["An out-of-date file at the destination stays out of date"]),
+                                    .init("Overwrite",
+                                          good: ["Destination ends up matching the source"],
+                                          bad: ["Can destroy a destination-only version of the file"]),
+                                    .init("Increment",
+                                          good: ["Preserves both versions (adds a counter suffix)"],
+                                          bad: ["Can create many duplicates over time"]),
+                                    .init("Ask",
+                                          good: ["You decide per conflict"],
+                                          bad: ["Interrupts unattended runs"])
                                 ]
                             )
                         )
@@ -724,14 +737,19 @@ extension BackupEditorView {
             let copyModeInfo = InfoPopoverContent(
                 title: "Copy mode",
                 description: "How FilmCan writes to multiple destinations.",
-                pros: [
-                    "Automatic picks parallel for SSDs, sequential for hard drives",
-                    "Parallel reads the source once and writes everywhere at once",
-                    "Sequential is gentler on shared buses and drives"
-                ],
-                cons: [
-                    "Parallel uses more bandwidth and disk activity",
-                    "Sequential re-reads the source for each destination"
+                options: [
+                    .init("Automatic",
+                          good: ["Parallel for SSDs, sequential for hard drives / shared buses",
+                                 "Sensible default — no need to think about it"]),
+                    .init("All destinations at once (parallel)",
+                          good: ["Reads the source once, writes everywhere together",
+                                 "Fastest with multiple SSDs"],
+                          bad: ["More bandwidth and disk activity",
+                                "Can thrash if destinations share one drive/bus"]),
+                    .init("One destination at a time (sequential)",
+                          good: ["Gentler on shared buses and hard drives"],
+                          bad: ["Re-reads the source for each destination",
+                                "Slower total time with multiple destinations"])
                 ],
                 notes: ["With one destination this setting has no effect."]
             )
@@ -778,16 +796,16 @@ extension BackupEditorView {
 
             let fileOrderInfo = InfoPopoverContent(
                 title: "Copy order",
-                description: "Choose the order FilmCan uses to copy files when using the FilmCan Engine.",
-                pros: [
-                    "Default order preserves the filesystem order",
-                    "Small first can speed up cards with lots of tiny files",
-                    "Large first can stabilize throughput on big files",
-                    "Creation date can help keep footage order consistent"
-                ],
-                cons: [
-                    "Only affects FilmCan Engine",
-                    "May not improve speed on all drives"
+                description: "The order FilmCan copies files in.",
+                options: [
+                    .init("Default", good: ["Preserves the filesystem order"]),
+                    .init("Smallest first",
+                          good: ["Can speed up cards with lots of tiny files"],
+                          bad: ["May not help on all drives"]),
+                    .init("Largest first",
+                          good: ["Can stabilize throughput on big files"]),
+                    .init("Creation date",
+                          good: ["Keeps footage order consistent"])
                 ]
             )
 
