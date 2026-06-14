@@ -341,6 +341,14 @@ extension BackupEditorView {
                 Divider()
                     .background(FilmCanTheme.cardStroke)
                 optionsTabContent
+                    // The Destinations tab carries the full organization editor — a
+                    // large subtree that drops frames when animated in/out. Skip the
+                    // open/close animation for it so it feels as snappy as the others.
+                    .transaction { txn in
+                        if selectedOptionsTab == .destinations {
+                            txn.animation = nil
+                        }
+                    }
             }
         }
         .padding(12)
