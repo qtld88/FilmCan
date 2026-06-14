@@ -39,6 +39,11 @@ enum FilmCanTheme {
     static var card: Color {
         panel
     }
+    /// Drawer surface — a distinct grey from `panel`/`card` so the settings drawer
+    /// reads as its own tray, not another data card.
+    static var drawerSurface: Color {
+        Color(hex: 0x343434)
+    }
     static var cardStroke: Color {
         textPrimary.opacity(0.2)
     }

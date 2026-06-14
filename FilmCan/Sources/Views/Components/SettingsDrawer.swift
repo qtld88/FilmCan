@@ -26,29 +26,34 @@ struct FolderTabShape: Shape {
     }
 }
 
+/// Browser-style tab pill: rounded top, near-flat bottom so it reads as a folder
+/// handle. When active it rises and scales slightly — as if the folder is being
+/// pulled up out of the drawer.
 struct SettingsFolderTab: View {
     let title: String
     let isActive: Bool
     let action: () -> Void
 
+    private var shape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 3,
+                               bottomTrailingRadius: 3, topTrailingRadius: 14)
+    }
+
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline.weight(isActive ? .semibold : .regular))
+                .font(.system(size: 15, weight: isActive ? .semibold : .medium))
                 .foregroundColor(isActive ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
                 .lineLimit(1)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 14)
-                .background(
-                    FolderTabShape(chamfer: 10)
-                        .fill(isActive ? FilmCanTheme.panel : FilmCanTheme.card)
-                )
+                .padding(.vertical, 10)
+                .padding(.horizontal, 18)
+                .background(shape.fill(isActive ? FilmCanTheme.drawerSurface : FilmCanTheme.panel))
                 .overlay(
-                    FolderTabShape(chamfer: 10)
-                        .stroke(isActive ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke,
-                                lineWidth: 1)
+                    shape.stroke(isActive ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke,
+                                 lineWidth: 1)
                 )
-                .offset(y: isActive ? -3 : 0)
+                .scaleEffect(isActive ? 1.05 : 1, anchor: .bottom)
+                .offset(y: isActive ? -5 : 0)
         }
         .buttonStyle(.plain)
     }
@@ -66,6 +71,8 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
     @ViewBuilder let content: () -> Content
     @ViewBuilder let presetSelector: () -> Preset
 
+    private var drawerAnimation: Animation { .spring(response: 0.38, dampingFraction: 0.82) }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isCollapsed {
@@ -76,13 +83,18 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
             }
             tabStrip
         }
+        // Drawer base grey runs the full height — including down behind the closed
+        // tab strip to the window's bottom edge.
+        .background(FilmCanTheme.drawerSurface.ignoresSafeArea(edges: .bottom))
+        // Clip so the content panel slides up from behind the tabs, not over the flow.
+        .clipped()
     }
 
     private var contentPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title(selection))
-                    .font(.headline)
+                    .font(.title3.weight(.semibold))
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Spacer(minLength: 12)
                 presetSelector()
@@ -91,28 +103,23 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
             ScrollView { content().frame(maxWidth: .infinity, alignment: .leading) }
         }
         .padding(16)
-        .background(
-            UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 0,
-                                   bottomTrailingRadius: 0, topTrailingRadius: 10)
-                .fill(FilmCanTheme.panel)
-        )
-        .overlay(
-            UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 0,
-                                   bottomTrailingRadius: 0, topTrailingRadius: 10)
-                .stroke(FilmCanTheme.cardStroke, lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(FilmCanTheme.drawerSurface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(FilmCanTheme.cardStroke).frame(height: 1)
+        }
     }
 
     private var tabStrip: some View {
-        HStack(alignment: .bottom, spacing: 4) {
+        HStack(alignment: .bottom, spacing: 6) {
             ForEach(tabs, id: \.self) { tab in
                 SettingsFolderTab(title: title(tab), isActive: tab == selection && !isCollapsed) {
                     if tab == selection {
-                        withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.toggle() }
+                        withAnimation(drawerAnimation) { isCollapsed.toggle() }
                     } else {
                         selection = tab
                         if isCollapsed {
-                            withAnimation(.easeInOut(duration: 0.2)) { isCollapsed = false }
+                            withAnimation(drawerAnimation) { isCollapsed = false }
                         }
                     }
                 }
@@ -121,7 +128,7 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
             if isCollapsed { presetSelector() }
         }
         .padding(.horizontal, 12)
-        .padding(.top, isCollapsed ? 8 : 0)
-        .background(FilmCanTheme.background)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
     }
 }
