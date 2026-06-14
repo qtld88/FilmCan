@@ -214,6 +214,7 @@ actor FanOutCopier {
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
         copyDoneByDest.removeAll()
+        combinedSamplesByDest.removeAll()
         etaEmitByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
@@ -908,18 +909,24 @@ actor FanOutCopier {
     // The copy-only rate swings hard (~300<->180 MB/s) as verification, which
     // overlaps copying via the pipeline, periodically steals disk bandwidth. But
     // the *total* disk throughput — copy bytes + verify bytes moved per second —
-    // is roughly constant (the drive's bandwidth). Measured as a cumulative
-    // average since job start it is stable and doesn't spike during verify gaps.
+    // is roughly constant (the drive's bandwidth).
     //
-    // Since total work is known up front (copy + verify = ~2x data in paranoid),
-    // dividing it by this stable rate gives a stable, honest ETA from the start.
-    // The displayed speed is that throughput divided by the verify factor, which
-    // predicts the verify slowdown from t=0 (shows the effective copy rate, never
-    // the no-verify peak).
+    // A cumulative average since job start over-weights the fast cached opening
+    // and lags the real rate, so the ETA drifts (Finder-grade ETAs use a moving
+    // average of *recent* throughput). So we measure the combined throughput over
+    // a short sliding window: stable (combined is ~constant even in paranoid) and
+    // accurate within ~10s, with no early-history drift.
+    //
+    // Total work is known up front (copy + verify = ~2x data in paranoid), so
+    // remaining_work / windowed_throughput is honest from the start. Displayed
+    // speed is that throughput ÷ verify factor — the effective copy rate, which
+    // predicts the verify slowdown rather than showing the no-verify peak.
     private var copyDoneByDest: [String: Int64] = [:]
+    private var combinedSamplesByDest: [String: [(t: Date, done: Int64)]] = [:]
     private var etaEmitByDest: [String: (t: Date, speed: Double, eta: TimeInterval?)] = [:]
     private let etaMinElapsed: TimeInterval = 2.0
     private let etaEmitInterval: TimeInterval = 3.0
+    private let throughputWindow: TimeInterval = 10.0
 
     /// `copyDoneNow` updates the stored copy progress (pass on copy emits, nil on
     /// verify emits). Reads live verified bytes from `verifiedBytesByDest`.
@@ -936,40 +943,55 @@ actor FanOutCopier {
         let combinedDone = copyDone + verifyDone
         let combinedTotal = copyTotal + verifyTotal
         let now = Date()
+
+        // Record a sample of cumulative combined work and keep a sliding window.
+        var samples = combinedSamplesByDest[destPath] ?? []
+        samples.append((now, combinedDone))
+        let cutoff = now.addingTimeInterval(-throughputWindow)
+        if let keepFrom = samples.firstIndex(where: { $0.t >= cutoff }), keepFrom > 0 {
+            samples.removeFirst(keepFrom)
+        }
+        combinedSamplesByDest[destPath] = samples
+
         let elapsed = now.timeIntervalSince(jobStart)
         guard elapsed >= etaMinElapsed, combinedDone > 0, combinedTotal > 0, copyTotal > 0
         else { return (0, nil) }
 
-        // Hold the displayed value between throttle ticks (smooths the noisy
-        // first seconds; the cumulative figure itself keeps updating).
+        // Throttle the displayed value (hold between ticks).
         if let last = etaEmitByDest[destPath], now.timeIntervalSince(last.t) < etaEmitInterval {
             return (last.speed, last.eta)
         }
 
+        // Windowed throughput = work done across the retained window.
+        guard let oldest = samples.first else { return (0, nil) }
+        let dt = now.timeIntervalSince(oldest.t)
+        let db = combinedDone - oldest.done
+        guard dt >= 0.5, db > 0 else {
+            // Not enough movement yet — keep showing the last value if we have one.
+            if let last = etaEmitByDest[destPath] { return (last.speed, last.eta) }
+            return (0, nil)
+        }
+
         let result = Self.computeCombinedSpeedETA(
-            copyDone: copyDone, verifyDone: verifyDone,
-            copyTotal: copyTotal, verifyTotal: verifyTotal, elapsed: elapsed)
+            combinedDone: combinedDone, combinedTotal: combinedTotal,
+            copyTotal: copyTotal, throughput: Double(db) / dt)
         etaEmitByDest[destPath] = (now, result.speed, result.eta)
         return result
     }
 
     /// Pure speed/ETA math (no timing/throttle) so it can be unit-tested.
-    /// Speed = total disk throughput ÷ verify factor (the effective copy rate,
-    /// which predicts the verify slowdown). ETA = remaining combined work ÷
-    /// total throughput (honest: counts the verify pass from the start).
+    /// `throughput` is the measured combined (copy+verify) bytes/sec. Speed =
+    /// throughput ÷ verify factor (effective copy rate, predicts the verify
+    /// slowdown). ETA = remaining combined work ÷ throughput (counts the verify
+    /// pass from the start).
     static func computeCombinedSpeedETA(
-        copyDone: Int64, verifyDone: Int64,
-        copyTotal: Int64, verifyTotal: Int64, elapsed: TimeInterval
+        combinedDone: Int64, combinedTotal: Int64, copyTotal: Int64, throughput: Double
     ) -> (speed: Double, eta: TimeInterval?) {
-        let combinedDone = copyDone + verifyDone
-        let combinedTotal = copyTotal + verifyTotal
-        guard elapsed > 0, combinedDone > 0, copyTotal > 0 else { return (0, nil) }
-        let combinedThroughput = Double(combinedDone) / elapsed
+        guard throughput > 0, combinedDone > 0, copyTotal > 0 else { return (0, nil) }
         let verifyFactor = Double(combinedTotal) / Double(copyTotal)
-        let speed = combinedThroughput / verifyFactor
+        let speed = throughput / verifyFactor
         let remaining = combinedTotal - combinedDone
-        let eta = (combinedThroughput > 0 && remaining > 0)
-            ? Double(remaining) / combinedThroughput : nil
+        let eta = remaining > 0 ? Double(remaining) / throughput : nil
         return (speed, eta)
     }
 
