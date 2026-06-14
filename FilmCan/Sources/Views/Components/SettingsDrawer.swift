@@ -1,5 +1,13 @@
 import SwiftUI
 
+enum SettingsDrawerLayout {
+    /// Max height of the open content panel. Floors at 160pt so it stays usable on short windows.
+    static func openCap(windowHeight: CGFloat, isWide: Bool) -> CGFloat {
+        let factor: CGFloat = isWide ? 0.45 : 0.55
+        return max(160, windowHeight * factor)
+    }
+}
+
 /// Rectangle with the two top corners chamfered — a binder/folder-tab silhouette.
 struct FolderTabShape: Shape {
     var chamfer: CGFloat = 10

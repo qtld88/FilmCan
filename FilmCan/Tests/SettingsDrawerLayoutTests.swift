@@ -18,4 +18,19 @@ final class SettingsDrawerLayoutTests: XCTestCase {
         let path = FolderTabShape(chamfer: 0).path(in: rect)
         XCTAssertTrue(path.contains(CGPoint(x: 1, y: 1)))
     }
+
+    func testOpenCapWideUses45Percent() {
+        XCTAssertEqual(SettingsDrawerLayout.openCap(windowHeight: 1000, isWide: true),
+                       450, accuracy: 0.01)
+    }
+
+    func testOpenCapNarrowUses55Percent() {
+        XCTAssertEqual(SettingsDrawerLayout.openCap(windowHeight: 1000, isWide: false),
+                       550, accuracy: 0.01)
+    }
+
+    func testOpenCapFloorsToReasonableMinimum() {
+        XCTAssertEqual(SettingsDrawerLayout.openCap(windowHeight: 100, isWide: true),
+                       160, accuracy: 0.01)
+    }
 }
