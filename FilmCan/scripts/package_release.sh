@@ -119,6 +119,29 @@ if ! command -v osascript >/dev/null 2>&1; then
   CUSTOMIZE_DMG=0
 fi
 
+# Pick a python3 that can actually import PIL. A bare `python3` may resolve to
+# Apple's /usr/bin/python3 (no Pillow) under a reduced/sandboxed PATH, which used
+# to silently drop the DMG background. Scan likely interpreters first.
+PIL_PYTHON=""
+for candidate in \
+  "${PIL_PYTHON_BIN:-}" \
+  /opt/homebrew/bin/python3 \
+  /usr/local/bin/python3 \
+  "$HOME/.pyenv/shims/python3" \
+  "$(command -v python3 2>/dev/null || true)"; do
+  [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+  if "$candidate" -c "import PIL" >/dev/null 2>&1; then
+    PIL_PYTHON="$candidate"
+    break
+  fi
+done
+if [ -z "$PIL_PYTHON" ]; then
+  echo "warning: no python3 with Pillow found — DMG background will be skipped." >&2
+  echo "         install Pillow (e.g. /opt/homebrew/bin/python3 -m pip install Pillow)" >&2
+  echo "         or set PIL_PYTHON_BIN to a python3 that has it." >&2
+  CUSTOMIZE_DMG=0
+fi
+
 mkdir -p "$STAGE_DIR/.background"
 export DMG_BG_PATH="$STAGE_DIR/.background/background.png"
 export DMG_BG_WIDTH=700
@@ -130,7 +153,7 @@ RETRY_DELAY="${RETRY_DELAY:-2}"
 LONG_DELAY="${LONG_DELAY:-5}"
 
 if [ "$CUSTOMIZE_DMG" -eq 1 ]; then
-  if ! python3 - <<'PY'
+  if ! "$PIL_PYTHON" - <<'PY'
 import os
 from PIL import Image, ImageDraw, ImageFont
 
