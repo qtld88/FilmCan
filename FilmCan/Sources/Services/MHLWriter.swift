@@ -13,6 +13,14 @@ actor MHLWriter {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 
+    /// Preload existing entries (e.g. from a prior, resumed run) so rewriting the
+    /// MHL preserves files that were already recorded instead of truncating them.
+    func seed(_ existing: [(hash: String, fileName: String)]) {
+        guard !finalized, !existing.isEmpty else { return }
+        let known = Set(entries.map { $0.fileName })
+        entries = existing.filter { !known.contains($0.fileName) } + entries
+    }
+
     func append(hash: String, fileName: String) async throws {
         guard !finalized else { return }
         entries.append((hash, fileName))

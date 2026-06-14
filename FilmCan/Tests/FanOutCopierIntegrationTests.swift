@@ -401,4 +401,61 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(verifyDoneValues.last, totalBytes,
                        "Final verified bytes should equal total bytes of all sources")
     }
+
+    // MARK: - Resume skip
+
+    private func resumeConfig(card: URL, dest: URL) -> FanOutCopier.Configuration {
+        FanOutCopier.Configuration(
+            sources: [card.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: "R",
+                                  verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil
+        )
+    }
+
+    func test_resume_skipsAlreadyBackedUpFiles() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("CARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<100_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("a.bin"))
+        try Data((0..<120_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("b.bin"))
+        let dest = tmpDir.appendingPathComponent("rdest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let r1 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r1.first?.filesTransferred, 2)
+
+        // Add a third file and resume.
+        try Data((0..<80_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("c.bin"))
+        let r2 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r2.first?.filesTransferred, 1, "only the new file is copied")
+        XCTAssertEqual(r2.first?.filesSkipped, 2, "two already-backed-up files skipped")
+
+        for name in ["a.bin", "b.bin", "c.bin"] {
+            XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("CARD/\(name)").path), "missing \(name)")
+        }
+        // The hash list retains all three entries (not truncated on resume).
+        let mhl = dest.appendingPathComponent(".filmcan/hashlists/CARD.mhl")
+        let entries = try MHLReader.read(url: mhl)
+        XCTAssertEqual(Set(entries.map { $0.fileName }), ["a.bin", "b.bin", "c.bin"])
+    }
+
+    func test_resume_allDone_skipsEverythingAndSucceeds() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("CARD2")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<64_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("x.bin"))
+        try Data((0..<64_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("y.bin"))
+        let dest = tmpDir.appendingPathComponent("rdest2")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        let r2 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+
+        XCTAssertEqual(r2.first?.success, true)
+        XCTAssertEqual(r2.first?.filesTransferred, 0, "nothing recopied")
+        XCTAssertEqual(r2.first?.filesSkipped, 2, "all files skipped")
+    }
 }

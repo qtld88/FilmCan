@@ -57,13 +57,13 @@ struct DestResultBuilder {
         verificationFailed = true
     }
 
-    func build() -> DestResult {
+    func build(skipped: Int = 0) -> DestResult {
         DestResult(
             destinationPath: destPath,
             displayName: displayName,
             success: success && !verificationFailed,
             filesTransferred: totalFiles,
-            filesSkipped: 0,
+            filesSkipped: skipped,
             filesFailedAfterCopy: verificationFailed ? totalFiles : failures.count,
             bytesTransferred: totalBytes,
             failureReason: verificationFailed ? .verify : failures.first,
@@ -179,6 +179,18 @@ actor FanOutCopier {
         verifiedBytesByDest[destPath] ?? 0
     }
 
+    /// Read the file names + hashes already recorded in a destination's hash
+    /// list for one source root, if any (for resume skip). Returns [] when no
+    /// prior MHL exists or it can't be parsed.
+    nonisolated static func loadExistingMHLEntries(destPath: String, rootName: String) -> [MHLReader.Entry] {
+        let url = URL(fileURLWithPath: destPath)
+            .appendingPathComponent(".filmcan")
+            .appendingPathComponent("hashlists")
+            .appendingPathComponent("\(rootName).mhl")
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        return (try? MHLReader.read(url: url)) ?? []
+    }
+
     private func buildSharedMHLs(forRootNames rootNames: Set<String>) throws -> [String: [String: MHLWriter]] {
         var result: [String: [String: MHLWriter]] = [:]
         for destCfg in config.destinations {
@@ -242,7 +254,7 @@ actor FanOutCopier {
             throw Error.sourceReadFailed(config.sources.first ?? "")
         }
 
-        let plannedFiles: [PlannedFile] = entries.map { entry in
+        let allPlannedFiles: [PlannedFile] = entries.map { entry in
             let rootName = (entry.sourceRoot as NSString).lastPathComponent
             return PlannedFile(
                 rootPath: entry.sourceRoot,
@@ -252,6 +264,47 @@ actor FanOutCopier {
                 size: entry.size
             )
         }
+
+        var builders: [String: DestResultBuilder] = [:]
+        for dest in config.destinations {
+            builders[dest.destPath] = DestResultBuilder(
+                destPath: dest.destPath,
+                displayName: dest.displayName,
+                verifyMode: dest.verifyMode
+            )
+        }
+
+        // Resume skip: a file already recorded in EVERY destination's hash list
+        // (from a previous run, e.g. one that was stopped) is not recopied. The
+        // MHL lives at <dest>/.filmcan/hashlists/<rootName>.mhl — a stable,
+        // organization/date-independent location — so this works across days.
+        let allRootNames = Set(allPlannedFiles.map { $0.rootName })
+        var existingMHLByDest: [String: [String: [MHLReader.Entry]]] = [:]
+        for dest in config.destinations {
+            var byRoot: [String: [MHLReader.Entry]] = [:]
+            for root in allRootNames {
+                byRoot[root] = Self.loadExistingMHLEntries(destPath: dest.destPath, rootName: root)
+            }
+            existingMHLByDest[dest.destPath] = byRoot
+        }
+        func plannedSourceName(_ f: PlannedFile) -> String {
+            f.relPath.isEmpty ? (f.absPath as NSString).lastPathComponent : f.relPath
+        }
+        var skippedFiles = 0
+        let plannedFiles = allPlannedFiles.filter { f in
+            let name = plannedSourceName(f)
+            let doneEverywhere = config.destinations.allSatisfy { dest in
+                existingMHLByDest[dest.destPath]?[f.rootName]?.contains(where: { $0.fileName == name }) ?? false
+            }
+            if doneEverywhere { skippedFiles += 1; return false }
+            return true
+        }
+
+        // Everything already backed up to every destination — nothing to copy.
+        guard !plannedFiles.isEmpty else {
+            return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedFiles) }
+        }
+
         let totalBytesAllSources = plannedFiles.reduce(Int64(0)) { $0 + $1.size }
 
         // Pre-flight: ensure every destination has enough free space before we start.
@@ -278,18 +331,18 @@ actor FanOutCopier {
         }
         let totalFiles = plannedFiles.count
 
-        var builders: [String: DestResultBuilder] = [:]
-        for dest in config.destinations {
-            builders[dest.destPath] = DestResultBuilder(
-                destPath: dest.destPath,
-                displayName: dest.displayName,
-                verifyMode: dest.verifyMode
-            )
-        }
-
-        // Build all shared MHL writers upfront, grouped by dest and rootName
+        // Build all shared MHL writers upfront, grouped by dest and rootName.
+        // Seed each with the destination's existing entries so a resumed run
+        // appends to its hash list instead of truncating already-recorded files.
         let uniqueRootNames = Set(plannedFiles.map { $0.rootName })
         let sharedMHLsByDest = try buildSharedMHLs(forRootNames: uniqueRootNames)
+        for (destPath, byRoot) in sharedMHLsByDest {
+            for (rootName, writer) in byRoot {
+                if let existing = existingMHLByDest[destPath]?[rootName], !existing.isEmpty {
+                    await writer.seed(existing.map { (hash: $0.hash, fileName: $0.fileName) })
+                }
+            }
+        }
 
         // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
         let sourceConcurrency = max(1, distinctSourceDriveCount(forPaths: config.sources))
@@ -379,7 +432,7 @@ actor FanOutCopier {
             }
         }
 
-        return config.destinations.compactMap { builders[$0.destPath]?.build() }
+        return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedFiles) }
     }
 
     /// Single serial verify lane: pulls copied files in order and verifies each,
