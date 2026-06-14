@@ -496,6 +496,10 @@ actor FanOutCopier {
                 let startTime = Date()
                 var totalBytes: Int64 = 0
                 var writeFailed: DestFailureReason? = nil
+                // Throttle copy-phase progress emits to ~10/s. Emitting per 8MB
+                // chunk spawned thousands of progress Tasks per file, flooding the
+                // main thread. The per-file copy-done emit below is always sent.
+                var lastEmit = Date.distantPast
                 // Snapshot verified bytes at the start of this source so copy-phase
                 // progress emits keep the verify bar frozen at the right position.
                 let verifiedAtStart = await self.verifiedBytesForDest(destCfg.destPath)
@@ -542,26 +546,30 @@ actor FanOutCopier {
                                 destHasher.update(data: chunk.data)
                                 totalBytes += Int64(chunk.data.count)
 
-                                var prog = DestProgress(
-                                    id: destCfg.destPath, displayName: destCfg.displayName,
-                                    status: .active, bytesTotal: totalBytesAllSources,
-                                    filesTotal: totalSources, verifyMode: destCfg.verifyMode
-                                )
-                                let paranoid = destCfg.verifyMode == .paranoid
-                                prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
-                                prog.filesCompleted = sourceIndex
-                                prog.currentFile = sourceName
-                                prog.verifyBytesTotal = paranoid ? totalBytesAllSources : 0
-                                prog.verifyBytesCompleted = verifiedAtStart
-                                let se = await self.combinedThroughputETA(
-                                    destPath: destCfg.destPath,
-                                    copyDoneNow: prog.bytesCompleted,
-                                    copyTotal: totalBytesAllSources,
-                                    paranoid: paranoid,
-                                    jobStart: jobStartTime)
-                                prog.speedBytesPerSecond = se.speed
-                                prog.estimatedTimeRemaining = se.eta
-                                progressHandler?(prog)
+                                let now = Date()
+                                if now.timeIntervalSince(lastEmit) >= 0.1 {
+                                    lastEmit = now
+                                    var prog = DestProgress(
+                                        id: destCfg.destPath, displayName: destCfg.displayName,
+                                        status: .active, bytesTotal: totalBytesAllSources,
+                                        filesTotal: totalSources, verifyMode: destCfg.verifyMode
+                                    )
+                                    let paranoid = destCfg.verifyMode == .paranoid
+                                    prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
+                                    prog.filesCompleted = sourceIndex
+                                    prog.currentFile = sourceName
+                                    prog.verifyBytesTotal = paranoid ? totalBytesAllSources : 0
+                                    prog.verifyBytesCompleted = verifiedAtStart
+                                    let se = await self.combinedThroughputETA(
+                                        destPath: destCfg.destPath,
+                                        copyDoneNow: prog.bytesCompleted,
+                                        copyTotal: totalBytesAllSources,
+                                        paranoid: paranoid,
+                                        jobStart: jobStartTime)
+                                    prog.speedBytesPerSecond = se.speed
+                                    prog.estimatedTimeRemaining = se.eta
+                                    progressHandler?(prog)
+                                }
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
                                 await channel.finish()
@@ -658,11 +666,13 @@ actor FanOutCopier {
         var deadDests: Set<String> = []
         do {
             let sourceHandle = try FileHandle(forReadingFrom: sourceURL)
-            // No F_NOCACHE here: the copy pass reads sequentially and benefits
-            // from kernel readahead/prefetch. The hashed bytes are identical
-            // whether cached or not; the paranoid verify uses its own F_NOCACHE
-            // handle to re-read real device content. F_NOCACHE on this hot path
-            // disables prefetch and slows large sequential reads.
+            // F_NOCACHE: the source is read once and never re-read on this path
+            // (paranoid verify uses its own handle), so caching it is pure waste —
+            // without this, copying a multi-hundred-GB source fills the unified
+            // buffer cache with data we never touch again, driving system memory
+            // pressure (observed: >30 GB, system crash). The kernel still does
+            // some prefetch on the descriptor; sequential throughput stays high.
+            _ = fcntl(sourceHandle.fileDescriptor, F_NOCACHE, 1)
             defer { try? sourceHandle.close() }
 
             guard let sourceHasher = XXH128StreamingHasher() else {
@@ -764,6 +774,15 @@ actor FanOutCopier {
             )
         }
 
+        // Verification disabled: copy only, no checks.
+        if config.verifyMode == .off {
+            return PerSourceOutcome(
+                sourcePath: c.sourcePath, writerResults: c.writerResults,
+                verifyFailedDestPaths: [], sourceCorrupted: false
+            )
+        }
+
+        // Fast + paranoid both compare the streamed dest hash to the source.
         var verifyFailed: Set<String> = []
         for r in c.writerResults where r.success {
             if let dh = r.destHashFromStream, dh != c.verifiedSourceHash {

@@ -564,28 +564,58 @@ extension BackupEditorView {
             // now controlled by the Copy mode picker below.
 
             let verificationInfo = InfoPopoverContent(
-                title: "Hash verification",
-                description: "When on, FilmCan computes hashes during copy and verifies every file at the destination.",
+                title: "Verification",
+                description: "How thoroughly FilmCan confirms each file landed correctly.",
                 pros: [
-                    "Detects corruption or incomplete writes",
-                    "Creates a hash list for later re-checks"
+                    "Paranoid: re-reads from disk, catches in-memory & write errors",
+                    "Fast: checks the hash computed during copy (no re-read)",
+                    "Off: no checks, fastest"
                 ],
                 cons: [
-                    "Adds extra reads and can slow down some drives",
-                    "Disabling it skips hash list generation"
+                    "Paranoid roughly doubles disk I/O (re-read pass)",
+                    "Off won't detect a write error or corruption"
                 ],
-                notes: ["Use this for safety-critical backups. Turn off for speed when needed."]
+                notes: ["Paranoid is recommended for safety-critical backups."]
             )
 
-            optionRow(
-                icon: "checkmark.seal",
-                iconColor: FilmCanTheme.textSecondary,
-                title: "Hash verification",
-                subtitle: isCustomEngine ? "" : "Only available with FilmCan Engine",
-                isOn: $viewModel.rsyncOptions.customVerifyEnabled,
-                textWidth: basicOptionTextWidth,
-                info: verificationInfo
-            )
+            HStack(spacing: optionSpacing) {
+                Image(systemName: "checkmark.seal")
+                    .font(.title3)
+                    .foregroundColor(FilmCanTheme.textSecondary)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Verification")
+                            .font(FilmCanFont.label(13))
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                        InfoPopoverButton(content: verificationInfo)
+                    }
+                }
+                .frame(width: resolvedTextWidth(basicOptionTextWidth), alignment: .leading)
+                Menu {
+                    ForEach(VerifyMode.allCases) { mode in
+                        Button(action: { viewModel.verificationMode = mode }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.displayName)
+                                Text(mode.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(viewModel.verificationMode.displayName)
+                        Image(systemName: "chevron.down").font(.caption)
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(FilmCanTheme.card)
+                    .cornerRadius(6)
+                    .frame(width: resolvedMenuWidth(optionMenuWidth + 60, textWidth: resolvedTextWidth(basicOptionTextWidth)), alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
             .disabled(!isCustomEngine)
             .opacity(isCustomEngine ? 1 : 0.5)
 

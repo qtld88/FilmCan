@@ -98,15 +98,15 @@ actor DestWriter {
         tempFileURL = tempURL
 
         let handle = try FileHandle(forWritingTo: tempURL)
-        // NOTE: deliberately do NOT set F_NOCACHE on the write path. Uncached
-        // writes bypass the OS write-back cache and cripple SSD throughput
-        // (no coalescing/buffering — observed ~160 MB/s SSD→SSD). Durability is
-        // still guaranteed by F_FULLFSYNC / synchronize() in finalize(), and
-        // integrity by the paranoid re-read which opens its own F_NOCACHE handle.
+        // F_NOCACHE: backup writes are write-once and not re-read on this path
+        // (the paranoid verify opens its own handle). Without it, writing a
+        // multi-hundred-GB destination fills the unified buffer cache and, with
+        // the equally-large source read, drives the system into memory pressure
+        // (observed >30 GB, crash). Large sequential writes stay fast; durability
+        // is still ensured by F_FULLFSYNC / synchronize() in finalize().
+        _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
         writeHandle = handle
     }
-
-    private var bytesSinceFlush: Int64 = 0
 
     /// Append a data chunk to the temp file.
     func write(data: Data) throws {
@@ -114,13 +114,6 @@ actor DestWriter {
             throw WriterError.writeFailed("No write handle (already finalized?)")
         }
         try handle.write(contentsOf: data)
-        // Periodically flush dirty pages to the device so a large cached copy
-        // doesn't pile up in RAM and cause system-wide memory pressure.
-        bytesSinceFlush += Int64(data.count)
-        if bytesSinceFlush >= Constants.writeFlushEveryBytes {
-            fsync(handle.fileDescriptor)
-            bytesSinceFlush = 0
-        }
     }
 
     /// Flush, fsync, close, then atomically rename temp → final destination.

@@ -85,6 +85,17 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    /// Verification mode (Off / Fast / Paranoid). Keeps `customVerifyEnabled`
+    /// in sync so hash-list generation and verify-enabled UI follow the choice.
+    var verificationMode: VerifyMode {
+        get { config.rsyncOptions.verificationMode }
+        set {
+            config.rsyncOptions.verificationMode = newValue
+            config.rsyncOptions.customVerifyEnabled = (newValue != .off)
+            save()
+        }
+    }
+
     func setCopyEngine(_ engine: CopyEngine) {
         var options = config.rsyncOptions
         if engine == .custom {

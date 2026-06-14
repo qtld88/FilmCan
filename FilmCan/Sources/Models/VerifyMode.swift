@@ -3,6 +3,7 @@ import Foundation
 enum VerifyMode: String, Codable, CaseIterable, Identifiable {
     case paranoid
     case fast
+    case off
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ enum VerifyMode: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .paranoid: return "Paranoid"
         case .fast: return "Fast"
+        case .off: return "Off"
         }
     }
 
@@ -18,7 +20,9 @@ enum VerifyMode: String, Codable, CaseIterable, Identifiable {
         case .paranoid:
             return "Re-reads source from disk after copy and verifies all destinations bit-for-bit. Catches in-memory corruption. Recommended."
         case .fast:
-            return "Verifies destinations against source hash from copy stream. Faster. Use only for scratch copies where a master verified copy lives elsewhere."
+            return "Verifies destinations against the source hash computed during the copy. No re-read — about twice as fast. Use for scratch copies."
+        case .off:
+            return "No verification. Fastest, but a write error or corruption won't be detected."
         }
     }
 }
