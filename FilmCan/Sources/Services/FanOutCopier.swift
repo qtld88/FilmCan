@@ -984,15 +984,23 @@ actor FanOutCopier {
             defer { try? handle.close() }
             _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
             guard let hasher = XXH128StreamingHasher() else { return nil }
+            // This is a tight synchronous loop with no `await` to drain the
+            // autorelease pool, so FileHandle.read's autoreleased Data would
+            // accumulate for the ENTIRE file (observed: 2 dests + source re-read
+            // ~= 3x a multi-GB clip = >15 GB). Drain per chunk.
             while true {
-                if #available(macOS 10.15.4, *) {
-                    guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { break }
-                    hasher.update(data: data)
-                } else {
-                    let data = handle.readData(ofLength: chunkSz)
-                    if data.isEmpty { break }
-                    hasher.update(data: data)
+                let done = autoreleasepool { () -> Bool in
+                    if #available(macOS 10.15.4, *) {
+                        guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { return true }
+                        hasher.update(data: data)
+                    } else {
+                        let data = handle.readData(ofLength: chunkSz)
+                        if data.isEmpty { return true }
+                        hasher.update(data: data)
+                    }
+                    return false
                 }
+                if done { break }
             }
             return hasher.finalize().hexString
         }.value
