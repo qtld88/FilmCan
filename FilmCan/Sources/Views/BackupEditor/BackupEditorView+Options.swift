@@ -320,26 +320,120 @@ extension BackupEditorView {
         .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
 
-    func settingsDrawer(windowHeight: CGFloat) -> some View {
+    func optionsSection() -> some View {
+        optionsTabCard
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { optionsAvailableWidth = proxy.size.width }
+                        .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
+                }
+            )
+            .padding(.horizontal, optionsHorizontalPadding)
+    }
+
+    private var optionsTabCard: some View {
         let isWide = effectiveOptionsWidth >= 600
-        return SettingsDrawer(
-            tabs: availableOptionsTabs,
-            title: { $0.shortTitle },
-            selection: $selectedOptionsTab,
-            isCollapsed: $isOptionsCollapsed,
-            isWide: isWide,
-            windowHeight: windowHeight,
-            content: { optionsTabContent },
-            presetSelector: { presetSelector }
-        )
-        .background(
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear { optionsAvailableWidth = proxy.size.width }
-                    .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
+        return VStack(alignment: .leading, spacing: 16) {
+            optionsTabBar
+            if !isOptionsCollapsed {
+                Divider()
+                    .background(FilmCanTheme.cardStroke)
+                optionsTabContent
             }
+        }
+        .padding(12)
+        .background(FilmCanTheme.settingsCard)
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(FilmCanTheme.cardStroke, lineWidth: 1)
         )
-        .tourAnchor("optionsTabs")
+        .frame(minWidth: isWide ? 600 : nil, maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var optionsTabBar: some View {
+        let isWide = effectiveOptionsWidth >= 600
+        return Group {
+            if isWide {
+                HStack(spacing: 8) {
+                    ForEach(availableOptionsTabs) { tab in
+                        let isSelected = selectedOptionsTab == tab
+                        Button {
+                            if isSelected {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    isOptionsCollapsed.toggle()
+                                }
+                            } else {
+                                selectedOptionsTab = tab
+                                if isOptionsCollapsed {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        isOptionsCollapsed = false
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(tab.shortTitle)
+                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer(minLength: 0)
+                    presetSelector
+                }
+                .tourAnchor("optionsTabs")
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(availableOptionsTabs) { tab in
+                        let isSelected = selectedOptionsTab == tab
+                        Button {
+                            if isSelected {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    isOptionsCollapsed.toggle()
+                                }
+                            } else {
+                                selectedOptionsTab = tab
+                                if isOptionsCollapsed {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        isOptionsCollapsed = false
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(tab.shortTitle)
+                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    presetSelector
+                }
+                .tourAnchor("optionsTabs")
+            }
+        }
     }
 
     private var presetSelector: some View {
@@ -431,6 +525,13 @@ extension BackupEditorView {
 
     private var availableOptionsTabs: [OptionsTab] {
         isCustomEngine ? OptionsTab.allCases.filter { $0 != .refinements } : OptionsTab.allCases
+    }
+
+    private var optionsHorizontalPadding: CGFloat {
+        let width = effectiveOptionsWidth
+        if width <= 0 { return 24 }
+        let padding = width * 0.05
+        return min(50, max(10, padding))
     }
 
     private var effectiveOptionsWidth: CGFloat {
