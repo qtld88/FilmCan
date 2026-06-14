@@ -1120,6 +1120,7 @@ class TransferViewModel: ObservableObject {
                 duplicateResolver: nil,
                 verifyMode: verifyMode,
                 dryRun: false,
+                forceRecopy: config.forceRecopy,
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
                     Task { @MainActor in

@@ -619,6 +619,24 @@ extension BackupEditorView {
             .disabled(!isCustomEngine)
             .opacity(isCustomEngine ? 1 : 0.5)
 
+            optionRow(
+                icon: "arrow.triangle.2.circlepath",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Force re-copy",
+                subtitle: "",
+                isOn: $viewModel.forceRecopy,
+                textWidth: basicOptionTextWidth,
+                info: InfoPopoverContent(
+                    title: "Force re-copy",
+                    description: "Re-copy every file even if it was already backed up.",
+                    pros: ["Guarantees a fresh copy of everything"],
+                    cons: ["Slower — disables resume skip"],
+                    notes: ["Off: files already recorded in every destination's hash list and still present are skipped on a re-run."]
+                )
+            )
+            .disabled(!isCustomEngine)
+            .opacity(isCustomEngine ? 1 : 0.5)
+
             HStack(spacing: optionSpacing) {
                 Image(systemName: "doc.on.doc")
                     .font(.title3)

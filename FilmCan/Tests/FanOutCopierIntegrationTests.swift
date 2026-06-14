@@ -404,15 +404,50 @@ final class FanOutCopierIntegrationTests: XCTestCase {
 
     // MARK: - Resume skip
 
-    private func resumeConfig(card: URL, dest: URL) -> FanOutCopier.Configuration {
+    private func resumeConfig(card: URL, dest: URL, forceRecopy: Bool = false) -> FanOutCopier.Configuration {
         FanOutCopier.Configuration(
             sources: [card.path],
             destinations: [
                 DestWriter.Config(destPath: dest.path, displayName: "R",
                                   verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
             ],
-            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false,
+            progressHandler: nil, forceRecopy: forceRecopy
         )
+    }
+
+    func test_resume_recopiesIfDestinationFileWasDeleted() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("CARD3")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("a.bin"))
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("b.bin"))
+        let dest = tmpDir.appendingPathComponent("rdest3")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        // Delete one destination file (MHL still lists it).
+        try fm.removeItem(at: dest.appendingPathComponent("CARD3/a.bin"))
+
+        let r = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r.first?.filesTransferred, 1, "the deleted file is re-copied")
+        XCTAssertEqual(r.first?.filesSkipped, 1, "the present file is skipped")
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("CARD3/a.bin").path))
+    }
+
+    func test_forceRecopy_recopiesEverything() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("CARD4")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("a.bin"))
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("b.bin"))
+        let dest = tmpDir.appendingPathComponent("rdest4")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        let r = try await FanOutCopier(config: resumeConfig(card: card, dest: dest, forceRecopy: true)).run()
+        XCTAssertEqual(r.first?.filesTransferred, 2, "force re-copy ignores the hash list")
+        XCTAssertEqual(r.first?.filesSkipped, 0)
     }
 
     func test_resume_skipsAlreadyBackedUpFiles() async throws {

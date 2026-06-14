@@ -114,6 +114,8 @@ actor FanOutCopier {
         var progressHandler: (@Sendable (DestProgress) -> Void)?
         var organizationPreset: OrganizationPreset?
         var copyFolderContents: Bool = false
+        /// Ignore prior hash lists and re-copy every file (disables resume skip).
+        var forceRecopy: Bool = false
         /// Polled cooperatively to abort the run when the user hits Stop.
         var shouldCancel: (@Sendable () -> Bool)?
     }
@@ -177,6 +179,38 @@ actor FanOutCopier {
 
     private func verifiedBytesForDest(_ destPath: String) -> Int64 {
         verifiedBytesByDest[destPath] ?? 0
+    }
+
+    /// The exact path a planned file is written to at a destination, accounting
+    /// for the organization preset and copy-folder-contents. Pure (no I/O); the
+    /// caller creates the parent directory when actually writing.
+    nonisolated static func resolveDestFilePath(
+        destRoot: String, rootName: String, rootPath: String, relPath: String,
+        preset: OrganizationPreset?, copyFolderContents: Bool, date: Date
+    ) -> String {
+        if let preset {
+            let resolved = OrganizationTemplate.resolve(
+                preset: preset, sourcePath: rootPath, destinationRoot: destRoot,
+                counter: 0, date: date)
+            let folderBase = resolved.folderPath.isEmpty
+                ? destRoot
+                : (destRoot as NSString).appendingPathComponent(resolved.folderPath)
+            if relPath.isEmpty {
+                return (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
+            } else if copyFolderContents {
+                return (folderBase as NSString).appendingPathComponent(relPath)
+            } else {
+                let named = (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
+                return (named as NSString).appendingPathComponent(relPath)
+            }
+        } else if relPath.isEmpty {
+            return (destRoot as NSString).appendingPathComponent(rootName)
+        } else if copyFolderContents {
+            return (destRoot as NSString).appendingPathComponent(relPath)
+        } else {
+            let named = (destRoot as NSString).appendingPathComponent(rootName)
+            return (named as NSString).appendingPathComponent(relPath)
+        }
     }
 
     /// Read the file names + hashes already recorded in a destination's hash
@@ -274,10 +308,15 @@ actor FanOutCopier {
             )
         }
 
+        // Wall-clock start, also used as the date for organization-template path
+        // resolution so the resume presence-check and the actual copy agree.
+        let jobStartTime = Date()
+
         // Resume skip: a file already recorded in EVERY destination's hash list
-        // (from a previous run, e.g. one that was stopped) is not recopied. The
-        // MHL lives at <dest>/.filmcan/hashlists/<rootName>.mhl — a stable,
-        // organization/date-independent location — so this works across days.
+        // AND still present on disk there is not recopied. The MHL lives at
+        // <dest>/.filmcan/hashlists/<rootName>.mhl — a stable, date-independent
+        // location. The presence check re-copies a file that was recorded but is
+        // missing (e.g. deleted by the user). `forceRecopy` skips all of this.
         let allRootNames = Set(allPlannedFiles.map { $0.rootName })
         var existingMHLByDest: [String: [String: [MHLReader.Entry]]] = [:]
         for dest in config.destinations {
@@ -291,10 +330,16 @@ actor FanOutCopier {
             f.relPath.isEmpty ? (f.absPath as NSString).lastPathComponent : f.relPath
         }
         var skippedFiles = 0
-        let plannedFiles = allPlannedFiles.filter { f in
+        let plannedFiles: [PlannedFile] = config.forceRecopy ? allPlannedFiles : allPlannedFiles.filter { f in
             let name = plannedSourceName(f)
             let doneEverywhere = config.destinations.allSatisfy { dest in
-                existingMHLByDest[dest.destPath]?[f.rootName]?.contains(where: { $0.fileName == name }) ?? false
+                guard existingMHLByDest[dest.destPath]?[f.rootName]?.contains(where: { $0.fileName == name }) == true else { return false }
+                // Quick presence check: the recorded file must still exist.
+                let path = Self.resolveDestFilePath(
+                    destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
+                    relPath: f.relPath, preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime)
+                return FileManager.default.fileExists(atPath: path)
             }
             if doneEverywhere { skippedFiles += 1; return false }
             return true
@@ -346,9 +391,6 @@ actor FanOutCopier {
 
         // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
         let sourceConcurrency = max(1, distinctSourceDriveCount(forPaths: config.sources))
-
-        // Wall-clock start for live copy speed / ETA reporting.
-        let jobStartTime = Date()
 
         // Pipeline: the copy task group produces CopyResults; a single verify
         // lane (drainVerifies) consumes them, so file N is verified while file
@@ -499,51 +541,13 @@ actor FanOutCopier {
 
         for destCfg in config.destinations {
             let channel = channels[destCfg.destPath]!
-            let destFileURL: URL
-            let destRootPath = destCfg.destPath
-            if let preset = config.organizationPreset {
-                let resolved = OrganizationTemplate.resolve(
-                    preset: preset,
-                    sourcePath: rootPath,
-                    destinationRoot: destRootPath,
-                    counter: 0,
-                    date: Date()
-                )
-                let folderBase = resolved.folderPath.isEmpty
-                    ? destRootPath
-                    : (destRootPath as NSString).appendingPathComponent(resolved.folderPath)
-                let baseTarget: String
-                if relPath.isEmpty {
-                    // Flat file: dest = folderBase / renamedItem
-                    baseTarget = (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
-                } else if config.copyFolderContents {
-                    // Directory, content-only: dest = folderBase / relPath
-                    baseTarget = (folderBase as NSString).appendingPathComponent(relPath)
-                } else {
-                    // Directory, include folder: dest = folderBase / renamedItem / relPath
-                    let namedFolder = (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
-                    baseTarget = (namedFolder as NSString).appendingPathComponent(relPath)
-                }
-                let parent = (baseTarget as NSString).deletingLastPathComponent
-                try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
-                destFileURL = URL(fileURLWithPath: baseTarget)
-            } else if relPath.isEmpty {
-                // Flat file, no preset: dest = destRoot / rootName
-                destFileURL = URL(fileURLWithPath: (destRootPath as NSString).appendingPathComponent(rootName))
-            } else if config.copyFolderContents {
-                // Directory, content-only, no preset: dest = destRoot / relPath
-                let target = (destRootPath as NSString).appendingPathComponent(relPath)
-                let parent = (target as NSString).deletingLastPathComponent
-                try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
-                destFileURL = URL(fileURLWithPath: target)
-            } else {
-                // Directory, include folder, no preset: dest = destRoot / rootName / relPath
-                let namedFolder = (destRootPath as NSString).appendingPathComponent(rootName)
-                let target = (namedFolder as NSString).appendingPathComponent(relPath)
-                let parent = (target as NSString).deletingLastPathComponent
-                try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
-                destFileURL = URL(fileURLWithPath: target)
-            }
+            let targetPath = Self.resolveDestFilePath(
+                destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
+                relPath: relPath, preset: config.organizationPreset,
+                copyFolderContents: config.copyFolderContents, date: jobStartTime)
+            let parent = (targetPath as NSString).deletingLastPathComponent
+            try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
+            let destFileURL = URL(fileURLWithPath: targetPath)
             let progressHandler = config.progressHandler
 
             let task = Task<DestWriterResult, Never> {

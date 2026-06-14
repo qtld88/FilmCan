@@ -829,6 +829,7 @@ class CustomCopierService: ObservableObject, TransferService {
         duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?,
         verifyMode: VerifyMode,
         dryRun: Bool,
+        forceRecopy: Bool = false,
         progressHandler: (@Sendable ([DestProgress]) -> Void)?,
         webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
         aggregatedWebhookHandler: (@Sendable ([DestResult], String) -> Void)? = nil
@@ -854,6 +855,7 @@ class CustomCopierService: ObservableObject, TransferService {
             },
             organizationPreset: organizationPreset,
             copyFolderContents: copyFolderContents,
+            forceRecopy: forceRecopy,
             shouldCancel: { cancellationState.isCancelledNow() }
         )
 

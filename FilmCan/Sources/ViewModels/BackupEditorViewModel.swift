@@ -202,6 +202,14 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    var forceRecopy: Bool {
+        get { config.forceRecopy }
+        set {
+            config.forceRecopy = newValue
+            save()
+        }
+    }
+
     var copyFolderContents: Bool {
         get { config.copyFolderContents }
         set {

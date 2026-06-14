@@ -14,6 +14,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var selectedOrganizationPresetId: UUID?
     var organizationReuseByDestination: [String: OrganizationReuseInfo] = [:]
     var copyFolderContents: Bool = false
+    /// Ignore prior hash lists and re-copy every file (disables resume skip).
+    var forceRecopy: Bool = false
     var runInParallel: Bool = false
     /// How the FilmCan fan-out engine writes to multiple destinations.
     var destinationCopyMode: DestinationCopyMode = .automatic
@@ -67,6 +69,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         selectedOrganizationPresetId = try c.decodeIfPresent(UUID.self, forKey: .selectedOrganizationPresetId)
         organizationReuseByDestination = try c.decodeIfPresent([String: OrganizationReuseInfo].self, forKey: .organizationReuseByDestination) ?? [:]
         copyFolderContents = try c.decodeIfPresent(Bool.self, forKey: .copyFolderContents) ?? false
+        forceRecopy = try c.decodeIfPresent(Bool.self, forKey: .forceRecopy) ?? false
         runInParallel = try c.decodeIfPresent(Bool.self,   forKey: .runInParallel) ?? false
         destinationCopyMode = try c.decodeIfPresent(DestinationCopyMode.self, forKey: .destinationCopyMode) ?? .automatic
         sourceAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .sourceAutoDetectEnabled) ?? false
@@ -121,6 +124,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encodeIfPresent(selectedOrganizationPresetId, forKey: .selectedOrganizationPresetId)
         try c.encode(organizationReuseByDestination, forKey: .organizationReuseByDestination)
         try c.encode(copyFolderContents, forKey: .copyFolderContents)
+        try c.encode(forceRecopy, forKey: .forceRecopy)
         try c.encode(runInParallel,    forKey: .runInParallel)
         try c.encode(destinationCopyMode, forKey: .destinationCopyMode)
         try c.encode(sourceAutoDetectEnabled, forKey: .sourceAutoDetectEnabled)
@@ -160,7 +164,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate
-        case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents
+        case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy
         case duplicatePolicy, duplicateCounterTemplate
         case organizationFolderTemplate, organizationRenameTemplate
         case organizationUseFolderTemplate, organizationUseRenameTemplate
