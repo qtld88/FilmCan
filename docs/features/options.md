@@ -1,7 +1,9 @@
 # Options
 
-Options are grouped into tabs in the **Backup Editor**.  
-The **Transfer refinements** tab appears only when **Copy engine** is set to `rsync`.
+Options are grouped into tabs in the **Backup Editor**.
+
+> The copy-engine picker was removed in 1.2.0 — the FilmCan Engine handles every
+> backup. See [Copy Engines](./copy-engines.md).
 
 ---
 
@@ -9,13 +11,17 @@ The **Transfer refinements** tab appears only when **Copy engine** is set to `rs
 
 See [Copy Engines](./copy-engines.md) for engine behavior.
 
-- **Copy engine** — choose `rsync` or `FilmCan Engine`. See [Copy Engines](./copy-engines.md).
-- **Automatic parallel copy** — FilmCan Engine only.
-- **Hash verification** — FilmCan Engine only. When off, no hash list is generated.
-- **Duplicate policy** — `Skip`, `Overwrite`, `Add counter`, `Verify using hash list`, `Ask each time`. See [Destination Presets](./destination-presets.md).
+- **Verification** — `Off`, `Fast`, or `Paranoid`. Default for new projects is
+  `Fast`. See [Copy Engines](./copy-engines.md#verification-modes).
+- **Force re-copy** — re-copies every file even if it's already backed up
+  (disables resume skip). Off by default.
+- **Duplicate policy** — `Skip`, `Overwrite`, `Add counter`, `Ask each time`. See [Destination Presets](./destination-presets.md).
 - **Counter style** — shown only when **Duplicate policy** is `Add counter`.
-- **Copy mode** — `One destination at a time` or `All destinations at once`.
-- **Copy order** — FilmCan Engine only: `Default order`, `Small files first`, `Large files first`, `Creation date (oldest first)`.
+- **Copy mode** — how multiple destinations are written:
+  - `Automatic` *(default)* — parallel for SSDs / distinct drives, sequential for a network destination or two destinations on the same physical volume.
+  - `All destinations at once` — read the source once, write everywhere together.
+  - `One destination at a time` — copy each destination fully before the next (re-reads the source per destination).
+- **Copy order** — `Default order`, `Smallest first`, `Largest first`, `Creation date`.
 
 ---
 
@@ -54,15 +60,12 @@ See [Destination Presets](./destination-presets.md) for templates and tokens.
 
 ---
 
-## Transfer refinements (rsync only)
+## Verification & integrity
 
-See [rsync Details](./rsync.md) for rsync behavior.
+- **Verification** mode (Off / Fast / Paranoid) is in **Basic options** above.
+- **xxHash128** is the checksum algorithm; hash lists are written per source
+  root. See [Hash Lists](./hash-lists.md).
+- Resume skip and **Force re-copy** are covered in [Copy Engines](./copy-engines.md#resume--re-running-skips-whats-already-there).
 
-- **Verify after copy** — toggle.
-- **Only copy new or changed files** — toggle.
-- **Checksum algorithm** — fixed to `xxHash128`. See [Hash Lists](./hash-lists.md).
-- **Use checksum to verify file contents before copy** — toggle.
-- **Update files in place** — toggle.
-- **Allow resume after stop** — toggle.
-- **Custom rsync arguments** — text field. See [Custom rsync Arguments](./custom-rsync.md).
-- **Delete files not in source** — toggle.
+> The rsync-only **Transfer refinements** tab was removed in 1.2.0 along with the
+> rsync engine.

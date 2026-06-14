@@ -1,5 +1,8 @@
 # Custom rsync Arguments
 
+> **Retired in 1.2.0** along with the rsync engine. Kept for historical
+> reference. See [Copy Engines](./copy-engines.md).
+
 Add extra rsync flags when you need them.
 
 ---

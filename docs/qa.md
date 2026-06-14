@@ -1,6 +1,6 @@
 # QA Checklist
 
-Manual test procedure for FilmCan. This validates core flows, both copy engines, and checks for doc/UI mismatches.
+Manual test procedure for FilmCan. This validates core flows and checks for doc/UI mismatches. (The FilmCan Engine is the only copy engine; rsync was retired from the UI in 1.2.0.)
 
 ---
 
@@ -12,23 +12,23 @@ Manual test procedure for FilmCan. This validates core flows, both copy engines,
 
 ---
 
-## Core Flow — rsync Engine
+## Core Flow
 
-1. Set **Copy engine** to `rsync` in **Options > Basic**.
-2. Open **Transfer refinements** and turn **Verify after copy** OFF.
-3. Click **Run Now**. Expected: transfer completes; destination status shows success (green) with no error message.
-4. Turn **Verify after copy** ON and run again. Expected: verification phase runs (blue bar advances); no error message.
-5. Open **Transfer History** (clock icon). Expected: history entry created with correct date/time.
-6. Right‑click a history card and run **Check data** for a destination. Expected: verification report matches the run.
+1. In **Options > Basic**, set **Verification** to `Off`. Click **Run Now**. Expected: copy completes; destination card shows 100% and Complete; no hash list written.
+2. Set **Verification** to `Fast` and run to a fresh destination. Expected: yellow copy bar fills, green verify overlay; success; MHL written per source root.
+3. Set **Verification** to `Paranoid` and run to a fresh destination. Expected: same, plus the "Verifying…" tail on the last file; verification of a file overlaps the next file's copy.
+4. Open **Transfer History** (clock icon). Expected: one history card with correct date/time.
+5. Right‑click the card and run **Check data** for a destination. Expected: verification report matches the run.
 
 ---
 
-## Core Flow — FilmCan Engine
+## Resume Skip
 
-1. Set **Copy engine** to `FilmCan Engine`.
-2. Ensure **Hash verification** is ON in **Options > Basic**.
-3. Click **Run Now**. Expected: copy and verification run; blue verification bar advances; destination shows success.
-4. Open **Transfer History** and run **Check data**. Expected: verification report matches the run.
+1. Run a Fast backup of a multi-file source to two destinations; let it finish.
+2. Click **Run Now** again (unchanged). Expected: **no new history card** — an **Already backed up** popup appears. Click **Verify data** → report shows all files match.
+3. Add one new file to the source and run again. Expected: only the new file copies; the row shows *"Resuming — N already backed up, copying the rest"*; a history card is added.
+4. Delete one already-backed-up file from a destination and run. Expected: only that file is re-copied (presence check).
+5. Turn **Force re-copy** ON and run. Expected: every file is re-copied; no skip.
 
 ---
 
@@ -38,18 +38,15 @@ Manual test procedure for FilmCan. This validates core flows, both copy engines,
 2. Set **Duplicate policy** to **Skip** and run. Expected: existing files remain unchanged.
 3. Set **Duplicate policy** to **Overwrite** and run. Expected: timestamps update and file contents are replaced.
 4. Set **Duplicate policy** to **Add counter** and run. Expected: new file names are created with a counter suffix.
-5. Set **Duplicate policy** to **Verify using hash list** and run. Expected: identical files are skipped when a hash list exists; mismatches are overwritten. (Ensure verification is enabled so a hash list exists.)
-6. Set **Duplicate policy** to **Ask each time** and run. Expected: a duplicate prompt appears for each conflict.
+5. Set **Duplicate policy** to **Ask each time** and run. Expected: a duplicate prompt appears for each conflict.
 
 ---
 
-## Stop / Cancel / Resume
+## Stop / Cancel
 
-1. With `rsync`, enable **Only copy new or changed files** and **Allow resume after stop**.
-2. Start a transfer with a large file.
-3. Click **Stop Backup** (or **Stop Backups**) during copy. Expected: transfer stops; status shows **Cancelled by user**.
-4. Click **Run Now** again. Expected: completed files are skipped; the in‑progress file resumes if partials exist.
-5. Switch to `FilmCan Engine`, start a transfer, then stop it. Expected: re‑running restarts the in‑progress file (no resume).
+1. Start a transfer with several large files.
+2. Click **Stop Backup** (or **Stop Backups**) during copy. Expected: a *"Stopping the backup(s) properly…"* indicator shows; the run stops within a few seconds; affected destinations show cancelled (red); no `.filmcan-*` orphans and no half-written final files in the destinations.
+3. Click **Run Now** again. Expected: files completed before the stop are skipped (resume); only the rest copy.
 
 ---
 
@@ -73,7 +70,7 @@ Manual test procedure for FilmCan. This validates core flows, both copy engines,
 1. Enable **Create log file** in **Options > Logs**.
 2. Run a backup.
 3. Verify a log file exists at the configured location.
-4. Verify a hash list exists at `<destination>/.filmcan/hashlists/` (only if verification is enabled for the engine used).
+4. Verify a hash list exists at `<destination>/.filmcan/hashlists/` (unless **Verification** is `Off`).
 5. If a log or hash list cannot be created, expected: a warning message appears on the destination card.
 
 ---

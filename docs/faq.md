@@ -28,13 +28,13 @@ Not officially supported. Local drives are recommended.
 ## Verification
 
 **How do I verify backups?**  
-Enable hash verification in Options. FilmCan uses xxHash128 hashes.
+Choose a Verification mode in Options — `Fast` (default) checks the hash computed during the copy; `Paranoid` re-reads every file from disk. FilmCan uses xxHash128.
 
 **Can I stop and resume?**  
-Yes for rsync runs when **Allow resume after stop** is enabled. FilmCan Engine restarts the current file on resume. See [Stop & Resume](./features/stop.md).
+Yes. Stop is clean (no partial files), and running again skips files already backed up to every destination and still present — only the rest is copied. See [Stop & Resume](./features/stop.md).
 
 **Hash lists?**  
-Yes. Created automatically when hash verification is enabled. See [Hash Lists](./features/hash-lists.md).
+Yes. Created automatically unless Verification is Off. See [Hash Lists](./features/hash-lists.md).
 
 ---
 
@@ -50,8 +50,8 @@ Use [Smart Date](./features/smart-date.md) to set a custom day boundary.
 
 ## Technical
 
-**rsync or custom copier?**  
-Both available. See [Copy Engines](./features/copy-engines.md).
+**Which copy engine?**  
+The FilmCan Engine handles every backup. (rsync was retired from the UI in 1.2.0.) See [Copy Engines](./features/copy-engines.md).
 
 **Config location?**  
 `~/Library/Application Support/FilmCan/configs.json`  
@@ -61,9 +61,6 @@ Both available. See [Copy Engines](./features/copy-engines.md).
 **Will I lose data if I reinstall or upgrade?**  
 No, not in normal reinstall/upgrade flows. FilmCan keeps movies, presets, and history in `~/Library/Application Support/FilmCan/`, outside the app bundle.  
 If you use cleanup tools that remove Application Support, data can be deleted.
-
-**Custom rsync arguments?**  
-Yes. See [Custom rsync](./features/custom-rsync.md).
 
 **Does it upload anything?**  
 No file uploads. Transfers stay local; optional notifications (ntfy/webhook) only send status metadata.

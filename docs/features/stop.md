@@ -1,35 +1,39 @@
 # Stop & Resume
 
-Stop a backup and continue later. With rsync, you can avoid re‑copying finished files.
-
----
-
-## How It Works
-
-- With rsync, **Only copy new or changed files** skips completed files on the next run.
-- With rsync, **Allow resume after stop** continues partial files when enabled.
-- FilmCan Engine restarts the in‑progress file.
+Stop a backup and continue later without re-copying what's already done.
 
 ---
 
 ## Stop
 
-- Click **Stop Backup** (or **Stop Backups**) during transfer
-
-## Resume
-
-- Select the backup and click **Run Now**
-- With rsync and **Only copy new or changed files**, FilmCan skips files that already match
+- Click **Stop Backup** (or **Stop Backups**) during a transfer.
+- The stop is clean: the file being written is aborted **before** it's finalized,
+  so no half-written file is left at the destination. A *"Stopping the backup(s)
+  properly…"* indicator shows while the engine finishes aborting.
 
 ---
 
-## Partial File Behavior
+## Resume
 
-- If **Allow resume after stop** is OFF, the in-progress file restarts
-- If ON, rsync can continue from the last written byte
+- Select the backup and click **Run Now** again.
+- Files already recorded in **every** destination's hash list **and** still
+  present on disk are skipped. Only the remaining files are copied. The progress
+  row reads *"Resuming — N already backed up, copying the rest."*
+- A file that was deleted from a destination is re-copied (presence is checked,
+  not just the hash list).
+- **Force re-copy** (Options) ignores all of this and re-copies everything.
+
+If the whole backup is already present when you press Run, no new history card is
+created — an **Already backed up** popup appears instead, with a **Verify data**
+button (the same hash-list check as History's *Check data*).
+
+> Caveat: with a `{date}` folder template, resuming on a *different day* re-copies
+> into that day's folder (earlier files aren't matched). Use Force re-copy to be
+> explicit.
 
 ---
 
 ## Related
 
+- [Copy Engines](./copy-engines.md)
 - [Transfer History](./transfer-history.md)

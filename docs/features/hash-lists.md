@@ -24,11 +24,9 @@ One line per file. Uses xxHash128 hashes.
 
 ## When Generated
 
-**FilmCan Engine**  
-Hashes are captured during verification and written to the hash list (when Hash verification is enabled).
-
-**rsync**  
-Hashes are computed in the background as files finish copying.
+The xxHash128 of each file is computed during the copy and written to the hash
+list as the file finalizes, unless **Verification** is set to `Off`. One sealed
+MHL is written per source root, per destination.
 
 ---
 

@@ -1,6 +1,10 @@
 # rsync Under the Hood
 
-FilmCan can use **rsync**, a proven file transfer tool.
+> **Retired in 1.2.0.** The rsync engine is no longer selectable in the UI — the
+> [FilmCan Engine](./copy-engines.md) handles every backup. This page is kept for
+> historical reference.
+
+FilmCan previously could use **rsync**, a proven file transfer tool.
 
 ---
 
