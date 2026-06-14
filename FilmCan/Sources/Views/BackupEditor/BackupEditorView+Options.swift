@@ -339,6 +339,7 @@ extension BackupEditorView {
                     .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
             }
         )
+        .tourAnchor("optionsTabs")
     }
 
     private var presetSelector: some View {
