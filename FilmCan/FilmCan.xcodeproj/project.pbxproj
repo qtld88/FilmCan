@@ -88,6 +88,7 @@
 		C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */; };
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
 		C9BB15A21E833EA6850E5D34 /* BackupEditorView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */; };
+		CB10BBAE07DBB48A5E304FA0 /* AlreadyBackedUpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */; };
 		CBCCDFAEC8E315B3158B8ED8 /* HashListBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2147830DD49FC39B828D61 /* HashListBuilder.swift */; };
 		CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */; };
 		CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */; };
@@ -199,6 +200,7 @@
 		9C1983264D0443559124CDB6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C7E8936CFBE0F758236B71B /* FilmCanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanApp.swift; sourceTree = "<group>"; };
 		9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEditorViewModel.swift; sourceTree = "<group>"; };
+		A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyBackedUpSheet.swift; sourceTree = "<group>"; };
 		A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierSafetyTests.swift; sourceTree = "<group>"; };
 		A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileStreamCopier.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
@@ -347,6 +349,7 @@
 		AF355A7E1E1C3D2C68701E21 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */,
 				0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */,
 				C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */,
 				DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */,
@@ -606,6 +609,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CB10BBAE07DBB48A5E304FA0 /* AlreadyBackedUpSheet.swift in Sources */,
 				EB135DDE8A17EF04263A2AB2 /* AppState.swift in Sources */,
 				FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */,
 				C9BB15A21E833EA6850E5D34 /* BackupEditorView+Actions.swift in Sources */,

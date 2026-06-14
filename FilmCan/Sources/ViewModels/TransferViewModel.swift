@@ -31,6 +31,9 @@ class TransferViewModel: ObservableObject {
     @Published var isParallelRun: Bool = false
     @Published var cancelledDestinations: Set<String> = []
     @Published var activeDuplicatePrompt: DuplicatePrompt? = nil
+    /// Set when a Run found everything already backed up (nothing to copy). The
+    /// UI shows an "already backed up" popup instead of adding a history card.
+    @Published var alreadyBackedUp: AlreadyBackedUpInfo? = nil
     @Published var verifiedDestinationsByConfig: [UUID: Set<String>] = [:]
     @Published var destinationProgress: [String: Double] = [:]
     @Published var pathProgress: [String: Double] = [:]
@@ -178,17 +181,32 @@ class TransferViewModel: ObservableObject {
                 perDestResults.append(contentsOf: groupResults)
             }
 
-            await recordHistory(
-                config: activeConfig,
-                sources: sources,
-                results: perDestResults,
-                preset: organizationPreset
-            )
-            await sendSourceNotifications(
-                source: sources.first ?? "",
-                config: activeConfig,
-                results: perDestResults
-            )
+            // Re-run of an already-complete backup: every destination skipped
+            // every file (nothing copied). Don't add a history card — show an
+            // "already backed up" popup instead.
+            let nothingCopied = !perDestResults.isEmpty
+                && perDestResults.allSatisfy { $0.success && $0.filesTransferred == 0 && $0.filesSkipped > 0 }
+            if nothingCopied {
+                let ids = Set(perDestResults.map { $0.id })
+                results.removeAll { ids.contains($0.id) }
+                alreadyBackedUp = AlreadyBackedUpInfo(
+                    sources: sources,
+                    destinations: perDestResults.map { $0.destination },
+                    fileCount: perDestResults.map { $0.filesSkipped }.max() ?? 0
+                )
+            } else {
+                await recordHistory(
+                    config: activeConfig,
+                    sources: sources,
+                    results: perDestResults,
+                    preset: organizationPreset
+                )
+                await sendSourceNotifications(
+                    source: sources.first ?? "",
+                    config: activeConfig,
+                    results: perDestResults
+                )
+            }
         } else {
             for source in sources {
                 if isCancellingAll || isPausingAll { break }
@@ -1025,6 +1043,26 @@ class TransferViewModel: ObservableObject {
         duplicatePromptCancelled = true
         cancelAll()
         submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
+    }
+
+    /// Re-verify an already-backed-up config against its hash lists (the same
+    /// check as "Check data" in History). Runs off the main thread.
+    func verifyAlreadyBackedUp(_ info: AlreadyBackedUpInfo) async -> (total: Int, missing: Int, mismatched: Int) {
+        let rootNames = info.sources.map { ($0 as NSString).lastPathComponent }
+        let sources = info.sources
+        let dests = info.destinations
+        return await Task.detached(priority: .utility) {
+            var total = 0, missing = 0, mismatched = 0
+            for dest in dests {
+                for root in rootNames {
+                    let mhl = (dest as NSString).appendingPathComponent(".filmcan/hashlists/\(root).mhl")
+                    if let r = HashListVerifier.verify(hashListPath: mhl, rootsFallback: sources) {
+                        total += r.total; missing += r.missing; mismatched += r.mismatched
+                    }
+                }
+            }
+            return (total, missing, mismatched)
+        }.value
     }
 
     func explodeFanOutResult(_ fanOut: TransferResult, configName: String) -> [TransferResult] {

@@ -17,10 +17,12 @@ struct InlineFanOutProgress: View {
     /// Overall progress over the combined copy+verify workload (100% = copied AND
     /// verified). Falls back to copy-only when there is no verify pass (fast mode).
     private var combinedPercent: Int {
+        // A finished destination is 100% — never 99% from byte rounding.
+        if case .complete = progress.status { return 100 }
         let done = progress.bytesCompleted + progress.verifyBytesCompleted
         let total = progress.bytesTotal + progress.verifyBytesTotal
         guard total > 0 else { return 0 }
-        return Int((Double(done) / Double(total) * 100).rounded(.towardZero))
+        return min(99, Int((Double(done) / Double(total) * 100).rounded(.towardZero)))
     }
 
     /// Copy for this dest is done but verification is still running (no copy to
@@ -89,6 +91,16 @@ struct InlineFanOutProgress: View {
                             .font(FilmCanFont.label(9))
                             .foregroundColor(FilmCanTheme.textTertiary)
                     }
+                }
+            }
+            if progress.filesSkipped > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.uturn.forward")
+                        .font(FilmCanFont.label(9))
+                        .foregroundColor(FilmCanTheme.textTertiary)
+                    Text("Resuming — \(progress.filesSkipped) already backed up, copying the rest")
+                        .font(FilmCanFont.label(9))
+                        .foregroundColor(FilmCanTheme.textTertiary)
                 }
             }
         }

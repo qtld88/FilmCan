@@ -98,6 +98,7 @@ struct CopyResult: Sendable {
     let totalSources: Int
     let totalBytesAllSources: Int64
     let jobStartTime: Date
+    let skippedFiles: Int
     /// The copy was aborted mid-file by the user — skip verification entirely.
     let cancelledEarly: Bool
 }
@@ -426,7 +427,8 @@ actor FanOutCopier {
                             rootPath: file.rootPath,
                             relPath: file.relPath,
                             sharedMHLsByDest: sharedMHLsByDest,
-                            jobStartTime: jobStartTime
+                            jobStartTime: jobStartTime,
+                            skippedFiles: skippedFiles
                         )
                     }
                     inFlight += 1
@@ -528,7 +530,8 @@ actor FanOutCopier {
         rootPath: String,
         relPath: String,
         sharedMHLsByDest: [String: [String: MHLWriter]],
-        jobStartTime: Date
+        jobStartTime: Date,
+        skippedFiles: Int
     ) async throws -> CopyResult {
         let sourcePath = sourceURL.path
 
@@ -626,6 +629,7 @@ actor FanOutCopier {
                                         jobStart: jobStartTime)
                                     prog.speedBytesPerSecond = se.speed
                                     prog.estimatedTimeRemaining = se.eta
+                                    prog.filesSkipped = skippedFiles
                                     progressHandler?(prog)
                                 }
                             } catch {
@@ -699,6 +703,7 @@ actor FanOutCopier {
                     jobStart: jobStartTime)
                 prog.speedBytesPerSecond = se.speed
                 prog.estimatedTimeRemaining = se.eta
+                prog.filesSkipped = skippedFiles
                 progressHandler?(prog)
 
                 let mhlPath = URL(fileURLWithPath: destCfg.destPath)
@@ -793,6 +798,7 @@ actor FanOutCopier {
             totalSources: totalSources,
             totalBytesAllSources: totalBytesAllSources,
             jobStartTime: jobStartTime,
+            skippedFiles: skippedFiles,
             cancelledEarly: config.shouldCancel?() == true
         )
     }
@@ -890,6 +896,7 @@ actor FanOutCopier {
                 copyTotal: c.totalBytesAllSources, paranoid: true, jobStart: c.jobStartTime)
             prog.speedBytesPerSecond = se.speed
             prog.estimatedTimeRemaining = se.eta
+            prog.filesSkipped = c.skippedFiles
             config.progressHandler?(prog)
         }
 
@@ -948,6 +955,7 @@ actor FanOutCopier {
                         copyTotal: c.totalBytesAllSources, paranoid: true, jobStart: c.jobStartTime)
                     prog.speedBytesPerSecond = se.speed
                     prog.estimatedTimeRemaining = se.eta
+                    prog.filesSkipped = c.skippedFiles
                     config.progressHandler?(prog)
                 }
             }

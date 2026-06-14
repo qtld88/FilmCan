@@ -112,6 +112,13 @@ struct BackupEditorView: View {
                 }
             )
         }
+        .sheet(item: $transferViewModel.alreadyBackedUp) { info in
+            AlreadyBackedUpSheet(
+                info: info,
+                onVerify: { await transferViewModel.verifyAlreadyBackedUp($0) },
+                onDone: { transferViewModel.alreadyBackedUp = nil }
+            )
+        }
         .alert(UIStrings.Alerts.validationTitle, isPresented: $viewModel.showValidationError) {
             Button("OK", role: .cancel) {}
         } message: {

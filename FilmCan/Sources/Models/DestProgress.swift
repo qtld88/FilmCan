@@ -16,4 +16,6 @@ struct DestProgress: Identifiable, Equatable {
     var verifyBytesTotal: Int64 = 0
     var failureReason: String?
     var requiresFullFsync: Bool = false
+    /// Files already backed up and skipped this run (resume skip).
+    var filesSkipped: Int = 0
 }
