@@ -98,7 +98,7 @@ struct InlineFanOutProgress: View {
                     Image(systemName: "arrow.uturn.forward")
                         .font(FilmCanFont.label(9))
                         .foregroundColor(FilmCanTheme.textTertiary)
-                    Text("Resuming — \(progress.filesSkipped) already backed up, copying the rest")
+                    Text("Resuming — \(progress.filesSkipped) \(progress.filesSkipped == 1 ? "file" : "files") already backed up, copying the rest")
                         .font(FilmCanFont.label(9))
                         .foregroundColor(FilmCanTheme.textTertiary)
                 }

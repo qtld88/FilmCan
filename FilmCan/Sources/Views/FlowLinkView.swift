@@ -262,8 +262,9 @@ struct FlowLinkView: View {
                 usedHeight = max(0, usedHeight - remaining)
             }
         }
-        let usedColor = Color.gray.opacity(0.35)
-        let freeColor = Color.gray.opacity(0.75)
+        // Free space is the light grey; other-used space is the darker grey.
+        let usedColor = Color.gray.opacity(0.55)
+        let freeColor = Color.gray.opacity(0.22)
         let backupCenterY = rect.minY + freeHeight + backupHeight / 2
         let usedPercent = Int(round(usedRatio * 100))
         let backupPercent = Int(round(backupRatio * 100))

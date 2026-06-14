@@ -31,6 +31,7 @@ struct BackupEditorView: View {
     @State var showExcludePatterns = false
     @State var showRenameOnlyPatterns = false
     @State var isOptionsCollapsed = true
+    @State var didLoadDestinations = false
     @State var showEngineHelp = false
     @State var lastDriveRefresh: Date = .distantPast
     @State var driveRefreshCounter: Int = 0

@@ -39,6 +39,11 @@ enum FilmCanTheme {
     static var card: Color {
         panel
     }
+    /// Settings card grey — darker than `panel`/`card` so the settings card reads as
+    /// distinct from the Copy From / Save To data cards.
+    static var settingsCard: Color {
+        Color(hex: 0x1F1F1F)
+    }
     static var cardStroke: Color {
         textPrimary.opacity(0.2)
     }
