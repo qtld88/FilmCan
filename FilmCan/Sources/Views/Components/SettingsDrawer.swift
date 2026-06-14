@@ -25,3 +25,31 @@ struct FolderTabShape: Shape {
         return p
     }
 }
+
+struct SettingsFolderTab: View {
+    let title: String
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(isActive ? .semibold : .regular))
+                .foregroundColor(isActive ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                .lineLimit(1)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 14)
+                .background(
+                    FolderTabShape(chamfer: 10)
+                        .fill(isActive ? FilmCanTheme.panel : FilmCanTheme.card)
+                )
+                .overlay(
+                    FolderTabShape(chamfer: 10)
+                        .stroke(isActive ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke,
+                                lineWidth: 1)
+                )
+                .offset(y: isActive ? -3 : 0)
+        }
+        .buttonStyle(.plain)
+    }
+}
