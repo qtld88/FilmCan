@@ -52,8 +52,7 @@ struct SettingsFolderTab: View {
                     shape.stroke(isActive ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke,
                                  lineWidth: 1)
                 )
-                .scaleEffect(isActive ? 1.05 : 1, anchor: .bottom)
-                .offset(y: isActive ? -5 : 0)
+                .scaleEffect(isActive ? 1.04 : 1, anchor: .bottom)
         }
         .buttonStyle(.plain)
     }
@@ -71,30 +70,29 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
     @ViewBuilder let content: () -> Content
     @ViewBuilder let presetSelector: () -> Preset
 
-    private var drawerAnimation: Animation { .spring(response: 0.38, dampingFraction: 0.82) }
+    private var drawerAnimation: Animation { .spring(response: 0.38, dampingFraction: 0.85) }
+    private let stripHeight: CGFloat = 56
 
     var body: some View {
-        // Tab strip sits ON TOP of the gray body. Opening grows the drawer upward:
-        // the strip rides up on the gray while the body is pulled up from below the
-        // window frame — like physically pulling a hidden card out of the drawer.
-        VStack(spacing: 0) {
-            tabStrip
-            if !isCollapsed {
-                contentPanel
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: SettingsDrawerLayout.openCap(windowHeight: windowHeight, isWide: isWide))
-                    .transition(.move(edge: .bottom))
-            }
+        // The tab strip lives on the main dark background. The gray body is a
+        // separate layer BEHIND the strip that slides up from below the window
+        // frame. Only the selected tab is lifted up to ride on the body's top edge —
+        // the others stay low, in front of the rising gray. Like pulling one folder
+        // out of a drawer.
+        let bodyH = SettingsDrawerLayout.openCap(windowHeight: windowHeight, isWide: isWide)
+        ZStack(alignment: .bottom) {
+            contentPanel(height: bodyH)
+                .offset(y: isCollapsed ? bodyH : 0)
+            tabStrip(lift: isCollapsed ? 0 : bodyH - stripHeight)
         }
-        // Drawer base grey runs the full height — including down behind the closed
-        // tab strip to the window's bottom edge.
-        .background(FilmCanTheme.drawerSurface.ignoresSafeArea(edges: .bottom))
-        // Clip so the body is hidden below the frame until pulled up.
+        .frame(maxWidth: .infinity)
+        .frame(height: isCollapsed ? stripHeight : bodyH, alignment: .bottom)
+        .background(FilmCanTheme.background.ignoresSafeArea(edges: .bottom))
         .clipped()
     }
 
-    /// Switch tabs. If already open, close the current card first, then pull the new
-    /// one up — so the user sees the old slide down and the new slide up.
+    /// Switch tabs. If already open, fully close the current card (slide down) before
+    /// pulling the new one up — so the two motions read as distinct, not a swap.
     private func handleTap(_ tab: Tab) {
         if tab == selection {
             withAnimation(drawerAnimation) { isCollapsed.toggle() }
@@ -103,42 +101,45 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
             withAnimation(drawerAnimation) { isCollapsed = false }
         } else {
             withAnimation(drawerAnimation) { isCollapsed = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
                 selection = tab
                 withAnimation(drawerAnimation) { isCollapsed = false }
             }
         }
     }
 
-    private var contentPanel: some View {
+    private func contentPanel(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title(selection))
-                    .font(.title3.weight(.semibold))
-                    .foregroundColor(FilmCanTheme.textPrimary)
+            HStack {
                 Spacer(minLength: 12)
                 presetSelector()
             }
-            Divider().background(FilmCanTheme.cardStroke)
             ScrollView { content().frame(maxWidth: .infinity, alignment: .leading) }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        // Top inset clears the lifted active tab; bottom inset clears the front strip.
+        .padding(.top, 46)
+        .padding(.bottom, stripHeight + 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: height, alignment: .top)
         .background(FilmCanTheme.drawerSurface)
     }
 
-    private var tabStrip: some View {
+    private func tabStrip(lift: CGFloat) -> some View {
         HStack(alignment: .bottom, spacing: 6) {
             ForEach(tabs, id: \.self) { tab in
-                SettingsFolderTab(title: title(tab), isActive: tab == selection && !isCollapsed) {
+                let active = tab == selection && !isCollapsed
+                SettingsFolderTab(title: title(tab), isActive: active) {
                     handleTap(tab)
                 }
+                .offset(y: active ? -lift : 0)
             }
             Spacer(minLength: 8)
             if isCollapsed { presetSelector() }
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: stripHeight, alignment: .bottom)
     }
 }

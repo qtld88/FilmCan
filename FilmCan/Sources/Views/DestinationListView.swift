@@ -654,17 +654,16 @@ struct DestinationListView: View {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
                 if info.hasTotal {
-                    // Order (left→right): occupied (other-used) · backup (green) · free.
                     HStack(spacing: 0) {
                         Rectangle()
-                            .fill(info.usedColor)
-                            .frame(width: geo.size.width * info.usedRatio)
+                            .fill(info.freeColor)
+                            .frame(width: geo.size.width * info.freeRatio)
                         Rectangle()
                             .fill(info.backupSegmentColor.opacity(0.6))
                             .frame(width: geo.size.width * info.backupRatio)
                         Rectangle()
-                            .fill(info.freeColor)
-                            .frame(width: geo.size.width * info.freeRatio)
+                            .fill(info.usedColor)
+                            .frame(width: geo.size.width * info.usedRatio)
                     }
                     .animation(.easeInOut(duration: 0.5), value: requiredBytes)
                 } else {
