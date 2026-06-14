@@ -335,22 +335,24 @@ extension BackupEditorView {
 
     private var optionsTabCard: some View {
         let isWide = effectiveOptionsWidth >= 600
-        return VStack(alignment: .leading, spacing: 16) {
+        return VStack(alignment: .leading, spacing: isOptionsCollapsed ? 0 : 16) {
             optionsTabBar
-            if !isOptionsCollapsed {
+            // Keep the tab content mounted and just hide it (height 0) when collapsed.
+            // The Destinations tab carries the heavy organization editor (TextEditor-
+            // backed pattern editors, 26 draggable token chips); mounting/unmounting it
+            // on every open/close was the slowness. Staying mounted makes toggling free.
+            VStack(alignment: .leading, spacing: 16) {
                 Divider()
                     .background(FilmCanTheme.cardStroke)
                 optionsTabContent
-                    // The Destinations tab carries the full organization editor — a
-                    // large subtree that drops frames when animated in/out. Skip the
-                    // open/close animation for it so it feels as snappy as the others.
-                    .transaction { txn in
-                        if selectedOptionsTab == .destinations {
-                            txn.animation = nil
-                        }
-                    }
             }
+            .frame(height: isOptionsCollapsed ? 0 : nil, alignment: .top)
+            .clipped()
+            .opacity(isOptionsCollapsed ? 0 : 1)
+            .allowsHitTesting(!isOptionsCollapsed)
         }
+        .onAppear { if selectedOptionsTab == .destinations { didLoadDestinations = true } }
+        .onChange(of: selectedOptionsTab) { if $0 == .destinations { didLoadDestinations = true } }
         .padding(12)
         .background(FilmCanTheme.settingsCard)
         .cornerRadius(10)
@@ -517,6 +519,26 @@ extension BackupEditorView {
 
     @ViewBuilder
     private var optionsTabContent: some View {
+        ZStack(alignment: .topLeading) {
+            // Light tabs build on demand (cheap).
+            if selectedOptionsTab != .destinations {
+                nonDestinationsContent
+            }
+            // Destinations carries the heavy organization editor. Build it once on
+            // first visit and keep it mounted (height 0 when not selected) so later
+            // tab switches and open/close toggles don't pay the mount/teardown cost.
+            if didLoadDestinations {
+                destinationsContent
+                    .frame(height: selectedOptionsTab == .destinations ? nil : 0, alignment: .top)
+                    .clipped()
+                    .opacity(selectedOptionsTab == .destinations ? 1 : 0)
+                    .allowsHitTesting(selectedOptionsTab == .destinations)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var nonDestinationsContent: some View {
         switch selectedOptionsTab {
         case .basic:
             basicOptionsContent
@@ -524,10 +546,10 @@ extension BackupEditorView {
             sourceOptionsContent
         case .refinements:
             transferRefinementsContent
-        case .destinations:
-            destinationsContent
         case .logs:
             logsContent
+        case .destinations:
+            EmptyView()
         }
     }
 
