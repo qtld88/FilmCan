@@ -4,11 +4,6 @@ struct InlineFanOutProgress: View {
     let progress: DestProgress
     let showPill: Bool
 
-    /// Anchored countdown so the ETA keeps ticking down every second between the
-    /// engine's (sparse) progress emits — instead of freezing during a long
-    /// verify pass. Reset whenever the engine reports a fresh estimate.
-    @State private var etaDeadline: Date?
-
     private var copyFraction: Double {
         guard progress.bytesTotal > 0 else { return 0 }
         return Double(progress.bytesCompleted) / Double(progress.bytesTotal)
@@ -48,11 +43,15 @@ struct InlineFanOutProgress: View {
         return String(format: "%.1f GB/s", s / 1_000_000_000)
     }
 
-    private func etaText(now: Date) -> String {
-        guard let deadline = etaDeadline else { return "—" }
-        let secs = max(0, Int(deadline.timeIntervalSince(now).rounded()))
+    /// ETA straight from the engine, which already smooths it (sustained-rate
+    /// EMA) and only changes the value every ~5s. No per-second countdown — a
+    /// ticking clock would change the digits every second, which the engine
+    /// throttle is specifically there to avoid.
+    private var etaText: String {
+        guard let eta = progress.estimatedTimeRemaining, eta > 0 else { return "—" }
+        let secs = Int(eta.rounded())
         if secs < 60 { return "\(secs)s left" }
-        if secs < 3600 { return String(format: "%dm %02ds left", secs / 60, secs % 60) }
+        if secs < 3600 { return String(format: "%dm left", (secs + 30) / 60) }
         return String(format: "%dh %02dm left", secs / 3600, (secs % 3600) / 60)
     }
 
@@ -84,20 +83,16 @@ struct InlineFanOutProgress: View {
                 }
             }
         }
-        .onChange(of: progress.estimatedTimeRemaining) { eta in
-            etaDeadline = eta.map { Date().addingTimeInterval($0) }
-        }
     }
 
     /// Three fixed-width data pills below the bar. Widths are fixed so the row
-    /// never reflows as digits change; the ETA ticks via a 1s timeline.
+    /// never reflows as digits change. Values come straight from the engine,
+    /// which throttles speed/ETA changes to ~once every 5s.
     private var pillsRow: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            HStack(spacing: 8) {
-                pill(icon: "externaldrive", text: bytesText, width: 104)
-                pill(icon: "speedometer", text: speedText, width: 84)
-                pill(icon: "clock", text: etaText(now: ctx.date), width: 96)
-            }
+        HStack(spacing: 8) {
+            pill(icon: "externaldrive", text: bytesText, width: 104)
+            pill(icon: "speedometer", text: speedText, width: 84)
+            pill(icon: "clock", text: etaText, width: 96)
         }
     }
 

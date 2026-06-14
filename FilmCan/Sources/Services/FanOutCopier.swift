@@ -214,6 +214,8 @@ actor FanOutCopier {
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
         copySamplesByDest.removeAll()
+        emaSpeedByDest.removeAll()
+        lastSpeedEmitByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
@@ -870,21 +872,28 @@ actor FanOutCopier {
         )
     }
 
-    /// Sliding-window (≈5s) copy throughput samples per destination, used to
-    /// compute a *current-rate* speed and ETA. A cumulative average is misleading
-    /// here: early writes are absorbed fast by the OS write cache (inflated speed
-    /// → ETA far too low), then settle to the real disk rate, so a cumulative ETA
-    /// keeps climbing. A recent window reflects the sustained rate and stabilizes.
+    // Throughput tracking per destination. Copy speed swings hard during a run
+    // because verification (which overlaps copying via the pipeline) periodically
+    // steals disk/bus bandwidth — observed ~300 MB/s when no verify is in flight,
+    // ~180 when one is. Reporting the raw windowed rate makes the ETA lurch. So:
+    //   1. measure an instantaneous rate over a short (~3s) window,
+    //   2. feed it into a heavily-smoothed EMA → the *sustained* rate, which
+    //      already bakes in the verify slowdown (so the ETA is honest: it lands
+    //      near the real ~40 min instead of a no-verify-peak ~20 min),
+    //   3. only let the *displayed* speed/ETA change once every few seconds.
     private var copySamplesByDest: [String: [(t: Date, bytes: Int64)]] = [:]
-    private let copySpeedWindow: TimeInterval = 5.0
+    private var emaSpeedByDest: [String: Double] = [:]
+    private var lastSpeedEmitByDest: [String: (t: Date, speed: Double, eta: TimeInterval?)] = [:]
+    private let copySpeedWindow: TimeInterval = 3.0
+    private let speedEmitInterval: TimeInterval = 5.0
+    private let emaAlpha: Double = 0.12
 
-    /// Verify overlaps copy (the pipeline), so it no longer adds to the timeline
-    /// and is excluded from speed/ETA — keeping them consistent with bytes-copied
-    /// and identical across lockstep parallel destinations.
     private func windowedCopySpeed(
         destPath: String, bytesCompleted: Int64, bytesTotal: Int64
     ) -> (speed: Double, eta: TimeInterval?) {
         let now = Date()
+
+        // 1. Instantaneous rate over the short window.
         var samples = copySamplesByDest[destPath] ?? []
         samples.append((now, bytesCompleted))
         let cutoff = now.addingTimeInterval(-copySpeedWindow)
@@ -892,15 +901,30 @@ actor FanOutCopier {
             samples.removeFirst(keepFrom)
         }
         copySamplesByDest[destPath] = samples
+        if let oldest = samples.first, samples.count >= 2 {
+            let dt = now.timeIntervalSince(oldest.t)
+            let db = bytesCompleted - oldest.bytes
+            if dt >= 0.5, db > 0 {
+                let inst = Double(db) / dt
+                // 2. Smooth into the sustained-rate EMA.
+                if let prev = emaSpeedByDest[destPath] {
+                    emaSpeedByDest[destPath] = emaAlpha * inst + (1 - emaAlpha) * prev
+                } else {
+                    emaSpeedByDest[destPath] = inst
+                }
+            }
+        }
+        let ema = emaSpeedByDest[destPath] ?? 0
 
-        guard let oldest = samples.first, samples.count >= 2 else { return (0, nil) }
-        let dt = now.timeIntervalSince(oldest.t)
-        let db = bytesCompleted - oldest.bytes
-        guard dt >= 0.5, db > 0 else { return (0, nil) }
-        let speed = Double(db) / dt
+        // 3. Throttle the displayed value: hold it for speedEmitInterval seconds.
+        if let last = lastSpeedEmitByDest[destPath],
+           now.timeIntervalSince(last.t) < speedEmitInterval {
+            return (last.speed, last.eta)
+        }
         let remaining = bytesTotal - bytesCompleted
-        let eta = (remaining > 0 && speed > 0) ? Double(remaining) / speed : nil
-        return (speed, eta)
+        let eta = (ema > 0 && remaining > 0) ? Double(remaining) / ema : nil
+        lastSpeedEmitByDest[destPath] = (now, ema, eta)
+        return (ema, eta)
     }
 
     nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {
