@@ -631,7 +631,10 @@ extension BackupEditorView {
                     description: "Re-copy every file even if it was already backed up.",
                     pros: ["Guarantees a fresh copy of everything"],
                     cons: ["Slower — disables resume skip"],
-                    notes: ["Off: files already recorded in every destination's hash list and still present are skipped on a re-run."]
+                    notes: [
+                        "Off: files already recorded in every destination's hash list and still present are skipped on a re-run.",
+                        "With a {date} folder template, resuming on a different day re-copies into that day's folder (the earlier files aren't matched). Turn this on to always re-copy regardless."
+                    ]
                 )
             )
             .disabled(!isCustomEngine)
