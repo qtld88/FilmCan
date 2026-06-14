@@ -598,8 +598,9 @@ struct DestinationListView: View {
         let usedPercent = Int(round(usedRatio * 100))
         let backupPercent = Int(round(backupRatio * 100))
         let freePercent = max(0, 100 - usedPercent - backupPercent)
-        let usedColor = Color.gray.opacity(0.35)
-        let freeColor = Color.gray.opacity(0.75)
+        // Free space is the light grey; other-used space is the darker grey.
+        let usedColor = Color.gray.opacity(0.55)
+        let freeColor = Color.gray.opacity(0.22)
         let backupSegmentColor: Color
         if treatBackupAsUsed {
             backupSegmentColor = FilmCanTheme.brandGreen

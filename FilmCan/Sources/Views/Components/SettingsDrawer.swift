@@ -74,20 +74,40 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
     private var drawerAnimation: Animation { .spring(response: 0.38, dampingFraction: 0.82) }
 
     var body: some View {
+        // Tab strip sits ON TOP of the gray body. Opening grows the drawer upward:
+        // the strip rides up on the gray while the body is pulled up from below the
+        // window frame — like physically pulling a hidden card out of the drawer.
         VStack(spacing: 0) {
+            tabStrip
             if !isCollapsed {
                 contentPanel
                     .frame(maxWidth: .infinity)
                     .frame(maxHeight: SettingsDrawerLayout.openCap(windowHeight: windowHeight, isWide: isWide))
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.move(edge: .bottom))
             }
-            tabStrip
         }
         // Drawer base grey runs the full height — including down behind the closed
         // tab strip to the window's bottom edge.
         .background(FilmCanTheme.drawerSurface.ignoresSafeArea(edges: .bottom))
-        // Clip so the content panel slides up from behind the tabs, not over the flow.
+        // Clip so the body is hidden below the frame until pulled up.
         .clipped()
+    }
+
+    /// Switch tabs. If already open, close the current card first, then pull the new
+    /// one up — so the user sees the old slide down and the new slide up.
+    private func handleTap(_ tab: Tab) {
+        if tab == selection {
+            withAnimation(drawerAnimation) { isCollapsed.toggle() }
+        } else if isCollapsed {
+            selection = tab
+            withAnimation(drawerAnimation) { isCollapsed = false }
+        } else {
+            withAnimation(drawerAnimation) { isCollapsed = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                selection = tab
+                withAnimation(drawerAnimation) { isCollapsed = false }
+            }
+        }
     }
 
     private var contentPanel: some View {
@@ -105,23 +125,13 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(FilmCanTheme.drawerSurface)
-        .overlay(alignment: .top) {
-            Rectangle().fill(FilmCanTheme.cardStroke).frame(height: 1)
-        }
     }
 
     private var tabStrip: some View {
         HStack(alignment: .bottom, spacing: 6) {
             ForEach(tabs, id: \.self) { tab in
                 SettingsFolderTab(title: title(tab), isActive: tab == selection && !isCollapsed) {
-                    if tab == selection {
-                        withAnimation(drawerAnimation) { isCollapsed.toggle() }
-                    } else {
-                        selection = tab
-                        if isCollapsed {
-                            withAnimation(drawerAnimation) { isCollapsed = false }
-                        }
-                    }
+                    handleTap(tab)
                 }
             }
             Spacer(minLength: 8)
