@@ -72,18 +72,21 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
 
     private var drawerAnimation: Animation { .spring(response: 0.38, dampingFraction: 0.85) }
     private let stripHeight: CGFloat = 56
+    private let sideMargin: CGFloat = 24
+    private let cardRadius: CGFloat = 10
 
     var body: some View {
-        // The tab strip lives on the main dark background. The gray body is a
-        // separate layer BEHIND the strip that slides up from below the window
-        // frame. Only the selected tab is lifted up to ride on the body's top edge —
-        // the others stay low, in front of the rising gray. Like pulling one folder
-        // out of a drawer.
+        // The tab strip lives on the main dark background. Opening pulls up a single
+        // glued unit — the active title pill on top of the gray body — as one card
+        // (margined, rounded like the data cards). The inactive tabs stay low on the
+        // dark background.
         let bodyH = SettingsDrawerLayout.openCap(windowHeight: windowHeight, isWide: isWide)
         ZStack(alignment: .bottom) {
-            contentPanel(height: bodyH)
-                .offset(y: isCollapsed ? bodyH : 0)
-            tabStrip(lift: isCollapsed ? 0 : bodyH - stripHeight)
+            if !isCollapsed {
+                pulledCard(height: bodyH)
+                    .transition(.move(edge: .bottom))
+            }
+            bottomStrip
         }
         .frame(maxWidth: .infinity)
         .frame(height: isCollapsed ? stripHeight : bodyH, alignment: .bottom)
@@ -91,8 +94,8 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
         .clipped()
     }
 
-    /// Switch tabs. If already open, fully close the current card (slide down) before
-    /// pulling the new one up — so the two motions read as distinct, not a swap.
+    /// Switch tabs. If already open, close the current card (slide down) first, then
+    /// pull the new one up — distinct motions, not a swap.
     private func handleTap(_ tab: Tab) {
         if tab == selection {
             withAnimation(drawerAnimation) { isCollapsed.toggle() }
@@ -101,43 +104,61 @@ struct SettingsDrawer<Tab: Hashable, Content: View, Preset: View>: View {
             withAnimation(drawerAnimation) { isCollapsed = false }
         } else {
             withAnimation(drawerAnimation) { isCollapsed = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
                 selection = tab
                 withAnimation(drawerAnimation) { isCollapsed = false }
             }
         }
     }
 
-    private func contentPanel(height: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Spacer(minLength: 12)
-                presetSelector()
+    /// One glued card: active title pill on top + gray body. Slides as a single unit.
+    private func pulledCard(height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title(selection))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(FilmCanTheme.textPrimary)
+                .lineLimit(1)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 18)
+                .background(
+                    UnevenRoundedRectangle(topLeadingRadius: cardRadius, topTrailingRadius: cardRadius)
+                        .fill(FilmCanTheme.drawerSurface)
+                )
+                .padding(.leading, 6)
+                // Overlap the body top by 1pt so pill and body read as one piece.
+                .padding(.bottom, -1)
+                .zIndex(1)
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack { Spacer(minLength: 12); presetSelector() }
+                ScrollView { content().frame(maxWidth: .infinity, alignment: .leading) }
             }
-            ScrollView { content().frame(maxWidth: .infinity, alignment: .leading) }
+            .padding(16)
+            .padding(.bottom, stripHeight - 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: cardRadius).fill(FilmCanTheme.drawerSurface))
+            .overlay(
+                RoundedRectangle(cornerRadius: cardRadius)
+                    .stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1)
+            )
         }
-        .padding(.horizontal, 16)
-        // Top inset clears the lifted active tab; bottom inset clears the front strip.
-        .padding(.top, 46)
-        .padding(.bottom, stripHeight + 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, sideMargin)
         .frame(height: height, alignment: .top)
-        .background(FilmCanTheme.drawerSurface)
     }
 
-    private func tabStrip(lift: CGFloat) -> some View {
+    private var bottomStrip: some View {
         HStack(alignment: .bottom, spacing: 6) {
             ForEach(tabs, id: \.self) { tab in
-                let active = tab == selection && !isCollapsed
-                SettingsFolderTab(title: title(tab), isActive: active) {
+                SettingsFolderTab(title: title(tab), isActive: false) {
                     handleTap(tab)
                 }
-                .offset(y: active ? -lift : 0)
+                // Hide the active tab while its card is pulled out.
+                .opacity(!isCollapsed && tab == selection ? 0 : 1)
             }
             Spacer(minLength: 8)
             if isCollapsed { presetSelector() }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, sideMargin)
         .padding(.bottom, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: stripHeight, alignment: .bottom)
