@@ -213,9 +213,8 @@ actor FanOutCopier {
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
-        copySamplesByDest.removeAll()
-        emaSpeedByDest.removeAll()
-        lastSpeedEmitByDest.removeAll()
+        copyDoneByDest.removeAll()
+        etaEmitByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
@@ -548,15 +547,18 @@ actor FanOutCopier {
                                     status: .active, bytesTotal: totalBytesAllSources,
                                     filesTotal: totalSources, verifyMode: destCfg.verifyMode
                                 )
+                                let paranoid = destCfg.verifyMode == .paranoid
                                 prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
                                 prog.filesCompleted = sourceIndex
                                 prog.currentFile = sourceName
-                                prog.verifyBytesTotal = totalBytesAllSources
+                                prog.verifyBytesTotal = paranoid ? totalBytesAllSources : 0
                                 prog.verifyBytesCompleted = verifiedAtStart
-                                let se = await self.windowedCopySpeed(
+                                let se = await self.combinedThroughputETA(
                                     destPath: destCfg.destPath,
-                                    bytesCompleted: prog.bytesCompleted,
-                                    bytesTotal: prog.bytesTotal)
+                                    copyDoneNow: prog.bytesCompleted,
+                                    copyTotal: totalBytesAllSources,
+                                    paranoid: paranoid,
+                                    jobStart: jobStartTime)
                                 prog.speedBytesPerSecond = se.speed
                                 prog.estimatedTimeRemaining = se.eta
                                 progressHandler?(prog)
@@ -617,15 +619,18 @@ actor FanOutCopier {
                     status: copyStatus, bytesTotal: totalBytesAllSources,
                     filesTotal: totalSources, verifyMode: destCfg.verifyMode
                 )
+                let paranoidDone = destCfg.verifyMode == .paranoid
                 prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
                 prog.filesCompleted = sourceIndex + 1
                 prog.currentFile = sourceName
-                prog.verifyBytesTotal = totalBytesAllSources
+                prog.verifyBytesTotal = paranoidDone ? totalBytesAllSources : 0
                 prog.verifyBytesCompleted = verifiedAtStart
-                let se = await self.windowedCopySpeed(
+                let se = await self.combinedThroughputETA(
                     destPath: destCfg.destPath,
-                    bytesCompleted: prog.bytesCompleted,
-                    bytesTotal: prog.bytesTotal)
+                    copyDoneNow: prog.bytesCompleted,
+                    copyTotal: totalBytesAllSources,
+                    paranoid: paranoidDone,
+                    jobStart: jobStartTime)
                 prog.speedBytesPerSecond = se.speed
                 prog.estimatedTimeRemaining = se.eta
                 progressHandler?(prog)
@@ -803,8 +808,11 @@ actor FanOutCopier {
             prog.verifyBytesTotal = c.totalBytesAllSources
             prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
             prog.currentFile = "Verifying \(c.sourceName)…"
-            // Speed/ETA are copy-only (verify overlaps copy via the pipeline, so
-            // it no longer adds to the timeline). Don't touch them on verify emits.
+            let se = await self.combinedThroughputETA(
+                destPath: r.destPath, copyDoneNow: nil,
+                copyTotal: c.totalBytesAllSources, paranoid: true, jobStart: c.jobStartTime)
+            prog.speedBytesPerSecond = se.speed
+            prog.estimatedTimeRemaining = se.eta
             config.progressHandler?(prog)
         }
 
@@ -858,7 +866,11 @@ actor FanOutCopier {
                     prog.verifyBytesTotal = c.totalBytesAllSources
                     prog.verifyBytesCompleted = newVerifiedBytes
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
-                    // Copy-only speed/ETA — left untouched on verify emits.
+                    let se = await self.combinedThroughputETA(
+                        destPath: destPath, copyDoneNow: nil,
+                        copyTotal: c.totalBytesAllSources, paranoid: true, jobStart: c.jobStartTime)
+                    prog.speedBytesPerSecond = se.speed
+                    prog.estimatedTimeRemaining = se.eta
                     config.progressHandler?(prog)
                 }
             }
@@ -872,59 +884,74 @@ actor FanOutCopier {
         )
     }
 
-    // Throughput tracking per destination. Copy speed swings hard during a run
-    // because verification (which overlaps copying via the pipeline) periodically
-    // steals disk/bus bandwidth — observed ~300 MB/s when no verify is in flight,
-    // ~180 when one is. Reporting the raw windowed rate makes the ETA lurch. So:
-    //   1. measure an instantaneous rate over a short (~3s) window,
-    //   2. feed it into a heavily-smoothed EMA → the *sustained* rate, which
-    //      already bakes in the verify slowdown (so the ETA is honest: it lands
-    //      near the real ~40 min instead of a no-verify-peak ~20 min),
-    //   3. only let the *displayed* speed/ETA change once every few seconds.
-    private var copySamplesByDest: [String: [(t: Date, bytes: Int64)]] = [:]
-    private var emaSpeedByDest: [String: Double] = [:]
-    private var lastSpeedEmitByDest: [String: (t: Date, speed: Double, eta: TimeInterval?)] = [:]
-    private let copySpeedWindow: TimeInterval = 3.0
-    private let speedEmitInterval: TimeInterval = 5.0
-    private let emaAlpha: Double = 0.12
+    // Combined-throughput speed/ETA per destination.
+    //
+    // The copy-only rate swings hard (~300<->180 MB/s) as verification, which
+    // overlaps copying via the pipeline, periodically steals disk bandwidth. But
+    // the *total* disk throughput — copy bytes + verify bytes moved per second —
+    // is roughly constant (the drive's bandwidth). Measured as a cumulative
+    // average since job start it is stable and doesn't spike during verify gaps.
+    //
+    // Since total work is known up front (copy + verify = ~2x data in paranoid),
+    // dividing it by this stable rate gives a stable, honest ETA from the start.
+    // The displayed speed is that throughput divided by the verify factor, which
+    // predicts the verify slowdown from t=0 (shows the effective copy rate, never
+    // the no-verify peak).
+    private var copyDoneByDest: [String: Int64] = [:]
+    private var etaEmitByDest: [String: (t: Date, speed: Double, eta: TimeInterval?)] = [:]
+    private let etaMinElapsed: TimeInterval = 2.0
+    private let etaEmitInterval: TimeInterval = 3.0
 
-    private func windowedCopySpeed(
-        destPath: String, bytesCompleted: Int64, bytesTotal: Int64
+    /// `copyDoneNow` updates the stored copy progress (pass on copy emits, nil on
+    /// verify emits). Reads live verified bytes from `verifiedBytesByDest`.
+    private func combinedThroughputETA(
+        destPath: String, copyDoneNow: Int64?, copyTotal: Int64,
+        paranoid: Bool, jobStart: Date
     ) -> (speed: Double, eta: TimeInterval?) {
+        if let c = copyDoneNow {
+            copyDoneByDest[destPath] = max(copyDoneByDest[destPath] ?? 0, c)
+        }
+        let copyDone = copyDoneByDest[destPath] ?? 0
+        let verifyDone = verifiedBytesByDest[destPath] ?? 0
+        let verifyTotal: Int64 = paranoid ? copyTotal : 0
+        let combinedDone = copyDone + verifyDone
+        let combinedTotal = copyTotal + verifyTotal
         let now = Date()
+        let elapsed = now.timeIntervalSince(jobStart)
+        guard elapsed >= etaMinElapsed, combinedDone > 0, combinedTotal > 0, copyTotal > 0
+        else { return (0, nil) }
 
-        // 1. Instantaneous rate over the short window.
-        var samples = copySamplesByDest[destPath] ?? []
-        samples.append((now, bytesCompleted))
-        let cutoff = now.addingTimeInterval(-copySpeedWindow)
-        if let keepFrom = samples.firstIndex(where: { $0.t >= cutoff }), keepFrom > 0 {
-            samples.removeFirst(keepFrom)
-        }
-        copySamplesByDest[destPath] = samples
-        if let oldest = samples.first, samples.count >= 2 {
-            let dt = now.timeIntervalSince(oldest.t)
-            let db = bytesCompleted - oldest.bytes
-            if dt >= 0.5, db > 0 {
-                let inst = Double(db) / dt
-                // 2. Smooth into the sustained-rate EMA.
-                if let prev = emaSpeedByDest[destPath] {
-                    emaSpeedByDest[destPath] = emaAlpha * inst + (1 - emaAlpha) * prev
-                } else {
-                    emaSpeedByDest[destPath] = inst
-                }
-            }
-        }
-        let ema = emaSpeedByDest[destPath] ?? 0
-
-        // 3. Throttle the displayed value: hold it for speedEmitInterval seconds.
-        if let last = lastSpeedEmitByDest[destPath],
-           now.timeIntervalSince(last.t) < speedEmitInterval {
+        // Hold the displayed value between throttle ticks (smooths the noisy
+        // first seconds; the cumulative figure itself keeps updating).
+        if let last = etaEmitByDest[destPath], now.timeIntervalSince(last.t) < etaEmitInterval {
             return (last.speed, last.eta)
         }
-        let remaining = bytesTotal - bytesCompleted
-        let eta = (ema > 0 && remaining > 0) ? Double(remaining) / ema : nil
-        lastSpeedEmitByDest[destPath] = (now, ema, eta)
-        return (ema, eta)
+
+        let result = Self.computeCombinedSpeedETA(
+            copyDone: copyDone, verifyDone: verifyDone,
+            copyTotal: copyTotal, verifyTotal: verifyTotal, elapsed: elapsed)
+        etaEmitByDest[destPath] = (now, result.speed, result.eta)
+        return result
+    }
+
+    /// Pure speed/ETA math (no timing/throttle) so it can be unit-tested.
+    /// Speed = total disk throughput ÷ verify factor (the effective copy rate,
+    /// which predicts the verify slowdown). ETA = remaining combined work ÷
+    /// total throughput (honest: counts the verify pass from the start).
+    static func computeCombinedSpeedETA(
+        copyDone: Int64, verifyDone: Int64,
+        copyTotal: Int64, verifyTotal: Int64, elapsed: TimeInterval
+    ) -> (speed: Double, eta: TimeInterval?) {
+        let combinedDone = copyDone + verifyDone
+        let combinedTotal = copyTotal + verifyTotal
+        guard elapsed > 0, combinedDone > 0, copyTotal > 0 else { return (0, nil) }
+        let combinedThroughput = Double(combinedDone) / elapsed
+        let verifyFactor = Double(combinedTotal) / Double(copyTotal)
+        let speed = combinedThroughput / verifyFactor
+        let remaining = combinedTotal - combinedDone
+        let eta = (combinedThroughput > 0 && remaining > 0)
+            ? Double(remaining) / combinedThroughput : nil
+        return (speed, eta)
     }
 
     nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {
