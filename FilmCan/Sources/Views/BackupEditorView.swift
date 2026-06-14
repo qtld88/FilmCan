@@ -207,18 +207,22 @@ struct BackupEditorView: View {
         let isOverviewWide = contentWidth >= 750
         let contentPadding: CGFloat = contentWidth < 520 ? 12 : 24
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                overviewSection(isWide: isOverviewWide)
-                optionsSection()
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    overviewSection(isWide: isOverviewWide)
+                }
+                .padding(contentPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(contentPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .onTapGesture {
-            if isEditingName {
-                confirmEditingName()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onTapGesture {
+                if isEditingName {
+                    confirmEditingName()
+                }
             }
+
+            settingsDrawer(windowHeight: proxy.size.height)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(FilmCanTheme.backgroundGradient)
