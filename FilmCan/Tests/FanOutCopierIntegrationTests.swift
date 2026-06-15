@@ -72,17 +72,17 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertFalse(contents1.contains { $0.hasPrefix(".filmcan-") }, "No temp files in dest1")
         XCTAssertFalse(contents2.contains { $0.hasPrefix(".filmcan-") }, "No temp files in dest2")
 
-        // Verify MHL file per destination
-        let mhl1 = dest1.appendingPathComponent(".filmcan/hashlists/source.bin.mhl")
-        let mhl2 = dest2.appendingPathComponent(".filmcan/hashlists/source.bin.mhl")
+        // Verify MHL file per destination (flat-file root: MHL at dest/ascmhl/0001_source.bin.mhl)
+        let mhl1 = dest1.appendingPathComponent("ascmhl/0001_source.bin.mhl")
+        let mhl2 = dest2.appendingPathComponent("ascmhl/0001_source.bin.mhl")
         XCTAssertTrue(fm.fileExists(atPath: mhl1.path), "MHL should exist in dest1")
         XCTAssertTrue(fm.fileExists(atPath: mhl2.path), "MHL should exist in dest2")
-        let entries1 = try MHLReader.read(url: mhl1)
+        let entries1 = try ASCMHLReader.read(url: mhl1)
         XCTAssertEqual(entries1.count, 1)
-        XCTAssertEqual(entries1[0].fileName, "source.bin")
-        let entries2 = try MHLReader.read(url: mhl2)
+        XCTAssertEqual(entries1[0].relPath, "source.bin")
+        let entries2 = try ASCMHLReader.read(url: mhl2)
         XCTAssertEqual(entries2.count, 1)
-        XCTAssertEqual(entries2[0].fileName, "source.bin")
+        XCTAssertEqual(entries2[0].relPath, "source.bin")
     }
 
     func test_fanOut_sourceNotFound() async throws {
@@ -269,10 +269,11 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         }
 
         // One MHL per source root per dest, with all 3 files aggregated
+        // (directory root "CARD": MHL at dest/CARD/ascmhl/0001_CARD.mhl)
         for dest in [dest1, dest2] {
-            let mhl = dest.appendingPathComponent(".filmcan/hashlists/CARD.mhl")
+            let mhl = dest.appendingPathComponent("CARD/ascmhl/0001_CARD.mhl")
             XCTAssertTrue(fm.fileExists(atPath: mhl.path), "Missing MHL at \(mhl.path)")
-            let entries = try MHLReader.read(url: mhl)
+            let entries = try ASCMHLReader.read(url: mhl)
             XCTAssertEqual(entries.count, 3, "MHL should aggregate all 3 files in the source root")
         }
     }
@@ -321,12 +322,14 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: dest.appendingPathComponent("CARD2/b.bin")), bData)
 
         // Two MHLs: one per source root
-        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent(".filmcan/hashlists/loose.bin.mhl").path))
-        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent(".filmcan/hashlists/CARD2.mhl").path))
+        // loose.bin (flat): dest/ascmhl/0001_loose.bin.mhl
+        // CARD2 (dir): dest/CARD2/ascmhl/0001_CARD2.mhl
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("ascmhl/0001_loose.bin.mhl").path))
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("CARD2/ascmhl/0001_CARD2.mhl").path))
 
-        let looseEntries = try MHLReader.read(url: dest.appendingPathComponent(".filmcan/hashlists/loose.bin.mhl"))
+        let looseEntries = try ASCMHLReader.read(url: dest.appendingPathComponent("ascmhl/0001_loose.bin.mhl"))
         XCTAssertEqual(looseEntries.count, 1)
-        let cardEntries = try MHLReader.read(url: dest.appendingPathComponent(".filmcan/hashlists/CARD2.mhl"))
+        let cardEntries = try ASCMHLReader.read(url: dest.appendingPathComponent("CARD2/ascmhl/0001_CARD2.mhl"))
         XCTAssertEqual(cardEntries.count, 2)
     }
 
@@ -472,9 +475,10 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("CARD/\(name)").path), "missing \(name)")
         }
         // The hash list retains all three entries (not truncated on resume).
-        let mhl = dest.appendingPathComponent(".filmcan/hashlists/CARD.mhl")
-        let entries = try MHLReader.read(url: mhl)
-        XCTAssertEqual(Set(entries.map { $0.fileName }), ["a.bin", "b.bin", "c.bin"])
+        // Directory root "CARD": MHL at dest/CARD/ascmhl/0001_CARD.mhl
+        let mhl = dest.appendingPathComponent("CARD/ascmhl/0001_CARD.mhl")
+        let entries = try ASCMHLReader.read(url: mhl)
+        XCTAssertEqual(Set(entries.map { $0.relPath }), ["a.bin", "b.bin", "c.bin"])
     }
 
     func test_resume_allDone_skipsEverythingAndSucceeds() async throws {
@@ -492,5 +496,60 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(r2.first?.success, true)
         XCTAssertEqual(r2.first?.filesTransferred, 0, "nothing recopied")
         XCTAssertEqual(r2.first?.filesSkipped, 2, "all files skipped")
+    }
+
+    func testResumeSkipWithASCMHL() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("ASCMHL_CARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("file1.bin"))
+        try Data((0..<80_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("file2.bin"))
+        let dest = tmpDir.appendingPathComponent("ascmhl-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let r1 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r1.first?.filesTransferred, 2)
+
+        // ASC MHL must exist at <dest>/ASCMHL_CARD/ascmhl/0001_ASCMHL_CARD.mhl
+        let mhlURL = dest.appendingPathComponent("ASCMHL_CARD/ascmhl/0001_ASCMHL_CARD.mhl")
+        XCTAssertTrue(fm.fileExists(atPath: mhlURL.path), "ASC MHL missing at \(mhlURL.path)")
+        let entries = try ASCMHLReader.read(url: mhlURL)
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(Set(entries.map { $0.relPath }), ["file1.bin", "file2.bin"])
+
+        // Second run with same config must skip all files
+        let r2 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r2.first?.filesSkipped, 2, "all files should be skipped on second run")
+        XCTAssertEqual(r2.first?.filesTransferred, 0, "nothing should be transferred on second run")
+    }
+
+    func testResumeSkipLegacyFallback() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("LEGACY_CARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("alpha.bin"))
+        try Data((0..<80_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("beta.bin"))
+        let dest = tmpDir.appendingPathComponent("legacy-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+
+        // Delete the ASC MHL folder, hand-write a legacy manifest instead
+        let ascmhlDir = dest.appendingPathComponent("LEGACY_CARD/ascmhl")
+        try fm.removeItem(at: ascmhlDir)
+
+        let legacyDir = dest.appendingPathComponent(".filmcan/hashlists")
+        try fm.createDirectory(at: legacyDir, withIntermediateDirectories: true)
+        let legacyMHL = legacyDir.appendingPathComponent("LEGACY_CARD.mhl")
+        let legacyXML = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <hashlist version="1.0" source="LEGACY_CARD"><file name="alpha.bin"><hash>deadbeef</hash></file><file name="beta.bin"><hash>deadbeef</hash></file></hashlist>
+            """
+        try legacyXML.write(to: legacyMHL, atomically: true, encoding: .utf8)
+
+        // Second run: legacy fallback should cause both files to be skipped
+        let r2 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r2.first?.filesSkipped, 2, "legacy fallback: both files should be skipped")
+        XCTAssertEqual(r2.first?.filesTransferred, 0, "legacy fallback: nothing should be transferred")
     }
 }

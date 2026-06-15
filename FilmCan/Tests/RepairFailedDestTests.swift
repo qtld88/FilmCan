@@ -31,24 +31,15 @@ final class RepairFailedDestTests: XCTestCase {
         try f1Data.write(to: siblingRoot.appendingPathComponent("a.bin"))
         try f2Data.write(to: siblingRoot.appendingPathComponent("b.bin"))
 
-        let mhlDir = siblingRoot.appendingPathComponent(".filmcan/hashlists")
-        try fm.createDirectory(at: mhlDir, withIntermediateDirectories: true)
-        let mhlURL = mhlDir.appendingPathComponent("CARD.mhl")
         // Compute real xxh128 hashes so SiblingDestSource will accept them.
         let h1 = try await xxh128Hex(of: siblingRoot.appendingPathComponent("a.bin"))
         let h2 = try await xxh128Hex(of: siblingRoot.appendingPathComponent("b.bin"))
-        // MHL schema per MHLReader: <file name="…"><hash>HEX</hash></file>
-        let mhlBody = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <hashlist version="2.0" xmlns:filmcan="https://filmcan.app/ns">
-          <hashes>
-            <file name="a.bin"><hash>\(h1)</hash></file>
-            <file name="b.bin"><hash>\(h2)</hash></file>
-          </hashes>
-          <sealed/>
-        </hashlist>
-        """
-        try mhlBody.write(to: mhlURL, atomically: true, encoding: .utf8)
+        // Write ASC MHL v2.0 manifest at sibling's roll-root/ascmhl/0001_sibling.mhl
+        let mhlURL = siblingRoot.appendingPathComponent("ascmhl/0001_sibling.mhl")
+        let writer = try ASCMHLWriter(url: mhlURL, rollName: "sibling")
+        try await writer.append(relPath: "a.bin", size: Int64(f1Data.count), hash: h1)
+        try await writer.append(relPath: "b.bin", size: Int64(f2Data.count), hash: h2)
+        try await writer.seal()
 
         // "failed" dest: empty directory.
         let failedRoot = tmpDir.appendingPathComponent("failed")
