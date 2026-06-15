@@ -36,6 +36,7 @@
 		3D7C343E514CF3B6D7683BD1 /* XXHash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C05BF20EEBC1E7CC7DB8795 /* XXHash.swift */; };
 		3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EDF10844CC898228982672 /* DuplicatePrompt.swift */; };
 		40FA5D85515E21FADAFE1D60 /* QuickTourView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D862BDFCB070BBF317B5C2 /* QuickTourView.swift */; };
+		46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */; };
 		489356ED8541D3AF5C041185 /* MHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A38DB3B25239F8094E5EFC /* MHLWriter.swift */; };
 		4E3F4192B4F29DD714EC6682 /* DestWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2314F69E3FD8DCE91282F1FA /* DestWriter.swift */; };
 		513CC93966E9BF3EB6F46E6C /* CopyEnginePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDC23E435829755245312C4 /* CopyEnginePersistenceTests.swift */; };
@@ -84,6 +85,7 @@
 		B4B86751C99DE113AACCED5A /* RsyncOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E3097772416FE89A21C7E62 /* RsyncOptions.swift */; };
 		B554D2819BD859BE97459AB4 /* OrganizationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D28EDE431F28873920B2B30 /* OrganizationSettingsView.swift */; };
 		BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF50C40E7C0C3EE500EFA4C1 /* ColorHex.swift */; };
+		BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */; };
 		BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867AFB25988C222B6A24039C /* PreviewInfo.swift */; };
 		C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */; };
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
@@ -188,6 +190,7 @@
 		7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifierTests.swift; sourceTree = "<group>"; };
 		7CDC23E435829755245312C4 /* CopyEnginePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyEnginePersistenceTests.swift; sourceTree = "<group>"; };
 		7F583D01B5F61457BFBA712E /* TotalTransfersEditMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TotalTransfersEditMode.swift; sourceTree = "<group>"; };
+		84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLWriterTests.swift; sourceTree = "<group>"; };
 		867AFB25988C222B6A24039C /* PreviewInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewInfo.swift; sourceTree = "<group>"; };
 		8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListNamer.swift; sourceTree = "<group>"; };
 		93EB91D5AC324DFAEC3E376F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -224,6 +227,7 @@
 		CE87AE92E6D0FD2C5F1566BA /* TitlebarAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitlebarAccessory.swift; sourceTree = "<group>"; };
 		D4123D4442C95453ADA7A942 /* MHLReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLReader.swift; sourceTree = "<group>"; };
 		D93FFA7594374B35EFD1117A /* DonationPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DonationPromptView.swift; sourceTree = "<group>"; };
+		DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLWriter.swift; sourceTree = "<group>"; };
 		DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineFanOutProgress.swift; sourceTree = "<group>"; };
 		DBAF7A0A4796303A8E24EE4B /* DestResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestResultRow.swift; sourceTree = "<group>"; };
 		DF50C40E7C0C3EE500EFA4C1 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
@@ -271,6 +275,7 @@
 			isa = PBXGroup;
 			children = (
 				6D1A5B5BDD573D20E4EF6A03 /* AppState.swift */,
+				DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */,
 				13273CE3DB6E17D073212DFE /* BoundedChannel.swift */,
 				64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */,
 				FEAB41177986B7BBED498656 /* CustomCopierService.swift */,
@@ -324,6 +329,7 @@
 		8A5ED741C11830E24674385D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
 				73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */,
@@ -584,6 +590,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
 				3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */,
@@ -604,6 +611,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */,
 				CB10BBAE07DBB48A5E304FA0 /* AlreadyBackedUpSheet.swift in Sources */,
 				EB135DDE8A17EF04263A2AB2 /* AppState.swift in Sources */,
 				FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */,
