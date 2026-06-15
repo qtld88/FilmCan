@@ -239,6 +239,20 @@ actor FanOutCopier {
         URL(fileURLWithPath: rollFolder).appendingPathComponent("ascmhl")
     }
 
+    /// Create Netflix's required sibling folders (`Reports/`, `Sound_Media/`) under the
+    /// shoot-day root (the first path component of the roll folder beneath the dest),
+    /// so the delivered structure is complete even when only camera media was copied.
+    nonisolated static func scaffoldNetflixSiblings(destRoot: String, rollFolder: String) {
+        let rel = rollFolder.hasPrefix(destRoot) ? String(rollFolder.dropFirst(destRoot.count)) : rollFolder
+        guard let firstComp = rel.split(separator: "/").first.map(String.init), !firstComp.isEmpty else { return }
+        let dayRoot = (destRoot as NSString).appendingPathComponent(firstComp)
+        for sub in ["Reports", "Sound_Media"] {
+            try? FileManager.default.createDirectory(
+                at: URL(fileURLWithPath: dayRoot).appendingPathComponent(sub),
+                withIntermediateDirectories: true)
+        }
+    }
+
     /// (fileName, hash) pairs already recorded for one root at one dest, for resume-skip.
     /// Prefers the ASC MHL at the roll root; falls back to the legacy hidden manifest so
     /// pre-1.3 backups still resume once. `fileName` == the path recorded in the manifest
@@ -298,6 +312,9 @@ actor FanOutCopier {
                     isDirectoryRoot: directoryRoots.contains(rootName),
                     preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime, metadata: config.shootMetadata)
+                if config.organizationPreset?.name == OrganizationPreset.netflixIngestName {
+                    Self.scaffoldNetflixSiblings(destRoot: destCfg.destPath, rollFolder: rollFolder)
+                }
                 let ascDir = Self.ascMHLDir(rollFolder: rollFolder)
                 let writer = try ASCMHLWriter(ascmhlDir: ascDir, rollName: rootName)
                 byRoot[rootName] = writer
