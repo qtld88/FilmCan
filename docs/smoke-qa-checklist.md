@@ -31,6 +31,11 @@ one independent test. Tick the box only after the result column matches.
 | 13 | Power-loss simulation | flat 10 GB → exFAT HDD | HDD-exFAT | paranoid + `F_FULLFSYNC` required | After hard reboot mid-copy: no half-written final filenames; only `.filmcan-*` orphans (which the next run cleans) | ☐ |
 | 14 | Webhook v1 + v2 | any small job, v1 then v2 | SSD-A, SSD-B | fast | v1: one ntfy / webhook per dest. v2 (`webhookTemplateFormatVersion = 2`): single aggregated event with both dest summaries | ☐ |
 | 15 | App relaunch mid-job | flat 50 GB | SSD-A, SSD-B | paranoid | Force-quit FilmCan during copy. Relaunch. Next run cleans `.filmcan-*` orphans from dests | ☐ |
+| 16 | Off verify mode | card dir | SSD-A, SSD-B | off | Copy completes; tiles reach 100% + Complete; **no MHL written** on either dest | ☐ |
+| 17 | Resume skip | re-run of #2 (unchanged) | SSD-A, SSD-B | fast | **No new history card** — "Already backed up" popup; "Verify data" matches all files | ☐ |
+| 18 | Resume — partial | #2 source + one new clip added | SSD-A, SSD-B | fast | Only the new clip copies; row reads "Resuming — N files already backed up…"; a history card is added | ☐ |
+| 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
+| 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
 
 ## Post-run sanity checks
 
@@ -41,6 +46,7 @@ one independent test. Tick the box only after the result column matches.
 
 ## Known limitations to verify did NOT regress
 
-- Rsync engine path (Copy Engine = Rsync) must still work end-to-end for backwards compatibility.
+- The FilmCan Engine is the only user-facing engine (rsync retired from the UI in
+  1.2.0). There is no engine picker to test; rsync code is dormant.
 - Sandbox stays disabled (entitlement file `com.apple.security.app-sandbox = false`).
 - Drive speed classifier still flags exFAT external as "slow flush required" so the `DO NOT UNPLUG` banner appears.
