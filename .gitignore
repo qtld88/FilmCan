@@ -32,3 +32,6 @@ xcuserdata/
 # Misc
 *.tmp
 *.swp
+
+# Internal brainstorming specs/plans — not published
+docs/superpowers/
