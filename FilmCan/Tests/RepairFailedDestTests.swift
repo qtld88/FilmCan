@@ -34,12 +34,12 @@ final class RepairFailedDestTests: XCTestCase {
         // Compute real xxh128 hashes so SiblingDestSource will accept them.
         let h1 = try await xxh128Hex(of: siblingRoot.appendingPathComponent("a.bin"))
         let h2 = try await xxh128Hex(of: siblingRoot.appendingPathComponent("b.bin"))
-        // Write ASC MHL v2.0 manifest at sibling's roll-root/ascmhl/0001_sibling.mhl
-        let mhlURL = siblingRoot.appendingPathComponent("ascmhl/0001_sibling.mhl")
-        let writer = try ASCMHLWriter(url: mhlURL, rollName: "sibling")
+        // Write an ASC MHL v2.0 generation at the sibling roll's ascmhl/ folder.
+        let writer = try ASCMHLWriter(ascmhlDir: siblingRoot.appendingPathComponent("ascmhl"), rollName: "sibling")
         try await writer.append(relPath: "a.bin", size: Int64(f1Data.count), hash: h1)
         try await writer.append(relPath: "b.bin", size: Int64(f2Data.count), hash: h2)
         try await writer.seal()
+        let mhlURL = URL(fileURLWithPath: writer.manifestPath)
 
         // "failed" dest: empty directory.
         let failedRoot = tmpDir.appendingPathComponent("failed")

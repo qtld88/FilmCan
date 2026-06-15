@@ -44,7 +44,7 @@ actor DestWriter {
         displayName: String,
         verifyMode: VerifyMode,
         requiresFullFsync: Bool,
-        mhlURL: URL?,
+        ascmhlDir: URL?,
         sourceName: String
     ) async throws {
         self.destPath = destPath
@@ -52,11 +52,9 @@ actor DestWriter {
         self.verifyMode = verifyMode
         self.requiresFullFsync = requiresFullFsync
 
-        // Set up MHL writer lazily or eagerly? Eager: we know sourceName at init.
-        if let mhlURL {
-            let dir = mhlURL.deletingLastPathComponent()
-            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.mhlWriter = try ASCMHLWriter(url: mhlURL, rollName: sourceName)
+        // Set up MHL writer eagerly when an ascmhl/ folder is provided.
+        if let ascmhlDir {
+            self.mhlWriter = try ASCMHLWriter(ascmhlDir: ascmhlDir, rollName: sourceName)
         } else {
             self.mhlWriter = nil
         }

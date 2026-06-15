@@ -230,10 +230,9 @@ actor FanOutCopier {
         return isDirectoryRoot ? resolvedRoot : (resolvedRoot as NSString).deletingLastPathComponent
     }
 
-    nonisolated static func ascMHLURL(rollFolder: String, rootName: String) -> URL {
-        URL(fileURLWithPath: rollFolder)
-            .appendingPathComponent("ascmhl")
-            .appendingPathComponent("0001_\(rootName).mhl")
+    /// The roll's `ascmhl/` folder (holds the generation manifests + chain index).
+    nonisolated static func ascMHLDir(rollFolder: String) -> URL {
+        URL(fileURLWithPath: rollFolder).appendingPathComponent("ascmhl")
     }
 
     /// (fileName, hash) pairs already recorded for one root at one dest, for resume-skip.
@@ -243,9 +242,9 @@ actor FanOutCopier {
     nonisolated static func loadExistingMHLEntries(
         destPath: String, rootName: String, rollFolder: String
     ) -> [(fileName: String, hash: String)] {
-        let ascURL = ascMHLURL(rollFolder: rollFolder, rootName: rootName)
-        if FileManager.default.fileExists(atPath: ascURL.path),
-           let entries = try? ASCMHLReader.read(url: ascURL) {
+        let ascDir = ascMHLDir(rollFolder: rollFolder)
+        if let latest = ASCMHLChain.latestManifestPath(ascmhlDir: ascDir),
+           let entries = try? ASCMHLReader.read(url: ascDir.appendingPathComponent(latest)) {
             return entries.map { (fileName: $0.relPath, hash: $0.hash) }
         }
         let legacy = URL(fileURLWithPath: destPath)
@@ -295,8 +294,8 @@ actor FanOutCopier {
                     isDirectoryRoot: directoryRoots.contains(rootName),
                     preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime)
-                let mhlURL = Self.ascMHLURL(rollFolder: rollFolder, rootName: rootName)
-                let writer = try ASCMHLWriter(url: mhlURL, rollName: rootName)
+                let ascDir = Self.ascMHLDir(rollFolder: rollFolder)
+                let writer = try ASCMHLWriter(ascmhlDir: ascDir, rollName: rootName)
                 byRoot[rootName] = writer
             }
             result[destCfg.destPath] = byRoot
@@ -782,11 +781,7 @@ actor FanOutCopier {
                 prog.filesSkipped = skippedFiles
                 progressHandler?(prog)
 
-                let mhlRollFolder = Self.resolveRollFolder(
-                    destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
-                    isDirectoryRoot: !relPath.isEmpty, preset: config.organizationPreset,
-                    copyFolderContents: config.copyFolderContents, date: jobStartTime)
-                let mhlPath = Self.ascMHLURL(rollFolder: mhlRollFolder, rootName: rootName).path
+                let mhlPath = sharedMHLsByDest[destCfg.destPath]?[rootName]?.manifestPath ?? ""
 
                 return DestWriterResult(
                     destPath: destCfg.destPath, displayName: destCfg.displayName,
