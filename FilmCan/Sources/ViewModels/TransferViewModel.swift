@@ -71,7 +71,6 @@ class TransferViewModel: ObservableObject {
         let verificationWeightedProgress: Double
     }
     
-    private let rsyncService = AppState.shared.rsyncService
     private var config: BackupConfiguration?
     private var transferStartTime: Date?
     private var isPausingAll: Bool = false
@@ -95,7 +94,6 @@ class TransferViewModel: ObservableObject {
     
     init(isBackgroundWorker: Bool = false) {
         self.isBackgroundWorker = isBackgroundWorker
-        bindProgress(to: rsyncService)
     }
     
     func startTransfer(config: BackupConfiguration) async {
@@ -376,23 +374,6 @@ class TransferViewModel: ObservableObject {
 
     private func progressKey(destination: String, source: String) -> String {
         return destination + "||" + source
-    }
-
-    private func bindProgress(to service: TransferService) {
-        progressBinding?.cancel()
-        if let custom = service as? CustomCopierService {
-            progressBinding = custom.$progress
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] value in
-                    guard let self else { return }
-                    self.progress = value
-                    if !self.isBackgroundWorker, let configId = self.activeConfigId {
-                        self.tabProgressByConfig[configId] = value.overallProgress
-                    }
-                }
-        } else {
-            progressBinding = nil
-        }
     }
 
     private func clearProgressObservers() {
