@@ -624,8 +624,6 @@ extension BackupEditorView {
                     notes: ["With a {date} folder template, resuming on a different day re-copies into that day's folder (earlier files aren't matched)."]
                 )
             )
-            .disabled(!isCustomEngine)
-            .opacity(isCustomEngine ? 1 : 0.5)
 
             HStack(spacing: optionSpacing) {
                 Image(systemName: "doc.on.doc")
@@ -818,8 +816,6 @@ extension BackupEditorView {
                     .frame(width: resolvedMenuWidth(optionMenuWidth + 100, textWidth: resolvedTextWidth(basicOptionTextWidth)), alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .disabled(!isCustomEngine)
-                .opacity(isCustomEngine ? 1 : 0.5)
             }
         }
     }

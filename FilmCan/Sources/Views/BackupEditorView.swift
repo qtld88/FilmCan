@@ -41,7 +41,6 @@ struct BackupEditorView: View {
     let optionSpacing: CGFloat = 20
     let optionIconWidth: CGFloat = 32
     let historyPanelWidth: CGFloat = 250
-    var isCustomEngine: Bool { viewModel.rsyncOptions.copyEngine == .custom }
 
     enum OptionsTab: String, CaseIterable, Identifiable {
         case basic = "Basic options"
