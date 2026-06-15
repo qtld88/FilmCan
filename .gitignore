@@ -35,3 +35,6 @@ xcuserdata/
 
 # Internal brainstorming specs/plans — not published
 docs/superpowers/
+.claude/
+opencode.jsonc
+AGENTS.md
