@@ -97,7 +97,6 @@
 		D3EA072D2E95C262F7C2657C /* TransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA563679AEE01B0FF5D12CB7 /* TransferService.swift */; };
 		D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */; };
 		D7A83CF121B3D61390AF5391 /* DestResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7BCF3596001402A6F510FC /* DestResult.swift */; };
-		D83EFD284AC9774F3233FA6B /* MultiDestSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41561E63507BB92CD9AC1EFD /* MultiDestSummaryView.swift */; };
 		DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB49243153FED4BA9A4594E /* BackupListView.swift */; };
 		DE4C5CF3B866008336DDAF07 /* RsyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06EB2AD3767834B698BF542 /* RsyncService.swift */; };
 		E19CFCE13B1A1F1155F2AF57 /* FolderPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F3544361F9AB588C49995D /* FolderPickerSheet.swift */; };
@@ -158,7 +157,6 @@
 		3622B8C4F47A914F473D8798 /* LogFolderNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogFolderNamer.swift; sourceTree = "<group>"; };
 		3D2147830DD49FC39B828D61 /* HashListBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListBuilder.swift; sourceTree = "<group>"; };
 		40E6C2BF26C154734D9112D1 /* FileOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOrdering.swift; sourceTree = "<group>"; };
-		41561E63507BB92CD9AC1EFD /* MultiDestSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiDestSummaryView.swift; sourceTree = "<group>"; };
 		43A1BB108A96290E666D66D7 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
 		4614DA736DD0AF7010D27E51 /* FilmCanTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanTheme.swift; sourceTree = "<group>"; };
 		4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSpeedProbe.swift; sourceTree = "<group>"; };
@@ -440,7 +438,6 @@
 				BAC7101BE8E60A311B55D57A /* InfoPopover.swift */,
 				0874AFE948C474D013C69931 /* LogSettingsView.swift */,
 				C6DAECC7717B5F2550472F23 /* MainView.swift */,
-				41561E63507BB92CD9AC1EFD /* MultiDestSummaryView.swift */,
 				1D28EDE431F28873920B2B30 /* OrganizationSettingsView.swift */,
 				97D862BDFCB070BBF317B5C2 /* QuickTourView.swift */,
 				93EB91D5AC324DFAEC3E376F /* SettingsView.swift */,
@@ -671,7 +668,6 @@
 				1B231AD8045DC3E57D3D66B2 /* MHLReader.swift in Sources */,
 				489356ED8541D3AF5C041185 /* MHLWriter.swift in Sources */,
 				A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */,
-				D83EFD284AC9774F3233FA6B /* MultiDestSummaryView.swift in Sources */,
 				CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */,
 				017252CB409DF5109BFB09CA /* NotificationService.swift in Sources */,
 				5479C010F2A311E752679B2F /* OrganizationPreset.swift in Sources */,

@@ -39,14 +39,15 @@ below.
    - Log creation and warnings are spread across multiple paths.
    - Hash list creation happens in the FilmCan Engine and in fallback generation.
 
-7. **Dead / dormant code**
-   - `MultiDestSummaryView` is dead code — the live progress path is
-     `InlineFanOutProgress` mounted inside each destination card. Safe to remove
-     now that the fan-out path has shipped (1.2.0).
-   - The rsync engine (`RsyncService`, rsync `preBuildScripts` bundling, the
-     `copyEngine` enum) is retained but unreachable: `RsyncOptions.copyEngine` is
-     force-coerced to `.custom` on decode. Decide whether to delete it outright or
-     keep it behind an explicit developer flag.
+7. **Dormant code**
+   - `MultiDestSummaryView` (dead) was removed in 1.2.0; the live progress path is
+     `InlineFanOutProgress` mounted inside each destination card.
+   - The rsync engine (`RsyncService` ~2k lines, rsync `preBuildScripts` bundling,
+     the `copyEngine` enum, the `RsyncOptions` model name) is retained but
+     unreachable: `RsyncOptions.copyEngine` is force-coerced to `.custom` on decode.
+     Removal is a 14-file refactor (`RsyncOptions` is the *shared* options model)
+     plus dropping the rsync binary bundling — tracked as a dedicated effort, not a
+     quick delete. Decide delete vs. keep behind an explicit developer flag.
 
 ---
 
@@ -77,7 +78,7 @@ below.
    - One place for log creation + failure messaging.
    - One place for hash list creation + failure messaging.
 
-6. **Remove dead/dormant code**
-   - Delete `MultiDestSummaryView`.
+6. **Remove dormant code**
+   - ~~Delete `MultiDestSummaryView`.~~ Done in 1.2.0.
    - Decide rsync’s fate (delete vs. dev-flag) and stop bundling rsync in the
      release build if it’s removed.
