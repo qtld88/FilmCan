@@ -1731,6 +1731,14 @@ class TransferViewModel: ObservableObject {
                 }
                 continue
             }
+            // Derive the transferred-file list from the destination's sealed hash
+            // list (MHL). Available only when verification wrote one (Fast/Paranoid);
+            // in Off mode there is no MHL, so the log lists status + counts only.
+            if results[index].transferredPaths.isEmpty,
+               let mhl = results[index].hashListPath, !mhl.isEmpty,
+               let entries = try? MHLReader.read(url: URL(fileURLWithPath: mhl)) {
+                results[index].transferredPaths = entries.map { $0.fileName }
+            }
             if let writeWarning = writeCustomLog(
                 result: results[index],
                 logFile: logFile,

@@ -608,9 +608,11 @@ extension BackupEditorView {
                                 "Trusts the data already in memory wasn't corrupted"]),
                     .init("Off",
                           good: ["Fastest — no hashing or checking"],
-                          bad: ["A write error or corruption goes undetected"])
+                          bad: ["A write error or corruption goes undetected",
+                                "No hash list — the transfer log can't list individual files (status + counts only)"])
                 ],
-                notes: ["Paranoid is recommended for safety-critical backups."]
+                notes: ["Paranoid is recommended for safety-critical backups.",
+                        "The transfer log's per-file list is derived from the hash list, so it needs Fast or Paranoid."]
             )
 
             HStack(spacing: optionSpacing) {
