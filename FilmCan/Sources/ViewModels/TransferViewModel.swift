@@ -195,6 +195,12 @@ class TransferViewModel: ObservableObject {
                     fileCount: perDestResults.map { $0.filesSkipped }.max() ?? 0
                 )
             } else {
+                writeFanOutLogs(
+                    config: activeConfig,
+                    sources: sources,
+                    results: &perDestResults,
+                    preset: organizationPreset
+                )
                 await recordHistory(
                     config: activeConfig,
                     sources: sources,
@@ -1690,6 +1696,62 @@ class TransferViewModel: ObservableObject {
         }
 
         return (nil, "Log file could not be created. Continuing without a log file.")
+    }
+
+    /// Write a per-destination log for the fan-out engine. The single-transfer path
+    /// (`runSingleTransfer`) writes its own log; the fan-out path did not, so logs
+    /// never got created for the (only) FilmCan Engine. Mirrors that behavior:
+    /// resolve the log path (same-as-destination or custom folder template) and
+    /// write it, recording the path / any warning back onto each result.
+    private func writeFanOutLogs(
+        config: BackupConfiguration,
+        sources: [String],
+        results: inout [TransferResult],
+        preset: OrganizationPreset?
+    ) {
+        guard config.logEnabled else { return }
+        let engine = config.rsyncOptions.copyEngine
+        let customDate = preset?.useCustomDate == true ? preset?.customDate : nil
+        for index in results.indices {
+            let destination = results[index].destination
+            let resolution = resolvedLogFilePath(
+                logEnabled: true,
+                logLocation: config.logLocation,
+                customLogPath: config.customLogPath,
+                logFileNameTemplate: config.logFileNameTemplate,
+                configName: config.name,
+                destination: destination,
+                sources: sources,
+                customDate: customDate
+            )
+            guard let logFile = resolution.path else {
+                results[index].logFilePath = nil
+                if let warning = resolution.warning {
+                    results[index].warningMessage = mergeWarning(results[index].warningMessage, warning)
+                }
+                continue
+            }
+            if let writeWarning = writeCustomLog(
+                result: results[index],
+                logFile: logFile,
+                sources: sources,
+                destination: destination,
+                engine: engine
+            ) {
+                results[index].logFilePath = nil
+                results[index].warningMessage = mergeWarning(results[index].warningMessage, writeWarning)
+            } else {
+                results[index].logFilePath = logFile
+                if let warning = resolution.warning {
+                    results[index].warningMessage = mergeWarning(results[index].warningMessage, warning)
+                }
+            }
+        }
+    }
+
+    private func mergeWarning(_ existing: String?, _ new: String) -> String {
+        guard let existing, !existing.isEmpty else { return new }
+        return existing.contains(new) ? existing : "\(existing)\n\(new)"
     }
 
     private func writeCustomLog(
