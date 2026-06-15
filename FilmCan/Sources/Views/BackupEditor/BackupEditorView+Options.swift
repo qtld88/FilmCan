@@ -494,8 +494,6 @@ extension BackupEditorView {
             basicOptionsContent
         case .source:
             sourceOptionsContent
-        case .refinements:
-            transferRefinementsContent
         case .logs:
             logsContent
         case .destinations:
@@ -504,7 +502,7 @@ extension BackupEditorView {
     }
 
     private var availableOptionsTabs: [OptionsTab] {
-        isCustomEngine ? OptionsTab.allCases.filter { $0 != .refinements } : OptionsTab.allCases
+        OptionsTab.allCases
     }
 
     private var optionsHorizontalPadding: CGFloat {
@@ -603,8 +601,6 @@ extension BackupEditorView {
                 }
                 .buttonStyle(.plain)
             }
-            .disabled(!isCustomEngine)
-            .opacity(isCustomEngine ? 1 : 0.5)
 
             optionRow(
                 icon: "arrow.triangle.2.circlepath",
@@ -1000,156 +996,6 @@ extension BackupEditorView {
                 .contentShape(Rectangle())
                 .onTapGesture { showExcludePatterns.toggle() }
             }
-        }
-    }
-
-    private var transferRefinementsContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            optionRow(
-                icon: "checkmark.shield.fill",
-                iconColor: FilmCanTheme.textSecondary,
-                title: "Verify after copy",
-                subtitle: isCustomEngine
-                    ? "Managed in Basic tab for FilmCan Engine"
-                    : "Ensures files copied correctly (recommended)",
-                isOn: $viewModel.rsyncOptions.postVerify,
-                textWidth: basicOptionTextWidth,
-                helpText: isCustomEngine
-                    ? "Use the Hash verification toggle in the Basic tab."
-                    : "Runs a checksum-based verification after copying."
-            )
-            .disabled(isCustomEngine)
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            optionRow(
-                icon: "arrow.triangle.2.circlepath",
-                iconColor: FilmCanTheme.textSecondary,
-                title: "Only copy new or changed files",
-                subtitle: isCustomEngine
-                    ? "Not available with FilmCan Engine"
-                    : "Incremental sync saves time and space",
-                isOn: $viewModel.rsyncOptions.onlyCopyChanged,
-                textWidth: basicOptionTextWidth,
-                helpText: isCustomEngine
-                    ? "FilmCan Engine always copies all files."
-                    : "Compares file changes (size/date or checksum) and skips identical files."
-            )
-            .disabled(isCustomEngine)
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: optionSpacing) {
-                    Color.clear
-                        .frame(width: optionIconWidth, height: 1)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Checksum algorithm")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                    Text("Used for transfer integrity checks and pre/post-copy comparisons.")
-                        .font(FilmCanFont.body(11))
-                        .foregroundColor(FilmCanTheme.textSecondary)
-                }
-                .frame(width: resolvedTextWidth(optionTextWidth), alignment: .leading)
-                HStack(spacing: 6) {
-                    Text(FilmCanHashAlgorithm.xxh128.displayName)
-                    Image(systemName: "lock.fill")
-                        .font(.caption)
-                        .foregroundColor(FilmCanTheme.textSecondary)
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(FilmCanTheme.card)
-                .cornerRadius(6)
-                .frame(width: resolvedMenuWidth(optionMenuWidth + 40, textWidth: resolvedTextWidth(optionTextWidth)), alignment: .leading)
-            }
-            .help("Checksum algorithm is fixed to xxHash128.")
-            }
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            Divider()
-
-            advancedOptionRow(
-                icon: nil,
-                title: "Use checksum to verify file contents before copy",
-                subtitle: isCustomEngine
-                    ? "Not available with FilmCan Engine"
-                    : "Uses checksums instead of size/date to decide what needs copying. This is pre-copy, not the post-copy verification.",
-                isOn: $viewModel.rsyncOptions.useChecksum,
-                helpText: isCustomEngine
-                    ? "FilmCan Engine always copies all files and verifies while copying."
-                    : "Forces checksum comparison before copying; slower but more accurate."
-            )
-            .disabled(isCustomEngine)
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            Divider()
-
-            advancedOptionRow(
-                icon: nil,
-                title: "Update files in place",
-                subtitle: isCustomEngine
-                    ? "Not available with FilmCan Engine"
-                    : "Writes updates directly into existing destination files instead of creating a new temp file and swapping it in at the end.",
-                isOn: $viewModel.rsyncOptions.inplace,
-                helpText: isCustomEngine
-                    ? "FilmCan Engine always writes new destination files."
-                    : "Can be faster for large files but is riskier if interrupted."
-            )
-            .disabled(isCustomEngine)
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            Divider()
-
-            advancedOptionRow(
-                icon: nil,
-                title: "Allow resume after stop",
-                subtitle: isCustomEngine
-                    ? "Not available with FilmCan Engine"
-                    : "Keeps partial files in .filmcan/partial so you can stop and continue later.",
-                isOn: $viewModel.rsyncOptions.allowResume,
-                helpText: isCustomEngine
-                    ? "FilmCan Engine does not support resuming."
-                    : "Resume keeps partial files on disk so you can continue after stopping. This can use extra space, leave partials until completion, and can be confusing if sources change between runs. Turn it off for a clean destination on stop."
-            )
-            .disabled(isCustomEngine)
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Custom rsync arguments")
-                    .font(.body.weight(.medium))
-                Text("For power users only.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                TextField("e.g., --exclude '*.tmp' --exclude '.DS_Store'", text: $viewModel.rsyncOptions.customArgs)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minWidth: 260, maxWidth: 360, alignment: .leading)
-                    .disabled(isCustomEngine)
-            }
-            .help(isCustomEngine ? "Not available with FilmCan Engine." : "Advanced: pass extra rsync flags directly.")
-            .opacity(isCustomEngine ? 0.5 : 1.0)
-
-            Divider()
-
-            advancedOptionRow(
-                icon: nil,
-                title: "Delete files not in source",
-                subtitle: isCustomEngine
-                    ? "Not available with FilmCan Engine"
-                    : "Dangerous: makes destination a mirror of the source.",
-                titleColor: .red,
-                subtitleColor: .red,
-                isOn: $viewModel.rsyncOptions.delete,
-                helpText: isCustomEngine
-                    ? "FilmCan Engine never deletes extra destination files."
-                    : "Deletes destination files that are not present in the source."
-            )
-            .disabled(isCustomEngine)
-            .opacity(isCustomEngine ? 0.5 : 1.0)
         }
     }
 

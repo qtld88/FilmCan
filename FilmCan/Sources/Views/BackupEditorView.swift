@@ -48,7 +48,6 @@ struct BackupEditorView: View {
         case source = "Source"
         case destinations = "Destinations"
         case logs = "Logs"
-        case refinements = "Transfer refinements"
 
         var id: String { rawValue }
 
@@ -58,7 +57,6 @@ struct BackupEditorView: View {
             case .source: return "Source"
             case .destinations: return "Destinations"
             case .logs: return "Logs"
-            case .refinements: return "Rsync refinements"
             }
         }
     }
@@ -152,11 +150,6 @@ struct BackupEditorView: View {
         .onChange(of: viewModel.sourceAutoDetectPatterns) { _ in
             if viewModel.sourceAutoDetectEnabled {
                 viewModel.refreshAutoDetectedSources()
-            }
-        }
-        .onChange(of: viewModel.rsyncOptions.copyEngine) { engine in
-            if engine == .custom && selectedOptionsTab == .refinements {
-                selectedOptionsTab = .basic
             }
         }
         .onChange(of: viewModel.destinationAutoDetectEnabled) { enabled in
