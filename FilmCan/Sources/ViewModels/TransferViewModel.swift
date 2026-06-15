@@ -1161,7 +1161,14 @@ class TransferViewModel: ObservableObject {
                 fileOrdering: config.rsyncOptions.fileOrdering,
                 duplicatePolicy: config.duplicatePolicy,
                 duplicateCounterTemplate: config.duplicateCounterTemplate,
-                duplicateResolver: nil,
+                duplicateResolver: (config.duplicatePolicy == .ask || config.duplicatePolicy == .verify)
+                    ? { @Sendable [weak self] prompt async -> DuplicateResolution in
+                        guard let self else {
+                            return DuplicateResolution(action: .skip, applyToAll: false, counterTemplate: nil)
+                        }
+                        return await self.resolveDuplicate(prompt: prompt)
+                    }
+                    : nil,
                 verifyMode: verifyMode,
                 dryRun: false,
                 forceRecopy: config.forceRecopy,
