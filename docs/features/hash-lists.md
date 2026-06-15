@@ -13,33 +13,42 @@ Hash files for later verification. Hash lists are generated for successful trans
 
 ## Format
 
-```
-# filmcan-hash: xxh128
-<xxh128>  <absolute-path>
-```
+FilmCan writes a spec-faithful **ASC MHL v2.0** manifest per roll (xxHash128 /
+xxh3-128 file hashes), plus an `ascmhl_chain.xml` index recording each generation by
+its **C4** hash — a chain of custody accepted by the reference ASC MHL tooling.
 
-One line per file. Uses xxHash128 hashes.
+```xml
+<hashlist version="2.0" xmlns="urn:ASC:MHL:v2.0">
+  <hashes>
+    <hash>
+      <path size="…">A001C001.mov</path>
+      <xxh128 action="original" hashdate="…">…</xxh128>
+    </hash>
+  </hashes>
+</hashlist>
+```
 
 ---
 
 ## When Generated
 
-The xxHash128 of each file is computed during the copy and written to the hash
-list as the file finalizes, unless **Verification** is set to `Off`. One sealed
-MHL is written per source root, per destination.
+The xxHash128 of each file is computed during the copy and written to the manifest
+as the file finalizes, unless **Verification** is set to `Off`. Each backup run adds
+a new **sealed generation** to the roll's chain.
 
 ---
 
 ## Location
 
+At each roll's `ascmhl/` folder (the roll = the source-root folder at the destination):
+
 ```
-<destination>/.filmcan/hashlists/
+<destination>/<roll-folder>/ascmhl/0001_<roll>_<date>Z.mhl
+<destination>/<roll-folder>/ascmhl/ascmhl_chain.xml
 ```
 
-Filename:
-```
-hashlist_<config>_<source>_<destination>_YYYYMMDD-HHMMSS.xxh128
-```
+(Backups made before 1.3 used the older `<destination>/.filmcan/hashlists/` location;
+resume still reads those once.)
 
 ---
 

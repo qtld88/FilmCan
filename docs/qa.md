@@ -42,6 +42,22 @@ Manual test procedure for FilmCan. This validates core flows and checks for doc/
 
 ---
 
+## Netflix Ingest preset
+
+1. In **Options**, pick **Preset > Netflix Ingest (built-in)**. Expected: the **Shoot
+   metadata** fields appear (Destinations tab); the log location defaults to `Reports/`.
+2. Set Episode `EP103`, Day `Day05`, Unit `MU`, Camera format `ARRI`. Add a card folder
+   `A001` and a destination. Run.
+3. Expected dest tree: `20260615_EP103_Day05_MU/Camera_Media/ARRI/A001/…`, plus sibling
+   `Reports/` and `Sound_Media/`, an `A001/ascmhl/0001_A001_<date>Z.mhl` + `ascmhl_chain.xml`,
+   and the transfer log in `Reports/`.
+4. Run again unchanged. Expected: a new generation `0002_…` is added to the chain.
+5. Name a source `B:01`. On Run, the validation sheet appears. Click **Auto-fix & run**.
+   Expected: the source folder is renamed to `B_01` and the backup proceeds.
+6. With fewer than 3 destinations, the metadata section shows the ≥3-copies reminder.
+
+---
+
 ## Stop / Cancel
 
 1. Start a transfer with several large files.
