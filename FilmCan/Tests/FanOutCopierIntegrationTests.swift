@@ -72,15 +72,13 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertFalse(contents1.contains { $0.hasPrefix(".filmcan-") }, "No temp files in dest1")
         XCTAssertFalse(contents2.contains { $0.hasPrefix(".filmcan-") }, "No temp files in dest2")
 
-        // Verify MHL file per destination (flat-file root: MHL at dest/ascmhl/0001_source.bin.mhl)
-        let mhl1 = dest1.appendingPathComponent("ascmhl/0001_source.bin.mhl")
-        let mhl2 = dest2.appendingPathComponent("ascmhl/0001_source.bin.mhl")
-        XCTAssertTrue(fm.fileExists(atPath: mhl1.path), "MHL should exist in dest1")
-        XCTAssertTrue(fm.fileExists(atPath: mhl2.path), "MHL should exist in dest2")
-        let entries1 = try ASCMHLReader.read(url: mhl1)
+        // Verify MHL file per destination (flat-file root: MHL at dest/ascmhl/<generation>.mhl)
+        XCTAssertTrue(ascMHLExists(ascmhlDir: dest1.appendingPathComponent("ascmhl")), "MHL should exist in dest1")
+        XCTAssertTrue(ascMHLExists(ascmhlDir: dest2.appendingPathComponent("ascmhl")), "MHL should exist in dest2")
+        let entries1 = try readLatestASCMHL(ascmhlDir: dest1.appendingPathComponent("ascmhl"))
         XCTAssertEqual(entries1.count, 1)
         XCTAssertEqual(entries1[0].relPath, "source.bin")
-        let entries2 = try ASCMHLReader.read(url: mhl2)
+        let entries2 = try readLatestASCMHL(ascmhlDir: dest2.appendingPathComponent("ascmhl"))
         XCTAssertEqual(entries2.count, 1)
         XCTAssertEqual(entries2[0].relPath, "source.bin")
     }
@@ -269,11 +267,11 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         }
 
         // One MHL per source root per dest, with all 3 files aggregated
-        // (directory root "CARD": MHL at dest/CARD/ascmhl/0001_CARD.mhl)
+        // (directory root "CARD": MHL at dest/CARD/ascmhl/<generation>.mhl)
         for dest in [dest1, dest2] {
-            let mhl = dest.appendingPathComponent("CARD/ascmhl/0001_CARD.mhl")
-            XCTAssertTrue(fm.fileExists(atPath: mhl.path), "Missing MHL at \(mhl.path)")
-            let entries = try ASCMHLReader.read(url: mhl)
+            let ascmhlDir = dest.appendingPathComponent("CARD/ascmhl")
+            XCTAssertTrue(ascMHLExists(ascmhlDir: ascmhlDir), "Missing MHL at \(ascmhlDir.path)")
+            let entries = try readLatestASCMHL(ascmhlDir: ascmhlDir)
             XCTAssertEqual(entries.count, 3, "MHL should aggregate all 3 files in the source root")
         }
     }
@@ -322,14 +320,14 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: dest.appendingPathComponent("CARD2/b.bin")), bData)
 
         // Two MHLs: one per source root
-        // loose.bin (flat): dest/ascmhl/0001_loose.bin.mhl
-        // CARD2 (dir): dest/CARD2/ascmhl/0001_CARD2.mhl
-        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("ascmhl/0001_loose.bin.mhl").path))
-        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("CARD2/ascmhl/0001_CARD2.mhl").path))
+        // loose.bin (flat): dest/ascmhl/<generation>.mhl
+        // CARD2 (dir): dest/CARD2/ascmhl/<generation>.mhl
+        XCTAssertTrue(ascMHLExists(ascmhlDir: dest.appendingPathComponent("ascmhl")))
+        XCTAssertTrue(ascMHLExists(ascmhlDir: dest.appendingPathComponent("CARD2/ascmhl")))
 
-        let looseEntries = try ASCMHLReader.read(url: dest.appendingPathComponent("ascmhl/0001_loose.bin.mhl"))
+        let looseEntries = try readLatestASCMHL(ascmhlDir: dest.appendingPathComponent("ascmhl"))
         XCTAssertEqual(looseEntries.count, 1)
-        let cardEntries = try ASCMHLReader.read(url: dest.appendingPathComponent("CARD2/ascmhl/0001_CARD2.mhl"))
+        let cardEntries = try readLatestASCMHL(ascmhlDir: dest.appendingPathComponent("CARD2/ascmhl"))
         XCTAssertEqual(cardEntries.count, 2)
     }
 
@@ -405,6 +403,19 @@ final class FanOutCopierIntegrationTests: XCTestCase {
                        "Final verified bytes should equal total bytes of all sources")
     }
 
+    // MARK: - ASC MHL helpers
+
+    /// True if a sealed ASC MHL generation exists in the given ascmhl/ folder.
+    private func ascMHLExists(ascmhlDir: URL) -> Bool {
+        ASCMHLChain.latestManifestPath(ascmhlDir: ascmhlDir) != nil
+    }
+    /// Read the latest ASC MHL generation manifest in the given ascmhl/ folder.
+    private func readLatestASCMHL(ascmhlDir: URL) throws -> [ASCMHLReader.Entry] {
+        let latest = try XCTUnwrap(ASCMHLChain.latestManifestPath(ascmhlDir: ascmhlDir),
+                                   "no ASC MHL generation in \(ascmhlDir.path)")
+        return try ASCMHLReader.read(url: ascmhlDir.appendingPathComponent(latest))
+    }
+
     // MARK: - Resume skip
 
     private func resumeConfig(card: URL, dest: URL, forceRecopy: Bool = false) -> FanOutCopier.Configuration {
@@ -475,9 +486,8 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("CARD/\(name)").path), "missing \(name)")
         }
         // The hash list retains all three entries (not truncated on resume).
-        // Directory root "CARD": MHL at dest/CARD/ascmhl/0001_CARD.mhl
-        let mhl = dest.appendingPathComponent("CARD/ascmhl/0001_CARD.mhl")
-        let entries = try ASCMHLReader.read(url: mhl)
+        // Directory root "CARD": MHL at dest/CARD/ascmhl/<generation>.mhl
+        let entries = try readLatestASCMHL(ascmhlDir: dest.appendingPathComponent("CARD/ascmhl"))
         XCTAssertEqual(Set(entries.map { $0.relPath }), ["a.bin", "b.bin", "c.bin"])
     }
 
@@ -510,10 +520,10 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let r1 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
         XCTAssertEqual(r1.first?.filesTransferred, 2)
 
-        // ASC MHL must exist at <dest>/ASCMHL_CARD/ascmhl/0001_ASCMHL_CARD.mhl
-        let mhlURL = dest.appendingPathComponent("ASCMHL_CARD/ascmhl/0001_ASCMHL_CARD.mhl")
-        XCTAssertTrue(fm.fileExists(atPath: mhlURL.path), "ASC MHL missing at \(mhlURL.path)")
-        let entries = try ASCMHLReader.read(url: mhlURL)
+        // ASC MHL must exist at <dest>/ASCMHL_CARD/ascmhl/<generation>.mhl
+        let ascmhlDir = dest.appendingPathComponent("ASCMHL_CARD/ascmhl")
+        XCTAssertTrue(ascMHLExists(ascmhlDir: ascmhlDir), "ASC MHL missing at \(ascmhlDir.path)")
+        let entries = try readLatestASCMHL(ascmhlDir: ascmhlDir)
         XCTAssertEqual(entries.count, 2)
         XCTAssertEqual(Set(entries.map { $0.relPath }), ["file1.bin", "file2.bin"])
 
