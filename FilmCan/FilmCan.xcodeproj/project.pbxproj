@@ -68,6 +68,7 @@
 		9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0874AFE948C474D013C69931 /* LogSettingsView.swift */; };
 		939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */; };
 		94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01136E3DBB8977E8B301ACEB /* DriveAnchorPreferences.swift */; };
+		98207FCDB77CDB0779BD40D0 /* ASCMHLChainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F570E4E93F3AA7F0C77ECF02 /* ASCMHLChainTests.swift */; };
 		99F49C12806796F55D999CEE /* FanOutCopierSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */; };
 		9A1054E723849EB87CABFE7E /* DriveUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BABC9B93BCC84A6687D8C17 /* DriveUtilities.swift */; };
 		9A5D1736A87B604795828764 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0DE00B31C198D55826941B /* Extensions.swift */; };
@@ -89,6 +90,7 @@
 		BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF50C40E7C0C3EE500EFA4C1 /* ColorHex.swift */; };
 		BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */; };
 		BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867AFB25988C222B6A24039C /* PreviewInfo.swift */; };
+		C5261D4C4443DBE1151C16AB /* ASCMHLChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */; };
 		C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */; };
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
 		C9BB15A21E833EA6850E5D34 /* BackupEditorView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */; };
@@ -173,6 +175,7 @@
 		5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailedDestRetryPanel.swift; sourceTree = "<group>"; };
 		5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePromptSheet.swift; sourceTree = "<group>"; };
 		5E84E2F5E2941DED39DB6EDD /* FileEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileEnumerator.swift; sourceTree = "<group>"; };
+		5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLChain.swift; sourceTree = "<group>"; };
 		61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhookService.swift; sourceTree = "<group>"; };
 		640924E857BB35194B737188 /* CombinedSpeedETATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedSpeedETATests.swift; sourceTree = "<group>"; };
 		64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunReport.swift; sourceTree = "<group>"; };
@@ -241,6 +244,7 @@
 		EA563679AEE01B0FF5D12CB7 /* TransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferService.swift; sourceTree = "<group>"; };
 		EB457DCE07BC5C884750E430 /* UIStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStrings.swift; sourceTree = "<group>"; };
 		F40F951445F8238F0B740353 /* PreviewCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCalculator.swift; sourceTree = "<group>"; };
+		F570E4E93F3AA7F0C77ECF02 /* ASCMHLChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLChainTests.swift; sourceTree = "<group>"; };
 		F772B2D53DF92EE1BA0929C9 /* RepairFailedDestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepairFailedDestTests.swift; sourceTree = "<group>"; };
 		F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferProgressTests.swift; sourceTree = "<group>"; };
 		FB8B45E6010E1222A7826DC8 /* WindowTitleSetter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleSetter.swift; sourceTree = "<group>"; };
@@ -278,6 +282,7 @@
 			isa = PBXGroup;
 			children = (
 				6D1A5B5BDD573D20E4EF6A03 /* AppState.swift */,
+				5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */,
 				9516D730EDD86DA944200527 /* ASCMHLReader.swift */,
 				DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */,
 				13273CE3DB6E17D073212DFE /* BoundedChannel.swift */,
@@ -331,6 +336,7 @@
 		8A5ED741C11830E24674385D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				F570E4E93F3AA7F0C77ECF02 /* ASCMHLChainTests.swift */,
 				31E297808A920BE36CE33E0B /* ASCMHLConformanceTests.swift */,
 				BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */,
 				84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */,
@@ -593,6 +599,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				98207FCDB77CDB0779BD40D0 /* ASCMHLChainTests.swift in Sources */,
 				63FFD96CEAF608C299F8CFA8 /* ASCMHLConformanceTests.swift in Sources */,
 				4536D8AE58C4A2678A9723B6 /* ASCMHLReaderTests.swift in Sources */,
 				46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */,
@@ -615,6 +622,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C5261D4C4443DBE1151C16AB /* ASCMHLChain.swift in Sources */,
 				3E6DB6C9100888E1E70240C3 /* ASCMHLReader.swift in Sources */,
 				BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */,
 				CB10BBAE07DBB48A5E304FA0 /* AlreadyBackedUpSheet.swift in Sources */,
