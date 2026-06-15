@@ -31,7 +31,7 @@ actor DestWriter {
     private let displayName: String
     private let verifyMode: VerifyMode
     private let requiresFullFsync: Bool
-    private let mhlWriter: MHLWriter?
+    private let mhlWriter: ASCMHLWriter?
 
     private var tempFileURL: URL?
     private var writeHandle: FileHandle?
@@ -56,7 +56,7 @@ actor DestWriter {
         if let mhlURL {
             let dir = mhlURL.deletingLastPathComponent()
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.mhlWriter = try MHLWriter(url: mhlURL, sourceName: sourceName)
+            self.mhlWriter = try ASCMHLWriter(url: mhlURL, rollName: sourceName)
         } else {
             self.mhlWriter = nil
         }
@@ -72,7 +72,7 @@ actor DestWriter {
         displayName: String,
         verifyMode: VerifyMode,
         requiresFullFsync: Bool,
-        sharedMHLWriter: MHLWriter?
+        sharedMHLWriter: ASCMHLWriter?
     ) async throws {
         self.destPath = destPath
         self.displayName = displayName
@@ -156,8 +156,8 @@ actor DestWriter {
     }
 
     /// Append this file's hash to the per-destination MHL.
-    func appendMHL(hash: String, fileName: String) async throws {
-        try await mhlWriter?.append(hash: hash, fileName: fileName)
+    func appendMHL(hash: String, fileName: String, size: Int64) async throws {
+        try await mhlWriter?.append(relPath: fileName, size: size, hash: hash)
         try await mhlWriter?.flush()
     }
 

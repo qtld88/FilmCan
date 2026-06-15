@@ -279,16 +279,24 @@ actor FanOutCopier {
         return out
     }
 
-    private func buildSharedMHLs(forRootNames rootNames: Set<String>) throws -> [String: [String: MHLWriter]] {
-        var result: [String: [String: MHLWriter]] = [:]
+    private func buildSharedMHLs(
+        forRootNames rootNames: Set<String>,
+        directoryRoots: Set<String>,
+        rootPaths: [String: String],
+        jobStartTime: Date
+    ) throws -> [String: [String: ASCMHLWriter]] {
+        var result: [String: [String: ASCMHLWriter]] = [:]
         for destCfg in config.destinations {
-            var byRoot: [String: MHLWriter] = [:]
+            var byRoot: [String: ASCMHLWriter] = [:]
             for rootName in rootNames {
-                let mhlURL = URL(fileURLWithPath: destCfg.destPath)
-                    .appendingPathComponent(".filmcan")
-                    .appendingPathComponent("hashlists")
-                    .appendingPathComponent("\(rootName).mhl")
-                let writer = try MHLWriter(url: mhlURL, sourceName: rootName)
+                let rollFolder = Self.resolveRollFolder(
+                    destRoot: destCfg.destPath, rootName: rootName,
+                    rootPath: rootPaths[rootName] ?? rootName,
+                    isDirectoryRoot: directoryRoots.contains(rootName),
+                    preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime)
+                let mhlURL = Self.ascMHLURL(rollFolder: rollFolder, rootName: rootName)
+                let writer = try ASCMHLWriter(url: mhlURL, rollName: rootName)
                 byRoot[rootName] = writer
             }
             result[destCfg.destPath] = byRoot
@@ -443,11 +451,17 @@ actor FanOutCopier {
         // Seed each with the destination's existing entries so a resumed run
         // appends to its hash list instead of truncating already-recorded files.
         let uniqueRootNames = Set(plannedFiles.map { $0.rootName })
-        let sharedMHLsByDest = try buildSharedMHLs(forRootNames: uniqueRootNames)
+        var rootPathsByName: [String: String] = [:]
+        for f in allPlannedFiles where rootPathsByName[f.rootName] == nil { rootPathsByName[f.rootName] = f.rootPath }
+        let sharedMHLsByDest = try buildSharedMHLs(
+            forRootNames: uniqueRootNames,
+            directoryRoots: directoryRoots,
+            rootPaths: rootPathsByName,
+            jobStartTime: jobStartTime)
         for (destPath, byRoot) in sharedMHLsByDest {
             for (rootName, writer) in byRoot {
                 if let existing = existingMHLByDest[destPath]?[rootName], !existing.isEmpty {
-                    await writer.seed(existing.map { (hash: $0.hash, fileName: $0.fileName) })
+                    await writer.seed(existing.map { ASCMHLWriter.Entry(relPath: $0.fileName, size: 0, hash: $0.hash) })
                 }
             }
         }
@@ -591,7 +605,7 @@ actor FanOutCopier {
         rootName: String,
         rootPath: String,
         relPath: String,
-        sharedMHLsByDest: [String: [String: MHLWriter]],
+        sharedMHLsByDest: [String: [String: ASCMHLWriter]],
         jobStartTime: Date,
         skippedFiles: Int
     ) async throws -> CopyResult {
@@ -731,7 +745,7 @@ actor FanOutCopier {
                 let destHash = destHasher.finalize().hexString
                 do {
                     try await writer.finalize(fileHash: destHash, sourceSize: sourceSize)
-                    try await writer.appendMHL(hash: destHash, fileName: sourceName)
+                    try await writer.appendMHL(hash: destHash, fileName: sourceName, size: sourceSize)
                 } catch {
                     return DestWriterResult(
                         destPath: destCfg.destPath, displayName: destCfg.displayName,
@@ -768,11 +782,11 @@ actor FanOutCopier {
                 prog.filesSkipped = skippedFiles
                 progressHandler?(prog)
 
-                let mhlPath = URL(fileURLWithPath: destCfg.destPath)
-                    .appendingPathComponent(".filmcan")
-                    .appendingPathComponent("hashlists")
-                    .appendingPathComponent("\(rootName).mhl")
-                    .path
+                let mhlRollFolder = Self.resolveRollFolder(
+                    destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
+                    isDirectoryRoot: !relPath.isEmpty, preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime)
+                let mhlPath = Self.ascMHLURL(rollFolder: mhlRollFolder, rootName: rootName).path
 
                 return DestWriterResult(
                     destPath: destCfg.destPath, displayName: destCfg.displayName,
