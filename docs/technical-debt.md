@@ -2,8 +2,9 @@
 
 This document tracks known weak spots and a plan to improve them, based on the
 current codebase. As of 1.2.x the **FilmCan Engine (fan-out copier) is the only
-copy engine** — the rsync engine has been fully removed and FilmCan no longer
-bundles or requires Homebrew rsync.
+copy engine** — the rsync engine code + UI were removed and FilmCan no longer
+requires Homebrew rsync. (The build still bundles the rsync binary solely to ship
+`libxxhash` for verification — see item 7.)
 
 ---
 
@@ -42,10 +43,13 @@ bundles or requires Homebrew rsync.
 7. **Dormant code**
    - `MultiDestSummaryView` (dead) was removed in 1.2.0; the live progress path is
      `InlineFanOutProgress` mounted inside each destination card.
-   - ~~The rsync engine (`RsyncService`, rsync `preBuildScripts` bundling, the
-     `copyEngine` enum) is retained but unreachable.~~ **Done in 1.2.x** — the rsync
-     engine has been fully removed and the rsync binary bundling dropped from the
-     release build.
+   - **rsync engine code + UI removed in 1.2.x** (`RsyncService`, the engine picker,
+     the "Transfer refinements" tab, engine-help sheet). **Remaining:** the build
+     still bundles the rsync binary + libs because `XXHash.swift` dlopen's
+     `libxxhash.0.dylib` from `Resources/rsync/lib/<arch>/` for xxh128 verification
+     (no pure-Swift fallback — `StreamingHasher` returns nil if it can't load). To
+     stop bundling rsync, vendor `libxxhash.0.dylib` standalone (own embed step +
+     update `XXHash.possibleLibraryPaths`) first, then drop the rsync embed.
 
 ---
 
@@ -78,5 +82,6 @@ bundles or requires Homebrew rsync.
 
 6. **Remove dormant code**
    - ~~Delete `MultiDestSummaryView`.~~ Done in 1.2.0.
-   - ~~Decide rsync’s fate and stop bundling rsync in the release build.~~ Done in
-     1.2.x — the rsync engine was deleted and rsync is no longer bundled.
+   - ~~Delete the rsync engine code + UI.~~ Done in 1.2.x.
+   - **Still TODO:** vendor `libxxhash.0.dylib` standalone, then stop bundling the
+     rsync binary (see Known Weak Areas #7).

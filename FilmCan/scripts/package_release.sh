@@ -198,10 +198,28 @@ PY
   fi
 fi
 
+# Ensure bundled rsync resources exist in the staged app (copy from x86_64 build if missing)
+RSYNC_STAGE_DIR="$STAGE_DIR/FilmCan.app/Contents/Resources/rsync"
+RSYNC_X86_DIR="$APP_X86_64/Contents/Resources/rsync"
+if [ ! -d "$RSYNC_STAGE_DIR/lib/x86_64" ] || [ ! -d "$RSYNC_STAGE_DIR/lib/arm64" ]; then
+  if [ ! -d "$RSYNC_X86_DIR/lib/x86_64" ] && [ ! -d "$RSYNC_X86_DIR/lib/arm64" ]; then
+    echo "error: No rsync resources found in either build." >&2
+    exit 1
+  fi
+  rsync -a "$RSYNC_X86_DIR/" "$RSYNC_STAGE_DIR/"
+fi
+
 lipo -create \
   "$APP_ARM64/Contents/MacOS/FilmCan" \
   "$APP_X86_64/Contents/MacOS/FilmCan" \
   -output "$STAGE_DIR/FilmCan.app/Contents/MacOS/FilmCan"
+
+# Re-sign bundled rsync binaries + dylibs (install_name_tool modifies signatures)
+RSYNC_DIR="$STAGE_DIR/FilmCan.app/Contents/Resources/rsync"
+if [ -d "$RSYNC_DIR" ]; then
+  find "$RSYNC_DIR" -type f \( -name "rsync*" -o -name "*.dylib" \) -print0 \
+    | xargs -0 -I{} codesign --force --sign - "{}"
+fi
 
 codesign --force --deep --sign - "$STAGE_DIR/FilmCan.app"
 codesign --verify --deep --strict --verbose=2 "$STAGE_DIR/FilmCan.app"
