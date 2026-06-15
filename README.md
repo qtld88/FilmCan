@@ -16,7 +16,7 @@
 
 ## What It Does
 
-FilmCan backs up camera cards, rushes, folders, or files to multiple destinations with verification and organization presets—giving DITs, ACs, and cinematographers peace of mind through battle‑tested rsync and a purpose‑built fan‑out copy engine.
+FilmCan backs up camera cards, rushes, folders, or files to multiple destinations with verification and organization presets—giving DITs, ACs, and cinematographers peace of mind through a purpose‑built fan‑out copy engine.
 
 - Copies multiple sources to multiple destinations in one pass (fan-out: source read once, broadcast to every drive)
 - Two verify modes: **fast** (stream hash during copy) and **paranoid** (post-copy re-read from disk, bypassing OS cache)
