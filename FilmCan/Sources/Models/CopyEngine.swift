@@ -23,8 +23,4 @@ enum CopyEngine: String, Codable, CaseIterable, Identifiable {
             return "Streamlined copier optimized for speed with built-in verification. Best for full backups to local drives."
         }
     }
-
-    var supportsIncrementalSync: Bool { self == .rsync }
-    var supportsResume: Bool { self == .rsync }
-    var supportsCustomFilters: Bool { self == .rsync }
 }
