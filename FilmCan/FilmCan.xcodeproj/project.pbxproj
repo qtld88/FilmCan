@@ -98,7 +98,6 @@
 		D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */; };
 		D7A83CF121B3D61390AF5391 /* DestResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7BCF3596001402A6F510FC /* DestResult.swift */; };
 		DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB49243153FED4BA9A4594E /* BackupListView.swift */; };
-		DE4C5CF3B866008336DDAF07 /* RsyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06EB2AD3767834B698BF542 /* RsyncService.swift */; };
 		E19CFCE13B1A1F1155F2AF57 /* FolderPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F3544361F9AB588C49995D /* FolderPickerSheet.swift */; };
 		E3339064DFC685E6CCD9EABF /* OrganizationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA472985C7AB10A3B859755A /* OrganizationSheet.swift */; };
 		E3646B0FD3D8713EE6949BCF /* TokenFlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9B0ACA5EC9329FFCD201A6 /* TokenFlowLayout.swift */; };
@@ -207,7 +206,6 @@
 		ACB49243153FED4BA9A4594E /* BackupListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupListView.swift; sourceTree = "<group>"; };
 		AD9B0ACA5EC9329FFCD201A6 /* TokenFlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenFlowLayout.swift; sourceTree = "<group>"; };
 		B045C641EBC5B34A97D7BD94 /* CopyEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyEngine.swift; sourceTree = "<group>"; };
-		B06EB2AD3767834B698BF542 /* RsyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RsyncService.swift; sourceTree = "<group>"; };
 		B1146F690162AC3EE569EFBB /* SourceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceListView.swift; sourceTree = "<group>"; };
 		B1EF3014920FF86C66BBDA1F /* DestinationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestinationListView.swift; sourceTree = "<group>"; };
 		B25CADDC1BE66072D93ADFD6 /* DestProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestProgress.swift; sourceTree = "<group>"; };
@@ -288,7 +286,6 @@
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
 				7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */,
 				F40F951445F8238F0B740353 /* PreviewCalculator.swift */,
-				B06EB2AD3767834B698BF542 /* RsyncService.swift */,
 				FF50D74C080DB0D6C4A8A93C /* SiblingDestSource.swift */,
 				EA563679AEE01B0FF5D12CB7 /* TransferService.swift */,
 				61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */,
@@ -680,7 +677,6 @@
 				40FA5D85515E21FADAFE1D60 /* QuickTourView.swift in Sources */,
 				C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */,
 				B4B86751C99DE113AACCED5A /* RsyncOptions.swift in Sources */,
-				DE4C5CF3B866008336DDAF07 /* RsyncService.swift in Sources */,
 				ADE31DDEE0B65D6199D89613 /* SettingsView.swift in Sources */,
 				F932C00CDF31D137B4D98E5C /* SiblingDestSource.swift in Sources */,
 				7191245AD630701955CB29ED /* SourceListView.swift in Sources */,

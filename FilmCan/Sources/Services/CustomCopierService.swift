@@ -1,5 +1,15 @@
 import Foundation
 
+enum CopyError: LocalizedError {
+    case sourceNotFound(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .sourceNotFound(let path): return "Source not found: \(path)"
+        }
+    }
+}
+
 @MainActor
 class CustomCopierService: ObservableObject, TransferService {
     @Published var progress = TransferProgress()
@@ -66,7 +76,7 @@ class CustomCopierService: ObservableObject, TransferService {
         for source in sources {
             guard fm.fileExists(atPath: source) else {
                 progress.isRunning = false
-                throw RsyncError.sourceNotFound(source)
+                throw CopyError.sourceNotFound(source)
             }
         }
 
