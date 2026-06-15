@@ -492,7 +492,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8C35359BAF755385EFA5FD74 /* Build configuration list for PBXNativeTarget "FilmCan" */;
 			buildPhases = (
-				49626612294C12A5179B09DA /* Embed rsync */,
 				B172D70E1C995905FCAF10ED /* Sources */,
 				D934B3D2821C3BD995395AEB /* Resources */,
 			);
@@ -555,29 +554,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		49626612294C12A5179B09DA /* Embed rsync */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Embed rsync";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync/rsync-arm64",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync/rsync-x86_64",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "REQUIRED_VERSION=\"3.4.0\"\n\nfind_rsync() {\n  local path=\"$1\"\n  local arch=\"$2\"\n  if [ -x \"$path\" ] && lipo -archs \"$path\" | grep -q \"$arch\"; then\n    echo \"$path\"\n  fi\n}\n\ncheck_version() {\n  local path=\"$1\"\n  local label=\"$2\"\n  local version\n  version=\"$(\"$path\" --version | head -n 1 | awk '{print $3}')\"\n  if [ -z \"$version\" ]; then\n    echo \"warning: Unable to determine rsync version for $label. Bundle will proceed, but features like xxh128 may be unavailable.\"\n    return\n  fi\n  local min_ok\n  min_ok=\"$(printf '%s\\n' \"$REQUIRED_VERSION\" \"$version\" | sort -V | head -n 1)\"\n  if [ \"$min_ok\" != \"$REQUIRED_VERSION\" ]; then\n    if [ \"$CONFIGURATION\" = \"Release\" ]; then\n      echo \"error: rsync $version ($label) found. FilmCan requires rsync $REQUIRED_VERSION+ for xxh128/checksum-choice. Update Homebrew rsync.\"\n      exit 1\n    fi\n    echo \"warning: rsync $version ($label) found. FilmCan requires rsync $REQUIRED_VERSION+ for xxh128/checksum-choice.\"\n  fi\n}\n\nRSYNC_ARM64=\"\"\nif [ -n \"${RSYNC_ARM64_PATH:-}\" ] && [ -x \"$RSYNC_ARM64_PATH\" ]; then\n  RSYNC_ARM64=\"$RSYNC_ARM64_PATH\"\nelse\n  RSYNC_ARM64=\"$(find_rsync \"/opt/homebrew/bin/rsync\" \"arm64\")\"\nfi\n\nRSYNC_X86_64=\"\"\nif [ -n \"${RSYNC_X86_64_PATH:-}\" ] && [ -x \"$RSYNC_X86_64_PATH\" ]; then\n  RSYNC_X86_64=\"$RSYNC_X86_64_PATH\"\nelse\n  RSYNC_X86_64=\"$(find_rsync \"/usr/local/bin/rsync\" \"x86_64\")\"\nfi\n\nif [ -z \"$RSYNC_ARM64\" ] || [ -z \"$RSYNC_X86_64\" ]; then\n  if [ \"$CONFIGURATION\" = \"Release\" ]; then\n    echo \"error: Both arm64 and x86_64 Homebrew rsync are required to bundle universal rsync.\"\n    echo \"       Set RSYNC_ARM64_PATH and RSYNC_X86_64_PATH to custom binaries if needed.\"\n    exit 1\n  fi\n  echo \"warning: Missing arm64 or x86_64 rsync. Bundle will include only the available architecture.\"\nfi\n\nif [ -n \"$RSYNC_ARM64\" ]; then\n  check_version \"$RSYNC_ARM64\" \"arm64\"\nfi\nif [ -n \"$RSYNC_X86_64\" ]; then\n  check_version \"$RSYNC_X86_64\" \"x86_64\"\nfi\n\nRSYNC_DEST_DIR=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync\"\nmkdir -p \"$RSYNC_DEST_DIR\"\nbundle_deps() {\n  local rsync_path=\"$1\"\n  local arch=\"$2\"\n  local rsync_dest=\"$RSYNC_DEST_DIR/rsync-$arch\"\n  local lib_dir=\"$RSYNC_DEST_DIR/lib/$arch\"\n  mkdir -p \"$lib_dir\"\n  cp \"$rsync_path\" \"$rsync_dest\"\n  chmod +x \"$rsync_dest\"\n\n  local libs\n  libs=\"$(otool -L \"$rsync_path\" | awk 'NR>1 {print $1}' | grep -v '^/usr/lib/' | grep -v '^/System/Library/')\"\n  for lib in $libs; do\n    local base\n    base=\"$(basename \"$lib\")\"\n    cp \"$lib\" \"$lib_dir/$base\"\n    chmod +x \"$lib_dir/$base\"\n    install_name_tool -change \"$lib\" \"@loader_path/lib/$arch/$base\" \"$rsync_dest\"\n  done\n}\n\nif [ -n \"$RSYNC_ARM64\" ]; then\n  bundle_deps \"$RSYNC_ARM64\" \"arm64\"\nfi\nif [ -n \"$RSYNC_X86_64\" ]; then\n  bundle_deps \"$RSYNC_X86_64\" \"x86_64\"\nfi\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3E5BD4F7D8629943112C2CF9 /* Sources */ = {
