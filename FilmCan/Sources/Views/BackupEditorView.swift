@@ -32,7 +32,6 @@ struct BackupEditorView: View {
     @State var showRenameOnlyPatterns = false
     @State var isOptionsCollapsed = true
     @State var didLoadDestinations = false
-    @State var showEngineHelp = false
     @State var lastDriveRefresh: Date = .distantPast
     @State var driveRefreshCounter: Int = 0
     let optionToggleWidth: CGFloat = 60
@@ -94,9 +93,6 @@ struct BackupEditorView: View {
                     viewModel.customLogPath = path
                 }
             }
-        }
-        .sheet(isPresented: $showEngineHelp) {
-            EngineHelpSheet()
         }
         .sheet(item: $transferViewModel.activeDuplicatePrompt) { prompt in
             DuplicatePromptSheet(

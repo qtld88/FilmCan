@@ -234,56 +234,6 @@ extension BackupEditorView {
         return AnyView(row)
     }
 
-    private func copyEnginePicker() -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: optionSpacing) {
-                Image(systemName: "gearshape.2")
-                    .font(.title3)
-                    .foregroundColor(FilmCanTheme.textSecondary)
-                    .frame(width: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("Copy engine")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        Button(action: { showEngineHelp = true }) {
-                            Image(systemName: "info.circle")
-                                .foregroundColor(FilmCanTheme.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Learn about copy engines")
-                    }
-                }
-                .frame(width: resolvedTextWidth(basicOptionTextWidth), alignment: .leading)
-                Menu {
-                    ForEach(CopyEngine.allCases) { engine in
-                        Button(action: { viewModel.setCopyEngine(engine) }) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(engine.displayName)
-                                Text(engine.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(viewModel.rsyncOptions.copyEngine.displayName)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                    }
-                    .contentShape(Rectangle())
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(FilmCanTheme.card)
-                    .cornerRadius(6)
-                    .frame(width: resolvedMenuWidth(optionMenuWidth + 60, textWidth: resolvedTextWidth(basicOptionTextWidth)), alignment: .leading)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
     private func disclosureCard<Content: View>(
         title: String,
         icon: String? = nil,

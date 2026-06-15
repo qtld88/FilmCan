@@ -96,36 +96,6 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
-    func setCopyEngine(_ engine: CopyEngine) {
-        var options = config.rsyncOptions
-        if engine == .custom {
-            if options.copyEngine == .rsync {
-                var snapshot = options
-                snapshot.copyEngine = .rsync
-                config.lastRsyncOptions = snapshot
-            }
-            options.copyEngine = .custom
-            options.useChecksum = false
-            options.onlyCopyChanged = false
-            options.allowResume = false
-            options.delete = false
-            options.inplace = false
-            options.reuseOrganizedFiles = false
-            options.customArgs = ""
-            options.postVerify = true
-        } else {
-            if let last = config.lastRsyncOptions {
-                options = last
-            } else {
-                options = RsyncOptions()
-                options.onlyCopyChanged = true
-            }
-            options.copyEngine = .rsync
-        }
-        config.rsyncOptions = options
-        save()
-    }
-
     func enforceCustomEngineDefaultsIfNeeded() {
         guard config.rsyncOptions.copyEngine == .custom else { return }
         var options = config.rsyncOptions

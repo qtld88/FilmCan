@@ -27,7 +27,6 @@
 		1FDBC1FC2134CD17CA9D1995 /* Hashing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A1BB108A96290E666D66D7 /* Hashing.swift */; };
 		223033F8122868CDF7816C29 /* MHLReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D21EBB57C39AFD5E1C83811 /* MHLReaderTests.swift */; };
 		2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */; };
-		27F7F97E8A992AEC94CBD902 /* EngineHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2B80B5C43ED6BC09ECCACC /* EngineHelpSheet.swift */; };
 		31751F288510D7BF06F7DF9B /* DryRunSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25785302A4FCE3EF859B358F /* DryRunSheet.swift */; };
 		33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */; };
 		36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640924E857BB35194B737188 /* CombinedSpeedETATests.swift */; };
@@ -185,7 +184,6 @@
 		79A38DB3B25239F8094E5EFC /* MHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLWriter.swift; sourceTree = "<group>"; };
 		7AF6668045A55C3936ACEFFF /* DestPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestPickerView.swift; sourceTree = "<group>"; };
 		7B7991468FC99B24016C2D9D /* MHLWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLWriterTests.swift; sourceTree = "<group>"; };
-		7C2B80B5C43ED6BC09ECCACC /* EngineHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineHelpSheet.swift; sourceTree = "<group>"; };
 		7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifierTests.swift; sourceTree = "<group>"; };
 		7F583D01B5F61457BFBA712E /* TotalTransfersEditMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TotalTransfersEditMode.swift; sourceTree = "<group>"; };
 		867AFB25988C222B6A24039C /* PreviewInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewInfo.swift; sourceTree = "<group>"; };
@@ -373,7 +371,6 @@
 			children = (
 				25785302A4FCE3EF859B358F /* DryRunSheet.swift */,
 				5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */,
-				7C2B80B5C43ED6BC09ECCACC /* EngineHelpSheet.swift */,
 				65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */,
 				51F3544361F9AB588C49995D /* FolderPickerSheet.swift */,
 				CA472985C7AB10A3B859755A /* OrganizationSheet.swift */,
@@ -637,7 +634,6 @@
 				31751F288510D7BF06F7DF9B /* DryRunSheet.swift in Sources */,
 				3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */,
 				CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */,
-				27F7F97E8A992AEC94CBD902 /* EngineHelpSheet.swift in Sources */,
 				8FA18785A60525202826D859 /* ExFATBanner.swift in Sources */,
 				9A5D1736A87B604795828764 /* Extensions.swift in Sources */,
 				D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */,
