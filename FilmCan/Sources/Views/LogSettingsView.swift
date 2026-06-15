@@ -38,7 +38,8 @@ struct LogSettingsView: View {
                     "Custom folder lets you centralize logs.",
                     "Use \"/\" to create subfolders.",
                     "Example folder: `Logs/{date}/{destinationDriveName}`.",
-                    "Example file: `logs/transfer_{datetime}`."
+                    "Example file: `logs/transfer_{datetime}`.",
+                    "Netflix-approved layout: per-roll reports go in a Reports/ folder at the shoot-day root (YYYYMMDD_EP###_Day##_Unit/Reports/). The Netflix Ingest preset pre-fills this."
                 ]
             )
 

@@ -32,6 +32,7 @@ struct BackupEditorView: View {
     @State var showRenameOnlyPatterns = false
     @State var isOptionsCollapsed = true
     @State var didLoadDestinations = false
+    @State var netflixValidation: NetflixValidationInfo?
     @State var lastDriveRefresh: Date = .distantPast
     @State var driveRefreshCounter: Int = 0
     let optionToggleWidth: CGFloat = 60
@@ -111,6 +112,14 @@ struct BackupEditorView: View {
                 info: info,
                 onVerify: { await transferViewModel.verifyAlreadyBackedUp($0) },
                 onDone: { transferViewModel.alreadyBackedUp = nil }
+            )
+        }
+        .sheet(item: $netflixValidation) { info in
+            NetflixValidationSheet(
+                info: info,
+                onAutoFix: { netflixValidation = nil; autoFixNetflixNames() },
+                onRunAnyway: { netflixValidation = nil; startTransfer(skipNetflixValidation: true) },
+                onCancel: { netflixValidation = nil }
             )
         }
         .alert(UIStrings.Alerts.validationTitle, isPresented: $viewModel.showValidationError) {

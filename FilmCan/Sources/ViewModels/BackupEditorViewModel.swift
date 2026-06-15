@@ -180,6 +180,23 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    var episode: String {
+        get { config.episode }
+        set { config.episode = newValue; save() }
+    }
+    var day: String {
+        get { config.day }
+        set { config.day = newValue; save() }
+    }
+    var unit: String {
+        get { config.unit }
+        set { config.unit = newValue; save() }
+    }
+    var cameraFormat: String {
+        get { config.cameraFormat }
+        set { config.cameraFormat = newValue; save() }
+    }
+
     var copyFolderContents: Bool {
         get { config.copyFolderContents }
         set {
@@ -468,7 +485,29 @@ class BackupEditorViewModel: ObservableObject {
         config.duplicateCounterTemplate = preset.duplicateCounterTemplate
         applyPresetOrganizationSettings(preset)
         config.selectedOrganizationPresetId = preset.id
+        // Netflix's approved layout puts per-roll reports in a Reports/ folder at the
+        // shoot-day root. Pre-fill that as a changeable default (don't clobber a path
+        // the user already chose).
+        if preset.name == OrganizationPreset.netflixIngestName, config.customLogPath.isEmpty {
+            config.logLocation = .custom
+            config.customLogPath = "Reports"
+        }
         save()
+    }
+
+    /// Apply the built-in Netflix Ingest preset, persisting it to storage (once) so it
+    /// behaves like a normal selectable preset with a stable id/name.
+    func applyNetflixIngestPreset() {
+        objectWillChange.send()
+        let preset: OrganizationPreset
+        if let existing = storage.organizationPresets.first(where: { $0.name == OrganizationPreset.netflixIngestName }) {
+            preset = existing
+        } else {
+            let p = OrganizationPreset.netflixIngest()
+            storage.organizationPresets.append(p)
+            preset = p
+        }
+        applyPreset(preset)
     }
 
     func syncFromSelectedPresetIfNeeded() {

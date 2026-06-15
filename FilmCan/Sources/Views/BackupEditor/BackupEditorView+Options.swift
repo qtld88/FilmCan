@@ -406,6 +406,10 @@ extension BackupEditorView {
                     viewModel.applyOffOrganizationSettings()
                     expandOptionsIfNeeded()
                 }
+                Button("Netflix Ingest (built-in)") {
+                    viewModel.applyNetflixIngestPreset()
+                    expandOptionsIfNeeded()
+                }
                 ForEach(viewModel.organizationPresets) { preset in
                     Button(preset.name) {
                         viewModel.applyPreset(preset)
@@ -995,8 +999,55 @@ extension BackupEditorView {
         }
     }
 
+    private func netflixMetaField(_ label: String, placeholder: String, text: Binding<String>) -> some View {
+        HStack(spacing: optionSpacing) {
+            Text(label)
+                .font(FilmCanFont.body(12))
+                .foregroundColor(FilmCanTheme.textSecondary)
+                .frame(width: 130, alignment: .leading)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 260)
+        }
+    }
+
+    @ViewBuilder
+    private var netflixMetadataSection: some View {
+        if selectedOrganizationPresetName == OrganizationPreset.netflixIngestName {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Shoot metadata")
+                    .font(FilmCanFont.label(13))
+                    .foregroundColor(FilmCanTheme.textPrimary)
+                netflixMetaField("Episode / Block", placeholder: "EP103 / B01",
+                                 text: Binding(get: { viewModel.episode }, set: { viewModel.episode = $0 }))
+                netflixMetaField("Day", placeholder: "Day05 / D05",
+                                 text: Binding(get: { viewModel.day }, set: { viewModel.day = $0 }))
+                netflixMetaField("Unit", placeholder: "MU / 2U",
+                                 text: Binding(get: { viewModel.unit }, set: { viewModel.unit = $0 }))
+                netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
+                                 text: Binding(get: { viewModel.cameraFormat }, set: { viewModel.cameraFormat = $0 }))
+                netflixReadinessHint
+            }
+            .padding(.bottom, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var netflixReadinessHint: some View {
+        let count = viewModel.destinations.count
+        HStack(spacing: 6) {
+            Image(systemName: count < 3 ? "exclamationmark.triangle.fill" : "info.circle")
+                .foregroundColor(count < 3 ? .orange : FilmCanTheme.textTertiary)
+            Text("Netflix recommends ≥3 copies on ≥2 media types, with ≥1 off-site. You have \(count) destination\(count == 1 ? "" : "s").")
+                .font(FilmCanFont.body(11))
+                .foregroundColor(FilmCanTheme.textSecondary)
+        }
+        .padding(.top, 2)
+    }
+
     private var destinationsContent: some View {
         VStack(alignment: .leading, spacing: 8) {
+            netflixMetadataSection
             let destinationAutoDetectInfo = InfoPopoverContent(
                 title: "Auto-detect destinations",
                 description: "Scans connected drives and automatically adds destinations whose names or subfolders match your patterns.",

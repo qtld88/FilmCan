@@ -109,3 +109,19 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         try c.encode(customDate, forKey: .customDate)
     }
 }
+
+extension OrganizationPreset {
+    /// Built-in preset matching Netflix Footage Ingest folder requirements:
+    /// `YYYYMMDD_EP###_Day##_Unit/Camera_Media/[Camera_Format]/<Roll>`. The roll
+    /// folder (source root) is appended automatically, so the template ends at the
+    /// camera-format segment (which collapses when {cameraFormat} is empty).
+    static let netflixIngestName = "Netflix Ingest"
+
+    static func netflixIngest() -> OrganizationPreset {
+        var p = OrganizationPreset()
+        p.name = netflixIngestName
+        p.useFolderTemplate = true
+        p.folderTemplate = "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
+        return p
+    }
+}

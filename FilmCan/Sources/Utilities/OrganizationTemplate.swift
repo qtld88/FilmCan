@@ -1,9 +1,24 @@
 import Foundation
 
+/// Per-shoot metadata feeding the Netflix folder tokens ({episode}/{day}/{unit}/{cameraFormat}).
+struct ShootMetadata: Equatable {
+    var episode: String = ""
+    var day: String = ""
+    var unit: String = ""
+    var cameraFormat: String = ""
+    static let empty = ShootMetadata()
+}
+
 enum OrganizationTemplate {
     struct ResolvedDestination {
         let folderPath: String
         let renamedItem: String
+    }
+
+    /// Remove empty path segments (e.g. from an empty {cameraFormat} token) so the
+    /// folder path never contains "//" or a stray leading/trailing separator.
+    static func collapseEmptySegments(_ path: String) -> String {
+        path.split(separator: "/", omittingEmptySubsequences: true).joined(separator: "/")
     }
 
     static func resolve(
@@ -11,7 +26,8 @@ enum OrganizationTemplate {
         sourcePath: String,
         destinationRoot: String,
         counter: Int,
-        date: Date
+        date: Date,
+        metadata: ShootMetadata = .empty
     ) -> ResolvedDestination {
         let effectiveDate = preset.useCustomDate ? preset.customDate : date
         let sourceName = (sourcePath as NSString).lastPathComponent
@@ -31,13 +47,14 @@ enum OrganizationTemplate {
             counter: counter,
             date: effectiveDate,
             fileModifiedDate: fileModifiedDate,
-            fileCreatedDate: fileCreatedDate
+            fileCreatedDate: fileCreatedDate,
+            metadata: metadata
         )
 
         let folderTemplate = preset.folderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedFolder = (!preset.useFolderTemplate || folderTemplate.isEmpty)
             ? ""
-            : applyTokens(folderTemplate, values: tokenValues, allowPathSeparators: true)
+            : collapseEmptySegments(applyTokens(folderTemplate, values: tokenValues, allowPathSeparators: true))
 
         let renameTemplate = preset.renameTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
         let renameOnly = preset.renameOnlyPatterns
@@ -108,7 +125,8 @@ enum OrganizationTemplate {
         counter: Int,
         date: Date,
         fileModifiedDate: String,
-        fileCreatedDate: String
+        fileCreatedDate: String,
+        metadata: ShootMetadata = .empty
     ) -> [String: String] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd"
@@ -131,7 +149,11 @@ enum OrganizationTemplate {
             "{datetime}": dateTimeFormatter.string(from: date),
             "{counter}": counterStr,
             "{filemodifieddate}": fileModifiedDate,
-            "{filecreationdate}": fileCreatedDate
+            "{filecreationdate}": fileCreatedDate,
+            "{episode}": metadata.episode,
+            "{day}": metadata.day,
+            "{unit}": metadata.unit,
+            "{cameraFormat}": metadata.cameraFormat
         ]
     }
 

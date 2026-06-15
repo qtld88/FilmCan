@@ -3,8 +3,50 @@ import Foundation
 import AppKit
 
 extension BackupEditorView {
-    func startTransfer(confirmedDelete: Bool = false) {
+    private var isNetflixPresetSelected: Bool {
+        viewModel.organizationPresets.first(where: { $0.id == viewModel.config.selectedOrganizationPresetId })?.name
+            == OrganizationPreset.netflixIngestName
+    }
+
+    /// Rename source folders to satisfy Netflix naming (sanitize prohibited chars,
+    /// dedupe), update the source list, and re-run.
+    func autoFixNetflixNames() {
+        let fm = FileManager.default
+        var used = Set<String>()
+        var newPaths: [String] = []
+        for path in viewModel.sourcePaths {
+            let url = URL(fileURLWithPath: path)
+            let base = NetflixNameValidator.sanitize(url.lastPathComponent)
+            var candidate = base
+            var n = 1
+            while used.contains(candidate) { candidate = "\(base)_\(String(format: "%03d", n))"; n += 1 }
+            used.insert(candidate)
+            if candidate != url.lastPathComponent {
+                let dst = url.deletingLastPathComponent().appendingPathComponent(candidate)
+                if (try? fm.moveItem(at: url, to: dst)) != nil {
+                    newPaths.append(dst.path)
+                } else {
+                    newPaths.append(path)
+                }
+            } else {
+                newPaths.append(path)
+            }
+        }
+        viewModel.sourcePaths = newPaths
+        startTransfer(skipNetflixValidation: true)
+    }
+
+    func startTransfer(confirmedDelete: Bool = false, skipNetflixValidation: Bool = false) {
         guard viewModel.validate() else { return }
+
+        if !skipNetflixValidation && isNetflixPresetSelected {
+            let rolls = viewModel.sourcePaths.map { ($0 as NSString).lastPathComponent }
+            let issues = NetflixNameValidator.validate(rollNames: rolls)
+            if !issues.isEmpty {
+                netflixValidation = NetflixValidationInfo(issues: issues)
+                return
+            }
+        }
 
         if viewModel.rsyncOptions.delete && !confirmedDelete {
             deleteWarningMessage = UIStrings.Alerts.deleteMessage

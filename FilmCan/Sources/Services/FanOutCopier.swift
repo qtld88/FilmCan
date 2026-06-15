@@ -115,6 +115,8 @@ actor FanOutCopier {
         var progressHandler: (@Sendable (DestProgress) -> Void)?
         var organizationPreset: OrganizationPreset?
         var copyFolderContents: Bool = false
+        /// Per-shoot metadata for the Netflix folder tokens.
+        var shootMetadata: ShootMetadata = .empty
         /// Ignore prior hash lists and re-copy every file (disables resume skip).
         var forceRecopy: Bool = false
         /// Polled cooperatively to abort the run when the user hits Stop.
@@ -187,12 +189,13 @@ actor FanOutCopier {
     /// caller creates the parent directory when actually writing.
     nonisolated static func resolveDestFilePath(
         destRoot: String, rootName: String, rootPath: String, relPath: String,
-        preset: OrganizationPreset?, copyFolderContents: Bool, date: Date
+        preset: OrganizationPreset?, copyFolderContents: Bool, date: Date,
+        metadata: ShootMetadata = .empty
     ) -> String {
         if let preset {
             let resolved = OrganizationTemplate.resolve(
                 preset: preset, sourcePath: rootPath, destinationRoot: destRoot,
-                counter: 0, date: date)
+                counter: 0, date: date, metadata: metadata)
             let folderBase = resolved.folderPath.isEmpty
                 ? destRoot
                 : (destRoot as NSString).appendingPathComponent(resolved.folderPath)
@@ -222,17 +225,32 @@ actor FanOutCopier {
     nonisolated static func resolveRollFolder(
         destRoot: String, rootName: String, rootPath: String,
         isDirectoryRoot: Bool, preset: OrganizationPreset?,
-        copyFolderContents: Bool, date: Date
+        copyFolderContents: Bool, date: Date, metadata: ShootMetadata = .empty
     ) -> String {
         let resolvedRoot = resolveDestFilePath(
             destRoot: destRoot, rootName: rootName, rootPath: rootPath,
-            relPath: "", preset: preset, copyFolderContents: copyFolderContents, date: date)
+            relPath: "", preset: preset, copyFolderContents: copyFolderContents,
+            date: date, metadata: metadata)
         return isDirectoryRoot ? resolvedRoot : (resolvedRoot as NSString).deletingLastPathComponent
     }
 
     /// The roll's `ascmhl/` folder (holds the generation manifests + chain index).
     nonisolated static func ascMHLDir(rollFolder: String) -> URL {
         URL(fileURLWithPath: rollFolder).appendingPathComponent("ascmhl")
+    }
+
+    /// Create Netflix's required sibling folders (`Reports/`, `Sound_Media/`) under the
+    /// shoot-day root (the first path component of the roll folder beneath the dest),
+    /// so the delivered structure is complete even when only camera media was copied.
+    nonisolated static func scaffoldNetflixSiblings(destRoot: String, rollFolder: String) {
+        let rel = rollFolder.hasPrefix(destRoot) ? String(rollFolder.dropFirst(destRoot.count)) : rollFolder
+        guard let firstComp = rel.split(separator: "/").first.map(String.init), !firstComp.isEmpty else { return }
+        let dayRoot = (destRoot as NSString).appendingPathComponent(firstComp)
+        for sub in ["Reports", "Sound_Media"] {
+            try? FileManager.default.createDirectory(
+                at: URL(fileURLWithPath: dayRoot).appendingPathComponent(sub),
+                withIntermediateDirectories: true)
+        }
     }
 
     /// (fileName, hash) pairs already recorded for one root at one dest, for resume-skip.
@@ -293,7 +311,10 @@ actor FanOutCopier {
                     rootPath: rootPaths[rootName] ?? rootName,
                     isDirectoryRoot: directoryRoots.contains(rootName),
                     preset: config.organizationPreset,
-                    copyFolderContents: config.copyFolderContents, date: jobStartTime)
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime, metadata: config.shootMetadata)
+                if config.organizationPreset?.name == OrganizationPreset.netflixIngestName {
+                    Self.scaffoldNetflixSiblings(destRoot: destCfg.destPath, rollFolder: rollFolder)
+                }
                 let ascDir = Self.ascMHLDir(rollFolder: rollFolder)
                 let writer = try ASCMHLWriter(ascmhlDir: ascDir, rollName: rootName)
                 byRoot[rootName] = writer
@@ -391,7 +412,7 @@ actor FanOutCopier {
                     destRoot: dest.destPath, rootName: root, rootPath: rootPath(for: root),
                     isDirectoryRoot: directoryRoots.contains(root),
                     preset: config.organizationPreset, copyFolderContents: config.copyFolderContents,
-                    date: jobStartTime)
+                    date: jobStartTime, metadata: config.shootMetadata)
                 byRoot[root] = Self.loadExistingMHLEntries(destPath: dest.destPath, rootName: root, rollFolder: rf)
             }
             existingMHLByDest[dest.destPath] = byRoot
@@ -408,7 +429,8 @@ actor FanOutCopier {
                 let path = Self.resolveDestFilePath(
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
-                    copyFolderContents: config.copyFolderContents, date: jobStartTime)
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                    metadata: config.shootMetadata)
                 return FileManager.default.fileExists(atPath: path)
             }
             if doneEverywhere { skippedFiles += 1; return false }
@@ -622,7 +644,8 @@ actor FanOutCopier {
             let targetPath = Self.resolveDestFilePath(
                 destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
                 relPath: relPath, preset: config.organizationPreset,
-                copyFolderContents: config.copyFolderContents, date: jobStartTime)
+                copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                metadata: config.shootMetadata)
             let parent = (targetPath as NSString).deletingLastPathComponent
             try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
             let destFileURL = URL(fileURLWithPath: targetPath)

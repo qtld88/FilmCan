@@ -16,6 +16,11 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var copyFolderContents: Bool = false
     /// Ignore prior hash lists and re-copy every file (disables resume skip).
     var forceRecopy: Bool = false
+    // Netflix shoot metadata (used by the Netflix Ingest preset's folder tokens).
+    var episode: String = ""
+    var day: String = ""
+    var unit: String = ""
+    var cameraFormat: String = ""
     var runInParallel: Bool = false
     /// How the FilmCan fan-out engine writes to multiple destinations.
     var destinationCopyMode: DestinationCopyMode = .automatic
@@ -70,6 +75,10 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         organizationReuseByDestination = try c.decodeIfPresent([String: OrganizationReuseInfo].self, forKey: .organizationReuseByDestination) ?? [:]
         copyFolderContents = try c.decodeIfPresent(Bool.self, forKey: .copyFolderContents) ?? false
         forceRecopy = try c.decodeIfPresent(Bool.self, forKey: .forceRecopy) ?? false
+        episode = try c.decodeIfPresent(String.self, forKey: .episode) ?? ""
+        day = try c.decodeIfPresent(String.self, forKey: .day) ?? ""
+        unit = try c.decodeIfPresent(String.self, forKey: .unit) ?? ""
+        cameraFormat = try c.decodeIfPresent(String.self, forKey: .cameraFormat) ?? ""
         runInParallel = try c.decodeIfPresent(Bool.self,   forKey: .runInParallel) ?? false
         destinationCopyMode = try c.decodeIfPresent(DestinationCopyMode.self, forKey: .destinationCopyMode) ?? .automatic
         sourceAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .sourceAutoDetectEnabled) ?? false
@@ -125,6 +134,10 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(organizationReuseByDestination, forKey: .organizationReuseByDestination)
         try c.encode(copyFolderContents, forKey: .copyFolderContents)
         try c.encode(forceRecopy, forKey: .forceRecopy)
+        try c.encode(episode, forKey: .episode)
+        try c.encode(day, forKey: .day)
+        try c.encode(unit, forKey: .unit)
+        try c.encode(cameraFormat, forKey: .cameraFormat)
         try c.encode(runInParallel,    forKey: .runInParallel)
         try c.encode(destinationCopyMode, forKey: .destinationCopyMode)
         try c.encode(sourceAutoDetectEnabled, forKey: .sourceAutoDetectEnabled)
@@ -159,6 +172,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case episode, day, unit, cameraFormat
         case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
