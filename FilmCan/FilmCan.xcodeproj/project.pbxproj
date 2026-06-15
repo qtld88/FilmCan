@@ -25,6 +25,7 @@
 		1E64C22B5381774E5D73BA7C /* InlineFanOutProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */; };
 		1FDBC1FC2134CD17CA9D1995 /* Hashing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A1BB108A96290E666D66D7 /* Hashing.swift */; };
 		2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */; };
+		2E372B345407C3DFAE943E92 /* BackupConfigurationCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */; };
 		31751F288510D7BF06F7DF9B /* DryRunSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25785302A4FCE3EF859B358F /* DryRunSheet.swift */; };
 		33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */; };
 		35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01775FD7053AF831126757D6 /* C4Hash.swift */; };
@@ -153,6 +154,7 @@
 		1D33906FE8BD0F1A2C8192DF /* FilmCan.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FilmCan.entitlements; sourceTree = "<group>"; };
 		205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifier.swift; sourceTree = "<group>"; };
 		2314F69E3FD8DCE91282F1FA /* DestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestWriter.swift; sourceTree = "<group>"; };
+		2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupConfigurationCodableTests.swift; sourceTree = "<group>"; };
 		244ADA509455AE3EBC04AC4D /* ExplodeFanOutResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplodeFanOutResultTests.swift; sourceTree = "<group>"; };
 		25785302A4FCE3EF859B358F /* DryRunSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunSheet.swift; sourceTree = "<group>"; };
 		28B96018630A1BE87D3AE467 /* FanOutCopierIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierIntegrationTests.swift; sourceTree = "<group>"; };
@@ -340,6 +342,7 @@
 				31E297808A920BE36CE33E0B /* ASCMHLConformanceTests.swift */,
 				BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */,
 				84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */,
+				2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
 				03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
@@ -603,6 +606,7 @@
 				63FFD96CEAF608C299F8CFA8 /* ASCMHLConformanceTests.swift in Sources */,
 				4536D8AE58C4A2678A9723B6 /* ASCMHLReaderTests.swift in Sources */,
 				46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */,
+				2E372B345407C3DFAE943E92 /* BackupConfigurationCodableTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
 				84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
