@@ -380,17 +380,7 @@ class TransferViewModel: ObservableObject {
 
     private func bindProgress(to service: TransferService) {
         progressBinding?.cancel()
-        if let rsync = service as? RsyncService {
-            progressBinding = rsync.$progress
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] value in
-                    guard let self else { return }
-                    self.progress = value
-                    if !self.isBackgroundWorker, let configId = self.activeConfigId {
-                        self.tabProgressByConfig[configId] = value.overallProgress
-                    }
-                }
-        } else if let custom = service as? CustomCopierService {
+        if let custom = service as? CustomCopierService {
             progressBinding = custom.$progress
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] value in
