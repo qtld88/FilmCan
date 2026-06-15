@@ -1226,8 +1226,8 @@ class TransferViewModel: ObservableObject {
             // in Off mode there is no MHL, so the log lists status + counts only.
             if results[index].transferredPaths.isEmpty,
                let mhl = results[index].hashListPath, !mhl.isEmpty,
-               let entries = try? MHLReader.read(url: URL(fileURLWithPath: mhl)) {
-                results[index].transferredPaths = entries.map { $0.fileName }
+               let entries = try? ASCMHLReader.read(url: URL(fileURLWithPath: mhl)) {
+                results[index].transferredPaths = entries.map { $0.relPath }
             }
             if let writeWarning = writeCustomLog(
                 result: results[index],
@@ -1641,9 +1641,9 @@ class TransferViewModel: ObservableObject {
         let siblingRoot = sibling.destinationPath
         let failedRoot = failed.destinationPath
 
-        let entries: [MHLReader.Entry]
+        let entries: [ASCMHLReader.Entry]
         do {
-            entries = try MHLReader.read(url: mhlURL)
+            entries = try ASCMHLReader.read(url: mhlURL)
         } catch {
             return []
         }
@@ -1651,18 +1651,18 @@ class TransferViewModel: ObservableObject {
         let source = SiblingDestSource()
         var results: [(fileName: String, success: Bool)] = []
         for entry in entries {
-            let siblingFilePath = (siblingRoot as NSString).appendingPathComponent(entry.fileName)
-            let failedFilePath = (failedRoot as NSString).appendingPathComponent(entry.fileName)
+            let siblingFilePath = (siblingRoot as NSString).appendingPathComponent(entry.relPath)
+            let failedFilePath = (failedRoot as NSString).appendingPathComponent(entry.relPath)
             do {
                 try await source.copyFromSibling(
-                    fileName: entry.fileName,
+                    fileName: entry.relPath,
                     from: siblingFilePath,
                     to: failedFilePath,
                     expectedHash: entry.hash
                 )
-                results.append((entry.fileName, true))
+                results.append((entry.relPath, true))
             } catch {
-                results.append((entry.fileName, false))
+                results.append((entry.relPath, false))
             }
         }
         return results
