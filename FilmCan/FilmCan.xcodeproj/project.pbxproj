@@ -27,6 +27,7 @@
 		2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */; };
 		31751F288510D7BF06F7DF9B /* DryRunSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25785302A4FCE3EF859B358F /* DryRunSheet.swift */; };
 		33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */; };
+		35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01775FD7053AF831126757D6 /* C4Hash.swift */; };
 		36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640924E857BB35194B737188 /* CombinedSpeedETATests.swift */; };
 		392EFFD780CF6346123B3FA7 /* DryRunReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */; };
 		3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */; };
@@ -58,6 +59,7 @@
 		7F60BFED71DF221F0DE7E195 /* DestResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBAF7A0A4796303A8E24EE4B /* DestResultRow.swift */; };
 		7F628CD5790C2B611BEA65BB /* FileChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */; };
 		818A3B2F83A72582CF1CB60D /* FlowLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */; };
+		84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */; };
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
 		8E3A60028B4927FA5CD1C2A2 /* DryRunPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18663FD23B1C73B08D717384 /* DryRunPlanner.swift */; };
@@ -130,6 +132,8 @@
 
 /* Begin PBXFileReference section */
 		01136E3DBB8977E8B301ACEB /* DriveAnchorPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveAnchorPreferences.swift; sourceTree = "<group>"; };
+		01775FD7053AF831126757D6 /* C4Hash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C4Hash.swift; sourceTree = "<group>"; };
+		03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C4HashTests.swift; sourceTree = "<group>"; };
 		055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupListViewModel.swift; sourceTree = "<group>"; };
 		07A9EC23F618959F4233E19D /* FilmCanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FilmCanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		083A2D2BAD99B47EB86C5386 /* FilmCan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmCan.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -249,6 +253,7 @@
 		1A3AE896260F508D68713690 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				01775FD7053AF831126757D6 /* C4Hash.swift */,
 				B8EAD261337C6BEE4032A23E /* DebugLog.swift */,
 				2BABC9B93BCC84A6687D8C17 /* DriveUtilities.swift */,
 				AB0DE00B31C198D55826941B /* Extensions.swift */,
@@ -330,6 +335,7 @@
 				BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */,
 				84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
+				03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
 				73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */,
 				7CDC23E435829755245312C4 /* CopyEnginePersistenceTests.swift */,
@@ -591,6 +597,7 @@
 				4536D8AE58C4A2678A9723B6 /* ASCMHLReaderTests.swift in Sources */,
 				46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
+				84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
 				3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */,
 				513CC93966E9BF3EB6F46E6C /* CopyEnginePersistenceTests.swift in Sources */,
@@ -621,6 +628,7 @@
 				DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */,
 				939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */,
 				F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */,
+				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,
 				BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */,
 				2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */,
 				58B0C02F251AA3212196E62C /* Constants.swift in Sources */,
