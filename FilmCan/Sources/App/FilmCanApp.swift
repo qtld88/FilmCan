@@ -13,7 +13,6 @@ struct FilmCanApp: App {
                 .modifier(InitialWindowSizer())
                 .environmentObject(appState)
                 .environmentObject(appState.storage)
-                .environmentObject(appState.rsyncService)
         }
         .windowStyle(.titleBar)
         .commands {

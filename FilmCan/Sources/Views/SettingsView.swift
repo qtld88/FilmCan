@@ -772,7 +772,7 @@ struct AboutView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
 
-            Text("A simple backup utility using rsync")
+            Text("A simple, reliable backup utility for camera cards")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)

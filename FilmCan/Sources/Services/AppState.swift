@@ -16,7 +16,6 @@ class AppState: ObservableObject {
     @Published var activeTourTargetId: String?
     
     let storage = ConfigurationStorage.shared
-    let rsyncService = RsyncService()
     let notificationService = NotificationService.shared
     
     private init() {

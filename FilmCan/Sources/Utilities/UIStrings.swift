@@ -32,43 +32,6 @@ enum UIStrings {
         static let counterStyleHint = "Used when you choose \"Add counter\"."
     }
 
-    enum EngineHelp {
-        static let title = "Copy Engines"
-        static let subtitle = "Choose between rsync and FilmCan Engine depending on your workflow. Each has strengths and trade-offs."
-        static let rsyncTitle = "rsync"
-        static let rsyncSubtitle = "Industry-standard sync tool used by professionals worldwide."
-        static let rsyncProsTitle = "Pros"
-        static let rsyncConsTitle = "Cons"
-        static let rsyncPros = [
-            "Incremental backups (only copy changed files)",
-            "Resume interrupted transfers",
-            "Network transfers (NAS, servers)",
-            "Custom filters and exclusions",
-            "Advanced sync scenarios"
-        ]
-        static let rsyncCons = [
-            "More complex options to configure",
-            "Can be slower on small local copies",
-            "Verification is optional and can be turned off"
-        ]
-        static let filmCanTitle = "FilmCan Engine"
-        static let filmCanSubtitle = "Streamlined copier optimized for speed with optional hash verification."
-        static let filmCanProsTitle = "Pros"
-        static let filmCanConsTitle = "Cons"
-        static let filmCanPros = [
-            "Full card backups to local drives",
-            "Maximum speed (20-30% faster verification)",
-            "Simple, reliable copying",
-            "Hash verification toggle for safety vs speed"
-        ]
-        static let filmCanCons = [
-            "No incremental sync or resume",
-            "No custom filters or exclusions",
-            "Always copies all files",
-            "Slower on lots of tiny files"
-        ]
-    }
-
     enum FolderPicker {
         static let title = "Select Folder"
         static let pathPlaceholder = "Path"

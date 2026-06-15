@@ -2,7 +2,7 @@
 
 ## What This Is
 
-macOS SwiftUI app for automated camera card backup. Two copy engines: **rsync** (requires Homebrew rsync ≥ 3.4.0) and **CustomCopierService** (FilmCan engine). macOS 13+, Swift 5.9, Xcode 15+.
+macOS SwiftUI app for automated camera card backup. Single copy engine: the **FilmCan Engine** (`CustomCopierService`, the fan-out copier) — Swift-only. The rsync **engine** (code + UI) was removed in 1.2.x. Note: the build still bundles the rsync binary **only** because its libs ship `libxxhash.0.dylib`, which `XXHash.swift` dlopen's for xxh128 verification (`Resources/rsync/lib/<arch>/`). Dropping the rsync binary requires vendoring just libxxhash first (tracked in technical-debt). macOS 13+, Swift 5.9, Xcode 15+.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ FilmCan/Sources/
 ├── App/             # FilmCanApp.swift (@main entry), MainView, SettingsView
 ├── Views/           # All SwiftUI views (tabs: Backup, History, Settings, About)
 ├── ViewModels/      # ObservableObjects, especially TaskState
-├── Services/        # RsyncService, CustomCopierService, NotificationService, WebhookService, etc.
+├── Services/        # CustomCopierService, NotificationService, WebhookService, etc.
 ├── Models/          # DriveInfo, TaskResult, Preset, HistoryEntry, etc.
 ├── Utilities/       # Logger, HashListGenerator, DiskArbitration helpers
 └── Resources/       # Assets, entitlements
@@ -38,7 +38,7 @@ Local data lives in `~/Application Support`.
 
 ## Architecture Notes
 
-- **Two copy engines**: `RsyncService` (xxh128 verification, needs Homebrew rsync ≥3.4.0) and `CustomCopierService` (Swift-only, no external deps). Both support pause/resume and duplicate detection.
+- **Single copy engine**: `CustomCopierService` (the FilmCan Engine — Swift-only, no external deps), driving the `FanOutCopier` actor. Supports pause/resume and duplicate detection. The rsync engine (`RsyncService`) was fully removed in 1.2.x; no Homebrew rsync dependency remains.
 - **Fan-out engine**: `FanOutCopier` (Swift actor) handles N-sources → M-destinations in one pass. One `BoundedChannel<Chunk>` per destination; source is read once and broadcast. Paranoid verify re-reads both source and dest from disk with `F_NOCACHE`. See `docs/architecture.md`.
 - **Entry point**: `FilmCanApp.swift` — creates `MainView` window and `SettingsView`. No storyboards.
 - **No CI, no linter, no formatter, no pre-commit hooks** — bare Xcode project.
@@ -74,7 +74,7 @@ Progress is mounted **inside each destination card** in `DestinationListView` �
 4. HistoryView mixes data logic and UI rendering
 5. Drive refresh timing is nondeterministic
 6. Log/hashlist lifecycle spread across multiple components
-7. Dormant rsync code retained but unreachable (`copyEngine` force-coerced to `.custom`) — decide delete vs dev-flag. (`MultiDestSummaryView` dead code was removed in 1.2.0.)
+7. The rsync engine (`RsyncService`) has now been fully removed; FilmCan no longer bundles or requires Homebrew rsync. (`MultiDestSummaryView` dead code was removed in 1.2.0.)
 
 ## Conventions
 

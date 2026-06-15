@@ -32,7 +32,6 @@ struct BackupEditorView: View {
     @State var showRenameOnlyPatterns = false
     @State var isOptionsCollapsed = true
     @State var didLoadDestinations = false
-    @State var showEngineHelp = false
     @State var lastDriveRefresh: Date = .distantPast
     @State var driveRefreshCounter: Int = 0
     let optionToggleWidth: CGFloat = 60
@@ -42,14 +41,12 @@ struct BackupEditorView: View {
     let optionSpacing: CGFloat = 20
     let optionIconWidth: CGFloat = 32
     let historyPanelWidth: CGFloat = 250
-    var isCustomEngine: Bool { viewModel.rsyncOptions.copyEngine == .custom }
 
     enum OptionsTab: String, CaseIterable, Identifiable {
         case basic = "Basic options"
         case source = "Source"
         case destinations = "Destinations"
         case logs = "Logs"
-        case refinements = "Transfer refinements"
 
         var id: String { rawValue }
 
@@ -59,7 +56,6 @@ struct BackupEditorView: View {
             case .source: return "Source"
             case .destinations: return "Destinations"
             case .logs: return "Logs"
-            case .refinements: return "Rsync refinements"
             }
         }
     }
@@ -94,9 +90,6 @@ struct BackupEditorView: View {
                     viewModel.customLogPath = path
                 }
             }
-        }
-        .sheet(isPresented: $showEngineHelp) {
-            EngineHelpSheet()
         }
         .sheet(item: $transferViewModel.activeDuplicatePrompt) { prompt in
             DuplicatePromptSheet(
@@ -156,11 +149,6 @@ struct BackupEditorView: View {
         .onChange(of: viewModel.sourceAutoDetectPatterns) { _ in
             if viewModel.sourceAutoDetectEnabled {
                 viewModel.refreshAutoDetectedSources()
-            }
-        }
-        .onChange(of: viewModel.rsyncOptions.copyEngine) { engine in
-            if engine == .custom && selectedOptionsTab == .refinements {
-                selectedOptionsTab = .basic
             }
         }
         .onChange(of: viewModel.destinationAutoDetectEnabled) { enabled in

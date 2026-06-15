@@ -5,10 +5,10 @@ copier designed for cinema rushes — read the source once, write to every
 destination at once, verify with cinema-grade hash lists, and recover a failed
 drive with one click.
 
-> **rsync was retired from the UI in 1.2.0.** Earlier versions let you pick
-> between rsync and the FilmCan Engine. The engine picker is gone; the FilmCan
-> Engine handles every backup. (The rsync code still ships but is no longer
-> selectable.)
+> **The rsync engine was retired in FilmCan 1.2.** Earlier versions let you pick
+> between rsync and the FilmCan Engine. The engine picker is gone and the rsync
+> engine has been removed entirely — the FilmCan Engine handles every backup, with
+> no Homebrew rsync to install.
 
 ---
 

@@ -1,9 +1,10 @@
 # Technical Debt & Cleanup Plan
 
 This document tracks known weak spots and a plan to improve them, based on the
-current codebase. As of 1.2.0 the **FilmCan Engine (fan-out copier) is the only
-user-facing copy engine** — rsync was retired from the UI; see the dead-code note
-below.
+current codebase. As of 1.2.x the **FilmCan Engine (fan-out copier) is the only
+copy engine** — the rsync engine code + UI were removed and FilmCan no longer
+requires Homebrew rsync. (The build still bundles the rsync binary solely to ship
+`libxxhash` for verification — see item 7.)
 
 ---
 
@@ -42,12 +43,13 @@ below.
 7. **Dormant code**
    - `MultiDestSummaryView` (dead) was removed in 1.2.0; the live progress path is
      `InlineFanOutProgress` mounted inside each destination card.
-   - The rsync engine (`RsyncService` ~2k lines, rsync `preBuildScripts` bundling,
-     the `copyEngine` enum, the `RsyncOptions` model name) is retained but
-     unreachable: `RsyncOptions.copyEngine` is force-coerced to `.custom` on decode.
-     Removal is a 14-file refactor (`RsyncOptions` is the *shared* options model)
-     plus dropping the rsync binary bundling — tracked as a dedicated effort, not a
-     quick delete. Decide delete vs. keep behind an explicit developer flag.
+   - **rsync engine code + UI removed in 1.2.x** (`RsyncService`, the engine picker,
+     the "Transfer refinements" tab, engine-help sheet). **Remaining:** the build
+     still bundles the rsync binary + libs because `XXHash.swift` dlopen's
+     `libxxhash.0.dylib` from `Resources/rsync/lib/<arch>/` for xxh128 verification
+     (no pure-Swift fallback — `StreamingHasher` returns nil if it can't load). To
+     stop bundling rsync, vendor `libxxhash.0.dylib` standalone (own embed step +
+     update `XXHash.possibleLibraryPaths`) first, then drop the rsync embed.
 
 ---
 
@@ -80,5 +82,6 @@ below.
 
 6. **Remove dormant code**
    - ~~Delete `MultiDestSummaryView`.~~ Done in 1.2.0.
-   - Decide rsync’s fate (delete vs. dev-flag) and stop bundling rsync in the
-     release build if it’s removed.
+   - ~~Delete the rsync engine code + UI.~~ Done in 1.2.x.
+   - **Still TODO:** vendor `libxxhash.0.dylib` standalone, then stop bundling the
+     rsync binary (see Known Weak Areas #7).
