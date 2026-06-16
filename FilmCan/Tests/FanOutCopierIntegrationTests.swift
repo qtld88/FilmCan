@@ -593,6 +593,86 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(r2.first?.filesTransferred, 0)
     }
 
+    /// On resume the progress bar spans the WHOLE job: total = all bytes, and the
+    /// bar starts at the already-present bytes (e.g. 30/500, not 0/470).
+    func test_resume_progressSpansFullJobAndStartsAtPresentBytes() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("SPANCARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        let da = Data((0..<100_000).map { _ in UInt8.random(in: 0...255) })
+        let db = Data((0..<120_000).map { _ in UInt8.random(in: 0...255) })
+        let dc = Data((0..<140_000).map { _ in UInt8.random(in: 0...255) })
+        try da.write(to: card.appendingPathComponent("a.bin"))
+        try db.write(to: card.appendingPathComponent("b.bin"))
+        try dc.write(to: card.appendingPathComponent("c.bin"))
+        let dest = tmpDir.appendingPathComponent("spandest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        try fm.removeItem(at: dest.appendingPathComponent("SPANCARD/a.bin"))  // dest now needs only a
+
+        let lock = NSLock()
+        var totals: Set<Int64> = []
+        var copyVals: [Int64] = []
+        let handler: @Sendable (DestProgress) -> Void = { prog in
+            let cf = prog.currentFile
+            guard !cf.hasPrefix("Verifying"), !cf.hasPrefix("✓"), !cf.hasPrefix("✗"),
+                  !cf.hasPrefix("Cancelled"), prog.bytesTotal > 0 else { return }
+            lock.lock(); totals.insert(prog.bytesTotal); copyVals.append(prog.bytesCompleted); lock.unlock()
+        }
+        var cfg = resumeConfig(card: card, dest: dest)
+        cfg.progressHandler = handler
+        _ = try await FanOutCopier(config: cfg).run()
+
+        // Sizes on disk are block-allocated, so compare structurally, not to logical
+        // byte counts. b and c are still present; a is re-copied.
+        let presentLogical = Int64(db.count + dc.count)
+        XCTAssertEqual(totals.count, 1, "bar total must be a single, whole-job value")
+        let total = totals.first ?? 0
+        XCTAssertFalse(copyVals.isEmpty)
+        XCTAssertGreaterThanOrEqual(copyVals.min() ?? 0, presentLogical, "bar must start at already-present bytes")
+        XCTAssertEqual(copyVals.max(), total, "bar must reach the full job total")
+        XCTAssertGreaterThan(total, copyVals.min() ?? total, "bar spans from present up to total")
+    }
+
+    /// Per-destination resume: a file missing from ONE destination is re-copied only
+    /// there; the destination that still has it skips it.
+    func test_resume_perDestination_copiesOnlyWhereMissing() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("PDCARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<70_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("a.bin"))
+        try Data((0..<90_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("b.bin"))
+        let dest1 = tmpDir.appendingPathComponent("pd1")
+        let dest2 = tmpDir.appendingPathComponent("pd2")
+        try fm.createDirectory(at: dest1, withIntermediateDirectories: true)
+        try fm.createDirectory(at: dest2, withIntermediateDirectories: true)
+
+        func cfg() -> FanOutCopier.Configuration {
+            FanOutCopier.Configuration(
+                sources: [card.path],
+                destinations: [
+                    DestWriter.Config(destPath: dest1.path, displayName: "D1", verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768),
+                    DestWriter.Config(destPath: dest2.path, displayName: "D2", verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
+                ],
+                verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil)
+        }
+
+        _ = try await FanOutCopier(config: cfg()).run()
+        // Remove one file from dest1 only.
+        try fm.removeItem(at: dest1.appendingPathComponent("PDCARD/a.bin"))
+
+        let r2 = try await FanOutCopier(config: cfg()).run()
+        let d1 = r2.first { $0.destinationPath == dest1.path }
+        let d2 = r2.first { $0.destinationPath == dest2.path }
+        XCTAssertEqual(d1?.filesTransferred, 1, "dest1 re-copies only the missing file")
+        XCTAssertEqual(d1?.filesSkipped, 1, "dest1 skips the file it still has")
+        XCTAssertEqual(d2?.filesTransferred, 0, "dest2 has both already")
+        XCTAssertEqual(d2?.filesSkipped, 2, "dest2 skips both")
+        // The missing file is restored at dest1.
+        XCTAssertTrue(fm.fileExists(atPath: dest1.appendingPathComponent("PDCARD/a.bin").path))
+    }
+
     func test_resume_allDone_skipsEverythingAndSucceeds() async throws {
         let fm = FileManager.default
         let card = tmpDir.appendingPathComponent("CARD2")

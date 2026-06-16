@@ -107,8 +107,12 @@ struct CopyResult: Sendable {
     let sourceIndex: Int
     let totalSources: Int
     let totalBytesAllSources: Int64
+    /// Per-destination totals/skip counts, since each destination copies its own
+    /// resume subset. The verify lane reads these for correct per-dest progress.
+    let bytesTotalByDest: [String: Int64]
+    let filesTotalByDest: [String: Int]
+    let skippedByDest: [String: Int]
     let jobStartTime: Date
-    let skippedFiles: Int
     /// The copy was aborted mid-file by the user — skip verification entirely.
     let cancelledEarly: Bool
 }
@@ -184,6 +188,10 @@ actor FanOutCopier {
         let next = (completedFilesByDest[destPath] ?? 0) + 1
         completedFilesByDest[destPath] = next
         return next >= totalFiles
+    }
+
+    private func completedFilesForDest(_ destPath: String) -> Int {
+        completedFilesByDest[destPath] ?? 0
     }
 
     private func recordVerifyCompletion(destPath: String, totalFiles: Int) -> Bool {
@@ -464,41 +472,93 @@ actor FanOutCopier {
         func plannedSourceName(_ f: PlannedFile) -> String {
             f.relPath.isEmpty ? (f.absPath as NSString).lastPathComponent : f.relPath
         }
-        var skippedFiles = 0
-        let plannedFiles: [PlannedFile] = config.forceRecopy ? allPlannedFiles : allPlannedFiles.filter { f in
+        // Per-destination resume: a file already recorded AND present at a given
+        // destination is skipped FOR THAT DESTINATION only; it is still copied to any
+        // destination missing it. `forceRecopy` needs everything everywhere.
+        func destsNeeding(_ f: PlannedFile) -> [DestWriter.Config] {
+            if config.forceRecopy { return config.destinations }
             let name = plannedSourceName(f)
-            let doneEverywhere = config.destinations.allSatisfy { dest in
-                guard existingMHLByDest[dest.destPath]?[f.rootName]?.contains(where: { $0.fileName == name }) == true else { return false }
-                // Quick presence check: the recorded file must still exist.
+            return config.destinations.filter { dest in
+                guard existingMHLByDest[dest.destPath]?[f.rootName]?.contains(where: { $0.fileName == name }) == true
+                else { return true }   // not recorded → needs copy
                 let path = Self.resolveDestFilePath(
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
                     metadata: config.shootMetadata)
-                return FileManager.default.fileExists(atPath: path)
+                return !FileManager.default.fileExists(atPath: path)   // present → skip
             }
-            if doneEverywhere { skippedFiles += 1; return false }
-            return true
         }
 
-        // Everything already backed up to every destination — nothing to copy.
-        guard !plannedFiles.isEmpty else {
-            return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedFiles) }
+        var skippedByDest: [String: Int] = [:]
+        var skippedBytesByDest: [String: Int64] = [:]
+        var neededBytesByDest: [String: Int64] = [:]
+        var plannedFiles: [PlannedFile] = []
+        var neededDestsByPlan: [[DestWriter.Config]] = []
+        for f in allPlannedFiles {
+            let needed = destsNeeding(f)
+            let neededSet = Set(needed.map { $0.destPath })
+            for dest in config.destinations {
+                if neededSet.contains(dest.destPath) {
+                    neededBytesByDest[dest.destPath, default: 0] += f.size
+                } else {
+                    skippedByDest[dest.destPath, default: 0] += 1
+                    skippedBytesByDest[dest.destPath, default: 0] += f.size
+                }
+            }
+            guard !needed.isEmpty else { continue }   // already on every destination
+            plannedFiles.append(f)
+            neededDestsByPlan.append(needed)
         }
 
-        let totalBytesAllSources = plannedFiles.reduce(Int64(0)) { $0 + $1.size }
-
-        // Pre-flight: ensure every destination has enough free space before we start.
-        // Use live statfs free space (not the cached ImportantUsage metric) so a
-        // drive the user just cleared isn't falsely reported as full.
+        // Progress bars span the WHOLE job (already-present + this run), so a resume
+        // reads e.g. 30/500 GB rather than 0/470 GB. Each destination's bar starts at
+        // what it already has and counts up to the full total — seed the live copy,
+        // verify and file counters with the resumed portion.
+        let fullJobBytes = allPlannedFiles.reduce(Int64(0)) { $0 + $1.size }
+        let fullJobFiles = allPlannedFiles.count
+        var bytesTotalByDest: [String: Int64] = [:]
+        var filesTotalByDest: [String: Int] = [:]
         for dest in config.destinations {
-            if let available = DriveUtilities.liveAvailableBytes(for: dest.destPath),
-               available < totalBytesAllSources {
+            bytesTotalByDest[dest.destPath] = fullJobBytes
+            filesTotalByDest[dest.destPath] = fullJobFiles
+            let sBytes = skippedBytesByDest[dest.destPath] ?? 0
+            let sFiles = skippedByDest[dest.destPath] ?? 0
+            finalizedBytesByDest[dest.destPath] = sBytes
+            verifiedBytesByDest[dest.destPath] = sBytes
+            completedFilesByDest[dest.destPath] = sFiles
+            verifiedFilesByDest[dest.destPath] = sFiles
+        }
+
+        // A destination that already has everything emits a one-shot Complete (full
+        // bars + skip count) so its card shows done instead of staying Waiting.
+        for dest in config.destinations where (neededBytesByDest[dest.destPath] ?? 0) == 0 {
+            var prog = DestProgress(
+                id: dest.destPath, displayName: dest.displayName,
+                status: .complete, bytesTotal: fullJobBytes, filesTotal: fullJobFiles,
+                verifyMode: dest.verifyMode)
+            prog.bytesCompleted = skippedBytesByDest[dest.destPath] ?? 0
+            prog.filesCompleted = skippedByDest[dest.destPath] ?? 0
+            prog.filesSkipped = skippedByDest[dest.destPath] ?? 0
+            config.progressHandler?(prog)
+        }
+
+        // Nothing to copy to any destination.
+        guard !plannedFiles.isEmpty else {
+            return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
+        }
+
+        let totalBytesAllSources = fullJobBytes
+
+        // Pre-flight: ensure each destination has room for the bytes it STILL needs.
+        // Live statfs free space (not the cached ImportantUsage metric) so a drive
+        // the user just cleared isn't falsely reported as full.
+        for dest in config.destinations {
+            let need = neededBytesByDest[dest.destPath] ?? 0
+            if need > 0, let available = DriveUtilities.liveAvailableBytes(for: dest.destPath),
+               available < need {
                 throw Error.insufficientSpace(
-                    destPath: dest.destPath,
-                    available: available,
-                    required: totalBytesAllSources
-                )
+                    destPath: dest.destPath, available: available, required: need)
             }
         }
 
@@ -569,6 +629,7 @@ actor FanOutCopier {
                     guard let (index, file) = iter.next() else { return false }
                     let absURL = URL(fileURLWithPath: file.absPath)
                     let cumBefore = cumulativeBeforeFile[index]
+                    let needed = neededDestsByPlan[index]
                     group.addTask { [self] in
                         try await copySource(
                             sourceURL: absURL,
@@ -578,14 +639,17 @@ actor FanOutCopier {
                             totalBytesAllSources: totalBytesAllSources,
                             sourceIndex: index,
                             totalSources: totalFiles,
+                            destinations: needed,
+                            bytesTotalByDest: bytesTotalByDest,
+                            filesTotalByDest: filesTotalByDest,
+                            skippedByDest: skippedByDest,
                             channelCapacity: channelCapacity,
                             chunkSz: chunkSz,
                             rootName: file.rootName,
                             rootPath: file.rootPath,
                             relPath: file.relPath,
                             sharedMHLsByDest: sharedMHLsByDest,
-                            jobStartTime: jobStartTime,
-                            skippedFiles: skippedFiles
+                            jobStartTime: jobStartTime
                         )
                     }
                     inFlight += 1
@@ -640,7 +704,7 @@ actor FanOutCopier {
             }
         }
 
-        return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedFiles) }
+        return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
     }
 
     /// Single serial verify lane: pulls copied files in order and verifies each,
@@ -688,25 +752,28 @@ actor FanOutCopier {
         totalBytesAllSources: Int64,
         sourceIndex: Int,
         totalSources: Int,
+        destinations: [DestWriter.Config],
+        bytesTotalByDest: [String: Int64],
+        filesTotalByDest: [String: Int],
+        skippedByDest: [String: Int],
         channelCapacity: Int,
         chunkSz: Int,
         rootName: String,
         rootPath: String,
         relPath: String,
         sharedMHLsByDest: [String: [String: any MHLWriting]],
-        jobStartTime: Date,
-        skippedFiles: Int
+        jobStartTime: Date
     ) async throws -> CopyResult {
         let sourcePath = sourceURL.path
 
         var channels: [String: BoundedChannel<Chunk>] = [:]
-        for dest in config.destinations {
+        for dest in destinations {
             channels[dest.destPath] = BoundedChannel<Chunk>(capacity: channelCapacity)
         }
 
         var writerTasks: [Task<DestWriterResult, Never>] = []
 
-        for destCfg in config.destinations {
+        for destCfg in destinations {
             let channel = channels[destCfg.destPath]!
             let targetPath = Self.resolveDestFilePath(
                 destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
@@ -717,11 +784,30 @@ actor FanOutCopier {
             try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
             let destFileURL = URL(fileURLWithPath: targetPath)
             let progressHandler = config.progressHandler
+            // Per-destination totals (this dest copies only its needed subset).
+            let destBytesTotal = bytesTotalByDest[destCfg.destPath] ?? totalBytesAllSources
+            let destFilesTotal = filesTotalByDest[destCfg.destPath] ?? totalSources
+            let destSkipped = skippedByDest[destCfg.destPath] ?? 0
 
             let task = Task<DestWriterResult, Never> {
                 let startTime = Date()
                 var totalBytes: Int64 = 0
                 var writeFailed: DestFailureReason? = nil
+                // Flip this destination's card to a red failed state immediately so a
+                // mid-copy failure (e.g. this drive disconnects) is visible while the
+                // other destinations keep going.
+                func emitFailed(_ reason: DestFailureReason) async {
+                    var prog = DestProgress(
+                        id: destCfg.destPath, displayName: destCfg.displayName,
+                        status: .failed(reason), bytesTotal: destBytesTotal,
+                        filesTotal: destFilesTotal, verifyMode: destCfg.verifyMode)
+                    prog.bytesCompleted = await self.finalizedBytesForDest(destCfg.destPath)
+                    prog.verifyBytesTotal = destCfg.verifyMode == .paranoid ? destBytesTotal : 0
+                    prog.verifyBytesCompleted = await self.verifiedBytesForDest(destCfg.destPath)
+                    prog.currentFile = sourceName
+                    prog.filesSkipped = destSkipped
+                    progressHandler?(prog)
+                }
                 // Throttle copy-phase progress emits to ~10/s. Emitting per 8MB
                 // chunk spawned thousands of progress Tasks per file, flooding the
                 // main thread. The per-file copy-done emit below is always sent.
@@ -732,6 +818,7 @@ actor FanOutCopier {
 
                 guard let destHasher = XXH128StreamingHasher() else {
                     await channel.finish()
+                    await emitFailed(.ioError("xxhash unavailable"))
                     return DestWriterResult(
                         destPath: destCfg.destPath, displayName: destCfg.displayName,
                         success: false, bytesTransferred: 0, filesTransferred: 0,
@@ -754,6 +841,7 @@ actor FanOutCopier {
                     )
                 } catch {
                     await channel.finish()
+                    await emitFailed(.ioError(error.localizedDescription))
                     return DestWriterResult(
                         destPath: destCfg.destPath, displayName: destCfg.displayName,
                         success: false, bytesTransferred: 0, filesTransferred: 0,
@@ -779,24 +867,24 @@ actor FanOutCopier {
                                     let copiedSoFar = await self.finalizedBytesForDest(destCfg.destPath) + totalBytes
                                     var prog = DestProgress(
                                         id: destCfg.destPath, displayName: destCfg.displayName,
-                                        status: .active, bytesTotal: totalBytesAllSources,
-                                        filesTotal: totalSources, verifyMode: destCfg.verifyMode
+                                        status: .active, bytesTotal: destBytesTotal,
+                                        filesTotal: destFilesTotal, verifyMode: destCfg.verifyMode
                                     )
                                     let paranoid = destCfg.verifyMode == .paranoid
                                     prog.bytesCompleted = copiedSoFar
-                                    prog.filesCompleted = sourceIndex
+                                    prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                                     prog.currentFile = sourceName
-                                    prog.verifyBytesTotal = paranoid ? totalBytesAllSources : 0
+                                    prog.verifyBytesTotal = paranoid ? destBytesTotal : 0
                                     prog.verifyBytesCompleted = verifiedAtStart
                                     let se = await self.combinedThroughputETA(
                                         destPath: destCfg.destPath,
                                         copyDoneNow: prog.bytesCompleted,
-                                        copyTotal: totalBytesAllSources,
+                                        copyTotal: destBytesTotal,
                                         paranoid: paranoid,
                                         jobStart: jobStartTime)
                                     prog.speedBytesPerSecond = se.speed
                                     prog.estimatedTimeRemaining = se.eta
-                                    prog.filesSkipped = skippedFiles
+                                    prog.filesSkipped = destSkipped
                                     progressHandler?(prog)
                                 }
                             } catch {
@@ -823,6 +911,7 @@ actor FanOutCopier {
                 }
 
                 if let reason = writeFailed {
+                    await emitFailed(reason)
                     return DestWriterResult(
                         destPath: destCfg.destPath, displayName: destCfg.displayName,
                         success: false, bytesTransferred: totalBytes, filesTransferred: 0,
@@ -838,6 +927,7 @@ actor FanOutCopier {
                     try await writer.finalize(fileHash: destHash, sourceSize: sourceSize)
                     try await writer.appendMHL(hash: destHash, fileName: sourceName, size: sourceSize)
                 } catch {
+                    await emitFailed(.ioError(error.localizedDescription))
                     return DestWriterResult(
                         destPath: destCfg.destPath, displayName: destCfg.displayName,
                         success: false, bytesTransferred: totalBytes, filesTransferred: 0,
@@ -849,32 +939,33 @@ actor FanOutCopier {
                 }
 
                 let duration = Date().timeIntervalSince(startTime)
-                // The file is now finalized (renamed) on disk — fold its bytes into
-                // the finalized total and report that (no in-flight partial to add).
+                // The file is now finalized (renamed) on disk — fold its planned size
+                // into the finalized total (using sourceSize, the same units as the
+                // bar's total, so the bar reaches exactly 100%).
                 let copiedAtDone = await self.recordFinalizedBytes(
-                    destPath: destCfg.destPath, adding: totalBytes)
-                let isLastFile = await self.recordFileCompletion(destPath: destCfg.destPath, totalFiles: totalSources)
+                    destPath: destCfg.destPath, adding: sourceSize)
+                let isLastFile = await self.recordFileCompletion(destPath: destCfg.destPath, totalFiles: destFilesTotal)
                 let copyStatus: DestStatus = isLastFile ? .complete : .active
                 var prog = DestProgress(
                     id: destCfg.destPath, displayName: destCfg.displayName,
-                    status: copyStatus, bytesTotal: totalBytesAllSources,
-                    filesTotal: totalSources, verifyMode: destCfg.verifyMode
+                    status: copyStatus, bytesTotal: destBytesTotal,
+                    filesTotal: destFilesTotal, verifyMode: destCfg.verifyMode
                 )
                 let paranoidDone = destCfg.verifyMode == .paranoid
                 prog.bytesCompleted = copiedAtDone
-                prog.filesCompleted = sourceIndex + 1
+                prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                 prog.currentFile = sourceName
-                prog.verifyBytesTotal = paranoidDone ? totalBytesAllSources : 0
+                prog.verifyBytesTotal = paranoidDone ? destBytesTotal : 0
                 prog.verifyBytesCompleted = verifiedAtStart
                 let se = await self.combinedThroughputETA(
                     destPath: destCfg.destPath,
                     copyDoneNow: prog.bytesCompleted,
-                    copyTotal: totalBytesAllSources,
+                    copyTotal: destBytesTotal,
                     paranoid: paranoidDone,
                     jobStart: jobStartTime)
                 prog.speedBytesPerSecond = se.speed
                 prog.estimatedTimeRemaining = se.eta
-                prog.filesSkipped = skippedFiles
+                prog.filesSkipped = destSkipped
                 progressHandler?(prog)
 
                 let mhlPath = sharedMHLsByDest[destCfg.destPath]?[rootName]?.manifestPath ?? ""
@@ -965,8 +1056,10 @@ actor FanOutCopier {
             sourceIndex: sourceIndex,
             totalSources: totalSources,
             totalBytesAllSources: totalBytesAllSources,
+            bytesTotalByDest: bytesTotalByDest,
+            filesTotalByDest: filesTotalByDest,
+            skippedByDest: skippedByDest,
             jobStartTime: jobStartTime,
-            skippedFiles: skippedFiles,
             cancelledEarly: config.shouldCancel?() == true
         )
     }
@@ -982,16 +1075,19 @@ actor FanOutCopier {
         // set marked as failed so the per-dest result is not a success.
         func emitCancelled() async -> Set<String> {
             for r in c.writerResults where r.success {
+                let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
                 var prog = DestProgress(
                     id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
-                    status: .failed(.userCancel), bytesTotal: c.totalBytesAllSources,
-                    filesTotal: c.totalSources, verifyMode: c.writerResults.first?.verifyMode ?? .paranoid
+                    status: .failed(.userCancel), bytesTotal: dTotal,
+                    filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources,
+                    verifyMode: c.writerResults.first?.verifyMode ?? .paranoid
                 )
                 prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
-                prog.filesCompleted = c.sourceIndex + 1
-                prog.verifyBytesTotal = c.totalBytesAllSources
+                prog.filesCompleted = await self.completedFilesForDest(r.destPath)
+                prog.verifyBytesTotal = dTotal
                 prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
                 prog.currentFile = "Cancelled"
+                prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
                 config.progressHandler?(prog)
             }
             return Set(successDests)
@@ -1049,22 +1145,23 @@ actor FanOutCopier {
 
         // Emit verify-start progress for each successful destination.
         for r in c.writerResults where r.success {
+            let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
             var prog = DestProgress(
                 id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
-                status: .active, bytesTotal: c.totalBytesAllSources,
-                filesTotal: c.totalSources, verifyMode: .paranoid
+                status: .active, bytesTotal: dTotal,
+                filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid
             )
             prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
-            prog.filesCompleted = c.sourceIndex + 1
-            prog.verifyBytesTotal = c.totalBytesAllSources
+            prog.filesCompleted = await self.completedFilesForDest(r.destPath)
+            prog.verifyBytesTotal = dTotal
             prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
             prog.currentFile = "Verifying \(c.sourceName)…"
             let se = await self.combinedThroughputETA(
                 destPath: r.destPath, copyDoneNow: nil,
-                copyTotal: c.totalBytesAllSources, paranoid: true, jobStart: c.jobStartTime)
+                copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
             prog.speedBytesPerSecond = se.speed
             prog.estimatedTimeRemaining = se.eta
-            prog.filesSkipped = c.skippedFiles
+            prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
             config.progressHandler?(prog)
         }
 
@@ -1075,6 +1172,14 @@ actor FanOutCopier {
             for r in c.writerResults where r.success {
                 try? fm.removeItem(atPath: r.writtenFilePath)
                 verifyFailed.insert(r.destPath)
+                // Flip the card to red now; the run also aborts with a corruption error.
+                var prog = DestProgress(
+                    id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                    status: .failed(.verify), bytesTotal: c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources,
+                    filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid)
+                prog.currentFile = "Source read error — retry"
+                prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
+                config.progressHandler?(prog)
             }
         } else {
             let writtenPathByDest: [String: String] = Dictionary(
@@ -1099,8 +1204,10 @@ actor FanOutCopier {
                     }
                     let verifyDestStatus: DestStatus
                     let newVerifiedBytes: Int64
+                    let dTotal = c.bytesTotalByDest[destPath] ?? c.totalBytesAllSources
                     if hashMatchesExpected {
-                        let isLastVerify = await self.recordVerifyCompletion(destPath: destPath, totalFiles: c.totalSources)
+                        let isLastVerify = await self.recordVerifyCompletion(
+                            destPath: destPath, totalFiles: c.filesTotalByDest[destPath] ?? c.totalSources)
                         newVerifiedBytes = await self.recordVerifyBytes(destPath: destPath, adding: c.sourceSize)
                         verifyDestStatus = isLastVerify ? .complete : .active
                     } else {
@@ -1110,20 +1217,20 @@ actor FanOutCopier {
                     var prog = DestProgress(
                         id: destPath, displayName: (destPath as NSString).lastPathComponent,
                         status: verifyDestStatus,
-                        bytesTotal: c.totalBytesAllSources, filesTotal: c.totalSources,
+                        bytesTotal: dTotal, filesTotal: c.filesTotalByDest[destPath] ?? c.totalSources,
                         verifyMode: .paranoid
                     )
                     prog.bytesCompleted = await self.finalizedBytesForDest(destPath)
-                    prog.filesCompleted = c.sourceIndex + 1
-                    prog.verifyBytesTotal = c.totalBytesAllSources
+                    prog.filesCompleted = await self.completedFilesForDest(destPath)
+                    prog.verifyBytesTotal = dTotal
                     prog.verifyBytesCompleted = newVerifiedBytes
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
                     let se = await self.combinedThroughputETA(
                         destPath: destPath, copyDoneNow: nil,
-                        copyTotal: c.totalBytesAllSources, paranoid: true, jobStart: c.jobStartTime)
+                        copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
                     prog.speedBytesPerSecond = se.speed
                     prog.estimatedTimeRemaining = se.eta
-                    prog.filesSkipped = c.skippedFiles
+                    prog.filesSkipped = c.skippedByDest[destPath] ?? 0
                     config.progressHandler?(prog)
                 }
             }

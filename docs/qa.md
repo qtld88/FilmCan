@@ -28,7 +28,10 @@ Manual test procedure for FilmCan. This validates core flows and checks for doc/
 2. Click **Run Now** again (unchanged). Expected: **no new history card** — an **Already backed up** popup appears. Click **Verify data** → report shows all files match.
 3. Add one new file to the source and run again. Expected: only the new file copies; the row shows *"Resuming — N already backed up, copying the rest"*; a history card is added.
 4. Delete one already-backed-up file from a destination and run. Expected: only that file is re-copied (presence check).
-5. Turn **Force re-copy** ON and run. Expected: every file is re-copied; no skip.
+5. **Per-destination resume:** with two destinations, delete a file from **one** of them and run. Expected: that file is re-copied to the destination missing it only; the other destination skips it (its card shows *"Resuming — N already here, copying the rest"*, or *"Already backed up — nothing to copy"* + an **Up to date** badge if it has everything).
+6. **Resume display:** on a partial resume the bar spans the **whole** job and starts at the already-present amount (e.g. `30 / 500 GB`), not `0 / 470 GB`.
+7. **Live failure:** unplug one destination mid-copy. Expected: that destination's card turns **red** immediately (the others keep going); the run finishes with that destination marked failed.
+8. Turn **Force re-copy** ON and run. Expected: every file is re-copied to every destination; no skip.
 
 ---
 

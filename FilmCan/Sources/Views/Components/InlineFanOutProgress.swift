@@ -66,6 +66,23 @@ struct InlineFanOutProgress: View {
         return String(format: "%dh %02dm left", secs / 3600, (secs % 3600) / 60)
     }
 
+    /// This destination already has every file (nothing to copy this run).
+    private var isFullyUpToDate: Bool {
+        progress.filesSkipped > 0 && progress.filesTotal > 0
+            && progress.filesSkipped >= progress.filesTotal
+    }
+
+    /// Resume indication. A fully-up-to-date destination has nothing to copy;
+    /// otherwise some files are skipped and the rest are copying.
+    private var skipText: String {
+        let n = progress.filesSkipped
+        let unit = n == 1 ? "file" : "files"
+        if isFullyUpToDate {
+            return "Already backed up — \(n) \(unit) here, nothing to copy"
+        }
+        return "Resuming — \(n) \(unit) already here, copying the rest"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
@@ -98,7 +115,7 @@ struct InlineFanOutProgress: View {
                     Image(systemName: "arrow.uturn.forward")
                         .font(FilmCanFont.label(9))
                         .foregroundColor(FilmCanTheme.textTertiary)
-                    Text("Resuming — \(progress.filesSkipped) \(progress.filesSkipped == 1 ? "file" : "files") already backed up, copying the rest")
+                    Text(skipText)
                         .font(FilmCanFont.label(9))
                         .foregroundColor(FilmCanTheme.textTertiary)
                 }
@@ -135,7 +152,11 @@ struct InlineFanOutProgress: View {
     private var trailingBadge: some View {
         switch progress.status {
         case .complete:
-            badge(icon: "checkmark.circle.fill", text: "Complete", color: FilmCanTheme.brandGreen)
+            if isFullyUpToDate {
+                badge(icon: "checkmark.circle", text: "Up to date", color: FilmCanTheme.brandGreen)
+            } else {
+                badge(icon: "checkmark.circle.fill", text: "Complete", color: FilmCanTheme.brandGreen)
+            }
         case .pending:
             Text("Waiting…")
                 .font(FilmCanFont.label(10))
