@@ -852,6 +852,9 @@ class TransferViewModel: ObservableObject {
                 hashListPath: dr.mhlPath,
                 wasVerified: dr.success && dr.verifyMode == .paranoid
             )
+            // Truthful "transferred items" list: exactly the files copied this run,
+            // not the (cumulative) hash list which also carries forward prior entries.
+            r.transferredPaths = dr.transferredFileNames
             r.destinationResults = [dr]
             return r
         }
@@ -1234,14 +1237,10 @@ class TransferViewModel: ObservableObject {
                 }
                 continue
             }
-            // Derive the transferred-file list from the destination's sealed hash
-            // list (MHL). Available only when verification wrote one (Fast/Paranoid);
-            // in Off mode there is no MHL, so the log lists status + counts only.
-            if results[index].transferredPaths.isEmpty,
-               let mhl = results[index].hashListPath, !mhl.isEmpty,
-               let entries = try? ASCMHLReader.read(url: URL(fileURLWithPath: mhl)) {
-                results[index].transferredPaths = entries.map { $0.relPath }
-            }
+            // The transferred-items list is the engine's truthful per-run list
+            // (set in explodeFanOutResult). It is deliberately NOT derived from the
+            // hash list, which is cumulative and would also list carried-forward /
+            // skipped files that weren't copied this run.
             if let writeWarning = writeCustomLog(
                 result: results[index],
                 logFile: logFile,

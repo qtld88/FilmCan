@@ -489,6 +489,37 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         // Directory root "CARD": MHL at dest/CARD/ascmhl/<generation>.mhl
         let entries = try readLatestASCMHL(ascmhlDir: dest.appendingPathComponent("CARD/ascmhl"))
         XCTAssertEqual(Set(entries.map { $0.relPath }), ["a.bin", "b.bin", "c.bin"])
+        // Carried-forward (seeded) entries must keep their real size, not 0.
+        for e in entries {
+            XCTAssertGreaterThan(e.size ?? 0, 0, "seeded entry \(e.relPath) lost its size")
+        }
+    }
+
+    /// A carried-forward entry whose destination file was deleted out-of-band must
+    /// NOT stay certified in the regenerated manifest.
+    func test_resume_dropsManifestEntryForDeletedDestinationFile() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("DROPCARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<50_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("keep.bin"))
+        try Data((0..<60_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("gone.bin"))
+        let dest = tmpDir.appendingPathComponent("dropdest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        // Delete one already-backed-up file from the destination, then resume.
+        try fm.removeItem(at: dest.appendingPathComponent("DROPCARD/gone.bin"))
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+
+        let entries = try readLatestASCMHL(ascmhlDir: dest.appendingPathComponent("DROPCARD/ascmhl"))
+        XCTAssertTrue(entries.contains { $0.relPath == "keep.bin" })
+        XCTAssertTrue(entries.contains { $0.relPath == "gone.bin" },
+                      "gone.bin is re-copied (present on source), so it is back in the manifest")
+        // All manifest entries correspond to files that exist on disk.
+        for e in entries {
+            XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DROPCARD/\(e.relPath)").path),
+                          "manifest certifies a missing file: \(e.relPath)")
+        }
     }
 
     func test_resume_allDone_skipsEverythingAndSucceeds() async throws {

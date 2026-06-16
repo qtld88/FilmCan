@@ -21,6 +21,10 @@ struct DestWriterResult: Sendable {
     let destHashFromStream: String?
     /// The exact path the file was written to (accounts for organization presets).
     let writtenFilePath: String
+    /// The manifest-relative name of the file copied this run (nil unless success).
+    /// Used to build a truthful "transferred items" list independent of the
+    /// (cumulative) hash list.
+    var transferredRelPath: String? = nil
 }
 
 // MARK: - Accumulator across sources for one destination
@@ -36,6 +40,8 @@ struct DestResultBuilder {
     var mhlPaths: [String] = []
     var totalDuration: TimeInterval = 0
     var verificationFailed: Bool = false
+    /// Names of files actually copied this run (for a truthful transferred-items list).
+    var transferredNames: [String] = []
 
     mutating func incorporate(_ result: DestWriterResult) {
         totalBytes += result.bytesTransferred
@@ -48,6 +54,9 @@ struct DestResultBuilder {
         }
         if let mhl = result.mhlPath {
             mhlPaths.append(mhl)
+        }
+        if result.success, let name = result.transferredRelPath {
+            transferredNames.append(name)
         }
         totalDuration += result.durationSec
     }
@@ -69,7 +78,8 @@ struct DestResultBuilder {
             failureReason: verificationFailed ? .verify : failures.first,
             mhlPath: mhlPaths.first,
             durationSec: totalDuration,
-            verifyMode: verifyMode
+            verifyMode: verifyMode,
+            transferredFileNames: transferredNames
         )
     }
 }
@@ -262,11 +272,11 @@ actor FanOutCopier {
     /// (relPath for directory roots, basename for flat-file roots).
     nonisolated static func loadExistingMHLEntries(
         destPath: String, rootName: String, rollFolder: String
-    ) -> [(fileName: String, hash: String)] {
+    ) -> [(fileName: String, hash: String, size: Int64)] {
         let ascDir = ascMHLDir(rollFolder: rollFolder)
         if let latest = ASCMHLChain.latestManifestPath(ascmhlDir: ascDir),
            let entries = try? ASCMHLReader.read(url: ascDir.appendingPathComponent(latest)) {
-            return entries.map { (fileName: $0.relPath, hash: $0.hash) }
+            return entries.map { (fileName: $0.relPath, hash: $0.hash, size: $0.size ?? 0) }
         }
         let legacy = URL(fileURLWithPath: destPath)
             .appendingPathComponent(".filmcan").appendingPathComponent("hashlists")
@@ -279,9 +289,10 @@ actor FanOutCopier {
     }
 
     /// Minimal parser for the old <file name=".."><hash>..</hash></file> format.
-    nonisolated private static func parseLegacyMHL(_ data: Data) -> [(fileName: String, hash: String)] {
+    /// (The legacy format carried no size, so size is reported as 0.)
+    nonisolated private static func parseLegacyMHL(_ data: Data) -> [(fileName: String, hash: String, size: Int64)] {
         guard let xml = String(data: data, encoding: .utf8) else { return [] }
-        var out: [(String, String)] = []
+        var out: [(String, String, Int64)] = []
         let ns = xml as NSString
         let pattern = #"<file name=\"(.*?)\"><hash>(.*?)</hash></file>"#
         guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else { return [] }
@@ -294,7 +305,7 @@ actor FanOutCopier {
                 .replacingOccurrences(of: "&quot;", with: "\"")
                 .replacingOccurrences(of: "&apos;", with: "'")
             let hash = ns.substring(with: m.range(at: 2))
-            out.append((name, hash))
+            out.append((name, hash, 0))
         }
         return out
     }
@@ -416,9 +427,9 @@ actor FanOutCopier {
         func rootPath(for rootName: String) -> String {
             allPlannedFiles.first(where: { $0.rootName == rootName })?.rootPath ?? rootName
         }
-        var existingMHLByDest: [String: [String: [(fileName: String, hash: String)]]] = [:]
+        var existingMHLByDest: [String: [String: [(fileName: String, hash: String, size: Int64)]]] = [:]
         for dest in config.destinations {
-            var byRoot: [String: [(fileName: String, hash: String)]] = [:]
+            var byRoot: [String: [(fileName: String, hash: String, size: Int64)]] = [:]
             for root in allRootNames {
                 let rf = Self.resolveRollFolder(
                     destRoot: dest.destPath, rootName: root, rootPath: rootPath(for: root),
@@ -491,10 +502,26 @@ actor FanOutCopier {
             directoryRoots: directoryRoots,
             rootPaths: rootPathsByName,
             jobStartTime: jobStartTime)
+        // Seed each writer with the destination's prior entries so a resumed run
+        // appends rather than truncating. Carry the real file size (not 0), and
+        // only carry forward an entry whose file STILL EXISTS at the destination —
+        // a file deleted out-of-band must not stay certified in the manifest.
         for (destPath, byRoot) in sharedMHLsByDest {
             for (rootName, writer) in byRoot {
-                if let existing = existingMHLByDest[destPath]?[rootName], !existing.isEmpty {
-                    await writer.seed(existing.map { MHLEntry(relPath: $0.fileName, size: 0, hash: $0.hash) })
+                guard let existing = existingMHLByDest[destPath]?[rootName], !existing.isEmpty else { continue }
+                let isDir = directoryRoots.contains(rootName)
+                let rp = rootPathsByName[rootName] ?? rootName
+                let present = existing.filter { entry in
+                    let destFile = Self.resolveDestFilePath(
+                        destRoot: destPath, rootName: rootName, rootPath: rp,
+                        relPath: isDir ? entry.fileName : "",
+                        preset: config.organizationPreset,
+                        copyFolderContents: config.copyFolderContents,
+                        date: jobStartTime, metadata: config.shootMetadata)
+                    return FileManager.default.fileExists(atPath: destFile)
+                }
+                if !present.isEmpty {
+                    await writer.seed(present.map { MHLEntry(relPath: $0.fileName, size: $0.size, hash: $0.hash) })
                 }
             }
         }
@@ -578,10 +605,17 @@ actor FanOutCopier {
             }
         }
 
-        // Seal each shared MHL so it gets the <sealed/> trailer.
+        // Finalize each shared MHL. A cancelled run writes a PARTIAL manifest (no
+        // chain entry) so it never certifies an interrupted generation; a clean run
+        // seals and records the generation in the chain.
+        let wasCancelled = config.shouldCancel?() == true
         for destMHLs in sharedMHLsByDest.values {
             for writer in destMHLs.values {
-                try? await writer.seal()
+                if wasCancelled {
+                    try? await writer.finalizeAsPartial(reason: "Run cancelled or failed before completion")
+                } else {
+                    try? await writer.seal()
+                }
             }
         }
 
@@ -824,7 +858,8 @@ actor FanOutCopier {
                     durationSec: duration, mhlPath: mhlPath,
                     failureReason: nil, verifyMode: destCfg.verifyMode,
                     destHashFromStream: destHash,
-                    writtenFilePath: destFileURL.path
+                    writtenFilePath: destFileURL.path,
+                    transferredRelPath: sourceName
                 )
             }
             writerTasks.append(task)
