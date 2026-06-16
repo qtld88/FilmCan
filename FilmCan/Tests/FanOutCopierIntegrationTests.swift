@@ -569,6 +569,30 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         }
     }
 
+    /// A cancelled run writes its generation manifest but does NOT chain it. Resume
+    /// must still find that on-disk (partial) manifest and skip the finalized files.
+    func test_resume_findsPartialGenerationWhenChainMissing() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("PARTCARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<90_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("p.bin"))
+        try Data((0..<110_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("q.bin"))
+        let dest = tmpDir.appendingPathComponent("partdest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        // Simulate a cancelled/partial generation: the manifest exists on disk but
+        // the chain file is absent.
+        let ascDir = dest.appendingPathComponent("PARTCARD/ascmhl")
+        try fm.removeItem(at: ascDir.appendingPathComponent("ascmhl_chain.xml"))
+        XCTAssertNil(ASCMHLChain.latestManifestPath(ascmhlDir: ascDir), "chain is gone")
+        XCTAssertNotNil(ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir), "manifest still on disk")
+
+        let r2 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(r2.first?.filesSkipped, 2, "resume must skip via the on-disk manifest")
+        XCTAssertEqual(r2.first?.filesTransferred, 0)
+    }
+
     func test_resume_allDone_skipsEverythingAndSucceeds() async throws {
         let fm = FileManager.default
         let card = tmpDir.appendingPathComponent("CARD2")

@@ -19,11 +19,44 @@ enum ASCMHLChain {
     }
 
     static func nextSequence(ascmhlDir: URL) -> Int {
-        (read(ascmhlDir: ascmhlDir).map { $0.seq }.max() ?? 0) + 1
+        // Consider both sealed (chain) and on-disk generations, so a partial
+        // generation written on cancel still advances the next sequence number.
+        let chainMax = read(ascmhlDir: ascmhlDir).map { $0.seq }.max() ?? 0
+        let diskMax = manifestFilesOnDisk(ascmhlDir: ascmhlDir).map { $0.seq }.max() ?? 0
+        return max(chainMax, diskMax) + 1
     }
 
+    /// The latest SEALED generation recorded in the chain (delivery view).
     static func latestManifestPath(ascmhlDir: URL) -> String? {
         read(ascmhlDir: ascmhlDir).max(by: { $0.seq < $1.seq })?.path
+    }
+
+    /// All generation manifests physically present (sealed or partial), with the
+    /// leading NNNN sequence parsed from the filename.
+    static func manifestFilesOnDisk(ascmhlDir: URL) -> [(seq: Int, url: URL)] {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(
+            at: ascmhlDir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return [] }
+        return items.compactMap { url in
+            guard url.pathExtension == "mhl",
+                  let underscore = url.lastPathComponent.firstIndex(of: "_"),
+                  let seq = Int(url.lastPathComponent[..<underscore]) else { return nil }
+            return (seq, url)
+        }
+    }
+
+    /// The latest generation manifest ON DISK (sealed OR partial) — used for resume,
+    /// which must see a partial generation a cancelled run left behind. Ties on
+    /// sequence break by modification date (newest wins).
+    static func latestManifestFileName(ascmhlDir: URL) -> String? {
+        let files = manifestFilesOnDisk(ascmhlDir: ascmhlDir)
+        guard !files.isEmpty else { return nil }
+        func mtime(_ url: URL) -> Date {
+            (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        }
+        return files.sorted {
+            $0.seq != $1.seq ? $0.seq < $1.seq : mtime($0.url) < mtime($1.url)
+        }.last?.url.lastPathComponent
     }
 
     /// Append (or replace) the generation `sequence` with the C4 of `manifestData`,
