@@ -937,6 +937,7 @@ class TransferViewModel: ObservableObject {
                 forceRecopy: config.forceRecopy,
                 shootMetadata: ShootMetadata(episode: config.episode, day: config.day,
                                              unit: config.unit, cameraFormat: config.cameraFormat),
+                hashListStyle: config.hashListStyle,
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
                     Task { @MainActor in

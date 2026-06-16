@@ -11,7 +11,21 @@ Hash files for later verification. Hash lists are generated for successful trans
 
 ---
 
-## Format
+## Style: ASC MHL vs Simple
+
+**Options › Basic › Hash list style** picks the manifest format:
+
+| Style | What it writes | For |
+|-------|----------------|-----|
+| **ASC MHL** (default) | Visible `ascmhl/` folder: a per-generation manifest + `ascmhl_chain.xml` (C4 chain of custody) | Delivery-grade, Netflix-conformant |
+| **Simple (hidden)** | One hidden `.filmcan/hashlists/<roll>.mhl` per roll, no chain | Users who just want verification, clean destination |
+
+Resume-skip and verification behave the same either way. The **Netflix Ingest** preset
+always forces ASC MHL (the picker is locked).
+
+---
+
+## Format (ASC MHL)
 
 FilmCan writes a spec-faithful **ASC MHL v2.0** manifest per roll (xxHash128 /
 xxh3-128 file hashes), plus an `ascmhl_chain.xml` index recording each generation by
@@ -40,14 +54,21 @@ a new **sealed generation** to the roll's chain.
 
 ## Location
 
-At each roll's `ascmhl/` folder (the roll = the source-root folder at the destination):
+**ASC MHL** — at each roll's `ascmhl/` folder (the roll = the source-root folder at
+the destination):
 
 ```
 <destination>/<roll-folder>/ascmhl/0001_<roll>_<date>Z.mhl
 <destination>/<roll-folder>/ascmhl/ascmhl_chain.xml
 ```
 
-(Backups made before 1.3 used the older `<destination>/.filmcan/hashlists/` location;
+**Simple** — one hidden file per roll:
+
+```
+<destination>/.filmcan/hashlists/<roll>.mhl
+```
+
+(Backups made before 1.3 used the `.filmcan/hashlists/` location for all styles;
 resume still reads those once.)
 
 ---

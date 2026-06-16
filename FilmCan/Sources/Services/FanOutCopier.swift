@@ -117,6 +117,9 @@ actor FanOutCopier {
         var copyFolderContents: Bool = false
         /// Per-shoot metadata for the Netflix folder tokens.
         var shootMetadata: ShootMetadata = .empty
+        /// Which hash-list format to write. The Netflix Ingest preset always forces
+        /// ASC MHL regardless of this value.
+        var hashListStyle: HashListStyle = .ascMHL
         /// Ignore prior hash lists and re-copy every file (disables resume skip).
         var forceRecopy: Bool = false
         /// Polled cooperatively to abort the run when the user hits Stop.
@@ -301,22 +304,31 @@ actor FanOutCopier {
         directoryRoots: Set<String>,
         rootPaths: [String: String],
         jobStartTime: Date
-    ) throws -> [String: [String: ASCMHLWriter]] {
-        var result: [String: [String: ASCMHLWriter]] = [:]
+    ) throws -> [String: [String: any MHLWriting]] {
+        // Netflix delivery always needs ASC MHL; otherwise honor the config style.
+        let isNetflix = config.organizationPreset?.name == OrganizationPreset.netflixIngestName
+        let style: HashListStyle = isNetflix ? .ascMHL : config.hashListStyle
+        var result: [String: [String: any MHLWriting]] = [:]
         for destCfg in config.destinations {
-            var byRoot: [String: ASCMHLWriter] = [:]
+            var byRoot: [String: any MHLWriting] = [:]
             for rootName in rootNames {
-                let rollFolder = Self.resolveRollFolder(
-                    destRoot: destCfg.destPath, rootName: rootName,
-                    rootPath: rootPaths[rootName] ?? rootName,
-                    isDirectoryRoot: directoryRoots.contains(rootName),
-                    preset: config.organizationPreset,
-                    copyFolderContents: config.copyFolderContents, date: jobStartTime, metadata: config.shootMetadata)
-                if config.organizationPreset?.name == OrganizationPreset.netflixIngestName {
-                    Self.scaffoldNetflixSiblings(destRoot: destCfg.destPath, rollFolder: rollFolder)
+                let writer: any MHLWriting
+                switch style {
+                case .ascMHL:
+                    let rollFolder = Self.resolveRollFolder(
+                        destRoot: destCfg.destPath, rootName: rootName,
+                        rootPath: rootPaths[rootName] ?? rootName,
+                        isDirectoryRoot: directoryRoots.contains(rootName),
+                        preset: config.organizationPreset,
+                        copyFolderContents: config.copyFolderContents, date: jobStartTime, metadata: config.shootMetadata)
+                    if isNetflix {
+                        Self.scaffoldNetflixSiblings(destRoot: destCfg.destPath, rollFolder: rollFolder)
+                    }
+                    let ascDir = Self.ascMHLDir(rollFolder: rollFolder)
+                    writer = try ASCMHLWriter(ascmhlDir: ascDir, rollName: rootName)
+                case .simpleHidden:
+                    writer = try SimpleMHLWriter(destRoot: destCfg.destPath, rollName: rootName)
                 }
-                let ascDir = Self.ascMHLDir(rollFolder: rollFolder)
-                let writer = try ASCMHLWriter(ascmhlDir: ascDir, rollName: rootName)
                 byRoot[rootName] = writer
             }
             result[destCfg.destPath] = byRoot
@@ -482,7 +494,7 @@ actor FanOutCopier {
         for (destPath, byRoot) in sharedMHLsByDest {
             for (rootName, writer) in byRoot {
                 if let existing = existingMHLByDest[destPath]?[rootName], !existing.isEmpty {
-                    await writer.seed(existing.map { ASCMHLWriter.Entry(relPath: $0.fileName, size: 0, hash: $0.hash) })
+                    await writer.seed(existing.map { MHLEntry(relPath: $0.fileName, size: 0, hash: $0.hash) })
                 }
             }
         }
@@ -626,7 +638,7 @@ actor FanOutCopier {
         rootName: String,
         rootPath: String,
         relPath: String,
-        sharedMHLsByDest: [String: [String: ASCMHLWriter]],
+        sharedMHLsByDest: [String: [String: any MHLWriting]],
         jobStartTime: Date,
         skippedFiles: Int
     ) async throws -> CopyResult {

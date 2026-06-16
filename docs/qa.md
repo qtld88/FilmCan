@@ -86,8 +86,12 @@ Manual test procedure for FilmCan. This validates core flows and checks for doc/
 1. Enable **Create log file** in **Options > Logs**.
 2. Run a backup.
 3. Verify a log file exists at the configured location.
-4. Verify a hash list exists at `<destination>/.filmcan/hashlists/` (unless **Verification** is `Off`).
-5. If a log or hash list cannot be created, expected: a warning message appears on the destination card.
+4. Verify a hash list exists (unless **Verification** is `Off`). With **Options › Basic ›
+   Hash list style** = **ASC MHL**, expect `<destination>/<roll>/ascmhl/`; with **Simple**,
+   expect a hidden `<destination>/.filmcan/hashlists/<roll>.mhl`.
+5. Switch the style and re-run: the manifest lands in the matching location; resume-skip
+   still detects already-copied files.
+6. If a log or hash list cannot be created, expected: a warning message appears on the destination card.
 
 ---
 

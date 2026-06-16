@@ -180,6 +180,11 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    var hashListStyle: HashListStyle {
+        get { config.hashListStyle }
+        set { config.hashListStyle = newValue; save() }
+    }
+
     var episode: String {
         get { config.episode }
         set { config.episode = newValue; save() }

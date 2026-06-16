@@ -5,9 +5,7 @@ import Foundation
 /// `ascmhl_chain.xml` index. Each backup run creates a new generation
 /// (`NNNN_<roll>_<date>Z.mhl`); the chain ties them into a chain of custody the
 /// ASC MHL tooling requires.
-actor ASCMHLWriter {
-    struct Entry { let relPath: String; let size: Int64; let hash: String }
-
+actor ASCMHLWriter: MHLWriting {
     private let ascmhlDir: URL
     private let rollName: String
     /// Generation number (1-based), determined from the existing chain at init.
@@ -16,7 +14,7 @@ actor ASCMHLWriter {
     /// Absolute path of this generation's manifest (for DestResult.mhlPath).
     nonisolated let manifestPath: String
     private let manifestURL: URL
-    private var entries: [Entry] = []
+    private var entries: [MHLEntry] = []
     private var finalized = false
     private let creationDate: String
 
@@ -35,7 +33,7 @@ actor ASCMHLWriter {
         self.manifestPath = url.path
     }
 
-    func seed(_ existing: [Entry]) {
+    func seed(_ existing: [MHLEntry]) {
         guard !finalized, !existing.isEmpty else { return }
         let known = Set(entries.map { $0.relPath })
         entries = existing.filter { !known.contains($0.relPath) } + entries
@@ -43,7 +41,7 @@ actor ASCMHLWriter {
 
     func append(relPath: String, size: Int64, hash: String) async throws {
         guard !finalized else { return }
-        entries.append(Entry(relPath: relPath, size: size, hash: hash))
+        entries.append(MHLEntry(relPath: relPath, size: size, hash: hash))
         if entries.count % Constants.mhlFlushEveryFiles == 0 { try render() }
     }
 

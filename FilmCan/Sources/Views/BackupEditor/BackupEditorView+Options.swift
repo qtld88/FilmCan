@@ -539,6 +539,71 @@ extension BackupEditorView {
         return min(base, maxForMenu)
     }
 
+    private var hashListStyleLocked: Bool {
+        selectedOrganizationPresetName == OrganizationPreset.netflixIngestName
+    }
+
+    @ViewBuilder
+    private var hashListStyleRow: some View {
+        let info = InfoPopoverContent(
+            title: "Hash list style",
+            description: "Which checksum manifest FilmCan writes next to each backed-up roll.",
+            options: [
+                .init("ASC MHL (Netflix-ready)",
+                      good: ["Visible ascmhl/ folder + chain of custody",
+                             "Validated by the reference ascmhl tool; accepted for delivery"],
+                      bad: ["More files on the destination (manifest + chain per generation)"]),
+                .init("Simple (hidden)",
+                      good: ["One lightweight hidden .filmcan hash list per roll",
+                             "Cleaner destination for users who don't deliver an MHL"],
+                      bad: ["No chain of custody / generations",
+                            "Not a Netflix-conformant deliverable"])
+            ],
+            notes: ["Resume-skip and verification work the same either way.",
+                    "The Netflix Ingest preset always uses ASC MHL (this picker is locked)."]
+        )
+        HStack(spacing: optionSpacing) {
+            Image(systemName: "list.bullet.rectangle")
+                .font(.title3)
+                .foregroundColor(FilmCanTheme.textSecondary)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Hash list style")
+                        .font(FilmCanFont.label(13))
+                        .foregroundColor(FilmCanTheme.textPrimary)
+                    InfoPopoverButton(content: info)
+                }
+            }
+            .frame(width: resolvedTextWidth(basicOptionTextWidth), alignment: .leading)
+            Menu {
+                ForEach(HashListStyle.allCases) { style in
+                    Button(action: { viewModel.hashListStyle = style }) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(style.displayName)
+                            Text(style.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(hashListStyleLocked ? HashListStyle.ascMHL.shortName : viewModel.hashListStyle.shortName)
+                    Image(systemName: "chevron.down").font(.caption)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(FilmCanTheme.card)
+                .cornerRadius(6)
+                .frame(width: resolvedMenuWidth(optionMenuWidth + 60, textWidth: resolvedTextWidth(basicOptionTextWidth)), alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(hashListStyleLocked)
+            .opacity(hashListStyleLocked ? 0.5 : 1)
+        }
+    }
+
     private var basicOptionsContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Copy-engine picker removed: rsync retired, FilmCan is the only engine.
@@ -605,6 +670,8 @@ extension BackupEditorView {
                 }
                 .buttonStyle(.plain)
             }
+
+            hashListStyleRow
 
             optionRow(
                 icon: "arrow.triangle.2.circlepath",

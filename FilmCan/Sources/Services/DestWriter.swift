@@ -31,7 +31,7 @@ actor DestWriter {
     private let displayName: String
     private let verifyMode: VerifyMode
     private let requiresFullFsync: Bool
-    private let mhlWriter: ASCMHLWriter?
+    private let mhlWriter: (any MHLWriting)?
 
     private var tempFileURL: URL?
     private var writeHandle: FileHandle?
@@ -39,38 +39,16 @@ actor DestWriter {
 
     private let fm = FileManager.default
 
+    /// Accepts a pre-built MHL writer so multiple DestWriter instances writing into
+    /// the same source root share one aggregator (avoids the last-writer-wins race
+    /// over a single manifest file). The writer is either an `ASCMHLWriter` or a
+    /// `SimpleMHLWriter` depending on the configured hash-list style.
     init(
         destPath: String,
         displayName: String,
         verifyMode: VerifyMode,
         requiresFullFsync: Bool,
-        ascmhlDir: URL?,
-        sourceName: String
-    ) async throws {
-        self.destPath = destPath
-        self.displayName = displayName
-        self.verifyMode = verifyMode
-        self.requiresFullFsync = requiresFullFsync
-
-        // Set up MHL writer eagerly when an ascmhl/ folder is provided.
-        if let ascmhlDir {
-            self.mhlWriter = try ASCMHLWriter(ascmhlDir: ascmhlDir, rollName: sourceName)
-        } else {
-            self.mhlWriter = nil
-        }
-
-        try setupTempFile()
-    }
-
-    /// Variant that accepts a pre-built MHLWriter so multiple DestWriter instances
-    /// writing into the same source root can share one MHL aggregator and avoid
-    /// the last-writer-wins race over a single CARD.mhl file.
-    init(
-        destPath: String,
-        displayName: String,
-        verifyMode: VerifyMode,
-        requiresFullFsync: Bool,
-        sharedMHLWriter: ASCMHLWriter?
+        sharedMHLWriter: (any MHLWriting)?
     ) async throws {
         self.destPath = destPath
         self.displayName = displayName

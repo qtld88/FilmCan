@@ -58,6 +58,7 @@
 		6F63821DF88A41F7D5728BD6 /* BackupEditorView+Overview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5633209606F4327D6FE158AA /* BackupEditorView+Overview.swift */; };
 		712C89C119B957716D4B9AEB /* PreviewCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40F951445F8238F0B740353 /* PreviewCalculator.swift */; };
 		7191245AD630701955CB29ED /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1146F690162AC3EE569EFBB /* SourceListView.swift */; };
+		73DA82CDD34327AFDB1104C4 /* MHLWriting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */; };
 		7E7F9A215F183FD32052AF27 /* AppIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = E25E2599CEF3906032A4D5A9 /* AppIcon.png */; };
 		7F60BFED71DF221F0DE7E195 /* DestResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBAF7A0A4796303A8E24EE4B /* DestResultRow.swift */; };
 		7F628CD5790C2B611BEA65BB /* FileChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */; };
@@ -119,11 +120,13 @@
 		E913256E07143EBE91685672 /* NetflixPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA912365575B6BB6724929CD /* NetflixPresetTests.swift */; };
 		EB135DDE8A17EF04263A2AB2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D1A5B5BDD573D20E4EF6A03 /* AppState.swift */; };
 		EC5874CE48288D04FD140DD1 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8EAD261337C6BEE4032A23E /* DebugLog.swift */; };
+		F04AD0B22FCB0313E2ABC4E9 /* SimpleMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB60E31AC734912F2B72ACB /* SimpleMHLWriter.swift */; };
 		F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13273CE3DB6E17D073212DFE /* BoundedChannel.swift */; };
 		F2AE780EA1EC53701F50D3C7 /* OrganizationTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */; };
 		F2E0833957D8398B94F490D7 /* DriveSpeedClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */; };
 		F815188F2A0AC030BBEF3C0D /* DestProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25CADDC1BE66072D93ADFD6 /* DestProgress.swift */; };
 		F932C00CDF31D137B4D98E5C /* SiblingDestSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF50D74C080DB0D6C4A8A93C /* SiblingDestSource.swift */; };
+		F95E3FE9B1896E8B4B908381 /* HashListStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0286B22138243BCD956CDCFF /* HashListStyle.swift */; };
 		FA5BA2A86E85CD12D7EFE614 /* UIStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB457DCE07BC5C884750E430 /* UIStrings.swift */; };
 		FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */; };
 /* End PBXBuildFile section */
@@ -141,6 +144,7 @@
 /* Begin PBXFileReference section */
 		01136E3DBB8977E8B301ACEB /* DriveAnchorPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveAnchorPreferences.swift; sourceTree = "<group>"; };
 		01775FD7053AF831126757D6 /* C4Hash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C4Hash.swift; sourceTree = "<group>"; };
+		0286B22138243BCD956CDCFF /* HashListStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListStyle.swift; sourceTree = "<group>"; };
 		03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = C4HashTests.swift; sourceTree = "<group>"; };
 		055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupListViewModel.swift; sourceTree = "<group>"; };
 		07A9EC23F618959F4233E19D /* FilmCanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FilmCanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -172,6 +176,7 @@
 		3D2147830DD49FC39B828D61 /* HashListBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListBuilder.swift; sourceTree = "<group>"; };
 		40E6C2BF26C154734D9112D1 /* FileOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOrdering.swift; sourceTree = "<group>"; };
 		43A1BB108A96290E666D66D7 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
+		43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLWriting.swift; sourceTree = "<group>"; };
 		4614DA736DD0AF7010D27E51 /* FilmCanTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanTheme.swift; sourceTree = "<group>"; };
 		4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSpeedProbe.swift; sourceTree = "<group>"; };
 		493E9CCA8A02D3E16ADEB97C /* HashListWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListWriter.swift; sourceTree = "<group>"; };
@@ -197,6 +202,7 @@
 		7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrphanCleaner.swift; sourceTree = "<group>"; };
 		76EDF10844CC898228982672 /* DuplicatePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePrompt.swift; sourceTree = "<group>"; };
 		78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationTemplate.swift; sourceTree = "<group>"; };
+		7AB60E31AC734912F2B72ACB /* SimpleMHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleMHLWriter.swift; sourceTree = "<group>"; };
 		7AF6668045A55C3936ACEFFF /* DestPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestPickerView.swift; sourceTree = "<group>"; };
 		7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifierTests.swift; sourceTree = "<group>"; };
 		7CDC23E435829755245312C4 /* CopyEnginePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyEnginePersistenceTests.swift; sourceTree = "<group>"; };
@@ -307,11 +313,13 @@
 				18663FD23B1C73B08D717384 /* DryRunPlanner.swift */,
 				B3F3E1E15AB98D6E20FE01A1 /* FanOutCopier.swift */,
 				A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */,
+				43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */,
 				4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */,
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
 				7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */,
 				F40F951445F8238F0B740353 /* PreviewCalculator.swift */,
 				FF50D74C080DB0D6C4A8A93C /* SiblingDestSource.swift */,
+				7AB60E31AC734912F2B72ACB /* SimpleMHLWriter.swift */,
 				EA563679AEE01B0FF5D12CB7 /* TransferService.swift */,
 				61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */,
 			);
@@ -428,6 +436,7 @@
 				64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */,
 				76EDF10844CC898228982672 /* DuplicatePrompt.swift */,
 				40E6C2BF26C154734D9112D1 /* FileOrdering.swift */,
+				0286B22138243BCD956CDCFF /* HashListStyle.swift */,
 				68D90641C9B9019E8312A23E /* OrganizationPreset.swift */,
 				867AFB25988C222B6A24039C /* PreviewInfo.swift */,
 				4E3097772416FE89A21C7E62 /* RsyncOptions.swift */,
@@ -698,6 +707,7 @@
 				8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */,
 				CBCCDFAEC8E315B3158B8ED8 /* HashListBuilder.swift in Sources */,
 				8EA1BB03FD52EB731E4D533E /* HashListNamer.swift in Sources */,
+				F95E3FE9B1896E8B4B908381 /* HashListStyle.swift in Sources */,
 				33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */,
 				CF26D25B0D58A7227FCA5275 /* HashListWriter.swift in Sources */,
 				1FDBC1FC2134CD17CA9D1995 /* Hashing.swift in Sources */,
@@ -706,6 +716,7 @@
 				65CBD0FB0B5729A94C62E049 /* LogFileNamer.swift in Sources */,
 				B367BE269DB7059A5820B67D /* LogFolderNamer.swift in Sources */,
 				9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */,
+				73DA82CDD34327AFDB1104C4 /* MHLWriting.swift in Sources */,
 				A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */,
 				8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */,
 				170A04CEAB4882CBFA7D184A /* NetflixValidationSheet.swift in Sources */,
@@ -723,6 +734,7 @@
 				B4B86751C99DE113AACCED5A /* RsyncOptions.swift in Sources */,
 				ADE31DDEE0B65D6199D89613 /* SettingsView.swift in Sources */,
 				F932C00CDF31D137B4D98E5C /* SiblingDestSource.swift in Sources */,
+				F04AD0B22FCB0313E2ABC4E9 /* SimpleMHLWriter.swift in Sources */,
 				7191245AD630701955CB29ED /* SourceListView.swift in Sources */,
 				63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */,
 				ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */,
@@ -806,7 +818,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -882,7 +894,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;

@@ -841,6 +841,7 @@ class CustomCopierService: ObservableObject, TransferService {
         dryRun: Bool,
         forceRecopy: Bool = false,
         shootMetadata: ShootMetadata = .empty,
+        hashListStyle: HashListStyle = .ascMHL,
         progressHandler: (@Sendable ([DestProgress]) -> Void)?,
         webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
         aggregatedWebhookHandler: (@Sendable ([DestResult], String) -> Void)? = nil
@@ -867,6 +868,7 @@ class CustomCopierService: ObservableObject, TransferService {
             organizationPreset: organizationPreset,
             copyFolderContents: copyFolderContents,
             shootMetadata: shootMetadata,
+            hashListStyle: hashListStyle,
             forceRecopy: forceRecopy,
             shouldCancel: { cancellationState.isCancelledNow() }
         )

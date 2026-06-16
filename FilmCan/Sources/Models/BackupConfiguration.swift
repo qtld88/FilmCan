@@ -21,6 +21,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var day: String = ""
     var unit: String = ""
     var cameraFormat: String = ""
+    /// Hash-list format written by the engine (ASC MHL vs simple hidden).
+    var hashListStyle: HashListStyle = .ascMHL
     var runInParallel: Bool = false
     /// How the FilmCan fan-out engine writes to multiple destinations.
     var destinationCopyMode: DestinationCopyMode = .automatic
@@ -79,6 +81,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         day = try c.decodeIfPresent(String.self, forKey: .day) ?? ""
         unit = try c.decodeIfPresent(String.self, forKey: .unit) ?? ""
         cameraFormat = try c.decodeIfPresent(String.self, forKey: .cameraFormat) ?? ""
+        hashListStyle = try c.decodeIfPresent(HashListStyle.self, forKey: .hashListStyle) ?? .ascMHL
         runInParallel = try c.decodeIfPresent(Bool.self,   forKey: .runInParallel) ?? false
         destinationCopyMode = try c.decodeIfPresent(DestinationCopyMode.self, forKey: .destinationCopyMode) ?? .automatic
         sourceAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .sourceAutoDetectEnabled) ?? false
@@ -138,6 +141,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(day, forKey: .day)
         try c.encode(unit, forKey: .unit)
         try c.encode(cameraFormat, forKey: .cameraFormat)
+        try c.encode(hashListStyle, forKey: .hashListStyle)
         try c.encode(runInParallel,    forKey: .runInParallel)
         try c.encode(destinationCopyMode, forKey: .destinationCopyMode)
         try c.encode(sourceAutoDetectEnabled, forKey: .sourceAutoDetectEnabled)
@@ -172,7 +176,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case episode, day, unit, cameraFormat
+        case episode, day, unit, cameraFormat, hashListStyle
         case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
