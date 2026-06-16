@@ -1206,16 +1206,26 @@ class TransferViewModel: ObservableObject {
         let customDate = preset?.useCustomDate == true ? preset?.customDate : nil
         for index in results.indices {
             let destination = results[index].destination
-            let resolution = resolvedLogFilePath(
-                logEnabled: true,
-                logLocation: config.logLocation,
-                customLogPath: config.customLogPath,
-                logFileNameTemplate: config.logFileNameTemplate,
-                configName: config.name,
-                destination: destination,
-                sources: sources,
-                customDate: customDate
-            )
+            // The Netflix preset must put the report in the shoot-day Reports/ folder
+            // at THIS destination — a relative "Reports" custom path can't anchor there,
+            // so resolve it explicitly. Other configs use the normal log resolver.
+            var resolution: (path: String?, warning: String?)
+            if let preset, preset.name == OrganizationPreset.netflixIngestName,
+               let nfPath = netflixReportLogPath(destination: destination, config: config,
+                                                 preset: preset, sources: sources, customDate: customDate) {
+                resolution = (nfPath, nil)
+            } else {
+                resolution = resolvedLogFilePath(
+                    logEnabled: true,
+                    logLocation: config.logLocation,
+                    customLogPath: config.customLogPath,
+                    logFileNameTemplate: config.logFileNameTemplate,
+                    configName: config.name,
+                    destination: destination,
+                    sources: sources,
+                    customDate: customDate
+                )
+            }
             guard let logFile = resolution.path else {
                 results[index].logFilePath = nil
                 if let warning = resolution.warning {
@@ -1252,6 +1262,29 @@ class TransferViewModel: ObservableObject {
     private func mergeWarning(_ existing: String?, _ new: String) -> String {
         guard let existing, !existing.isEmpty else { return new }
         return existing.contains(new) ? existing : "\(existing)\n\(new)"
+    }
+
+    /// `<destination>/<shoot-day-root>/Reports/<logname>` for the Netflix preset, where
+    /// the shoot-day root is the first folder component of the resolved Netflix template.
+    private func netflixReportLogPath(destination: String, config: BackupConfiguration,
+                                      preset: OrganizationPreset, sources: [String],
+                                      customDate: Date?) -> String? {
+        let date = customDate ?? Date()
+        let meta = ShootMetadata(episode: config.episode, day: config.day,
+                                 unit: config.unit, cameraFormat: config.cameraFormat)
+        let resolved = OrganizationTemplate.resolve(
+            preset: preset, sourcePath: sources.first ?? "", destinationRoot: destination,
+            counter: 0, date: date, metadata: meta)
+        guard let shootDay = resolved.folderPath.split(separator: "/").first.map(String.init),
+              !shootDay.isEmpty else { return nil }
+        let reportsDir = (destination as NSString)
+            .appendingPathComponent(shootDay)
+            .appending("/Reports")
+        let logName = LogFileNamer.makeFileName(
+            template: config.logFileNameTemplate, configName: config.name,
+            destination: destination, sources: sources, date: date)
+        let path = (reportsDir as NSString).appendingPathComponent(logName)
+        return ensureWritableLogPath(path) ? path : nil
     }
 
     private func writeCustomLog(
