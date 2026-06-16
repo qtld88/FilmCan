@@ -191,9 +191,29 @@ enum OrganizationTemplate {
             let components = normalized
                 .split(separator: "/", omittingEmptySubsequences: true)
                 .compactMap { sanitizePathComponent(String($0)) }
+                .map { collapseUnderscores($0) }
+                .filter { !$0.isEmpty }
             return components.joined(separator: "/")
         }
         return sanitizePathComponent(normalized) ?? "Unnamed"
+    }
+
+    /// Collapse separator artifacts left by empty tokens (e.g. an empty {episode}
+    /// in "{date}_{episode}_{day}" → "20260616__Day01"): squeeze runs of "_" to one
+    /// and trim leading/trailing "_" from each folder-path component.
+    private static func collapseUnderscores(_ value: String) -> String {
+        var out = ""
+        var prevUnderscore = false
+        for ch in value {
+            if ch == "_" {
+                if prevUnderscore { continue }
+                prevUnderscore = true
+            } else {
+                prevUnderscore = false
+            }
+            out.append(ch)
+        }
+        return out.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
     }
 
     private static func sanitizePathComponent(_ name: String) -> String? {
