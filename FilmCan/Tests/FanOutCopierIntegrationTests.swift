@@ -403,6 +403,53 @@ final class FanOutCopierIntegrationTests: XCTestCase {
                        "Final verified bytes should equal total bytes of all sources")
     }
 
+    func test_copyBytesCompleted_startsLowMonotonicReachesTotal() async throws {
+        let fm = FileManager.default
+        let src1 = tmpDir.appendingPathComponent("m-a.bin")
+        let src2 = tmpDir.appendingPathComponent("m-b.bin")
+        let src3 = tmpDir.appendingPathComponent("m-c.bin")
+        let d1 = Data((0..<300 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let d2 = Data((0..<400 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let d3 = Data((0..<100 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try d1.write(to: src1); try d2.write(to: src2); try d3.write(to: src3)
+        let dest = tmpDir.appendingPathComponent("copybar-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+        let total = Int64(d1.count + d2.count + d3.count)
+
+        let lock = NSLock()
+        var copyValues: [Int64] = []  // bytesCompleted from copy-phase emits, in order
+        let handler: @Sendable (DestProgress) -> Void = { prog in
+            // Copy-phase emits carry the bare file name; verify emits are prefixed.
+            let cf = prog.currentFile
+            guard !cf.hasPrefix("Verifying"), !cf.hasPrefix("✓"),
+                  !cf.hasPrefix("✗"), !cf.hasPrefix("Cancelled"), prog.bytesTotal > 0 else { return }
+            lock.lock(); copyValues.append(prog.bytesCompleted); lock.unlock()
+        }
+
+        let config = FanOutCopier.Configuration(
+            sources: [src1.path, src2.path, src3.path],
+            destinations: [DestWriter.Config(destPath: dest.path, displayName: "C",
+                                             verifyMode: .fast, requiresFullFsync: false, chunkSize: 65536)],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: handler)
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results[0].success)
+
+        XCTAssertFalse(copyValues.isEmpty)
+        // Must start at the first file's bytes, not jump to ~total — the bug
+        // emitted a near-total cumulative on the very first tick.
+        XCTAssertLessThanOrEqual(copyValues.first ?? .max, Int64(d1.count),
+                                 "copy bar started high (\(copyValues.first ?? -1)) instead of near 0")
+        XCTAssertLessThan(Int64(d1.count), total)  // sanity: total is well above one file
+        var last: Int64 = -1
+        for v in copyValues {
+            XCTAssertLessThanOrEqual(v, total, "copy bytesCompleted exceeded total")
+            XCTAssertGreaterThanOrEqual(v, last, "copy bytesCompleted decreased \(last)→\(v)")
+            last = v
+        }
+        XCTAssertEqual(copyValues.last, total, "copy bar should reach the full job size")
+    }
+
     // MARK: - ASC MHL helpers
 
     /// True if a sealed ASC MHL generation exists in the given ascmhl/ folder.

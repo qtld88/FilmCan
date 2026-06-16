@@ -173,6 +173,11 @@ actor FanOutCopier {
     private var completedFilesByDest: [String: Int] = [:]
     private var verifiedFilesByDest: [String: Int] = [:]
     private var verifiedBytesByDest: [String: Int64] = [:]
+    /// True bytes physically written to each destination so far. This is the copy
+    /// bar's source of truth — unlike an index-based `cumulativeBytesBeforeSource`
+    /// estimate, it stays correct and monotonic when files copy concurrently or
+    /// finish out of index order.
+    private var copiedBytesByDest: [String: Int64] = [:]
 
     private func recordFileCompletion(destPath: String, totalFiles: Int) -> Bool {
         let next = (completedFilesByDest[destPath] ?? 0) + 1
@@ -195,6 +200,17 @@ actor FanOutCopier {
 
     private func verifiedBytesForDest(_ destPath: String) -> Int64 {
         verifiedBytesByDest[destPath] ?? 0
+    }
+
+    /// Adds `bytes` to the per-dest cumulative copied total and returns the new value.
+    private func recordCopiedBytes(destPath: String, adding bytes: Int64) -> Int64 {
+        let next = (copiedBytesByDest[destPath] ?? 0) + bytes
+        copiedBytesByDest[destPath] = next
+        return next
+    }
+
+    private func copiedBytesForDest(_ destPath: String) -> Int64 {
+        copiedBytesByDest[destPath] ?? 0
     }
 
     /// The exact path a planned file is written to at a destination, accounting
@@ -364,6 +380,7 @@ actor FanOutCopier {
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
+        copiedBytesByDest.removeAll()
         copyDoneByDest.removeAll()
         combinedSamplesByDest.removeAll()
         etaEmitByDest.removeAll()
@@ -700,6 +717,9 @@ actor FanOutCopier {
             let task = Task<DestWriterResult, Never> {
                 let startTime = Date()
                 var totalBytes: Int64 = 0
+                // How much of this file's bytes has already been added to the
+                // per-dest copied counter, so each emit pushes only the delta.
+                var pushedBytes: Int64 = 0
                 var writeFailed: DestFailureReason? = nil
                 // Throttle copy-phase progress emits to ~10/s. Emitting per 8MB
                 // chunk spawned thousands of progress Tasks per file, flooding the
@@ -754,13 +774,16 @@ actor FanOutCopier {
                                 let now = Date()
                                 if now.timeIntervalSince(lastEmit) >= 0.1 {
                                     lastEmit = now
+                                    let copiedSoFar = await self.recordCopiedBytes(
+                                        destPath: destCfg.destPath, adding: totalBytes - pushedBytes)
+                                    pushedBytes = totalBytes
                                     var prog = DestProgress(
                                         id: destCfg.destPath, displayName: destCfg.displayName,
                                         status: .active, bytesTotal: totalBytesAllSources,
                                         filesTotal: totalSources, verifyMode: destCfg.verifyMode
                                     )
                                     let paranoid = destCfg.verifyMode == .paranoid
-                                    prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
+                                    prog.bytesCompleted = copiedSoFar
                                     prog.filesCompleted = sourceIndex
                                     prog.currentFile = sourceName
                                     prog.verifyBytesTotal = paranoid ? totalBytesAllSources : 0
@@ -826,6 +849,11 @@ actor FanOutCopier {
                 }
 
                 let duration = Date().timeIntervalSince(startTime)
+                // Push any bytes not yet reflected in the counter (between the last
+                // throttled emit and finalize), then report the true cumulative.
+                let copiedAtDone = await self.recordCopiedBytes(
+                    destPath: destCfg.destPath, adding: totalBytes - pushedBytes)
+                pushedBytes = totalBytes
                 let isLastFile = await self.recordFileCompletion(destPath: destCfg.destPath, totalFiles: totalSources)
                 let copyStatus: DestStatus = isLastFile ? .complete : .active
                 var prog = DestProgress(
@@ -834,7 +862,7 @@ actor FanOutCopier {
                     filesTotal: totalSources, verifyMode: destCfg.verifyMode
                 )
                 let paranoidDone = destCfg.verifyMode == .paranoid
-                prog.bytesCompleted = cumulativeBytesBeforeSource + totalBytes
+                prog.bytesCompleted = copiedAtDone
                 prog.filesCompleted = sourceIndex + 1
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = paranoidDone ? totalBytesAllSources : 0
@@ -960,7 +988,7 @@ actor FanOutCopier {
                     status: .failed(.userCancel), bytesTotal: c.totalBytesAllSources,
                     filesTotal: c.totalSources, verifyMode: c.writerResults.first?.verifyMode ?? .paranoid
                 )
-                prog.bytesCompleted = c.cumulativeBytesBeforeSource + c.sourceSize
+                prog.bytesCompleted = await self.copiedBytesForDest(r.destPath)
                 prog.filesCompleted = c.sourceIndex + 1
                 prog.verifyBytesTotal = c.totalBytesAllSources
                 prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
@@ -1027,7 +1055,7 @@ actor FanOutCopier {
                 status: .active, bytesTotal: c.totalBytesAllSources,
                 filesTotal: c.totalSources, verifyMode: .paranoid
             )
-            prog.bytesCompleted = c.cumulativeBytesBeforeSource + c.sourceSize
+            prog.bytesCompleted = await self.copiedBytesForDest(r.destPath)
             prog.filesCompleted = c.sourceIndex + 1
             prog.verifyBytesTotal = c.totalBytesAllSources
             prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
@@ -1086,7 +1114,7 @@ actor FanOutCopier {
                         bytesTotal: c.totalBytesAllSources, filesTotal: c.totalSources,
                         verifyMode: .paranoid
                     )
-                    prog.bytesCompleted = c.cumulativeBytesBeforeSource + c.sourceSize
+                    prog.bytesCompleted = await self.copiedBytesForDest(destPath)
                     prog.filesCompleted = c.sourceIndex + 1
                     prog.verifyBytesTotal = c.totalBytesAllSources
                     prog.verifyBytesCompleted = newVerifiedBytes
