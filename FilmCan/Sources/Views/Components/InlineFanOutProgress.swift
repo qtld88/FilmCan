@@ -84,7 +84,10 @@ struct InlineFanOutProgress: View {
         if isFullyUpToDate {
             return "Already backed up — \(n) \(unit) here, nothing to copy"
         }
-        if multiDestination {
+        // While this destination is still waiting for its first needed file (no
+        // current file yet), explain why; once it's actively copying, drop the note.
+        let waiting = progress.currentFile.isEmpty
+        if multiDestination && waiting {
             return "Resuming — \(n) \(unit) already here, copying the rest in step with the other destinations (the source is read once)"
         }
         return "Resuming — \(n) \(unit) already here, copying the rest"
