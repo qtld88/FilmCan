@@ -196,26 +196,24 @@ struct SourceListView: View {
         }
     }
 
-    /// Discreet Camera/Sound toggle: the active type's glyph is clear/white, the
-    /// inactive type is dimmed grey and slashed. Tap inverts.
+    /// Discreet Camera/Sound toggle: a single white glyph — a video camera for
+    /// Camera, a speaker for Sound. Click switches between them (which destination
+    /// folder template the source uses).
     private func mediaKindToggle(path: String, kind: SourceMediaKind,
                                  set: @escaping (String, SourceMediaKind) -> Void) -> some View {
         let isCamera = kind == .camera
         return Button {
             set(path, isCamera ? .sound : .camera)
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: isCamera ? "camera.fill" : "camera.slash.fill")
-                    .foregroundColor(isCamera ? FilmCanTheme.textPrimary : FilmCanTheme.textTertiary)
-                Image(systemName: isCamera ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .foregroundColor(isCamera ? FilmCanTheme.textTertiary : FilmCanTheme.textPrimary)
-            }
-            .font(.system(size: 11))
-            .contentShape(Rectangle())
+            Image(systemName: isCamera ? "video.fill" : "speaker.wave.2.fill")
+                .font(.system(size: 12))
+                .foregroundColor(FilmCanTheme.textPrimary)
+                .frame(width: 20, height: 16)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(isCamera ? "Camera source — click to mark as Sound (Netflix Sound_Media)"
-                       : "Sound source — click to mark as Camera (Netflix Camera_Media)")
+        .help(isCamera ? "Camera source — click to switch to Sound (uses the Sound folder)"
+                       : "Sound source — click to switch to Camera (uses the Camera folder)")
     }
 
     private func sourceRow(source: SourcePath, isExternal: Bool) -> some View {

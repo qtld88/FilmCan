@@ -18,8 +18,8 @@ enum SourceMediaKind: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var symbol: String {
         switch self {
-        case .camera: return "camera"
-        case .sound: return "waveform"
+        case .camera: return "video.fill"
+        case .sound: return "speaker.wave.2.fill"
         }
     }
 }
