@@ -60,13 +60,18 @@ Main unit, ARRI:
 Netflix protects production sound (OPA) exactly like camera (OCF) — same copies,
 hashes, and ASC MHL — it just lands under `Sound_Media/` instead of `Camera_Media/`.
 
-- Each source row has a **Camera / Sound** toggle. Tag a sound card as **Sound** and it
-  routes to `…/Sound_Media/<SoundRoll>/` (with its own `ascmhl/`, verify and resume),
-  a sibling of the camera media in the same shoot-day root.
-- **Options › Sources › Auto-detect sound drives**: patterns (e.g. `SOUND`, `MIXPRE*`,
-  `ZOOM*`) auto-tag matching cards as Sound.
-- **Options › Destinations › Sound folder**: the sound sub-path is editable (default
-  `{date}_{episode}_{day}_{unit}/Sound_Media`). Camera sources are unaffected.
+- **Click the icon at the top-right of each source card to switch it between Camera and
+  Sound.** A **🎥 video-camera** icon means the source is treated as Camera
+  (→ `Camera_Media/`); a **🔊 speaker** icon means Sound (→ `Sound_Media/`). It's a
+  toggle — each click flips it. Sources default to Camera.
+- The **Save To** card's path preview updates as you toggle, so you can confirm a
+  sound card resolves to `…/Sound_Media/<SoundRoll>/` (with its own `ascmhl/`, verify
+  and resume) — a sibling of the camera media in the same shoot-day root.
+- **Options › Sources › Auto-detect sound sources**: drive/folder name patterns (e.g.
+  `SOUND`, `MIXPRE*`, `ZOOM*`) auto-add matching drives and tag them Sound.
+- **Options › Destinations › Folder templates**: both the **Camera folder** and **Sound
+  folder** sub-paths are editable (defaults `…/Camera_Media/{cameraFormat}` and
+  `…/Sound_Media`).
 
 Camera and sound can be backed up in the **same run** — the source is read once and
 fanned out.

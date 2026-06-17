@@ -16,10 +16,26 @@ Or click **Browse Files...**
 
 Automatically add specific drives when connected:
 
-1. Enable **Auto-detect sources**
+1. Enable **Auto-detect camera sources** (or **Auto-detect sound sources** for sound)
 2. Add drive/folder names (supports `*` wildcards)
 
-Auto-detected sources are never removed automatically.
+Auto-detected sources are never removed automatically. Sound auto-detect also tags the
+matched drives as Sound.
+
+---
+
+## Camera / Sound (Netflix routing)
+
+Each source card has a small **clickable icon at the top-right** marking it Camera or
+Sound:
+
+- **🎥 video-camera** → Camera (lands in `Camera_Media/` under the Netflix preset)
+- **🔊 speaker** → Sound (lands in `Sound_Media/`)
+
+**Click the icon to switch** between the two — it's a toggle. Sources default to Camera.
+The **Save To** preview updates to show where each source will land. This only changes
+the destination folder; it has no effect unless you use a preset with separate camera
+and sound folders (e.g. **Netflix Ingest**).
 
 ---
 
