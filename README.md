@@ -67,6 +67,7 @@ Done. FilmCan copies, verify and save checksums.
 - [Troubleshooting](docs/troubleshooting.md)
 - [FAQ](docs/faq.md)
 - [Documentation](docs/index.md)
+- [Roadmap](docs/roadmap.md)
 - [Privacy](docs/privacy.md)
 - [AI Usage](docs/ai-usage.md)
 - [Report a bug](docs/contributing.md)

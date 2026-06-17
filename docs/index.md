@@ -37,4 +37,5 @@
 - [Privacy Policy](./privacy.md)
 - [QA Checklist](./qa.md)
 - [Technical Debt](./technical-debt.md)
+- [Roadmap](./roadmap.md)
 - [AI Usage](./ai-usage.md)
