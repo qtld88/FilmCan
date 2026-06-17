@@ -17,6 +17,24 @@ extension BackupEditorView {
         return presets.first { $0.id == id }
     }
 
+    /// Preset for the destination-path preview: the effective preset with the user's
+    /// edited Camera/Sound folder templates applied (matching the run-time resolver).
+    var previewOrganizationPreset: OrganizationPreset? {
+        guard var preset = effectiveOrganizationPreset else { return nil }
+        if preset.name == OrganizationPreset.netflixIngestName {
+            let cam = viewModel.cameraFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cam.isEmpty { preset.folderTemplate = viewModel.cameraFolderTemplate }
+            let snd = viewModel.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !snd.isEmpty { preset.soundFolderTemplate = viewModel.soundFolderTemplate }
+        }
+        return preset
+    }
+
+    var previewShootMetadata: ShootMetadata {
+        ShootMetadata(episode: viewModel.episode, day: viewModel.day,
+                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat)
+    }
+
     var effectiveOrganizationPreset: OrganizationPreset? {
         if let preset = selectedOrganizationPreset { return preset }
         let local = viewModel.localOrganizationPreset

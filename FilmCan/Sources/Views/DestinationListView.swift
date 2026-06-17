@@ -19,6 +19,10 @@ struct DestinationListView: View {
     var requiredBytes: Int64 = 0
     var organizationPreset: OrganizationPreset? = nil
     var sourcePaths: [String] = []
+    /// Camera/Sound tag per source path, so the preview shows the Camera_Media /
+    /// Sound_Media path the source will actually land in.
+    var mediaKind: (String) -> SourceMediaKind = { _ in .camera }
+    var shootMetadata: ShootMetadata = .empty
     var copyFolderContents: Bool = true
     var configId: UUID
     var postVerifyEnabled: Bool = false
@@ -449,7 +453,9 @@ struct DestinationListView: View {
                 sourcePath: sourcePath,
                 destinationRoot: destinationRoot,
                 counter: counter,
-                date: previewDate
+                date: previewDate,
+                metadata: shootMetadata,
+                mediaKind: mediaKind(sourcePath)
             )
             let base: String
             if resolved.folderPath.isEmpty {
