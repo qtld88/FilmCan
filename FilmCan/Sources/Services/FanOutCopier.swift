@@ -66,6 +66,11 @@ struct DestResultBuilder {
         verificationFailed = true
     }
 
+    mutating func markCancelled() {
+        success = false
+        if !failures.contains(.userCancel) { failures.append(.userCancel) }
+    }
+
     func build(skipped: Int = 0) -> DestResult {
         DestResult(
             destinationPath: destPath,
@@ -146,6 +151,7 @@ actor FanOutCopier {
         case noDestinations
         case sourceCorruption(String)
         case insufficientSpace(destPath: String, available: Int64, required: Int64)
+        case destinationUnwritable(String)
 
         var errorDescription: String? {
             switch self {
@@ -159,6 +165,8 @@ actor FanOutCopier {
                 let avMB = available / (1024 * 1024)
                 let reqMB = required / (1024 * 1024)
                 return "Not enough space on \"\(dest)\" — \(reqMB) MB needed, \(avMB) MB available. Free space before backing up."
+            case .destinationUnwritable(let path):
+                return "Cannot write to \"\((path as NSString).lastPathComponent)\". Check the drive is connected and not read-only."
             }
         }
     }
@@ -490,6 +498,17 @@ actor FanOutCopier {
             }
         }
 
+        // Writability preflight: a destination that can't be written (disconnected
+        // or read-only) aborts the whole run before any data is copied, with a clear
+        // error — distinct from a drive that drops out mid-copy (handled per-dest).
+        for dest in config.destinations {
+            let probe = (dest.destPath as NSString).appendingPathComponent(".filmcan-writeprobe")
+            guard FileManager.default.createFile(atPath: probe, contents: nil) else {
+                throw Error.destinationUnwritable(dest.destPath)
+            }
+            try? FileManager.default.removeItem(atPath: probe)
+        }
+
         var skippedByDest: [String: Int] = [:]
         var skippedBytesByDest: [String: Int64] = [:]
         var neededBytesByDest: [String: Int64] = [:]
@@ -530,16 +549,24 @@ actor FanOutCopier {
             verifiedFilesByDest[dest.destPath] = sFiles
         }
 
-        // A destination that already has everything emits a one-shot Complete (full
-        // bars + skip count) so its card shows done instead of staying Waiting.
-        for dest in config.destinations where (neededBytesByDest[dest.destPath] ?? 0) == 0 {
+        // Emit an initial state for EVERY destination up front so none shows a blank
+        // card: a destination with nothing to copy reads Complete/Up-to-date, and a
+        // destination that has some files already but more to copy shows its bar
+        // already sitting at the resumed position ("N already here") even before its
+        // first needed file starts (e.g. while another destination catches up).
+        for dest in config.destinations {
+            let sBytes = skippedBytesByDest[dest.destPath] ?? 0
+            let sFiles = skippedByDest[dest.destPath] ?? 0
+            let needs = (neededBytesByDest[dest.destPath] ?? 0) > 0
             var prog = DestProgress(
                 id: dest.destPath, displayName: dest.displayName,
-                status: .complete, bytesTotal: fullJobBytes, filesTotal: fullJobFiles,
-                verifyMode: dest.verifyMode)
-            prog.bytesCompleted = skippedBytesByDest[dest.destPath] ?? 0
-            prog.filesCompleted = skippedByDest[dest.destPath] ?? 0
-            prog.filesSkipped = skippedByDest[dest.destPath] ?? 0
+                status: needs ? .active : .complete,
+                bytesTotal: fullJobBytes, filesTotal: fullJobFiles, verifyMode: dest.verifyMode)
+            prog.bytesCompleted = sBytes
+            prog.filesCompleted = sFiles
+            prog.verifyBytesTotal = dest.verifyMode == .paranoid ? fullJobBytes : 0
+            prog.verifyBytesCompleted = sBytes
+            prog.filesSkipped = sFiles
             config.progressHandler?(prog)
         }
 
@@ -694,6 +721,18 @@ actor FanOutCopier {
         // chain entry) so it never certifies an interrupted generation; a clean run
         // seals and records the generation in the chain.
         let wasCancelled = config.shouldCancel?() == true
+
+        // On cancel, any destination that didn't finish all the files it needed is a
+        // failure (not a silent success) — even if the stop landed before its first
+        // file was dispatched.
+        if wasCancelled {
+            for dest in config.destinations {
+                let done = completedFilesByDest[dest.destPath] ?? 0
+                if done < (filesTotalByDest[dest.destPath] ?? 0) {
+                    builders[dest.destPath]?.markCancelled()
+                }
+            }
+        }
         for destMHLs in sharedMHLsByDest.values {
             for writer in destMHLs.values {
                 if wasCancelled {
@@ -1068,29 +1107,32 @@ actor FanOutCopier {
     /// with the copy of later files, so paranoid re-reads don't block copying.
     nonisolated private func verifySource(_ c: CopyResult) async -> PerSourceOutcome {
         let fm = FileManager.default
-        let successDests = c.writerResults.filter { $0.success }.map { $0.destPath }
 
         // Emit a terminal failed(.userCancel) for each in-progress destination so
         // the UI shows red crosses and the live pills/ETA stop. Returns the dest
         // set marked as failed so the per-dest result is not a success.
+        // Re-emit EVERY destination that was copying this file (whether or not its
+        // writer finished), snapping the bar back to the bytes actually finalized on
+        // disk — the in-flight file was discarded, so the count drops to what Finder
+        // shows rather than leaving the pre-stop in-flight figure on screen.
         func emitCancelled() async -> Set<String> {
-            for r in c.writerResults where r.success {
+            for r in c.writerResults {
                 let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
                 var prog = DestProgress(
                     id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
                     status: .failed(.userCancel), bytesTotal: dTotal,
                     filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources,
-                    verifyMode: c.writerResults.first?.verifyMode ?? .paranoid
+                    verifyMode: r.verifyMode
                 )
                 prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
                 prog.filesCompleted = await self.completedFilesForDest(r.destPath)
-                prog.verifyBytesTotal = dTotal
+                prog.verifyBytesTotal = r.verifyMode == .paranoid ? dTotal : 0
                 prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
-                prog.currentFile = "Cancelled"
+                prog.currentFile = "Stopped"
                 prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
                 config.progressHandler?(prog)
             }
-            return Set(successDests)
+            return Set(c.writerResults.map { $0.destPath })
         }
 
         // Cancelled before or during verification: mark cancelled, don't verify.

@@ -7,15 +7,18 @@ import Foundation
 actor SimpleMHLWriter: MHLWriting {
     nonisolated let manifestPath: String
 
+    private let dirURL: URL
     private let fileURL: URL
     private var entries: [MHLEntry] = []
     private var finalized = false
 
     init(destRoot: String, rollName: String) throws {
+        // Directory is created lazily in render(), so a roll with nothing copied
+        // this run leaves no hidden hash-list folder behind.
         let dir = URL(fileURLWithPath: destRoot)
             .appendingPathComponent(".filmcan").appendingPathComponent("hashlists")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("\(rollName).mhl")
+        self.dirURL = dir
         self.fileURL = url
         self.manifestPath = url.path
     }
@@ -36,6 +39,7 @@ actor SimpleMHLWriter: MHLWriting {
 
     func seal() async throws {
         guard !finalized else { return }
+        guard !entries.isEmpty else { finalized = true; return }
         try render()
         finalized = true
     }
@@ -43,6 +47,7 @@ actor SimpleMHLWriter: MHLWriting {
     /// A simple hash list has no chain, so a partial run just leaves what it wrote.
     func finalizeAsPartial(reason: String) async throws {
         guard !finalized else { return }
+        guard !entries.isEmpty else { finalized = true; return }
         try render()
         finalized = true
     }
@@ -54,6 +59,7 @@ actor SimpleMHLWriter: MHLWriting {
     }
 
     private func render() throws {
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
         var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n<hashlist>\n"
         for e in entries {
             xml += "<file name=\"\(Self.esc(e.relPath))\"><hash>\(e.hash)</hash></file>\n"

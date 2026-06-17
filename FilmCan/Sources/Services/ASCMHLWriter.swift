@@ -21,7 +21,9 @@ actor ASCMHLWriter: MHLWriting {
     init(ascmhlDir: URL, rollName: String) throws {
         self.ascmhlDir = ascmhlDir
         self.rollName = rollName
-        try FileManager.default.createDirectory(at: ascmhlDir, withIntermediateDirectories: true)
+        // Do NOT create the ascmhl/ directory here — only when something is actually
+        // written (render). A roll whose files aren't copied this run leaves no
+        // empty ascmhl/ folder behind.
         let seq = ASCMHLChain.nextSequence(ascmhlDir: ascmhlDir)
         self.sequence = seq
         let now = Date()
@@ -51,6 +53,8 @@ actor ASCMHLWriter: MHLWriting {
     /// the chain index.
     func seal() async throws {
         guard !finalized else { return }
+        // Nothing copied to this roll this run → no generation to write.
+        guard !entries.isEmpty else { finalized = true; return }
         try render()
         let data = try Data(contentsOf: manifestURL)
         try ASCMHLChain.append(ascmhlDir: ascmhlDir, sequence: sequence,
@@ -62,6 +66,7 @@ actor ASCMHLWriter: MHLWriting {
     /// resume falls back to the last complete generation.
     func finalizeAsPartial(reason: String) async throws {
         guard !finalized else { return }
+        guard !entries.isEmpty else { finalized = true; return }
         try render(partialReason: reason)
         finalized = true
     }
@@ -75,6 +80,8 @@ actor ASCMHLWriter: MHLWriting {
     // MARK: - Rendering
 
     private func render(partialReason: String? = nil) throws {
+        // Create the ascmhl/ folder lazily, only when there is something to write.
+        try FileManager.default.createDirectory(at: ascmhlDir, withIntermediateDirectories: true)
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0"
         let host = Host.current().localizedName ?? "unknown"
         var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"

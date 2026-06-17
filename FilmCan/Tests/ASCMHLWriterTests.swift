@@ -27,6 +27,15 @@ final class ASCMHLWriterTests: XCTestCase {
         XCTAssertEqual(ASCMHLChain.latestManifestPath(ascmhlDir: dir), w.manifestFileName)
     }
 
+    func testEmptyWriterLeavesNoDirOrManifest() async throws {
+        let dir = tempAscmhlDir()
+        let w = try ASCMHLWriter(ascmhlDir: dir, rollName: "A001")
+        try await w.seal()  // nothing appended
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path),
+                       "a roll with nothing copied must not create an ascmhl/ folder")
+        XCTAssertNil(ASCMHLChain.latestManifestFileName(ascmhlDir: dir))
+    }
+
     func testSecondRunCreatesGenerationTwo() async throws {
         let dir = tempAscmhlDir()
         let g1 = try ASCMHLWriter(ascmhlDir: dir, rollName: "A001")
