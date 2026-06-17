@@ -491,7 +491,12 @@ class TransferViewModel: ObservableObject {
 
     private func resolveOrganizationPreset(for config: BackupConfiguration) -> OrganizationPreset? {
         if let id = config.selectedOrganizationPresetId,
-           let preset = AppState.shared.storage.organizationPresets.first(where: { $0.id == id }) {
+           var preset = AppState.shared.storage.organizationPresets.first(where: { $0.id == id }) {
+            // The Sound folder template is user-editable on the config; let it drive
+            // sound routing for the selected preset.
+            if !config.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                preset.soundFolderTemplate = config.soundFolderTemplate
+            }
             return preset
         }
         let hasTemplate = config.offOrganizationUseFolderTemplate
@@ -518,6 +523,46 @@ class TransferViewModel: ObservableObject {
         preset.useCustomDate = config.offOrganizationUseCustomDate
         preset.customDate = config.offOrganizationCustomDate
         return preset
+    }
+
+    /// Per-source Camera/Sound tags for the run: explicit tags from the config,
+    /// plus any source whose volume/folder name matches a Sound auto-detect pattern.
+    private func effectiveSourceMediaKinds(
+        for config: BackupConfiguration, sources: [String]
+    ) -> [String: SourceMediaKind] {
+        var kinds = config.sourceMediaKinds
+        guard config.soundAutoDetectEnabled else { return kinds }
+        let patterns = config.soundAutoDetectPatterns
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !patterns.isEmpty else { return kinds }
+        for src in sources where kinds[src] == nil {
+            let names = [(src as NSString).lastPathComponent, volumeName(forPath: src)]
+            if patterns.contains(where: { p in names.contains { matchesPattern($0, pattern: p) } }) {
+                kinds[src] = .sound
+            }
+        }
+        return kinds
+    }
+
+    private func volumeName(forPath path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        if let values = try? url.resourceValues(forKeys: [.volumeNameKey]),
+           let name = values.volumeName, !name.isEmpty {
+            return name
+        }
+        return (path as NSString).lastPathComponent
+    }
+
+    private func matchesPattern(_ name: String, pattern: String) -> Bool {
+        let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if trimmed.contains("*") {
+            let escaped = NSRegularExpression.escapedPattern(for: trimmed)
+            let regex = "^" + escaped.replacingOccurrences(of: "\\*", with: ".*") + "$"
+            return name.range(of: regex, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+        return name.range(of: trimmed, options: .caseInsensitive) != nil
     }
 
     private func hasCustomFilterPatterns(
@@ -940,6 +985,7 @@ class TransferViewModel: ObservableObject {
                 forceRecopy: config.forceRecopy,
                 shootMetadata: ShootMetadata(episode: config.episode, day: config.day,
                                              unit: config.unit, cameraFormat: config.cameraFormat),
+                sourceMediaKinds: effectiveSourceMediaKinds(for: config, sources: sources),
                 hashListStyle: config.hashListStyle,
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }

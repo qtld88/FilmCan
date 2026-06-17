@@ -67,6 +67,7 @@
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
 		8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */; };
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
+		8E0F3EB7D7BCA27B339F1418 /* SourceMediaKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8978606748B7E273D703E81B /* SourceMediaKind.swift */; };
 		8E3A60028B4927FA5CD1C2A2 /* DryRunPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18663FD23B1C73B08D717384 /* DryRunPlanner.swift */; };
 		8EA1BB03FD52EB731E4D533E /* HashListNamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */; };
 		8FA18785A60525202826D859 /* ExFATBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */; };
@@ -210,6 +211,7 @@
 		802D5EC223B6B2F4CB3CF764 /* OrganizationTemplateTokenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationTemplateTokenTests.swift; sourceTree = "<group>"; };
 		84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLWriterTests.swift; sourceTree = "<group>"; };
 		867AFB25988C222B6A24039C /* PreviewInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewInfo.swift; sourceTree = "<group>"; };
+		8978606748B7E273D703E81B /* SourceMediaKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceMediaKind.swift; sourceTree = "<group>"; };
 		8B24A04D94C538092C852CA0 /* NetflixValidationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetflixValidationSheet.swift; sourceTree = "<group>"; };
 		8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListNamer.swift; sourceTree = "<group>"; };
 		93EB91D5AC324DFAEC3E376F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -440,6 +442,7 @@
 				68D90641C9B9019E8312A23E /* OrganizationPreset.swift */,
 				867AFB25988C222B6A24039C /* PreviewInfo.swift */,
 				4E3097772416FE89A21C7E62 /* RsyncOptions.swift */,
+				8978606748B7E273D703E81B /* SourceMediaKind.swift */,
 				C639F55EAD692B4FDA94F547 /* TransferHistoryEntry.swift */,
 				297A6705D2E34EA8E454FB3B /* TransferProgress.swift */,
 				73C4305DE01CFC043DF8C21A /* TransferResult.swift */,
@@ -736,6 +739,7 @@
 				F932C00CDF31D137B4D98E5C /* SiblingDestSource.swift in Sources */,
 				F04AD0B22FCB0313E2ABC4E9 /* SimpleMHLWriter.swift in Sources */,
 				7191245AD630701955CB29ED /* SourceListView.swift in Sources */,
+				8E0F3EB7D7BCA27B339F1418 /* SourceMediaKind.swift in Sources */,
 				63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */,
 				ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */,
 				E3646B0FD3D8713EE6949BCF /* TokenFlowLayout.swift in Sources */,

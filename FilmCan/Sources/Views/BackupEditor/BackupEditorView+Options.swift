@@ -948,6 +948,52 @@ extension BackupEditorView {
                 .padding(.top, 4)
             }
 
+            optionRow(
+                icon: "waveform",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Auto-detect sound drives",
+                subtitle: "",
+                isOn: $viewModel.soundAutoDetectEnabled,
+                textWidth: basicOptionTextWidth,
+                info: InfoPopoverContent(
+                    title: "Auto-detect sound drives",
+                    description: "Tags a source as Sound (routed to Sound_Media under the Netflix preset) when its drive or folder name matches one of these patterns.",
+                    pros: ["No need to flip each sound card to Sound by hand"],
+                    cons: ["A broad pattern could mis-tag a camera card as sound"]
+                )
+            )
+
+            if viewModel.soundAutoDetectEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text("Sound drive/folder names")
+                            .font(FilmCanFont.label(13))
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                        InfoPopoverButton(
+                            content: InfoPopoverContent(
+                                title: "Sound drive/folder names",
+                                description: "A drive name, folder name, or substring. Wildcards (*) supported; matching is case-insensitive.",
+                                notes: [
+                                    "Sound recorders: `SOUND`, `MIXPRE*`, `ZOOM*`, `F8*`, `TASCAM*`.",
+                                    "A plain word like `SOUND` matches any volume/folder containing it."
+                                ]
+                            )
+                        )
+                    }
+                    PatternEditor(
+                        title: "",
+                        placeholder: "SOUND\nMIXPRE*\nZOOM*",
+                        patterns: Binding(
+                            get: { viewModel.soundAutoDetectPatterns },
+                            set: { viewModel.soundAutoDetectPatterns = $0 }
+                        ),
+                        showsTitle: false
+                    )
+                }
+                .padding(.leading, optionIconWidth + optionSpacing)
+                .padding(.top, 4)
+            }
+
             let copyContentsInfo = InfoPopoverContent(
                 title: "Copy folder contents only",
                 description: "When on, FilmCan skips the top-level folder and copies only its contents into the destination.",
@@ -1093,6 +1139,21 @@ extension BackupEditorView {
                                  text: Binding(get: { viewModel.unit }, set: { viewModel.unit = $0 }))
                 netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
                                  text: Binding(get: { viewModel.cameraFormat }, set: { viewModel.cameraFormat = $0 }))
+
+                HStack(spacing: 6) {
+                    Text("Sound folder")
+                        .font(FilmCanFont.label(13))
+                        .foregroundColor(FilmCanTheme.textPrimary)
+                    InfoPopoverButton(content: InfoPopoverContent(
+                        title: "Sound folder template",
+                        description: "Destination sub-path for sources tagged as Sound. The sound roll folder is appended automatically. Tokens: {date} {episode} {day} {unit}.",
+                        notes: ["Netflix default: {date}_{episode}_{day}_{unit}/Sound_Media",
+                                "Camera sources use the preset's Camera_Media path; this only affects Sound-tagged sources."]
+                    ))
+                }
+                netflixMetaField("", placeholder: "{date}_{episode}_{day}_{unit}/Sound_Media",
+                                 text: Binding(get: { viewModel.soundFolderTemplate },
+                                               set: { viewModel.soundFolderTemplate = $0 }))
                 netflixReadinessHint
             }
             .padding(.bottom, 8)

@@ -136,6 +136,9 @@ actor FanOutCopier {
         var copyFolderContents: Bool = false
         /// Per-shoot metadata for the Netflix folder tokens.
         var shootMetadata: ShootMetadata = .empty
+        /// Camera/Sound tag per source ROOT path; absent ⇒ camera. Routes a source
+        /// under Camera_Media/ or Sound_Media/ (Netflix preset).
+        var sourceMediaKinds: [String: SourceMediaKind] = [:]
         /// Which hash-list format to write. The Netflix Ingest preset always forces
         /// ASC MHL regardless of this value.
         var hashListStyle: HashListStyle = .ascMHL
@@ -237,12 +240,12 @@ actor FanOutCopier {
     nonisolated static func resolveDestFilePath(
         destRoot: String, rootName: String, rootPath: String, relPath: String,
         preset: OrganizationPreset?, copyFolderContents: Bool, date: Date,
-        metadata: ShootMetadata = .empty
+        metadata: ShootMetadata = .empty, mediaKind: SourceMediaKind = .camera
     ) -> String {
         if let preset {
             let resolved = OrganizationTemplate.resolve(
                 preset: preset, sourcePath: rootPath, destinationRoot: destRoot,
-                counter: 0, date: date, metadata: metadata)
+                counter: 0, date: date, metadata: metadata, mediaKind: mediaKind)
             let folderBase = resolved.folderPath.isEmpty
                 ? destRoot
                 : (destRoot as NSString).appendingPathComponent(resolved.folderPath)
@@ -272,13 +275,19 @@ actor FanOutCopier {
     nonisolated static func resolveRollFolder(
         destRoot: String, rootName: String, rootPath: String,
         isDirectoryRoot: Bool, preset: OrganizationPreset?,
-        copyFolderContents: Bool, date: Date, metadata: ShootMetadata = .empty
+        copyFolderContents: Bool, date: Date, metadata: ShootMetadata = .empty,
+        mediaKind: SourceMediaKind = .camera
     ) -> String {
         let resolvedRoot = resolveDestFilePath(
             destRoot: destRoot, rootName: rootName, rootPath: rootPath,
             relPath: "", preset: preset, copyFolderContents: copyFolderContents,
-            date: date, metadata: metadata)
+            date: date, metadata: metadata, mediaKind: mediaKind)
         return isDirectoryRoot ? resolvedRoot : (resolvedRoot as NSString).deletingLastPathComponent
+    }
+
+    /// Camera/Sound tag for a source root (defaults to camera).
+    nonisolated func mediaKind(forRoot rootPath: String) -> SourceMediaKind {
+        config.sourceMediaKinds[rootPath] ?? .camera
     }
 
     /// The roll's `ascmhl/` folder (holds the generation manifests + chain index).
@@ -367,7 +376,9 @@ actor FanOutCopier {
                         rootPath: rootPaths[rootName] ?? rootName,
                         isDirectoryRoot: directoryRoots.contains(rootName),
                         preset: config.organizationPreset,
-                        copyFolderContents: config.copyFolderContents, date: jobStartTime, metadata: config.shootMetadata)
+                        copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                        metadata: config.shootMetadata,
+                        mediaKind: mediaKind(forRoot: rootPaths[rootName] ?? rootName))
                     if isNetflix {
                         Self.scaffoldNetflixSiblings(destRoot: destCfg.destPath, rollFolder: rollFolder)
                     }
@@ -472,7 +483,8 @@ actor FanOutCopier {
                     destRoot: dest.destPath, rootName: root, rootPath: rootPath(for: root),
                     isDirectoryRoot: directoryRoots.contains(root),
                     preset: config.organizationPreset, copyFolderContents: config.copyFolderContents,
-                    date: jobStartTime, metadata: config.shootMetadata)
+                    date: jobStartTime, metadata: config.shootMetadata,
+                    mediaKind: mediaKind(forRoot: rootPath(for: root)))
                 byRoot[root] = Self.loadExistingMHLEntries(destPath: dest.destPath, rootName: root, rollFolder: rf)
             }
             existingMHLByDest[dest.destPath] = byRoot
@@ -493,7 +505,7 @@ actor FanOutCopier {
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                    metadata: config.shootMetadata)
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath))
                 return !FileManager.default.fileExists(atPath: path)   // present → skip
             }
         }
@@ -625,7 +637,8 @@ actor FanOutCopier {
                         relPath: isDir ? entry.fileName : "",
                         preset: config.organizationPreset,
                         copyFolderContents: config.copyFolderContents,
-                        date: jobStartTime, metadata: config.shootMetadata)
+                        date: jobStartTime, metadata: config.shootMetadata,
+                        mediaKind: mediaKind(forRoot: rp))
                     return FileManager.default.fileExists(atPath: destFile)
                 }
                 if !present.isEmpty {
@@ -818,7 +831,7 @@ actor FanOutCopier {
                 destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
                 relPath: relPath, preset: config.organizationPreset,
                 copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                metadata: config.shootMetadata)
+                metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: rootPath))
             let parent = (targetPath as NSString).deletingLastPathComponent
             try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
             let destFileURL = URL(fileURLWithPath: targetPath)

@@ -25,6 +25,9 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var name: String = "Preset 1"
     var folderTemplate: String = ""
+    /// Optional separate folder template for sources tagged as Sound (Netflix
+    /// Sound_Media routing). Empty → sound sources use `folderTemplate` like camera.
+    var soundFolderTemplate: String = ""
     var renameTemplate: String = ""
     var useFolderTemplate: Bool = false
     var useRenameTemplate: Bool = false
@@ -45,7 +48,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
     var customDate: Date = Date()
     
     private enum CodingKeys: String, CodingKey {
-        case id, name, folderTemplate, renameTemplate
+        case id, name, folderTemplate, soundFolderTemplate, renameTemplate
         case useFolderTemplate, useRenameTemplate, renameOnlyPatterns
         case includePatterns, excludePatterns, copyOnlyPatterns
         case duplicatePolicy, duplicateCounterTemplate
@@ -61,6 +64,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Preset 1"
         folderTemplate = try c.decodeIfPresent(String.self, forKey: .folderTemplate) ?? ""
+        soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? ""
         renameTemplate = try c.decodeIfPresent(String.self, forKey: .renameTemplate) ?? ""
         useFolderTemplate = try c.decodeIfPresent(Bool.self, forKey: .useFolderTemplate)
             ?? !folderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -89,6 +93,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         try c.encode(id, forKey: .id)
         try c.encode(name, forKey: .name)
         try c.encode(folderTemplate, forKey: .folderTemplate)
+        try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
         try c.encode(renameTemplate, forKey: .renameTemplate)
         try c.encode(useFolderTemplate, forKey: .useFolderTemplate)
         try c.encode(useRenameTemplate, forKey: .useRenameTemplate)
@@ -122,6 +127,7 @@ extension OrganizationPreset {
         p.name = netflixIngestName
         p.useFolderTemplate = true
         p.folderTemplate = "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
+        p.soundFolderTemplate = "{date}_{episode}_{day}_{unit}/Sound_Media"
         return p
     }
 }

@@ -16,6 +16,9 @@ struct SourceListView: View {
     var showsTitle: Bool = true
     var headerView: AnyView? = nil
     var footerView: AnyView? = nil
+    /// When provided, each source row shows a Camera/Sound toggle (Netflix routing).
+    var mediaKind: ((String) -> SourceMediaKind)? = nil
+    var setMediaKind: ((String, SourceMediaKind) -> Void)? = nil
     
     var body: some View {
         let _ = refreshToken
@@ -248,8 +251,23 @@ struct SourceListView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            
+
             Spacer()
+
+            if let mediaKind, let setMediaKind {
+                Picker("", selection: Binding(
+                    get: { mediaKind(source.path) },
+                    set: { setMediaKind(source.path, $0) }
+                )) {
+                    ForEach(SourceMediaKind.allCases) { kind in
+                        Label(kind.displayName, systemImage: kind.symbol).tag(kind)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 132)
+                .help("Camera → Camera_Media · Sound → Sound_Media (Netflix Ingest)")
+            }
         }
         .contentShape(Rectangle())
         .contextMenu {

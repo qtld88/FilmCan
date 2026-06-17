@@ -841,6 +841,7 @@ class CustomCopierService: ObservableObject, TransferService {
         dryRun: Bool,
         forceRecopy: Bool = false,
         shootMetadata: ShootMetadata = .empty,
+        sourceMediaKinds: [String: SourceMediaKind] = [:],
         hashListStyle: HashListStyle = .ascMHL,
         progressHandler: (@Sendable ([DestProgress]) -> Void)?,
         webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
@@ -868,6 +869,7 @@ class CustomCopierService: ObservableObject, TransferService {
             organizationPreset: organizationPreset,
             copyFolderContents: copyFolderContents,
             shootMetadata: shootMetadata,
+            sourceMediaKinds: sourceMediaKinds,
             hashListStyle: hashListStyle,
             forceRecopy: forceRecopy,
             shouldCancel: { cancellationState.isCancelledNow() }

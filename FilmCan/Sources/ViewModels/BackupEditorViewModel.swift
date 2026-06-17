@@ -226,6 +226,36 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Camera/Sound media kind (Netflix Sound_Media routing)
+
+    func mediaKind(for path: String) -> SourceMediaKind {
+        config.sourceMediaKinds[path] ?? .camera
+    }
+
+    func setMediaKind(_ kind: SourceMediaKind, for path: String) {
+        if kind == .camera {
+            config.sourceMediaKinds[path] = nil   // camera is the default; keep the map small
+        } else {
+            config.sourceMediaKinds[path] = kind
+        }
+        save()
+    }
+
+    var soundFolderTemplate: String {
+        get { config.soundFolderTemplate }
+        set { config.soundFolderTemplate = newValue; save() }
+    }
+
+    var soundAutoDetectEnabled: Bool {
+        get { config.soundAutoDetectEnabled }
+        set { config.soundAutoDetectEnabled = newValue; save() }
+    }
+
+    var soundAutoDetectPatterns: [String] {
+        get { config.soundAutoDetectPatterns }
+        set { config.soundAutoDetectPatterns = newValue; save() }
+    }
+
     var destinationAutoDetectEnabled: Bool {
         get { config.destinationAutoDetectEnabled }
         set {

@@ -28,6 +28,13 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var destinationCopyMode: DestinationCopyMode = .automatic
     var sourceAutoDetectEnabled: Bool = false
     var sourceAutoDetectPatterns: [String] = []
+    /// Camera/Sound tag per source path (absent ⇒ camera). Netflix routing.
+    var sourceMediaKinds: [String: SourceMediaKind] = [:]
+    /// Auto-tag a source as Sound when its path/volume matches one of these patterns.
+    var soundAutoDetectEnabled: Bool = false
+    var soundAutoDetectPatterns: [String] = []
+    /// Editable Sound folder template for the Netflix preset (Sound_Media routing).
+    var soundFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Sound_Media"
     var destinationAutoDetectEnabled: Bool = false
     var destinationAutoDetectPatterns: [String] = []
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .ask
@@ -86,6 +93,10 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         destinationCopyMode = try c.decodeIfPresent(DestinationCopyMode.self, forKey: .destinationCopyMode) ?? .automatic
         sourceAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .sourceAutoDetectEnabled) ?? false
         sourceAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .sourceAutoDetectPatterns) ?? []
+        sourceMediaKinds = try c.decodeIfPresent([String: SourceMediaKind].self, forKey: .sourceMediaKinds) ?? [:]
+        soundAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .soundAutoDetectEnabled) ?? false
+        soundAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .soundAutoDetectPatterns) ?? []
+        soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Sound_Media"
         destinationAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .destinationAutoDetectEnabled) ?? false
         destinationAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .destinationAutoDetectPatterns) ?? []
         duplicatePolicy = try c.decodeIfPresent(OrganizationPreset.DuplicatePolicy.self, forKey: .duplicatePolicy) ?? .ask
@@ -146,6 +157,10 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(destinationCopyMode, forKey: .destinationCopyMode)
         try c.encode(sourceAutoDetectEnabled, forKey: .sourceAutoDetectEnabled)
         try c.encode(sourceAutoDetectPatterns, forKey: .sourceAutoDetectPatterns)
+        try c.encode(sourceMediaKinds, forKey: .sourceMediaKinds)
+        try c.encode(soundAutoDetectEnabled, forKey: .soundAutoDetectEnabled)
+        try c.encode(soundAutoDetectPatterns, forKey: .soundAutoDetectPatterns)
+        try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
         try c.encode(destinationAutoDetectEnabled, forKey: .destinationAutoDetectEnabled)
         try c.encode(destinationAutoDetectPatterns, forKey: .destinationAutoDetectPatterns)
         try c.encode(duplicatePolicy, forKey: .duplicatePolicy)
@@ -180,6 +195,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
+        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns, soundFolderTemplate
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate
         case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy

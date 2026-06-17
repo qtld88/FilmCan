@@ -49,6 +49,24 @@ For a card `A001` shot on 2026-06-15, EP103, Day 5, Main unit, ARRI:
 
 ---
 
+## Camera & Sound in one ingest
+
+Netflix protects production sound (OPA) exactly like camera (OCF) — same copies,
+hashes, and ASC MHL — it just lands under `Sound_Media/` instead of `Camera_Media/`.
+
+- Each source row has a **Camera / Sound** toggle. Tag a sound card as **Sound** and it
+  routes to `…/Sound_Media/<SoundRoll>/` (with its own `ascmhl/`, verify and resume),
+  a sibling of the camera media in the same shoot-day root.
+- **Options › Sources › Auto-detect sound drives**: patterns (e.g. `SOUND`, `MIXPRE*`,
+  `ZOOM*`) auto-tag matching cards as Sound.
+- **Options › Destinations › Sound folder**: the sound sub-path is editable (default
+  `{date}_{episode}_{day}_{unit}/Sound_Media`). Camera sources are unaffected.
+
+Camera and sound can be backed up in the **same run** — the source is read once and
+fanned out.
+
+---
+
 ## Naming validation
 
 When the Netflix Ingest preset is active, FilmCan pre-flights your roll (source

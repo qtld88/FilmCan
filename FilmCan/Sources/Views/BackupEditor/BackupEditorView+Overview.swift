@@ -39,7 +39,9 @@ extension BackupEditorView {
                         Spacer()
                     }
                 ),
-                footerView: sourcePreviewFooter
+                footerView: sourcePreviewFooter,
+                mediaKind: { viewModel.mediaKind(for: $0) },
+                setMediaKind: { viewModel.setMediaKind($1, for: $0) }
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("sourcePanel")
@@ -138,7 +140,9 @@ extension BackupEditorView {
                         Spacer()
                     }
                 ),
-                footerView: sourcePreviewFooter
+                footerView: sourcePreviewFooter,
+                mediaKind: { viewModel.mediaKind(for: $0) },
+                setMediaKind: { viewModel.setMediaKind($1, for: $0) }
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("sourcePanel")

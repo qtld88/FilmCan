@@ -27,7 +27,8 @@ enum OrganizationTemplate {
         destinationRoot: String,
         counter: Int,
         date: Date,
-        metadata: ShootMetadata = .empty
+        metadata: ShootMetadata = .empty,
+        mediaKind: SourceMediaKind = .camera
     ) -> ResolvedDestination {
         let effectiveDate = preset.useCustomDate ? preset.customDate : date
         let sourceName = (sourcePath as NSString).lastPathComponent
@@ -51,7 +52,12 @@ enum OrganizationTemplate {
             metadata: metadata
         )
 
-        let folderTemplate = preset.folderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Sound sources use the preset's sound template when set; otherwise they
+        // fall back to the camera folder template.
+        let rawTemplate = (mediaKind == .sound && !preset.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ? preset.soundFolderTemplate
+            : preset.folderTemplate
+        let folderTemplate = rawTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedFolder = (!preset.useFolderTemplate || folderTemplate.isEmpty)
             ? ""
             : collapseEmptySegments(applyTokens(folderTemplate, values: tokenValues, allowPathSeparators: true))

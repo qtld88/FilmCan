@@ -450,6 +450,41 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(copyValues.last, total, "copy bar should reach the full job size")
     }
 
+    func test_soundTaggedSource_routesUnderSoundMedia() async throws {
+        let fm = FileManager.default
+        let cam = tmpDir.appendingPathComponent("A001")
+        let snd = tmpDir.appendingPathComponent("SR001")
+        try fm.createDirectory(at: cam, withIntermediateDirectories: true)
+        try fm.createDirectory(at: snd, withIntermediateDirectories: true)
+        try Data((0..<40_000).map { _ in UInt8.random(in: 0...255) }).write(to: cam.appendingPathComponent("a.mxf"))
+        try Data((0..<30_000).map { _ in UInt8.random(in: 0...255) }).write(to: snd.appendingPathComponent("s.wav"))
+        let dest = tmpDir.appendingPathComponent("nfdest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        var preset = OrganizationPreset()
+        preset.name = OrganizationPreset.netflixIngestName
+        preset.useFolderTemplate = true
+        preset.folderTemplate = "Shoot/Camera_Media"
+        preset.soundFolderTemplate = "Shoot/Sound_Media"
+
+        let config = FanOutCopier.Configuration(
+            sources: [cam.path, snd.path],
+            destinations: [DestWriter.Config(destPath: dest.path, displayName: "D",
+                                             verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil,
+            organizationPreset: preset,
+            sourceMediaKinds: [snd.path: .sound])
+
+        _ = try await FanOutCopier(config: config).run()
+
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("Shoot/Camera_Media/A001/a.mxf").path),
+                      "camera source under Camera_Media")
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("Shoot/Sound_Media/SR001/s.wav").path),
+                      "sound source under Sound_Media")
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("Shoot/Camera_Media/SR001").path),
+                       "sound must not land under Camera_Media")
+    }
+
     // MARK: - ASC MHL helpers
 
     /// True if a sealed ASC MHL generation exists in the given ascmhl/ folder.
