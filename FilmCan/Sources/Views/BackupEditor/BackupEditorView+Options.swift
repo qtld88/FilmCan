@@ -894,7 +894,7 @@ extension BackupEditorView {
     private var sourceOptionsContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             let sourceAutoDetectInfo = InfoPopoverContent(
-                title: "Auto-detect sources",
+                title: "Auto-detect camera sources",
                 description: "Scans connected drives and automatically adds sources whose names or subfolders match your patterns.",
                 pros: [
                     "Hands-free source selection",
@@ -909,7 +909,7 @@ extension BackupEditorView {
             optionRow(
                 icon: "externaldrive",
                 iconColor: FilmCanTheme.textSecondary,
-                title: "Auto-detect sources",
+                title: "Auto-detect camera sources",
                 subtitle: "",
                 isOn: $viewModel.sourceAutoDetectEnabled,
                 textWidth: basicOptionTextWidth,
@@ -919,12 +919,12 @@ extension BackupEditorView {
             if viewModel.sourceAutoDetectEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
-                        Text("Drive and folder names to detect")
+                        Text("Camera drive and folder names to detect")
                             .font(FilmCanFont.label(13))
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(
                             content: InfoPopoverContent(
-                                title: "Drive and folder names to detect",
+                                title: "Camera drive and folder names to detect",
                                 description: "Enter a drive name or a drive/folder path (Drive/Folder). Files are ignored. Wildcards (*) are supported.",
                                 notes: [
                                     "ARRI cards named A001, A002: use `A*`.",
@@ -951,12 +951,12 @@ extension BackupEditorView {
             optionRow(
                 icon: "waveform",
                 iconColor: FilmCanTheme.textSecondary,
-                title: "Auto-detect sound drives",
+                title: "Auto-detect sound sources",
                 subtitle: "",
                 isOn: $viewModel.soundAutoDetectEnabled,
                 textWidth: basicOptionTextWidth,
                 info: InfoPopoverContent(
-                    title: "Auto-detect sound drives",
+                    title: "Auto-detect sound sources",
                     description: "Tags a source as Sound (routed to Sound_Media under the Netflix preset) when its drive or folder name matches one of these patterns.",
                     pros: ["No need to flip each sound card to Sound by hand"],
                     cons: ["A broad pattern could mis-tag a camera card as sound"]
@@ -966,12 +966,12 @@ extension BackupEditorView {
             if viewModel.soundAutoDetectEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
-                        Text("Sound drive/folder names")
+                        Text("Sound drive and folder names to detect")
                             .font(FilmCanFont.label(13))
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(
                             content: InfoPopoverContent(
-                                title: "Sound drive/folder names",
+                                title: "Sound drive and folder names to detect",
                                 description: "A drive name, folder name, or substring. Wildcards (*) supported; matching is case-insensitive.",
                                 notes: [
                                     "Sound recorders: `SOUND`, `MIXPRE*`, `ZOOM*`, `F8*`, `TASCAM*`.",
@@ -1140,23 +1140,37 @@ extension BackupEditorView {
                 netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
                                  text: Binding(get: { viewModel.cameraFormat }, set: { viewModel.cameraFormat = $0 }))
 
-                HStack(spacing: 6) {
-                    Text("Sound folder")
-                        .font(FilmCanFont.label(13))
-                        .foregroundColor(FilmCanTheme.textPrimary)
-                    InfoPopoverButton(content: InfoPopoverContent(
-                        title: "Sound folder template",
-                        description: "Destination sub-path for sources tagged as Sound. The sound roll folder is appended automatically. Tokens: {date} {episode} {day} {unit}.",
-                        notes: ["Netflix default: {date}_{episode}_{day}_{unit}/Sound_Media",
-                                "Camera sources use the preset's Camera_Media path; this only affects Sound-tagged sources."]
-                    ))
-                }
-                netflixMetaField("", placeholder: "{date}_{episode}_{day}_{unit}/Sound_Media",
-                                 text: Binding(get: { viewModel.soundFolderTemplate },
-                                               set: { viewModel.soundFolderTemplate = $0 }))
+                folderTemplatesSection
                 netflixReadinessHint
             }
             .padding(.bottom, 8)
+        }
+    }
+
+    /// Editable Camera and Sound destination sub-paths for the Netflix preset. The
+    /// roll folder is appended automatically; tokens {date} {episode} {day} {unit}
+    /// {cameraFormat} are supported.
+    private var folderTemplatesSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("Folder templates")
+                    .font(FilmCanFont.label(13))
+                    .foregroundColor(FilmCanTheme.textPrimary)
+                InfoPopoverButton(content: InfoPopoverContent(
+                    title: "Folder templates",
+                    description: "Where each source lands at the destination, by media type. The roll folder is appended automatically.",
+                    notes: ["Camera sources use the Camera folder; Sound-tagged sources use the Sound folder.",
+                            "Tokens: {date} {episode} {day} {unit} {cameraFormat}.",
+                            "Netflix defaults: Camera_Media/{cameraFormat} and Sound_Media."]
+                ))
+            }
+            .padding(.top, 4)
+            netflixMetaField("Camera folder", placeholder: "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}",
+                             text: Binding(get: { viewModel.cameraFolderTemplate },
+                                           set: { viewModel.cameraFolderTemplate = $0 }))
+            netflixMetaField("Sound folder", placeholder: "{date}_{episode}_{day}_{unit}/Sound_Media",
+                             text: Binding(get: { viewModel.soundFolderTemplate },
+                                           set: { viewModel.soundFolderTemplate = $0 }))
         }
     }
 

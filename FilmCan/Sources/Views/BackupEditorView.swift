@@ -146,6 +146,7 @@ struct BackupEditorView: View {
         .onAppear {
             refreshPreview()
             viewModel.refreshAutoDetectedSources()
+            viewModel.refreshAutoDetectedSoundSources()
             viewModel.refreshAutoDetectedDestinations()
             viewModel.enforceCustomEngineDefaultsIfNeeded()
         }
@@ -158,6 +159,16 @@ struct BackupEditorView: View {
         .onChange(of: viewModel.sourceAutoDetectPatterns) { _ in
             if viewModel.sourceAutoDetectEnabled {
                 viewModel.refreshAutoDetectedSources()
+            }
+        }
+        .onChange(of: viewModel.soundAutoDetectEnabled) { enabled in
+            if enabled {
+                viewModel.refreshAutoDetectedSoundSources()
+            }
+        }
+        .onChange(of: viewModel.soundAutoDetectPatterns) { _ in
+            if viewModel.soundAutoDetectEnabled {
+                viewModel.refreshAutoDetectedSoundSources()
             }
         }
         .onChange(of: viewModel.destinationAutoDetectEnabled) { enabled in

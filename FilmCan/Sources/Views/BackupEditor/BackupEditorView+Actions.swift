@@ -99,6 +99,7 @@ extension BackupEditorView {
             refreshPreview()
         }
         viewModel.refreshAutoDetectedSources()
+        viewModel.refreshAutoDetectedSoundSources()
         viewModel.refreshAutoDetectedDestinations()
         driveRefreshCounter &+= 1
         if includePreview {

@@ -492,10 +492,13 @@ class TransferViewModel: ObservableObject {
     private func resolveOrganizationPreset(for config: BackupConfiguration) -> OrganizationPreset? {
         if let id = config.selectedOrganizationPresetId,
            var preset = AppState.shared.storage.organizationPresets.first(where: { $0.id == id }) {
-            // The Sound folder template is user-editable on the config; let it drive
-            // sound routing for the selected preset.
-            if !config.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                preset.soundFolderTemplate = config.soundFolderTemplate
+            // The Camera/Sound folder templates are user-editable on the config for the
+            // Netflix preset; let them drive routing.
+            if preset.name == OrganizationPreset.netflixIngestName {
+                let cam = config.cameraFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cam.isEmpty { preset.folderTemplate = config.cameraFolderTemplate }
+                let snd = config.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !snd.isEmpty { preset.soundFolderTemplate = config.soundFolderTemplate }
             }
             return preset
         }

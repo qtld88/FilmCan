@@ -241,6 +241,11 @@ class BackupEditorViewModel: ObservableObject {
         save()
     }
 
+    var cameraFolderTemplate: String {
+        get { config.cameraFolderTemplate }
+        set { config.cameraFolderTemplate = newValue; save() }
+    }
+
     var soundFolderTemplate: String {
         get { config.soundFolderTemplate }
         set { config.soundFolderTemplate = newValue; save() }
@@ -296,6 +301,38 @@ class BackupEditorViewModel: ObservableObject {
 
         if updated != config.sourcePaths {
             config.sourcePaths = updated
+            save()
+        }
+    }
+
+    /// Like `refreshAutoDetectedSources`, but for Sound: matching drives/folders are
+    /// added to the source list AND tagged as Sound (Netflix Sound_Media routing).
+    func refreshAutoDetectedSoundSources() {
+        guard config.soundAutoDetectEnabled else { return }
+        let rules = config.soundAutoDetectPatterns
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !rules.isEmpty else { return }
+
+        var updated = config.sourcePaths
+        var kinds = config.sourceMediaKinds
+        var changed = false
+        let volumeURLs = mountedExternalVolumes()
+        for volumeURL in volumeURLs {
+            let volumeName = volumeURL.lastPathComponent
+            for rule in rules {
+                let (pattern, subpath) = splitRule(rule)
+                guard matches(volumeName, pattern: pattern) else { continue }
+                for resolved in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                    if !updated.contains(resolved) { updated.append(resolved); changed = true }
+                    if kinds[resolved] != .sound { kinds[resolved] = .sound; changed = true }
+                }
+            }
+        }
+
+        if changed {
+            config.sourcePaths = updated
+            config.sourceMediaKinds = kinds
             save()
         }
     }
@@ -655,6 +692,9 @@ class BackupEditorViewModel: ObservableObject {
     func validate() -> Bool {
         if config.sourceAutoDetectEnabled {
             refreshAutoDetectedSources()
+        }
+        if config.soundAutoDetectEnabled {
+            refreshAutoDetectedSoundSources()
         }
         if config.sourcePaths.isEmpty {
             validationMessage = "Please add at least one source file or folder"

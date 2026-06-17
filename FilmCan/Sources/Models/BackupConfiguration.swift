@@ -33,7 +33,9 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     /// Auto-tag a source as Sound when its path/volume matches one of these patterns.
     var soundAutoDetectEnabled: Bool = false
     var soundAutoDetectPatterns: [String] = []
-    /// Editable Sound folder template for the Netflix preset (Sound_Media routing).
+    /// Editable Camera/Sound folder templates for the Netflix preset. Empty ⇒ use
+    /// the preset's built-in template.
+    var cameraFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
     var soundFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Sound_Media"
     var destinationAutoDetectEnabled: Bool = false
     var destinationAutoDetectPatterns: [String] = []
@@ -96,6 +98,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         sourceMediaKinds = try c.decodeIfPresent([String: SourceMediaKind].self, forKey: .sourceMediaKinds) ?? [:]
         soundAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .soundAutoDetectEnabled) ?? false
         soundAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .soundAutoDetectPatterns) ?? []
+        cameraFolderTemplate = try c.decodeIfPresent(String.self, forKey: .cameraFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
         soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Sound_Media"
         destinationAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .destinationAutoDetectEnabled) ?? false
         destinationAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .destinationAutoDetectPatterns) ?? []
@@ -160,6 +163,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(sourceMediaKinds, forKey: .sourceMediaKinds)
         try c.encode(soundAutoDetectEnabled, forKey: .soundAutoDetectEnabled)
         try c.encode(soundAutoDetectPatterns, forKey: .soundAutoDetectPatterns)
+        try c.encode(cameraFolderTemplate, forKey: .cameraFolderTemplate)
         try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
         try c.encode(destinationAutoDetectEnabled, forKey: .destinationAutoDetectEnabled)
         try c.encode(destinationAutoDetectPatterns, forKey: .destinationAutoDetectPatterns)
@@ -195,7 +199,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
-        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns, soundFolderTemplate
+        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
+        case cameraFolderTemplate, soundFolderTemplate
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate
         case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy
