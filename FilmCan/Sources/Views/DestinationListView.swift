@@ -358,7 +358,8 @@ struct DestinationListView: View {
 
             if isFanOutActive {
                 if let destProg = progress.perDestProgress.first(where: { $0.id == destination.path }) {
-                    InlineFanOutProgress(progress: destProg, showPill: true)
+                    InlineFanOutProgress(progress: destProg, showPill: true,
+                                         multiDestination: progress.perDestProgress.count > 1)
                         .padding(.leading, 28)
                 }
             } else if showProgress {

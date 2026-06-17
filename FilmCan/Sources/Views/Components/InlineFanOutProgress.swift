@@ -3,6 +3,9 @@ import SwiftUI
 struct InlineFanOutProgress: View {
     let progress: DestProgress
     let showPill: Bool
+    /// True when the run has more than one destination — used to explain that a
+    /// resuming destination copies the rest in step with the others.
+    var multiDestination: Bool = false
 
     private var copyFraction: Double {
         guard progress.bytesTotal > 0 else { return 0 }
@@ -80,6 +83,9 @@ struct InlineFanOutProgress: View {
         let unit = n == 1 ? "file" : "files"
         if isFullyUpToDate {
             return "Already backed up — \(n) \(unit) here, nothing to copy"
+        }
+        if multiDestination {
+            return "Resuming — \(n) \(unit) already here, copying the rest in step with the other destinations (the source is read once)"
         }
         return "Resuming — \(n) \(unit) already here, copying the rest"
     }
