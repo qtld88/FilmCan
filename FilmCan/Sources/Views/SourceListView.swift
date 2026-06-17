@@ -196,6 +196,28 @@ struct SourceListView: View {
         }
     }
 
+    /// Discreet Camera/Sound toggle: the active type's glyph is clear/white, the
+    /// inactive type is dimmed grey and slashed. Tap inverts.
+    private func mediaKindToggle(path: String, kind: SourceMediaKind,
+                                 set: @escaping (String, SourceMediaKind) -> Void) -> some View {
+        let isCamera = kind == .camera
+        return Button {
+            set(path, isCamera ? .sound : .camera)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: isCamera ? "camera.fill" : "camera.slash.fill")
+                    .foregroundColor(isCamera ? FilmCanTheme.textPrimary : FilmCanTheme.textTertiary)
+                Image(systemName: isCamera ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .foregroundColor(isCamera ? FilmCanTheme.textTertiary : FilmCanTheme.textPrimary)
+            }
+            .font(.system(size: 11))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(isCamera ? "Camera source — click to mark as Sound (Netflix Sound_Media)"
+                       : "Sound source — click to mark as Camera (Netflix Camera_Media)")
+    }
+
     private func sourceRow(source: SourcePath, isExternal: Bool) -> some View {
         let metadata = getFileMetadata(source.path)
         let iconName = DriveUtilities.iconName(
@@ -255,18 +277,8 @@ struct SourceListView: View {
             Spacer()
 
             if let mediaKind, let setMediaKind {
-                Picker("", selection: Binding(
-                    get: { mediaKind(source.path) },
-                    set: { setMediaKind(source.path, $0) }
-                )) {
-                    ForEach(SourceMediaKind.allCases) { kind in
-                        Label(kind.displayName, systemImage: kind.symbol).tag(kind)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 132)
-                .help("Camera → Camera_Media · Sound → Sound_Media (Netflix Ingest)")
+                mediaKindToggle(path: source.path, kind: mediaKind(source.path), set: setMediaKind)
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
         }
         .contentShape(Rectangle())
