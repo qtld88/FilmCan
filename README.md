@@ -21,11 +21,14 @@ FilmCan backs up camera cards, rushes, folders, or files to multiple destination
 - Copies multiple sources to multiple destinations in one pass (fan-out: source read once, broadcast to every drive)
 - Two verify modes: **fast** (stream hash during copy) and **paranoid** (post-copy re-read from disk, bypassing OS cache)
 - Honest writes on external/exFAT drives via `F_FULLFSYNC` (forces drive cache flush, not just OS buffers)
-- Per-destination ASC MHL hash lists, sealed at job end (cinema standard)
+- Per-destination ASC MHL hash lists with chain of custody, sealed at job end — validated against the reference `ascmhl` tool
+- **Netflix Footage Ingest** preset: the required `Camera_Media` / `Sound_Media` / `Reports` structure, ASC MHL per roll, shoot-metadata folder tokens, and roll-name validation
+- **Camera + Sound in one run**: tag each source Camera or Sound (or auto-detect sound drives) — camera lands in `Camera_Media/`, sound in `Sound_Media/`, source read once
+- Per-destination resume: a file already on one drive but missing from another is copied only where missing; the bar spans the whole job (reads 30/500, not 0/470)
 - Auto-detect drives, folders, files — handles cinema card directory trees (RDC, RDM, BRAW, .ari, R3D)
 - Live per-destination progress, "DO NOT UNPLUG" banner on slow-flush drives
 - One-click **Retry from sibling**: a failed drive rebuilds from a verified neighbor's MHL — no need to re-mount the card
-- Organizes files with custom folder presets
+- Organizes files with custom folder presets (or a simple hidden hash list for non-delivery use)
 - Aggregated webhooks and ntfy push notifications
 
 ---

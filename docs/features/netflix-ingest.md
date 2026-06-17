@@ -19,19 +19,25 @@ required folder structure plus a conformant **ASC MHL** manifest per roll.
 
 ## What you get
 
-For a card `A001` shot on 2026-06-15, EP103, Day 5, Main unit, ARRI:
+For a camera card `A001` and a sound card `SR001`, shot 2026-06-15, EP103, Day 5,
+Main unit, ARRI:
 
 ```
 20260615_EP103_Day05_MU/
 ├── Reports/                         ← auto-created (the transfer log lands here)
-├── Sound_Media/                     ← auto-created
-└── Camera_Media/
-    └── ARRI/
-        └── A001/
-            ├── …copied clips…
-            └── ascmhl/
-                ├── 0001_A001_2026-06-15_…Z.mhl   ← ASC MHL v2.0 manifest (this generation)
-                └── ascmhl_chain.xml              ← generation chain (chain of custody)
+├── Camera_Media/
+│   └── ARRI/
+│       └── A001/
+│           ├── …copied clips…
+│           └── ascmhl/
+│               ├── 0001_A001_2026-06-15_…Z.mhl   ← ASC MHL v2.0 manifest (this generation)
+│               └── ascmhl_chain.xml              ← generation chain (chain of custody)
+└── Sound_Media/
+    └── SR001/
+        ├── …copied wavs…
+        └── ascmhl/                  ← sound roll gets its own ASC MHL + chain
+            ├── 0001_SR001_2026-06-15_…Z.mhl
+            └── ascmhl_chain.xml
 ```
 
 - **Root folder**: `YYYYMMDD_EP###_Day##_Unit`.

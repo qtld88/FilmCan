@@ -42,7 +42,7 @@ Local data lives in `~/Application Support`.
 - **Fan-out engine**: `FanOutCopier` (Swift actor) handles N-sources → M-destinations in one pass. One `BoundedChannel<Chunk>` per destination; source is read once and broadcast. Paranoid verify re-reads both source and dest from disk with `F_NOCACHE`. See `docs/architecture.md`.
 - **Entry point**: `FilmCanApp.swift` — creates `MainView` window and `SettingsView`. No storyboards.
 - **No CI, no linter, no formatter, no pre-commit hooks** — bare Xcode project.
-- **Automated tests**: `FilmCan/Tests/` — `FanOutCopierIntegrationTests` (verify-bar monotonicity, real disk I/O) and `ExplodeFanOutResultTests`. No mocks — tests hit real temp dirs.
+- **Automated tests**: `FilmCan/Tests/` (~100 tests, real temp-dir disk I/O, no mocks) — `FanOutCopierIntegrationTests` (progress monotonicity, per-dest resume, sound routing, cancel/partial), `FanOutCopierSafetyTests` (cancel/unwritable), `ASCMHLWriter/Reader/Chain/Conformance` (validated against the reference `ascmhl` CLI), `C4HashTests`, `OrganizationTemplateTokenTests`.
 - **State pattern**: `@StateObject` in views, `@Published` in ObservableObjects. `TransferViewModel` is the single source of truth for backup runs.
 
 ## Fan-Out Engine — Key Details
@@ -50,10 +50,22 @@ Local data lives in `~/Application Support`.
 - `FanOutCopier` is a Swift **actor**; all mutable state (`completedFilesByDest`, `verifiedFilesByDest`, `verifiedBytesByDest`) is actor-isolated.
 - `DestWriterResult.writtenFilePath` carries the **exact written path** (accounting for organization presets). Use this — never reconstruct the path from `destPath + rootName`.
 - **Verify bar monotonicity**: each writer task snapshots `verifiedAtStart = await verifiedBytesForDest(dest)` before copy starts. Copy-phase progress emits carry this value so the verify bar never resets to 0% during the next file's copy.
-- **Disk space pre-flight**: `FanOutCopier.run()` checks `volumeAvailableCapacityForImportantUsage` per dest before touching any file. Throws `Error.insufficientSpace` with a user-friendly message.
+- **Disk space pre-flight**: `FanOutCopier.run()` checks `DriveUtilities.liveAvailableBytes` against each dest's **needed** bytes (post-resume subset) before touching any file. Throws `Error.insufficientSpace` with a user-friendly message.
 - **Paranoid verify on F_FULLFSYNC drives**: 1s settle delay before re-read to prevent false hash mismatches on drives that don't honor `F_FULLFSYNC` (exFAT USB, some SD cards).
 - **Fan-out result explosion**: `TransferViewModel.explodeFanOutResult` converts one aggregate `TransferResult{destinationResults:[N]}` into N per-dest records so history and notifications show correct ✓/✗ per destination.
 - **Organization preset**: `FanOutCopier.Configuration` carries `organizationPreset` and `copyFolderContents`. Path resolution uses `OrganizationTemplate.resolve` in `processSource` per writer task.
+- **Per-destination resume**: a file present+recorded at one destination but missing at another is copied **only where missing** (`destsNeeding(_:)`); the up-to-date destination skips it. Per-dest `skippedByDest`/`bytesTotalByDest` drive the UI. The progress bar spans the **whole job** (already-present + this run) — the per-dest counters (`finalizedBytesByDest`, `verifiedBytesByDest`, `completedFilesByDest`) are **seeded** with the resumed portion so the bar reads e.g. 30/500 not 0/470.
+- **Copy bar = finalized + current file**: `finalizedBytesByDest` counts bytes actually renamed into place (what Finder shows); the live bar adds only the *current* file's in-flight bytes. On stop, `emitCancelled` snaps every in-progress dest back to finalized. Increment uses the planned `sourceSize` (same units as the bar total) so it reaches exactly 100%.
+- **Resume reads the latest manifest ON DISK** (`ASCMHLChain.latestManifestFileName`), sealed *or* partial — a cancelled run writes a partial manifest (no chain entry), so chain-only lookup would miss it. `nextSequence` also counts on-disk generations.
+- **Writability preflight**: `run()` probes each destination (write+delete a `.filmcan-writeprobe`) and throws `Error.destinationUnwritable` before copying. A mid-copy write/finalize/verify failure or source corruption emits a per-dest `.failed` so the card flips red live while other dests continue.
+
+## Netflix Ingest & Camera/Sound Routing
+
+- **Netflix Ingest preset** (`OrganizationPreset.netflixIngest()`, name `OrganizationPreset.netflixIngestName`): camera template `{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}`, sound template `{date}_{episode}_{day}_{unit}/Sound_Media`. Roll folder auto-appended. Scaffolds sibling `Reports/` + `Sound_Media/`. Shoot metadata = `BackupConfiguration.episode/day/unit/cameraFormat` → `ShootMetadata` tokens.
+- **Camera/Sound per source**: `SourceMediaKind` (camera/sound), tagged in `BackupConfiguration.sourceMediaKinds[path]` (absent ⇒ camera). `OrganizationTemplate.resolve(…, mediaKind:)` picks the sound template for sound sources; threaded through `FanOutCopier.Configuration.sourceMediaKinds` → `resolveDestFilePath/resolveRollFolder(mediaKind:)`. Each sound roll gets its own `ascmhl/`, verify and resume — identical treatment, just under `Sound_Media/`.
+- **Editable templates**: `config.cameraFolderTemplate` / `config.soundFolderTemplate` override the Netflix preset's paths (applied in `TransferViewModel.resolveOrganizationPreset`, gated to the Netflix preset). Edited in **Options › Destinations › Folder templates**.
+- **Sound auto-detect**: `config.soundAutoDetectEnabled` + `soundAutoDetectPatterns`. `BackupEditorViewModel.refreshAutoDetectedSoundSources()` mirrors the camera detector — adds matching drives to sources AND tags them Sound, live on pattern/enable/drive-refresh.
+- **ASC MHL**: `ASCMHLWriter` (generation-aware, lazy dir creation, skips empty generations) + `ASCMHLChain` (C4-hashed `ascmhl_chain.xml`) + `ASCMHLReader`. `MHLWriting` protocol abstracts ASC MHL vs `SimpleMHLWriter` (hidden `.filmcan/hashlists/<roll>.mhl`), chosen by `config.hashListStyle`. `NetflixNameValidator` enforces prohibited chars + unique roll names. See `docs/features/netflix-ingest.md` and `docs/reference/netflix-asc-mhl-requirements.md`.
 
 ## Fan-Out UI Components
 
