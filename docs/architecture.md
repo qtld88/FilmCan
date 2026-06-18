@@ -74,3 +74,13 @@ FilmCan stores configuration, presets, and history in the user's **Application S
 - **Orphan cleanup.** Any `.filmcan-*` left behind by a crash or hard quit is removed at the next job start.
 - **Stop is clean.** Cancellation is polled cooperatively; an aborted file's writer returns before finalize, so no partial file is ever renamed into place (the temp is removed by `DestWriter.deinit`). The verify lane skips remaining work and marks affected destinations cancelled.
 - **Memory is bounded.** Source reads and destination writes use `F_NOCACHE`, and the paranoid re-read drains its autorelease pool per chunk, so even a multi-hundred-GB offload stays within the small per-destination ring buffer (`clamp(physRAM / 128, 32 MB, 96 MB)`).
+
+---
+
+## Security posture
+
+**Hardened Runtime** is enabled (`ENABLE_HARDENED_RUNTIME: YES`). This prevents code injection and library hijacking and is required for notarization on macOS.
+
+**App Sandbox is intentionally disabled.** FilmCan reads and writes arbitrary user-selected removable volumes (camera cards, external drives) and must follow symbolic links across arbitrary mount points. Sandboxing this with security-scoped bookmarks would require a significant redesign and is tracked as future work.
+
+**`libxxhash.0.dylib` is bundled** inside `Contents/Resources/rsync/lib/<arch>/` and loaded at runtime via `dlopen` by `XXHash.swift`. The rsync binary is also bundled (arm64 + x86_64, lipo-merged for distribution) solely as the carrier for libxxhash — the rsync copy engine was removed in 1.2.x. `package_release.sh` re-signs all nested binaries and dylibs with the release identity before notarization.
