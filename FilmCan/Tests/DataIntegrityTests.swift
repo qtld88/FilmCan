@@ -276,6 +276,42 @@ final class DataIntegrityTests: XCTestCase {
         }
     }
 
+    // MARK: P0 Bug 3.2 — increment policy must not clobber original via paranoid verify
+
+    func test_incrementPolicy_paranoidVerify_doesNotDeleteOriginalFile() async throws {
+        let src = tempDir(); let dst = tempDir()
+        defer {
+            try? FileManager.default.removeItem(at: src)
+            try? FileManager.default.removeItem(at: dst)
+        }
+
+        // Source card
+        let card = src.appendingPathComponent("A001")
+        try FileManager.default.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data("source content".utf8).write(to: card.appendingPathComponent("clip.mov"))
+
+        // Pre-existing unmanifested file at destination — same relative path, different content
+        let target = dst.appendingPathComponent("A001/clip.mov")
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        let originalData = Data("old content".utf8)
+        try originalData.write(to: target)
+
+        // DataIntegrityHarness.run(sources:dest:policy:) sets config.duplicatePolicy = policy
+        _ = try await DataIntegrityHarness.run(sources: [card.path], dest: dst.path, policy: .increment)
+
+        // Original must be untouched
+        let afterOriginal = try Data(contentsOf: target)
+        XCTAssertEqual(afterOriginal, originalData,
+                       "increment mode must not delete or modify the pre-existing file")
+
+        // Suffix template "_001" inserts before extension: clip.mov → clip_001.mov
+        let suffixed = dst.appendingPathComponent("A001/clip_001.mov")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: suffixed.path),
+                      "new suffixed file must exist at A001/clip_001.mov")
+        XCTAssertEqual(try String(data: Data(contentsOf: suffixed), encoding: .utf8), "source content")
+    }
+
     // MARK: Task 8: distinct roots do not share manifest entries
 
     func test_distinctRoots_doNotShareManifestEntries() async throws {

@@ -99,12 +99,13 @@ actor DestWriter {
     /// Flush, fsync, close, then atomically rename temp → final destination.
     /// - `conflictPolicy`: when `.skip` and dest exists, throws `SkippedDueToConflict`.
     ///   When `.increment`, finds an unused name using `counterTemplate` (e.g. `"_001"`).
+    @discardableResult
     func finalize(
         fileHash: String, sourceSize: Int64,
         conflictPolicy: OrganizationPreset.DuplicatePolicy = .overwrite,
         counterTemplate: String = "_001"
-    ) throws {
-        guard !finalized, let tempURL = tempFileURL, let handle = writeHandle else { return }
+    ) throws -> String {
+        guard !finalized, let tempURL = tempFileURL, let handle = writeHandle else { return destPath }
 
         let destURL = URL(fileURLWithPath: destPath)
 
@@ -156,6 +157,8 @@ actor DestWriter {
         guard ok else {
             throw WriterError.finalizeFailed("rename(2) failed for \(effectiveDestURL.path)")
         }
+
+        return effectiveDestURL.path
     }
 
     private static func findUnusedPath(base: URL, template: String) -> URL {
