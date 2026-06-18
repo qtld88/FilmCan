@@ -11,6 +11,7 @@
 		017252CB409DF5109BFB09CA /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69275D7B8B574E36B94814D5 /* NotificationService.swift */; };
 		029978F378E16E78F04A2F82 /* FanOutCopier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F3E1E15AB98D6E20FE01A1 /* FanOutCopier.swift */; };
 		0A072FA0A742F50215424112 /* WindowTitleSetter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8B45E6010E1222A7826DC8 /* WindowTitleSetter.swift */; };
+		0AAD1CB515FD9AAD743B601E /* CustomCopierServiceE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */; };
 		0BD143F4349CB68832E1D2EA /* CustomCopierService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEAB41177986B7BBED498656 /* CustomCopierService.swift */; };
 		0C6E8C035A09C8748B2BE1B0 /* TotalTransfersEditMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F583D01B5F61457BFBA712E /* TotalTransfersEditMode.swift */; };
 		0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93FFA7594374B35EFD1117A /* DonationPromptView.swift */; };
@@ -235,6 +236,7 @@
 		9C7E8936CFBE0F758236B71B /* FilmCanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanApp.swift; sourceTree = "<group>"; };
 		9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEditorViewModel.swift; sourceTree = "<group>"; };
 		A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyBackedUpSheet.swift; sourceTree = "<group>"; };
+		A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierServiceE2ETests.swift; sourceTree = "<group>"; };
 		A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierSafetyTests.swift; sourceTree = "<group>"; };
 		A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileStreamCopier.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
@@ -386,6 +388,7 @@
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
 				73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */,
 				7CDC23E435829755245312C4 /* CopyEnginePersistenceTests.swift */,
+				A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */,
 				2A6DC9FACD5035B47A5E3C96 /* DataIntegrityTests.swift */,
 				7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */,
 				244ADA509455AE3EBC04AC4D /* ExplodeFanOutResultTests.swift */,
@@ -660,6 +663,7 @@
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
 				3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */,
 				513CC93966E9BF3EB6F46E6C /* CopyEnginePersistenceTests.swift in Sources */,
+				0AAD1CB515FD9AAD743B601E /* CustomCopierServiceE2ETests.swift in Sources */,
 				695913F9928C23E38743D1B2 /* DataIntegrityTests.swift in Sources */,
 				F2E0833957D8398B94F490D7 /* DriveSpeedClassifierTests.swift in Sources */,
 				3D35F63A0736E54799B7FC99 /* ExplodeFanOutResultTests.swift in Sources */,

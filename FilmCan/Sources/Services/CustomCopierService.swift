@@ -859,7 +859,7 @@ class CustomCopierService: ObservableObject, TransferService {
         }
 
         let cancellationState = self.cancellationState
-        let fanOutConfig = FanOutCopier.Configuration(
+        var fanOutConfig = FanOutCopier.Configuration(
             sources: sources,
             destinations: fanOutDestinations,
             verifyMode: verifyMode,
@@ -877,6 +877,22 @@ class CustomCopierService: ObservableObject, TransferService {
             shouldCancel: { cancellationState.isCancelledNow() },
             reVerifyExistingOnResume: reVerifyExistingOnResume
         )
+
+        fanOutConfig.duplicatePolicy = duplicatePolicy
+        fanOutConfig.duplicateCounterTemplate = duplicateCounterTemplate
+        if let duplicateResolver {
+            fanOutConfig.duplicateResolver = { @Sendable conflicts in
+                guard let first = conflicts.first else { return duplicatePolicy }
+                let prompt = DuplicatePrompt(
+                    sourcePath: first.fileName,
+                    destinationPath: first.resolvedPath,
+                    isDirectory: false,
+                    counterTemplate: duplicateCounterTemplate,
+                    canVerifyWithHashList: false,
+                    hashListMissing: false)
+                return await duplicateResolver(prompt).action
+            }
+        }
 
         let copier = FanOutCopier(config: fanOutConfig)
         let destResults = try await copier.run()
