@@ -68,6 +68,7 @@
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
 		8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */; };
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
+		8DF8D007DFC3E0509BAAACCB /* SecretsNetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBDF7051DA56C935FDB1E25A /* SecretsNetworkTests.swift */; };
 		8E0F3EB7D7BCA27B339F1418 /* SourceMediaKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8978606748B7E273D703E81B /* SourceMediaKind.swift */; };
 		8E3A60028B4927FA5CD1C2A2 /* DryRunPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18663FD23B1C73B08D717384 /* DryRunPlanner.swift */; };
 		8EA1BB03FD52EB731E4D533E /* HashListNamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */; };
@@ -111,6 +112,7 @@
 		CF26D25B0D58A7227FCA5275 /* HashListWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493E9CCA8A02D3E16ADEB97C /* HashListWriter.swift */; };
 		D253DFE921F577B38B44CF23 /* FileStreamCopier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */; };
 		D3EA072D2E95C262F7C2657C /* TransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA563679AEE01B0FF5D12CB7 /* TransferService.swift */; };
+		D4D1CA5AB6031337836735E1 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75DFBCD664B68D864309A2C9 /* KeychainStore.swift */; };
 		D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */; };
 		D7A83CF121B3D61390AF5391 /* DestResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7BCF3596001402A6F510FC /* DestResult.swift */; };
 		DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB49243153FED4BA9A4594E /* BackupListView.swift */; };
@@ -206,6 +208,7 @@
 		73C4305DE01CFC043DF8C21A /* TransferResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferResult.swift; sourceTree = "<group>"; };
 		73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstantsTests.swift; sourceTree = "<group>"; };
 		7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrphanCleaner.swift; sourceTree = "<group>"; };
+		75DFBCD664B68D864309A2C9 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		76EDF10844CC898228982672 /* DuplicatePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePrompt.swift; sourceTree = "<group>"; };
 		78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationTemplate.swift; sourceTree = "<group>"; };
 		7AB60E31AC734912F2B72ACB /* SimpleMHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleMHLWriter.swift; sourceTree = "<group>"; };
@@ -260,6 +263,7 @@
 		DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLWriter.swift; sourceTree = "<group>"; };
 		DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineFanOutProgress.swift; sourceTree = "<group>"; };
 		DBAF7A0A4796303A8E24EE4B /* DestResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestResultRow.swift; sourceTree = "<group>"; };
+		DBDF7051DA56C935FDB1E25A /* SecretsNetworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretsNetworkTests.swift; sourceTree = "<group>"; };
 		DF50C40E7C0C3EE500EFA4C1 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
 		DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackupEditorView+Actions.swift"; sourceTree = "<group>"; };
 		E25E2599CEF3906032A4D5A9 /* AppIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon.png; sourceTree = "<group>"; };
@@ -322,6 +326,7 @@
 				18663FD23B1C73B08D717384 /* DryRunPlanner.swift */,
 				B3F3E1E15AB98D6E20FE01A1 /* FanOutCopier.swift */,
 				A515CC3AA3035B5734811AE4 /* FileStreamCopier.swift */,
+				75DFBCD664B68D864309A2C9 /* KeychainStore.swift */,
 				43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */,
 				4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */,
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
@@ -388,6 +393,7 @@
 				FA912365575B6BB6724929CD /* NetflixPresetTests.swift */,
 				802D5EC223B6B2F4CB3CF764 /* OrganizationTemplateTokenTests.swift */,
 				F772B2D53DF92EE1BA0929C9 /* RepairFailedDestTests.swift */,
+				DBDF7051DA56C935FDB1E25A /* SecretsNetworkTests.swift */,
 				F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */,
 			);
 			path = Tests;
@@ -658,6 +664,7 @@
 				E913256E07143EBE91685672 /* NetflixPresetTests.swift in Sources */,
 				178F4B6B36FD3B5548F3E219 /* OrganizationTemplateTokenTests.swift in Sources */,
 				ADD84C805512EEC84CD93FFA /* RepairFailedDestTests.swift in Sources */,
+				8DF8D007DFC3E0509BAAACCB /* SecretsNetworkTests.swift in Sources */,
 				6A1495C244606EC2E72C29E9 /* TransferProgressTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -727,6 +734,7 @@
 				1FDBC1FC2134CD17CA9D1995 /* Hashing.swift in Sources */,
 				1D4332EE017A572123B64D50 /* InfoPopover.swift in Sources */,
 				1E64C22B5381774E5D73BA7C /* InlineFanOutProgress.swift in Sources */,
+				D4D1CA5AB6031337836735E1 /* KeychainStore.swift in Sources */,
 				65CBD0FB0B5729A94C62E049 /* LogFileNamer.swift in Sources */,
 				B367BE269DB7059A5820B67D /* LogFolderNamer.swift in Sources */,
 				9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */,

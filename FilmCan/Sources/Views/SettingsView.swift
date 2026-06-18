@@ -8,13 +8,14 @@ struct SettingsView: View {
     @AppStorage("notifyOnError") private var notifyOnError: Bool = true
     @AppStorage("ntfyEnabled") private var ntfyEnabled: Bool = false
     @AppStorage("ntfyURL") private var ntfyURL: String = ""
-    @AppStorage("ntfyBearerToken") private var ntfyBearerToken: String = ""
     @AppStorage("ntfyTitleTemplate") private var ntfyTitleTemplate: String = "{source}'s backup to {destinations} for {movie} : {backupStatus}"
     @AppStorage("ntfyMessageTemplate") private var ntfyMessageTemplate: String = "{bytes} ({files} files) from {source} has been {backupAction} to {destination} in {duration}.\n{backupDetails}"
     @AppStorage("webhookEnabled") private var webhookEnabled: Bool = false
     @AppStorage("webhookURL") private var webhookURL: String = ""
-    @AppStorage("webhookHeaders") private var webhookHeaders: String = ""
-    @AppStorage("webhookSecret") private var webhookSecret: String = ""
+    @AppStorage("webhookIncludeFullPaths") private var webhookIncludeFullPaths: Bool = false
+    @State private var ntfyBearerToken: String = ""
+    @State private var webhookHeaders: String = ""
+    @State private var webhookSecret: String = ""
     @AppStorage("historyRetentionLimit") private var historyRetentionLimit: Int = 200
     @AppStorage("appearanceAccentHex") private var appearanceAccentHex: String = AppearanceDefaults.accentHex
     @AppStorage("appearanceAccentMode") private var appearanceAccentMode: String = AppearanceDefaults.accentMode
@@ -56,6 +57,7 @@ struct SettingsView: View {
                 webhookEnabled: $webhookEnabled,
                 webhookURL: $webhookURL,
                 webhookHeaders: $webhookHeaders,
+                webhookIncludeFullPaths: $webhookIncludeFullPaths,
                 legacyWebhookSecret: $webhookSecret
             )
             .tabItem {
@@ -81,6 +83,21 @@ struct SettingsView: View {
         }
         .frame(minWidth: 560, idealWidth: 560, minHeight: 660, idealHeight: 660)
         .modifier(SettingsWindowSizer())
+        .onAppear {
+            let store = KeychainStore()
+            ntfyBearerToken = store.get("ntfyBearerToken") ?? ""
+            webhookHeaders = store.get("webhookHeaders") ?? ""
+            webhookSecret = store.get("webhookSecret") ?? ""
+        }
+        .onChange(of: ntfyBearerToken) { newValue in
+            KeychainStore().set(newValue, for: "ntfyBearerToken")
+        }
+        .onChange(of: webhookHeaders) { newValue in
+            KeychainStore().set(newValue, for: "webhookHeaders")
+        }
+        .onChange(of: webhookSecret) { newValue in
+            KeychainStore().set(newValue, for: "webhookSecret")
+        }
     }
 }
 
@@ -281,6 +298,7 @@ struct PushSettingsView: View {
     @Binding var webhookEnabled: Bool
     @Binding var webhookURL: String
     @Binding var webhookHeaders: String
+    @Binding var webhookIncludeFullPaths: Bool
     @Binding var legacyWebhookSecret: String
 
     var body: some View {
@@ -372,9 +390,13 @@ struct PushSettingsView: View {
                             .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                     )
                     .disabled(!webhookEnabled)
+                Toggle("Include full file paths in notifications", isOn: $webhookIncludeFullPaths)
+                    .tint(FilmCanTheme.toggleTint)
+                    .disabled(!webhookEnabled)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Sends a JSON payload using the same title and message templates as ntfy.")
                     Text("Example: Authorization: Bearer <token>")
+                    Text("Off: notifications show file names only, not full paths.")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)

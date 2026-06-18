@@ -10,12 +10,11 @@ class TransferViewModel: ObservableObject {
     @AppStorage("notifyOnError") private var notifyOnError: Bool = true
     @AppStorage("ntfyEnabled") private var ntfyEnabled: Bool = false
     @AppStorage("ntfyURL") private var ntfyURL: String = ""
-    @AppStorage("ntfyBearerToken") private var ntfyBearerToken: String = ""
     @AppStorage("ntfyTitleTemplate") private var ntfyTitleTemplate: String = "{source}'s backup to {destinations} for {movie} : {backupStatus}"
     @AppStorage("ntfyMessageTemplate") private var ntfyMessageTemplate: String = "{bytes} ({files} files) from {source} has been {backupAction} to {destination} in {duration}.\n{backupDetails}"
     @AppStorage("webhookEnabled") private var webhookEnabled: Bool = false
     @AppStorage("webhookURL") private var webhookURL: String = ""
-    @AppStorage("webhookHeaders") private var webhookHeaders: String = ""
+    @AppStorage("webhookIncludeFullPaths") private var webhookIncludeFullPaths: Bool = false
     @AppStorage("historyRetentionLimit") private var historyRetentionLimit: Int = 200
     
     @Published var isTransferring: Bool = false
@@ -658,9 +657,10 @@ class TransferViewModel: ObservableObject {
             NotificationService.shared.notify(title: title, body: body)
         }
         if ntfyEnabled, !ntfyURL.isEmpty {
+            let ntfyToken = KeychainStore().get("ntfyBearerToken")
             WebhookService.sendNtfy(
                 urlString: ntfyURL,
-                bearerToken: ntfyBearerToken,
+                bearerToken: ntfyToken,
                 title: title,
                 message: body,
                 fields: [
@@ -675,9 +675,10 @@ class TransferViewModel: ObservableObject {
             )
         }
         if webhookEnabled, !webhookURL.isEmpty {
+            let webhookHeadersText = KeychainStore().get("webhookHeaders") ?? ""
             WebhookService.sendJSON(
                 urlString: webhookURL,
-                headers: WebhookService.parseHeaders(from: webhookHeaders),
+                headers: WebhookService.parseHeaders(from: webhookHeadersText),
                 payload: [
                     "title": title,
                     "message": body,
@@ -691,7 +692,7 @@ class TransferViewModel: ObservableObject {
                     "destinations": results.map { r in
                         [
                             "name": (r.destination as NSString).lastPathComponent,
-                            "path": r.destination,
+                            "path": WebhookService.maskedField(path: r.destination, includeFull: webhookIncludeFullPaths),
                             "success": r.success,
                             "bytesTransferred": r.bytesTransferred,
                             "filesTransferred": r.filesTransferred,
@@ -802,9 +803,10 @@ class TransferViewModel: ObservableObject {
     }
 
     private func sendNtfySummary(summary: DestinationNotificationSummary) {
+        let ntfyToken = KeychainStore().get("ntfyBearerToken")
         WebhookService.sendNtfy(
             urlString: ntfyURL,
-            bearerToken: ntfyBearerToken,
+            bearerToken: ntfyToken,
             title: summary.messageTitle,
             message: summary.messageBody,
             fields: [:]
@@ -812,9 +814,10 @@ class TransferViewModel: ObservableObject {
     }
 
     private func sendWebhookSummary(summary: DestinationNotificationSummary) {
+        let webhookHeadersText = KeychainStore().get("webhookHeaders") ?? ""
         WebhookService.sendJSON(
             urlString: webhookURL,
-            headers: WebhookService.parseHeaders(from: webhookHeaders),
+            headers: WebhookService.parseHeaders(from: webhookHeadersText),
             payload: [
                 "title": summary.messageTitle,
                 "message": summary.messageBody,
