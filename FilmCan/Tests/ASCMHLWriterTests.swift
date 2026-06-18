@@ -12,7 +12,7 @@ final class ASCMHLWriterTests: XCTestCase {
     func testWritesValidASCMHLV2() async throws {
         let dir = tempAscmhlDir()
         let w = try ASCMHLWriter(ascmhlDir: dir, rollName: "A001")
-        try await w.append(relPath: "Clips/A001C001.mov", size: 5, hash: "0ea03b369a463d9d2ad5f8e0c1b4a9f3")
+        try await w.append(relPath: "Clips/A001C001.mov", size: 5, hash: "0ea03b369a463d9d2ad5f8e0c1b4a9f3", mtime: nil)
         try await w.seal()
         let xml = try String(contentsOfFile: w.manifestPath, encoding: .utf8)
         XCTAssertTrue(xml.contains(#"<hashlist version="2.0" xmlns="urn:ASC:MHL:v2.0">"#))
@@ -39,11 +39,11 @@ final class ASCMHLWriterTests: XCTestCase {
     func testSecondRunCreatesGenerationTwo() async throws {
         let dir = tempAscmhlDir()
         let g1 = try ASCMHLWriter(ascmhlDir: dir, rollName: "A001")
-        try await g1.append(relPath: "f.mov", size: 1, hash: "aa")
+        try await g1.append(relPath: "f.mov", size: 1, hash: "aa", mtime: nil)
         try await g1.seal()
         let g2 = try ASCMHLWriter(ascmhlDir: dir, rollName: "A001")
         XCTAssertEqual(g2.sequence, 2)
-        try await g2.append(relPath: "f.mov", size: 1, hash: "aa")
+        try await g2.append(relPath: "f.mov", size: 1, hash: "aa", mtime: nil)
         try await g2.seal()
         XCTAssertEqual(ASCMHLChain.read(ascmhlDir: dir).count, 2)
         XCTAssertEqual(ASCMHLChain.latestManifestPath(ascmhlDir: dir), g2.manifestFileName)
@@ -52,7 +52,7 @@ final class ASCMHLWriterTests: XCTestCase {
     func testEscapesXMLInPath() async throws {
         let dir = tempAscmhlDir()
         let w = try ASCMHLWriter(ascmhlDir: dir, rollName: "A001")
-        try await w.append(relPath: "a & b <x>.mov", size: 1, hash: "ab")
+        try await w.append(relPath: "a & b <x>.mov", size: 1, hash: "ab", mtime: nil)
         try await w.seal()
         let xml = try String(contentsOfFile: w.manifestPath, encoding: .utf8)
         XCTAssertTrue(xml.contains("a &amp; b &lt;x&gt;.mov"))

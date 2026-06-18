@@ -19,6 +19,10 @@ actor DestWriter {
         }
     }
 
+    /// Thrown from `finalize` when `conflictPolicy == .skip` and the destination
+    /// file already exists. Caller should treat the file as skipped, not failed.
+    struct SkippedDueToConflict: Swift.Error {}
+
     struct Config {
         var destPath: String
         var displayName: String
@@ -93,8 +97,33 @@ actor DestWriter {
     }
 
     /// Flush, fsync, close, then atomically rename temp → final destination.
-    func finalize(fileHash: String, sourceSize: Int64) throws {
+    /// - `conflictPolicy`: when `.skip` and dest exists, throws `SkippedDueToConflict`.
+    ///   When `.increment`, finds an unused name using `counterTemplate` (e.g. `"_001"`).
+    func finalize(
+        fileHash: String, sourceSize: Int64,
+        conflictPolicy: OrganizationPreset.DuplicatePolicy = .overwrite,
+        counterTemplate: String = "_001"
+    ) throws {
         guard !finalized, let tempURL = tempFileURL, let handle = writeHandle else { return }
+
+        let destURL = URL(fileURLWithPath: destPath)
+
+        if conflictPolicy == .skip && fm.fileExists(atPath: destURL.path) {
+            finalized = true
+            try? handle.close()
+            writeHandle = nil
+            try? fm.removeItem(at: tempURL)
+            tempFileURL = nil
+            throw SkippedDueToConflict()
+        }
+
+        let effectiveDestURL: URL
+        if conflictPolicy == .increment && fm.fileExists(atPath: destURL.path) {
+            effectiveDestURL = Self.findUnusedPath(base: destURL, template: counterTemplate)
+        } else {
+            effectiveDestURL = destURL
+        }
+
         finalized = true
 
         if requiresFullFsync {
@@ -116,24 +145,38 @@ actor DestWriter {
         try handle.close()
         writeHandle = nil
 
-        let destURL = URL(fileURLWithPath: destPath)
-
         // POSIX rename(2) — atomic within the same volume
         let ok = tempURL.withUnsafeFileSystemRepresentation { tRep in
-            destURL.withUnsafeFileSystemRepresentation { dRep in
+            effectiveDestURL.withUnsafeFileSystemRepresentation { dRep in
                 guard let t = tRep, let d = dRep else { return false }
                 return Darwin.rename(t, d) == 0
             }
         }
 
         guard ok else {
-            throw WriterError.finalizeFailed("rename(2) failed for \(destURL.path)")
+            throw WriterError.finalizeFailed("rename(2) failed for \(effectiveDestURL.path)")
+        }
+    }
+
+    private static func findUnusedPath(base: URL, template: String) -> URL {
+        let dir = base.deletingLastPathComponent()
+        let ext = base.pathExtension
+        let stem = base.deletingPathExtension().lastPathComponent
+        var counter = 1
+        while true {
+            let suffix = String(format: "%03d", counter)
+            let candidate = ext.isEmpty
+                ? dir.appendingPathComponent("\(stem)\(template.replacingOccurrences(of: "001", with: suffix))")
+                : dir.appendingPathComponent("\(stem)\(template.replacingOccurrences(of: "001", with: suffix)).\(ext)")
+            if !FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+            counter += 1
+            if counter > 999 { return candidate }
         }
     }
 
     /// Append this file's hash to the per-destination MHL.
-    func appendMHL(hash: String, fileName: String, size: Int64) async throws {
-        try await mhlWriter?.append(relPath: fileName, size: size, hash: hash)
+    func appendMHL(hash: String, fileName: String, size: Int64, mtime: Int64?) async throws {
+        try await mhlWriter?.append(relPath: fileName, size: size, hash: hash, mtime: mtime)
         try await mhlWriter?.flush()
     }
 

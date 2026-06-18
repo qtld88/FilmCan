@@ -41,9 +41,9 @@ actor ASCMHLWriter: MHLWriting {
         entries = existing.filter { !known.contains($0.relPath) } + entries
     }
 
-    func append(relPath: String, size: Int64, hash: String) async throws {
+    func append(relPath: String, size: Int64, hash: String, mtime: Int64?) async throws {
         guard !finalized else { return }
-        entries.append(MHLEntry(relPath: relPath, size: size, hash: hash))
+        entries.append(MHLEntry(relPath: relPath, size: size, hash: hash, mtime: mtime))
         if entries.count % Constants.mhlFlushEveryFiles == 0 { try render() }
     }
 
@@ -101,7 +101,7 @@ actor ASCMHLWriter: MHLWriting {
         xml += "  <hashes>\n"
         for e in entries {
             xml += "    <hash>\n"
-            xml += "      <path size=\"\(e.size)\">\(Self.esc(e.relPath))</path>\n"
+            xml += "      <path size=\"\(e.size)\"" + (e.mtime.map { " lastmodificationdate=\"\($0)\"" } ?? "") + ">\(Self.esc(e.relPath))</path>\n"
             xml += "      <xxh128 action=\"original\" hashdate=\"\(creationDate)\">\(e.hash)</xxh128>\n"
             xml += "    </hash>\n"
         }

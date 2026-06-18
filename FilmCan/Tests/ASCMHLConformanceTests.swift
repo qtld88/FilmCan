@@ -26,7 +26,7 @@ final class ASCMHLConformanceTests: XCTestCase {
         guard let hex = Hashing.hash(for: clip, algorithm: .xxh128) else { throw XCTSkip("no libxxhash") }
 
         let w = try ASCMHLWriter(ascmhlDir: roll.appendingPathComponent("ascmhl"), rollName: "A001")
-        try await w.append(relPath: "clip.bin", size: 5, hash: hex)
+        try await w.append(relPath: "clip.bin", size: 5, hash: hex, mtime: nil)
         try await w.seal()
 
         // `ascmhl diff` re-reads the folder against our chain+manifest and reports a

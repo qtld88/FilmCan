@@ -29,9 +29,9 @@ actor SimpleMHLWriter: MHLWriting {
         entries = existing.filter { !known.contains($0.relPath) } + entries
     }
 
-    func append(relPath: String, size: Int64, hash: String) async throws {
+    func append(relPath: String, size: Int64, hash: String, mtime: Int64?) async throws {
         guard !finalized else { return }
-        entries.append(MHLEntry(relPath: relPath, size: size, hash: hash))
+        entries.append(MHLEntry(relPath: relPath, size: size, hash: hash, mtime: mtime))
         if entries.count % Constants.mhlFlushEveryFiles == 0 { try render() }
     }
 
@@ -62,7 +62,8 @@ actor SimpleMHLWriter: MHLWriting {
         try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
         var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n<hashlist>\n"
         for e in entries {
-            xml += "<file name=\"\(Self.esc(e.relPath))\"><hash>\(e.hash)</hash></file>\n"
+            let mt = e.mtime.map { " mtime=\"\($0)\"" } ?? ""
+            xml += "<file name=\"\(Self.esc(e.relPath))\"\(mt)><hash>\(e.hash)</hash></file>\n"
         }
         xml += "</hashlist>\n"
         try xml.write(to: fileURL, atomically: true, encoding: .utf8)

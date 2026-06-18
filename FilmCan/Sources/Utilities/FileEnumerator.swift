@@ -27,7 +27,7 @@ enum FileEnumerator {
             let copyOnlyPatterns = normalizedPatterns(preset?.copyOnlyPatterns ?? [])
             var excludePatterns = normalizedPatterns(preset?.excludePatterns ?? [])
             if excludePatterns.isEmpty {
-                excludePatterns = RsyncOptions.defaultExcludedPatterns
+                excludePatterns = DefaultExcludes.patterns
             }
 
             let excludedDirectoryNames: Set<String> = [

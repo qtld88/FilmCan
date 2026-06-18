@@ -7,6 +7,7 @@ enum ASCMHLReader {
         let relPath: String
         let size: Int64?
         let hash: String   // value of the file's hash element (xxh128/xxh64/md5/…)
+        let mtime: Int64?
     }
 
     static func read(url: URL) throws -> [Entry] {
@@ -23,6 +24,7 @@ private final class ASCMHLParser: NSObject, XMLParserDelegate {
     private var inHash = false
     private var curPath: String?
     private var curSize: Int64?
+    private var curMtime: Int64?
     private var curHash: String?
     private var charBuf = ""
     private var capturingHashValue = false
@@ -42,9 +44,10 @@ private final class ASCMHLParser: NSObject, XMLParserDelegate {
         switch name {
         case "hash":
             inHash = true
-            curPath = nil; curSize = nil; curHash = nil
+            curPath = nil; curSize = nil; curMtime = nil; curHash = nil
         case "path" where inHash:
             curSize = attrs["size"].flatMap { Int64($0) }
+            curMtime = attrs["lastmodificationdate"].flatMap { Int64($0) }
         case let h where ASCMHLParser.hashElements.contains(h) && inHash:
             capturingHashValue = true
         default:
@@ -64,7 +67,7 @@ private final class ASCMHLParser: NSObject, XMLParserDelegate {
             capturingHashValue = false
         case "hash":
             if let path = curPath, let hash = curHash {
-                entries.append(.init(relPath: path, size: curSize, hash: hash))
+                entries.append(.init(relPath: path, size: curSize, hash: hash, mtime: curMtime))
             }
             inHash = false
         default:

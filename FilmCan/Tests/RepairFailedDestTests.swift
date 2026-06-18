@@ -36,8 +36,8 @@ final class RepairFailedDestTests: XCTestCase {
         let h2 = try await xxh128Hex(of: siblingRoot.appendingPathComponent("b.bin"))
         // Write an ASC MHL v2.0 generation at the sibling roll's ascmhl/ folder.
         let writer = try ASCMHLWriter(ascmhlDir: siblingRoot.appendingPathComponent("ascmhl"), rollName: "sibling")
-        try await writer.append(relPath: "a.bin", size: Int64(f1Data.count), hash: h1)
-        try await writer.append(relPath: "b.bin", size: Int64(f2Data.count), hash: h2)
+        try await writer.append(relPath: "a.bin", size: Int64(f1Data.count), hash: h1, mtime: nil)
+        try await writer.append(relPath: "b.bin", size: Int64(f2Data.count), hash: h2, mtime: nil)
         try await writer.seal()
         let mhlURL = URL(fileURLWithPath: writer.manifestPath)
 
