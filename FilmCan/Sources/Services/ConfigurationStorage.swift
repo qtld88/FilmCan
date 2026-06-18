@@ -8,6 +8,7 @@ class ConfigurationStorage: ObservableObject {
     @Published var lastUsedConfigId: UUID?
     @Published var organizationPresets: [OrganizationPreset] = []
     @Published var transferHistory: [TransferHistoryEntry] = []
+    @Published private(set) var lastSaveError: String?
     
     private let fileManager = FileManager.default
     private let configFileURL: URL
@@ -112,6 +113,16 @@ class ConfigurationStorage: ObservableObject {
         historyBackupFileURL = historyFileURL.appendingPathExtension("bak")
         load()
     }
+
+    init(baseDirectory: URL) {
+        configFileURL = baseDirectory.appendingPathComponent("configs.json")
+        presetsFileURL = baseDirectory.appendingPathComponent("presets.json")
+        historyFileURL = baseDirectory.appendingPathComponent("history.json")
+        configBackupFileURL = configFileURL.appendingPathExtension("bak")
+        presetsBackupFileURL = presetsFileURL.appendingPathExtension("bak")
+        historyBackupFileURL = historyFileURL.appendingPathExtension("bak")
+        load()
+    }
     
     // MARK: - CRUD Operations
     
@@ -151,7 +162,8 @@ class ConfigurationStorage: ObservableObject {
     
     // MARK: - Persistence
     
-    func save() {
+    @discardableResult
+    func save() -> Bool {
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -162,10 +174,14 @@ class ConfigurationStorage: ObservableObject {
             try writeWithBackup(presetData, to: presetsFileURL, backupURL: presetsBackupFileURL)
             let historyData = try encoder.encode(transferHistory)
             try writeWithBackup(historyData, to: historyFileURL, backupURL: historyBackupFileURL)
+            lastSaveError = nil
+            return true
         } catch {
+            lastSaveError = error.localizedDescription
             #if DEBUG
             DebugLog.warn("Failed to save configurations: \(error)")
             #endif
+            return false
         }
     }
     

@@ -1,20 +1,13 @@
 import Foundation
 
 actor DryRunPlanner {
-    func plan(sourcePaths: [String], destinations: [DestWriter.Config]) async throws -> DryRunReport {
+    func plan(sourcePaths: [String], destinations: [DestWriter.Config], preset: OrganizationPreset? = nil) async throws -> DryRunReport {
         guard !sourcePaths.isEmpty else {
             return DryRunReport(
                 sourceName: "(empty)", destinations: [], timestamp: Date(),
                 totalBytes: 0, totalFiles: 0,
                 memoryPeakBytes: 0, ringCapBytesPerDest: 0, chunkBytes: 0,
                 blockingErrors: ["No source paths provided"], warnings: [])
-        }
-        guard !destinations.isEmpty else {
-            return DryRunReport(
-                sourceName: sourcePaths.first ?? "", destinations: [], timestamp: Date(),
-                totalBytes: 0, totalFiles: 0,
-                memoryPeakBytes: 0, ringCapBytesPerDest: 0, chunkBytes: 0,
-                blockingErrors: ["No destinations configured"], warnings: [])
         }
 
         let fm = FileManager.default
@@ -30,9 +23,23 @@ actor DryRunPlanner {
             }
         }
 
-        let entries = await FileEnumerator.enumerateFiles(sources: sourcePaths, preset: nil)
+        let enumResult = await FileEnumerator.enumerateFiles(sources: sourcePaths, preset: preset)
+        let entries = enumResult.entries
+        for path in enumResult.unreadable {
+            warnings.append("Could not read: \(path)")
+        }
         totalBytes = entries.reduce(Int64(0)) { $0 + $1.size }
         totalFiles = entries.count
+        let plannedRelPaths = entries.map { $0.relativePath }
+
+        guard !destinations.isEmpty else {
+            return DryRunReport(
+                sourceName: sourcePaths.first ?? "", destinations: [], timestamp: Date(),
+                totalBytes: totalBytes, totalFiles: totalFiles,
+                plannedRelPaths: plannedRelPaths,
+                memoryPeakBytes: 0, ringCapBytesPerDest: 0, chunkBytes: 0,
+                blockingErrors: blockingErrors + ["No destinations configured"], warnings: warnings)
+        }
 
         let physRam = ProcessInfo.processInfo.physicalMemory
         let ringCap = Constants.ringCapBytesPerDest(physRamBytes: physRam)
@@ -105,6 +112,7 @@ actor DryRunPlanner {
             timestamp: Date(),
             totalBytes: totalBytes,
             totalFiles: totalFiles,
+            plannedRelPaths: plannedRelPaths,
             memoryPeakBytes: memoryPeak,
             ringCapBytesPerDest: ringCap,
             chunkBytes: chunkSz,

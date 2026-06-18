@@ -8,13 +8,19 @@ struct SourceFileEntry {
     let sourceIsDirectory: Bool
 }
 
+struct EnumerationResult {
+    let entries: [SourceFileEntry]
+    let unreadable: [String]
+}
+
 enum FileEnumerator {
     static func enumerateFiles(
         sources: [String],
         preset: OrganizationPreset?
-    ) async -> [SourceFileEntry] {
+    ) async -> EnumerationResult {
         await Task.detached(priority: .utility) {
             var entries: [SourceFileEntry] = []
+            var unreadable: [String] = []
             let fm = FileManager.default
 
             let includePatterns = normalizedPatterns(preset?.includePatterns ?? [])
@@ -53,7 +59,10 @@ enum FileEnumerator {
                         at: sourceURL,
                         includingPropertiesForKeys: Array(keys),
                         options: [],
-                        errorHandler: nil
+                        errorHandler: { url, _ in
+                            unreadable.append(url.path)
+                            return true
+                        }
                     ) {
                         while let fileURL = enumerator.nextObject() as? URL {
                             let path = fileURL.path
@@ -125,7 +134,7 @@ enum FileEnumerator {
                 }
             }
 
-            return entries
+            return EnumerationResult(entries: entries, unreadable: unreadable)
         }.value
     }
 

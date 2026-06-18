@@ -7,18 +7,20 @@ struct DryRunReport: Codable, Identifiable {
     let timestamp: Date
     let totalBytes: Int64
     let totalFiles: Int
+    let plannedRelPaths: [String]
     let memoryPeakBytes: UInt64
     let ringCapBytesPerDest: Int
     let chunkBytes: Int
     let blockingErrors: [String]
     let warnings: [String]
 
-    init(sourceName: String, destinations: [DestReport], timestamp: Date, totalBytes: Int64, totalFiles: Int, memoryPeakBytes: UInt64, ringCapBytesPerDest: Int, chunkBytes: Int, blockingErrors: [String], warnings: [String]) {
+    init(sourceName: String, destinations: [DestReport], timestamp: Date, totalBytes: Int64, totalFiles: Int, plannedRelPaths: [String] = [], memoryPeakBytes: UInt64, ringCapBytesPerDest: Int, chunkBytes: Int, blockingErrors: [String], warnings: [String]) {
         self.sourceName = sourceName
         self.destinations = destinations
         self.timestamp = timestamp
         self.totalBytes = totalBytes
         self.totalFiles = totalFiles
+        self.plannedRelPaths = plannedRelPaths
         self.memoryPeakBytes = memoryPeakBytes
         self.ringCapBytesPerDest = ringCapBytesPerDest
         self.chunkBytes = chunkBytes

@@ -1,5 +1,15 @@
 import Foundation
 
+struct RunContext: Codable {
+    var organizationPresetId: UUID?
+    var cameraFolderTemplate: String?
+    var soundFolderTemplate: String?
+    var copyFolderContents: Bool
+    var sourceMediaKinds: [String: SourceMediaKind]
+    var duplicatePolicy: OrganizationPreset.DuplicatePolicy
+    var hashListStyle: HashListStyle
+}
+
 struct TransferHistoryEntry: Codable, Identifiable {
     var id: UUID = UUID()
     var configId: UUID?
@@ -13,6 +23,7 @@ struct TransferHistoryEntry: Codable, Identifiable {
     var options: TransferOptionsSnapshot
     var hashListPath: String?
     var hashRoots: [String] = []
+    var runContext: RunContext? = nil
 }
 
 struct TransferResultRecord: Codable, Identifiable {

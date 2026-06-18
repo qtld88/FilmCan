@@ -88,7 +88,8 @@ class CustomCopierService: ObservableObject, TransferService {
 
         let destinationRoot = destination.hasSuffix("/") ? String(destination.dropLast()) : destination
         let hashAlgorithm: FilmCanHashAlgorithm = .xxh128
-        let entries = await FileEnumerator.enumerateFiles(sources: sources, preset: organizationPreset)
+        let enumResult = await FileEnumerator.enumerateFiles(sources: sources, preset: organizationPreset)
+        let entries = enumResult.entries
         let entriesBySource = Dictionary(grouping: entries, by: { $0.sourceRoot })
         let totalBytes = entries.reduce(Int64(0)) { $0 + $1.size }
         let shouldLoadHashIndex = useHashListPrecheck || duplicatePolicy == .verify || duplicatePolicy == .ask

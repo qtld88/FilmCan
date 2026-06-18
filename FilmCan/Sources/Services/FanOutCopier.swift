@@ -463,7 +463,8 @@ actor FanOutCopier {
         // Expand every source root into its constituent files. A flat-file root
         // yields one PlannedFile with relPath == "" and rootName == basename.
         // A directory root yields one PlannedFile per regular file under it.
-        let entries = await FileEnumerator.enumerateFiles(sources: config.sources, preset: config.organizationPreset)
+        let enumResult = await FileEnumerator.enumerateFiles(sources: config.sources, preset: config.organizationPreset)
+        let entries = enumResult.entries
         guard !entries.isEmpty else {
             throw Error.sourceReadFailed(config.sources.first ?? "")
         }

@@ -72,6 +72,7 @@ class TransferViewModel: ObservableObject {
     
     private var config: BackupConfiguration?
     private var transferStartTime: Date?
+    private var lastRunContext: RunContext?
     private var isPausingAll: Bool = false
     private var activeServices: [TransferService] = []
     private var cachedDuplicateResolution: DuplicateResolution? = nil
@@ -524,6 +525,22 @@ class TransferViewModel: ObservableObject {
         preset.copyOnlyPatterns = config.offOrganizationCopyOnlyPatterns
         preset.useCustomDate = config.offOrganizationUseCustomDate
         preset.customDate = config.offOrganizationCustomDate
+        return preset
+    }
+
+    private func resolvedPreset(from ctx: RunContext) -> OrganizationPreset? {
+        guard let id = ctx.organizationPresetId,
+              var preset = AppState.shared.storage.organizationPresets.first(where: { $0.id == id }) else {
+            return nil
+        }
+        if preset.name == OrganizationPreset.netflixIngestName {
+            if let cam = ctx.cameraFolderTemplate, !cam.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                preset.folderTemplate = cam
+            }
+            if let snd = ctx.soundFolderTemplate, !snd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                preset.soundFolderTemplate = snd
+            }
+        }
         return preset
     }
 
@@ -1557,7 +1574,7 @@ class TransferViewModel: ObservableObject {
                 recordedResults[index].visibleFilesSkipped = max(0, visibleTotal - visibleTransferred)
             }
         }
-        let entry = TransferHistoryEntry(
+        var entry = TransferHistoryEntry(
             configId: config.id,
             configName: config.name,
             startedAt: start,
@@ -1570,6 +1587,17 @@ class TransferViewModel: ObservableObject {
             hashListPath: backupHashPath,
             hashRoots: backupHashRoots
         )
+        let ctx = RunContext(
+            organizationPresetId: config.selectedOrganizationPresetId,
+            cameraFolderTemplate: config.cameraFolderTemplate,
+            soundFolderTemplate: config.soundFolderTemplate,
+            copyFolderContents: config.copyFolderContents,
+            sourceMediaKinds: config.sourceMediaKinds,
+            duplicatePolicy: config.duplicatePolicy,
+            hashListStyle: config.hashListStyle
+        )
+        entry.runContext = ctx
+        lastRunContext = ctx
         storage.appendHistory(entry, retentionLimit: historyRetentionLimit)
     }
 
@@ -1790,6 +1818,8 @@ class TransferViewModel: ObservableObject {
                 requiresFullFsync: DriveSpeedClassifier.requiresFullFsync(info),
                 chunkSize: nil
             )
+            let repairCtx = lastRunContext
+            let repairPreset = repairCtx.flatMap { resolvedPreset(from: $0) }
             let service = CustomCopierService()
             let recovered: TransferResult
             do {
@@ -1797,16 +1827,18 @@ class TransferViewModel: ObservableObject {
                     sources: sources,
                     fanOutDestinations: [destCfg],
                     configName: "repair",
-                    organizationPreset: nil,
-                    copyFolderContents: false,
+                    organizationPreset: repairPreset,
+                    copyFolderContents: repairCtx?.copyFolderContents ?? false,
                     useHashListPrecheck: false,
                     hashListPath: nil,
                     fileOrdering: .defaultOrder,
-                    duplicatePolicy: .ask,
+                    duplicatePolicy: repairCtx?.duplicatePolicy ?? .ask,
                     duplicateCounterTemplate: "",
                     duplicateResolver: nil,
                     verifyMode: failed.verifyMode,
                     dryRun: false,
+                    sourceMediaKinds: repairCtx?.sourceMediaKinds ?? [:],
+                    hashListStyle: repairCtx?.hashListStyle ?? .ascMHL,
                     progressHandler: nil
                 )
             } catch {
