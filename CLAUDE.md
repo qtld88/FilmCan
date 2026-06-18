@@ -2,7 +2,7 @@
 
 ## What This Is
 
-macOS SwiftUI app for automated camera card backup. Single copy engine: the **FilmCan Engine** (`CustomCopierService`, the fan-out copier) — Swift-only. The rsync **engine** (code + UI) was removed in 1.2.x. Note: the build still bundles the rsync binary **only** because its libs ship `libxxhash.0.dylib`, which `XXHash.swift` dlopen's for xxh128 verification (`Resources/rsync/lib/<arch>/`). Dropping the rsync binary requires vendoring just libxxhash first (tracked in technical-debt). macOS 13+, Swift 5.9, Xcode 15+.
+macOS SwiftUI app for automated camera card backup. Single copy engine: the **FilmCan Engine** (`CustomCopierService`, the fan-out copier) — Swift-only. The rsync engine (code + UI) was removed in 1.2.x; `RsyncOptions`/`CopyEngine` models replaced by `EngineOptions`/`DefaultExcludes` in 1.3.x. Note: the build still bundles the rsync binary **only** because its libs ship `libxxhash.0.dylib`, which `XXHash.swift` dlopen's for xxh128 verification (`Resources/rsync/lib/<arch>/`). Dropping the rsync binary requires vendoring just libxxhash first (tracked in technical-debt). macOS 13+, Swift 5.9, Xcode 15+.
 
 ## Quick Start
 

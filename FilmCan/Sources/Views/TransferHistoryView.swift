@@ -1198,17 +1198,11 @@ struct TransferHistoryView: View {
         }
         config.duplicateCounterTemplate = entry.options.duplicateCounterTemplate
 
-        var options = RsyncOptions()
-        options.copyEngine = .custom // rsync retired — always FilmCan engine
-        options.useChecksum = entry.options.useChecksum
-        options.postVerify = entry.options.postVerify
-        options.onlyCopyChanged = entry.options.onlyCopyChanged
-        options.reuseOrganizedFiles = false
-        options.allowResume = entry.options.allowResume
-        options.delete = entry.options.deleteExtraFiles
-        options.inplace = entry.options.updateInPlace
-        options.customArgs = entry.options.customArgs
-        config.rsyncOptions = options
+        var engineOpts = EngineOptions()
+        engineOpts.postVerify = entry.options.postVerify
+        engineOpts.onlyCopyChanged = entry.options.onlyCopyChanged
+        engineOpts.allowResume = entry.options.allowResume
+        config.engineOptions = engineOpts
 
         if let presetName = entry.options.organizationPresetName {
             if let preset = appState.storage.organizationPresets.first(where: { $0.name == presetName }) {

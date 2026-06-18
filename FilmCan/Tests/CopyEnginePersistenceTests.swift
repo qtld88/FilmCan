@@ -2,16 +2,44 @@ import XCTest
 @testable import FilmCan
 
 final class CopyEnginePersistenceTests: XCTestCase {
-    // A config saved by an older build may carry copyEngine = "rsync".
-    // It must still decode (as the FilmCan engine) and never throw.
-    func testLegacyRsyncOptionsDecodeAsCustom() throws {
-        let json = #"{"copyEngine":"rsync","verificationMode":"fast"}"#.data(using: .utf8)!
-        let options = try JSONDecoder().decode(RsyncOptions.self, from: json)
-        XCTAssertEqual(options.copyEngine, .custom)
+    // Old history entries may carry copyEngine = "rsync" — must decode as-is (string preserved).
+    func testLegacyRsyncCopyEngineDecodesInSnapshot() throws {
+        let json = """
+        {"copyFolderContents":false,"runInParallel":false,"logEnabled":true,
+         "copyEngine":"rsync","duplicatePolicy":"increment",
+         "duplicateCounterTemplate":"_001","useChecksum":false,
+         "checksumChoice":"xxh128","postVerify":false,"onlyCopyChanged":false,
+         "reuseOrganizedFiles":false,"allowResume":false,"deleteExtraFiles":false,
+         "updateInPlace":false,"customArgs":""}
+        """.data(using: .utf8)!
+        let snapshot = try JSONDecoder().decode(TransferOptionsSnapshot.self, from: json)
+        XCTAssertEqual(snapshot.copyEngine, "rsync")
     }
 
-    func testCopyEngineStillDecodesBothRawValues() throws {
-        XCTAssertEqual(CopyEngine(rawValue: "rsync"), .rsync)
-        XCTAssertEqual(CopyEngine(rawValue: "custom"), .custom)
+    // New runs always record copyEngine = "custom".
+    func testNewSnapshotRecordsCopyEngineAsCustom() throws {
+        var config = BackupConfiguration()
+        config.engineOptions = EngineOptions()
+        let snapshot = TransferOptionsSnapshot(config: config, presetName: nil)
+        XCTAssertEqual(snapshot.copyEngine, "custom")
+    }
+
+    // EngineOptions Codable round-trip.
+    func testEngineOptionsRoundTrips() throws {
+        var opts = EngineOptions()
+        opts.postVerify = false
+        opts.allowResume = false
+        let data = try JSONEncoder().encode(opts)
+        let decoded = try JSONDecoder().decode(EngineOptions.self, from: data)
+        XCTAssertEqual(opts, decoded)
+    }
+
+    // BackupConfiguration with missing engineOptions key falls back to defaults.
+    func testBackupConfigurationMissingEngineOptionsUsesDefaults() throws {
+        let json = """
+        {"id":"\(UUID().uuidString)","name":"Test","sources":[],"destinations":[]}
+        """.data(using: .utf8)!
+        let config = try JSONDecoder().decode(BackupConfiguration.self, from: json)
+        XCTAssertEqual(config.engineOptions, EngineOptions())
     }
 }

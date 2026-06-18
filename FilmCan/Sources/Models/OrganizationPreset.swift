@@ -39,7 +39,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
     var duplicateCounterTemplate: String = "_001"
     var copyFolderContents: Bool = false
     var runInParallel: Bool = false
-    var rsyncOptions: RsyncOptions = RsyncOptions()
+    var engineOptions: EngineOptions = EngineOptions()
     var logEnabled: Bool = true
     var logLocation: BackupConfiguration.LogLocation = .sameAsDestination
     var customLogPath: String = ""
@@ -52,7 +52,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         case useFolderTemplate, useRenameTemplate, renameOnlyPatterns
         case includePatterns, excludePatterns, copyOnlyPatterns
         case duplicatePolicy, duplicateCounterTemplate
-        case copyFolderContents, runInParallel, rsyncOptions
+        case copyFolderContents, runInParallel, engineOptions
         case logEnabled, logLocation, customLogPath, logFileNameTemplate
         case useCustomDate, customDate
     }
@@ -77,7 +77,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         duplicatePolicy = try c.decodeIfPresent(DuplicatePolicy.self, forKey: .duplicatePolicy) ?? .ask
         copyFolderContents = try c.decodeIfPresent(Bool.self, forKey: .copyFolderContents) ?? false
         runInParallel = try c.decodeIfPresent(Bool.self, forKey: .runInParallel) ?? false
-        rsyncOptions = try c.decodeIfPresent(RsyncOptions.self, forKey: .rsyncOptions) ?? RsyncOptions()
+        engineOptions = try c.decodeIfPresent(EngineOptions.self, forKey: .engineOptions) ?? EngineOptions()
         logEnabled = try c.decodeIfPresent(Bool.self, forKey: .logEnabled) ?? true
         logLocation = try c.decodeIfPresent(BackupConfiguration.LogLocation.self, forKey: .logLocation) ?? .sameAsDestination
         customLogPath = try c.decodeIfPresent(String.self, forKey: .customLogPath) ?? ""
@@ -105,7 +105,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         try c.encode(duplicateCounterTemplate, forKey: .duplicateCounterTemplate)
         try c.encode(copyFolderContents, forKey: .copyFolderContents)
         try c.encode(runInParallel, forKey: .runInParallel)
-        try c.encode(rsyncOptions, forKey: .rsyncOptions)
+        try c.encode(engineOptions, forKey: .engineOptions)
         try c.encode(logEnabled, forKey: .logEnabled)
         try c.encode(logLocation, forKey: .logLocation)
         try c.encode(customLogPath, forKey: .customLogPath)

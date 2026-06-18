@@ -5,8 +5,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var name: String = "New Backup"
     var sourcePaths: [String] = []
     var destinationPaths: [String] = []
-    var rsyncOptions: RsyncOptions = RsyncOptions()
-    var lastRsyncOptions: RsyncOptions? = nil
+    var engineOptions: EngineOptions = EngineOptions()
     var logEnabled: Bool = true
     var logLocation: LogLocation = .sameAsDestination
     var customLogPath: String = ""
@@ -77,8 +76,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         id           = try c.decodeIfPresent(UUID.self,   forKey: .id)           ?? UUID()
         name         = try c.decodeIfPresent(String.self, forKey: .name)         ?? "New Backup"
         destinationPaths = try c.decodeIfPresent([String].self, forKey: .destinationPaths) ?? []
-        rsyncOptions = try c.decodeIfPresent(RsyncOptions.self, forKey: .rsyncOptions) ?? RsyncOptions()
-        lastRsyncOptions = try c.decodeIfPresent(RsyncOptions.self, forKey: .lastRsyncOptions)
+        engineOptions = try c.decodeIfPresent(EngineOptions.self, forKey: .engineOptions) ?? EngineOptions()
         logEnabled = try c.decodeIfPresent(Bool.self, forKey: .logEnabled) ?? true
         logLocation  = try c.decodeIfPresent(LogLocation.self, forKey: .logLocation) ?? .sameAsDestination
         customLogPath = try c.decodeIfPresent(String.self, forKey: .customLogPath) ?? ""
@@ -143,8 +141,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(name,             forKey: .name)
         try c.encode(sourcePaths,      forKey: .sourcePaths)
         try c.encode(destinationPaths, forKey: .destinationPaths)
-        try c.encode(rsyncOptions,     forKey: .rsyncOptions)
-        try c.encodeIfPresent(lastRsyncOptions, forKey: .lastRsyncOptions)
+        try c.encode(engineOptions,    forKey: .engineOptions)
         try c.encode(logEnabled,       forKey: .logEnabled)
         try c.encode(logLocation,      forKey: .logLocation)
         try c.encode(customLogPath,    forKey: .customLogPath)
@@ -199,7 +196,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case episode, day, unit, cameraFormat, hashListStyle
-        case id, name, sourcePaths, destinationPaths, rsyncOptions, lastRsyncOptions
+        case id, name, sourcePaths, destinationPaths, engineOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
@@ -224,8 +221,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         !sourcePaths.isEmpty &&
         !destinationPaths.isEmpty &&
         sourcePaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } &&
-        !name.isEmpty &&
-        rsyncOptions.isValid
+        !name.isEmpty
     }
     
     static var empty: BackupConfiguration {

@@ -77,10 +77,10 @@ class BackupEditorViewModel: ObservableObject {
     }
     
     // Rsync options
-    var rsyncOptions: RsyncOptions {
-        get { config.rsyncOptions }
+    var engineOptions: EngineOptions {
+        get { config.engineOptions }
         set {
-            config.rsyncOptions = newValue
+            config.engineOptions = newValue
             save()
         }
     }
@@ -88,31 +88,15 @@ class BackupEditorViewModel: ObservableObject {
     /// Verification mode (Off / Fast / Paranoid). Keeps `customVerifyEnabled`
     /// in sync so hash-list generation and verify-enabled UI follow the choice.
     var verificationMode: VerifyMode {
-        get { config.rsyncOptions.verificationMode }
+        get { config.engineOptions.verificationMode }
         set {
-            config.rsyncOptions.verificationMode = newValue
-            config.rsyncOptions.customVerifyEnabled = (newValue != .off)
+            config.engineOptions.verificationMode = newValue
+            config.engineOptions.customVerifyEnabled = (newValue != .off)
             save()
         }
     }
 
-    func enforceCustomEngineDefaultsIfNeeded() {
-        guard config.rsyncOptions.copyEngine == .custom else { return }
-        var options = config.rsyncOptions
-        var changed = false
-        if options.useChecksum { options.useChecksum = false; changed = true }
-        if options.onlyCopyChanged { options.onlyCopyChanged = false; changed = true }
-        if options.allowResume { options.allowResume = false; changed = true }
-        if options.delete { options.delete = false; changed = true }
-        if options.inplace { options.inplace = false; changed = true }
-        if options.reuseOrganizedFiles { options.reuseOrganizedFiles = false; changed = true }
-        if !options.customArgs.isEmpty { options.customArgs = ""; changed = true }
-        if !options.postVerify { options.postVerify = true; changed = true }
-        if changed {
-            config.rsyncOptions = options
-            save()
-        }
-    }
+    func enforceCustomEngineDefaultsIfNeeded() {}
     
     // Name
     var name: String {
@@ -553,7 +537,7 @@ class BackupEditorViewModel: ObservableObject {
     func applyPreset(_ preset: OrganizationPreset) {
         config.copyFolderContents = preset.copyFolderContents
         config.runInParallel = preset.runInParallel
-        config.rsyncOptions = preset.rsyncOptions
+        config.engineOptions = preset.engineOptions
         config.logEnabled = preset.logEnabled
         config.logLocation = preset.logLocation
         config.customLogPath = preset.customLogPath
@@ -615,7 +599,7 @@ class BackupEditorViewModel: ObservableObject {
         var preset = storage.organizationPresets[index]
         preset.copyFolderContents = config.copyFolderContents
         preset.runInParallel = config.runInParallel
-        preset.rsyncOptions = config.rsyncOptions
+        preset.engineOptions = config.engineOptions
         preset.logEnabled = config.logEnabled
         preset.logLocation = config.logLocation
         preset.customLogPath = config.customLogPath
@@ -654,7 +638,7 @@ class BackupEditorViewModel: ObservableObject {
 
         preset.copyFolderContents = config.copyFolderContents
         preset.runInParallel = config.runInParallel
-        preset.rsyncOptions = config.rsyncOptions
+        preset.engineOptions = config.engineOptions
         preset.logEnabled = config.logEnabled
         preset.logLocation = config.logLocation
         preset.customLogPath = config.customLogPath
@@ -787,12 +771,6 @@ class BackupEditorViewModel: ObservableObject {
                 showValidationError = true
                 return false
             }
-        }
-        
-        if !config.rsyncOptions.isValid {
-            validationMessage = "Invalid custom rsync arguments"
-            showValidationError = true
-            return false
         }
         
         showValidationError = false

@@ -44,12 +44,14 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
    - `MultiDestSummaryView` (dead) was removed in 1.2.0; the live progress path is
      `InlineFanOutProgress` mounted inside each destination card.
    - **rsync engine code + UI removed in 1.2.x** (`RsyncService`, the engine picker,
-     the "Transfer refinements" tab, engine-help sheet). **Remaining:** the build
-     still bundles the rsync binary + libs because `XXHash.swift` dlopen's
-     `libxxhash.0.dylib` from `Resources/rsync/lib/<arch>/` for xxh128 verification
-     (no pure-Swift fallback — `StreamingHasher` returns nil if it can't load). To
-     stop bundling rsync, vendor `libxxhash.0.dylib` standalone (own embed step +
-     update `XXHash.possibleLibraryPaths`) first, then drop the rsync embed.
+     the "Transfer refinements" tab, engine-help sheet). **Also done:** `RsyncOptions`
+     and `CopyEngine` models replaced by `EngineOptions` (live fields only) and
+     `DefaultExcludes` (1.3.x). **Remaining:** the build still bundles the rsync
+     binary + libs because `XXHash.swift` dlopen's `libxxhash.0.dylib` from
+     `Resources/rsync/lib/<arch>/` for xxh128 verification (no pure-Swift fallback —
+     `StreamingHasher` returns nil if it can't load). To stop bundling rsync, vendor
+     `libxxhash.0.dylib` standalone (own embed step + update
+     `XXHash.possibleLibraryPaths`) first, then drop the rsync embed.
 
 ---
 

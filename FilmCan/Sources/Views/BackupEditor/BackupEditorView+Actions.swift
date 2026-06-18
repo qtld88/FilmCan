@@ -48,12 +48,6 @@ extension BackupEditorView {
             }
         }
 
-        if viewModel.rsyncOptions.delete && !confirmedDelete {
-            deleteWarningMessage = UIStrings.Alerts.deleteMessage
-            showDeleteWarning = true
-            return
-        }
-        
         // Pre-flight space check
         let insufficientSpaceDestinations = checkSpaceBeforeTransfer()
         if !insufficientSpaceDestinations.isEmpty {

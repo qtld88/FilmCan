@@ -95,7 +95,7 @@ extension TransferOptionsSnapshot {
         runInParallel = try c.decodeIfPresent(Bool.self, forKey: .runInParallel) ?? false
         organizationPresetName = try c.decodeIfPresent(String.self, forKey: .organizationPresetName)
         logEnabled = try c.decodeIfPresent(Bool.self, forKey: .logEnabled) ?? true
-        copyEngine = try c.decodeIfPresent(String.self, forKey: .copyEngine) ?? CopyEngine.rsync.rawValue
+        copyEngine = try c.decodeIfPresent(String.self, forKey: .copyEngine) ?? "rsync"
         duplicatePolicy = try c.decodeIfPresent(String.self, forKey: .duplicatePolicy) ?? OrganizationPreset.DuplicatePolicy.increment.rawValue
         duplicateCounterTemplate = try c.decodeIfPresent(String.self, forKey: .duplicateCounterTemplate) ?? "_001"
         useChecksum = try c.decodeIfPresent(Bool.self, forKey: .useChecksum) ?? false
@@ -218,17 +218,17 @@ extension TransferOptionsSnapshot {
         runInParallel = config.runInParallel
         organizationPresetName = presetName
         logEnabled = config.logEnabled
-        copyEngine = config.rsyncOptions.copyEngine.rawValue
+        copyEngine = "custom"
         duplicatePolicy = config.duplicatePolicy.rawValue
         duplicateCounterTemplate = config.duplicateCounterTemplate
-        useChecksum = config.rsyncOptions.useChecksum
+        useChecksum = false
         checksumChoice = FilmCanHashAlgorithm.xxh128.rawValue
-        postVerify = config.rsyncOptions.postVerify
-        onlyCopyChanged = config.rsyncOptions.onlyCopyChanged
-        reuseOrganizedFiles = config.rsyncOptions.reuseOrganizedFiles
-        allowResume = config.rsyncOptions.allowResume
-        deleteExtraFiles = config.rsyncOptions.delete
-        updateInPlace = config.rsyncOptions.inplace
-        customArgs = config.rsyncOptions.customArgs
+        postVerify = config.engineOptions.postVerify
+        onlyCopyChanged = config.engineOptions.onlyCopyChanged
+        reuseOrganizedFiles = config.engineOptions.reuseOrganizedFiles
+        allowResume = config.engineOptions.allowResume
+        deleteExtraFiles = false
+        updateInPlace = false
+        customArgs = ""
     }
 }

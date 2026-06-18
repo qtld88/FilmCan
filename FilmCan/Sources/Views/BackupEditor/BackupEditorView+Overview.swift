@@ -52,9 +52,7 @@ extension BackupEditorView {
                     DriveAnchorData(flowFrame: bounds)
                 }
             
-            let verifyEnabled = viewModel.rsyncOptions.copyEngine == .custom
-                ? viewModel.rsyncOptions.customVerifyEnabled
-                : viewModel.rsyncOptions.postVerify
+            let verifyEnabled = viewModel.engineOptions.customVerifyEnabled
 
             DestinationListView(
                 destinations: Binding(
@@ -157,9 +155,7 @@ extension BackupEditorView {
                 Spacer()
             }
             
-            let verifyEnabled = viewModel.rsyncOptions.copyEngine == .custom
-                ? viewModel.rsyncOptions.customVerifyEnabled
-                : viewModel.rsyncOptions.postVerify
+            let verifyEnabled = viewModel.engineOptions.customVerifyEnabled
 
             DestinationListView(
                 destinations: Binding(

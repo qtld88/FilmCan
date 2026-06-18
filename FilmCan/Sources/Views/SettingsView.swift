@@ -115,7 +115,7 @@ private struct SettingsWindowSizer: ViewModifier {
         guard !didApply else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
-            let newSize = NSSize(width: 440, height: 660)
+            let newSize = NSSize(width: 560, height: 660)
             let frame = window.frame
             let newOrigin = NSPoint(
                 x: frame.midX - newSize.width / 2,

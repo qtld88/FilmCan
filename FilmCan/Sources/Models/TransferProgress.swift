@@ -24,16 +24,16 @@ class TransferProgress: ObservableObject {
     @Published var isCancelled: Bool = false
     @Published var isPaused: Bool = false
 
-    // Byte-level progress (most accurate — from rsync per-file progress lines)
+    // Byte-level progress (from fan-out engine per-file progress)
     @Published var bytesCompleted: Int64 = 0
     @Published var cumulativeBytes: Int64 = 0  // Total bytes written to destination (for folder-size tracking)
     @Published var totalBytes: Int64 = 0
 
-    // File-count progress (from rsync "to-chk=X/Y" lines)
+    // File-count progress
     @Published var filesCompleted: Int = 0
     @Published var filesTotal: Int = 0
 
-    // Speed and ETA (parsed directly from rsync --progress lines)
+    // Speed and ETA (from fan-out engine progress updates)
     @Published var speedBytesPerSecond: Double = 0
     @Published var estimatedTimeRemaining: TimeInterval? = nil
     @Published var verificationStartTime: Date? = nil

@@ -103,7 +103,7 @@ extension BackupEditorView {
     }
 
     private var defaultExcludePatterns: [String] {
-        RsyncOptions.defaultExcludedPatterns
+        DefaultExcludes.patterns
     }
 
     private func normalizedPatterns(_ patterns: [String]) -> [String] {
@@ -912,11 +912,11 @@ extension BackupEditorView {
                 .frame(width: resolvedTextWidth(basicOptionTextWidth), alignment: .leading)
                 Menu {
                     ForEach(FileOrdering.allCases) { ordering in
-                        Button(ordering.displayName) { viewModel.rsyncOptions.fileOrdering = ordering }
+                        Button(ordering.displayName) { viewModel.engineOptions.fileOrdering = ordering }
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(viewModel.rsyncOptions.fileOrdering.displayName)
+                        Text(viewModel.engineOptions.fileOrdering.displayName)
                         Image(systemName: "chevron.down")
                             .font(.caption)
                     }

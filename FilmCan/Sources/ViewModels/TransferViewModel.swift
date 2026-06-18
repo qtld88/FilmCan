@@ -595,7 +595,7 @@ class TransferViewModel: ObservableObject {
             return true
         }
         let normalizedExclude = normalizedPatterns(exclude)
-        let defaultSet = Set(RsyncOptions.defaultExcludedPatterns)
+        let defaultSet = Set(DefaultExcludes.patterns)
         let nonDefaultExcludes = normalizedExclude.filter { !defaultSet.contains($0) }
         return !nonDefaultExcludes.isEmpty
     }
@@ -968,7 +968,7 @@ class TransferViewModel: ObservableObject {
         activeServices = [service]
         defer { activeServices = [] }
 
-        let verifyMode = config.rsyncOptions.verificationMode
+        let verifyMode = config.engineOptions.verificationMode
         let fanOutDests: [DestWriter.Config] = destinations.map { destPath in
             let info = DriveSpeedClassifier.info(for: destPath)
             return DestWriter.Config(
@@ -990,9 +990,9 @@ class TransferViewModel: ObservableObject {
                 configName: config.name,
                 organizationPreset: organizationPreset,
                 copyFolderContents: config.copyFolderContents,
-                useHashListPrecheck: config.rsyncOptions.customVerifyEnabled,
+                useHashListPrecheck: config.engineOptions.customVerifyEnabled,
                 hashListPath: nil,
-                fileOrdering: config.rsyncOptions.fileOrdering,
+                fileOrdering: config.engineOptions.fileOrdering,
                 duplicatePolicy: config.duplicatePolicy,
                 duplicateCounterTemplate: config.duplicateCounterTemplate,
                 duplicateResolver: (config.duplicatePolicy == .ask || config.duplicatePolicy == .verify)
@@ -1276,7 +1276,6 @@ class TransferViewModel: ObservableObject {
         preset: OrganizationPreset?
     ) {
         guard config.logEnabled else { return }
-        let engine = config.rsyncOptions.copyEngine
         let customDate = preset?.useCustomDate == true ? preset?.customDate : nil
         for index in results.indices {
             let destination = results[index].destination
@@ -1315,8 +1314,7 @@ class TransferViewModel: ObservableObject {
                 result: results[index],
                 logFile: logFile,
                 sources: sources,
-                destination: destination,
-                engine: engine
+                destination: destination
             ) {
                 results[index].logFilePath = nil
                 results[index].warningMessage = mergeWarning(results[index].warningMessage, writeWarning)
@@ -1361,8 +1359,7 @@ class TransferViewModel: ObservableObject {
         result: TransferResult,
         logFile: String,
         sources: [String],
-        destination: String,
-        engine: CopyEngine
+        destination: String
     ) -> String? {
         let start = result.startTime
         let end = result.endTime ?? Date()
@@ -1380,7 +1377,7 @@ class TransferViewModel: ObservableObject {
         var lines: [String] = []
         lines.append("FilmCan Copy Log")
         lines.append("Backup: \(result.configurationName)")
-        lines.append("Engine: \(engine.displayName)")
+        lines.append("Engine: FilmCan Engine")
         lines.append("Status: \(status)")
         if let message = result.errorMessage, !message.isEmpty {
             lines.append("Error: \(message)")
