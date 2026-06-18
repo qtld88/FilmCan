@@ -876,7 +876,7 @@ actor FanOutCopier {
                 for r in c.writerResults where r.success && r.filesTransferred > 0 && !failed.contains(r.destPath) {
                     if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
                         try? await writer.append(
-                            relPath: c.sourceName, size: c.sourceSize,
+                            relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
                             hash: r.destHashFromStream ?? c.verifiedSourceHash,
                             mtime: c.srcMtime)
                         try? await writer.flush()
@@ -1098,8 +1098,9 @@ actor FanOutCopier {
                     await self.isConflict(path: destFileURL.path)
                         ? await self.conflictPolicyValue()
                         : .overwrite
+                let actualWrittenPath: String
                 do {
-                    try await writer.finalize(
+                    actualWrittenPath = try await writer.finalize(
                         fileHash: destHash, sourceSize: sourceSize,
                         conflictPolicy: conflictPolicy,
                         counterTemplate: config.duplicateCounterTemplate)
@@ -1157,14 +1158,25 @@ actor FanOutCopier {
 
                 let mhlPath = sharedMHLsByDest[destCfg.destPath]?[rootName]?.manifestPath ?? ""
 
+                let rollFolder = Self.resolveRollFolder(
+                    destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
+                    isDirectoryRoot: !relPath.isEmpty,
+                    preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents,
+                    date: jobStartTime, metadata: config.shootMetadata,
+                    mediaKind: self.mediaKind(forRoot: rootPath))
+                let writtenRelPath = actualWrittenPath.hasPrefix(rollFolder + "/")
+                    ? String(actualWrittenPath.dropFirst(rollFolder.count + 1))
+                    : sourceName
+
                 return DestWriterResult(
                     destPath: destCfg.destPath, displayName: destCfg.displayName,
                     success: true, bytesTransferred: totalBytes, filesTransferred: 1,
                     durationSec: duration, mhlPath: mhlPath,
                     failureReason: nil, verifyMode: destCfg.verifyMode,
                     destHashFromStream: destHash,
-                    writtenFilePath: destFileURL.path,
-                    transferredRelPath: sourceName
+                    writtenFilePath: actualWrittenPath,
+                    transferredRelPath: writtenRelPath
                 )
             }
             writerTasks.append(task)
