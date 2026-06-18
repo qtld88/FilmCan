@@ -27,6 +27,7 @@ targets:
     preBuildScripts:
       - name: Embed rsync
         script: |
+          set -euo pipefail
           REQUIRED_VERSION="3.4.0"
 
           find_rsync() {
@@ -41,13 +42,13 @@ targets:
             local path="$1"
             local label="$2"
             local version
-            version="$("$path" --version | head -n 1 | awk '{print $3}')"
+            version="$("$path" --version | awk 'NR==1{print $3}')"
             if [ -z "$version" ]; then
               echo "warning: Unable to determine rsync version for $label. Bundle will proceed, but features like xxh128 may be unavailable."
               return
             fi
             local min_ok
-            min_ok="$(printf '%s\n' "$REQUIRED_VERSION" "$version" | sort -V | head -n 1)"
+            min_ok="$(printf '%s\n' "$REQUIRED_VERSION" "$version" | sort -V | awk 'NR==1{print}')"
             if [ "$min_ok" != "$REQUIRED_VERSION" ]; then
               if [ "$CONFIGURATION" = "Release" ]; then
                 echo "error: rsync $version ($label) found. FilmCan requires rsync $REQUIRED_VERSION+ for xxh128/checksum-choice. Update Homebrew rsync."
@@ -94,19 +95,23 @@ targets:
             local arch="$2"
             local rsync_dest="$RSYNC_DEST_DIR/rsync-$arch"
             local lib_dir="$RSYNC_DEST_DIR/lib/$arch"
+            rm -rf "$lib_dir"
             mkdir -p "$lib_dir"
+            rm -f "$rsync_dest"
             cp "$rsync_path" "$rsync_dest"
             chmod +x "$rsync_dest"
 
             local libs
             libs="$(otool -L "$rsync_path" | awk 'NR>1 {print $1}' | grep -v '^/usr/lib/' | grep -v '^/System/Library/')"
-            for lib in $libs; do
-              local base
-              base="$(basename "$lib")"
-              cp "$lib" "$lib_dir/$base"
-              chmod +x "$lib_dir/$base"
-              install_name_tool -change "$lib" "@loader_path/lib/$arch/$base" "$rsync_dest"
-            done
+            if [ -n "${libs:-}" ]; then
+              while IFS= read -r lib; do
+                local base
+                base="$(basename "$lib")"
+                cp "$lib" "$lib_dir/$base"
+                chmod +x "$lib_dir/$base"
+                install_name_tool -change "$lib" "@loader_path/lib/$arch/$base" "$rsync_dest"
+              done <<< "$libs"
+            fi
           }
 
           if [ -n "$RSYNC_ARM64" ]; then
@@ -114,6 +119,20 @@ targets:
           fi
           if [ -n "$RSYNC_X86_64" ]; then
             bundle_deps "$RSYNC_X86_64" "x86_64"
+          fi
+
+          # libxxhash is required at runtime for XXH128 streaming hash (dlopen'd by XXHash.swift)
+          if [ -n "$RSYNC_ARM64" ]; then
+            if ! ls "$RSYNC_DEST_DIR/lib/arm64/libxxhash"*.dylib >/dev/null 2>&1; then
+              echo "error: libxxhash.dylib not bundled for arm64. Ensure rsync >= 3.4.0 is linked against libxxhash."
+              exit 1
+            fi
+          fi
+          if [ -n "$RSYNC_X86_64" ]; then
+            if ! ls "$RSYNC_DEST_DIR/lib/x86_64/libxxhash"*.dylib >/dev/null 2>&1; then
+              echo "error: libxxhash.dylib not bundled for x86_64. Ensure rsync >= 3.4.0 is linked against libxxhash."
+              exit 1
+            fi
           fi
         outputFiles:
           - ${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/rsync/rsync-arm64
