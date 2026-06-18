@@ -80,6 +80,8 @@ class TransferViewModel: ObservableObject {
     private var activeDuplicateContinuation: CheckedContinuation<DuplicateResolution, Never>? = nil
     private var isShowingDuplicatePrompt: Bool = false
     private var duplicatePromptCancelled: Bool = false
+    @Published var pendingUnreadableFiles: [String] = []
+    private var unreadableContinuation: CheckedContinuation<Bool, Never>?
     private var destinationProgressCancellables: [String: AnyCancellable] = [:]
     private var progressBinding: AnyCancellable? = nil
     private var currentService: TransferService? = nil
@@ -882,6 +884,14 @@ class TransferViewModel: ObservableObject {
         submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
     }
 
+    @MainActor
+    func resolveUnreadable(proceed: Bool) {
+        let c = unreadableContinuation
+        unreadableContinuation = nil
+        pendingUnreadableFiles = []
+        c?.resume(returning: proceed)
+    }
+
     /// Re-verify an already-backed-up config against its hash lists (the same
     /// check as "Check data" in History). Runs off the main thread.
     func verifyAlreadyBackedUp(_ info: AlreadyBackedUpInfo) async -> (total: Int, missing: Int, mismatched: Int) {
@@ -1011,6 +1021,16 @@ class TransferViewModel: ObservableObject {
                 sourceMediaKinds: effectiveSourceMediaKinds(for: config, sources: sources),
                 hashListStyle: config.hashListStyle,
                 reVerifyExistingOnResume: config.reVerifyExistingOnResume,
+                unreadableHandler: { [weak self] paths async -> Bool in
+                    guard let self else { return false }
+                    return await withCheckedContinuation { continuation in
+                        Task { @MainActor [weak self] in
+                            guard let self else { continuation.resume(returning: false); return }
+                            self.unreadableContinuation = continuation
+                            self.pendingUnreadableFiles = paths
+                        }
+                    }
+                },
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
                     Task { @MainActor in

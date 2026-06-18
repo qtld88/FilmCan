@@ -114,6 +114,16 @@ struct BackupEditorView: View {
                 onDone: { transferViewModel.alreadyBackedUp = nil }
             )
         }
+        .sheet(isPresented: Binding(
+            get: { !transferViewModel.pendingUnreadableFiles.isEmpty },
+            set: { if !$0 { transferViewModel.resolveUnreadable(proceed: false) } }
+        )) {
+            UnreadableFilesSheet(
+                paths: transferViewModel.pendingUnreadableFiles,
+                onContinue: { transferViewModel.resolveUnreadable(proceed: true) },
+                onCancel: { transferViewModel.resolveUnreadable(proceed: false) }
+            )
+        }
         .sheet(item: $netflixValidation) { info in
             NetflixValidationSheet(
                 info: info,

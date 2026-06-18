@@ -107,6 +107,7 @@
 		C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */; };
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
 		C9BB15A21E833EA6850E5D34 /* BackupEditorView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */; };
+		CA4825B83DBA48B44DE72C58 /* UnreadableFilesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F1A00062B058D89BA1ED02 /* UnreadableFilesSheet.swift */; };
 		CB10BBAE07DBB48A5E304FA0 /* AlreadyBackedUpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */; };
 		CBCCDFAEC8E315B3158B8ED8 /* HashListBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2147830DD49FC39B828D61 /* HashListBuilder.swift */; };
 		CC9CDD4A5E70CB6B2BDA8920 /* ConflictScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF95B7C89A071A16B63AAA0 /* ConflictScanner.swift */; };
@@ -251,6 +252,7 @@
 		B3536A61B485A79461038B1C /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		B3F3E1E15AB98D6E20FE01A1 /* FanOutCopier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopier.swift; sourceTree = "<group>"; };
 		B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashAlgorithm.swift; sourceTree = "<group>"; };
+		B4F1A00062B058D89BA1ED02 /* UnreadableFilesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnreadableFilesSheet.swift; sourceTree = "<group>"; };
 		B8EAD261337C6BEE4032A23E /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BAC7101BE8E60A311B55D57A /* InfoPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoPopover.swift; sourceTree = "<group>"; };
 		BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLReaderTests.swift; sourceTree = "<group>"; };
@@ -446,6 +448,7 @@
 				CA472985C7AB10A3B859755A /* OrganizationSheet.swift */,
 				EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */,
 				7F583D01B5F61457BFBA712E /* TotalTransfersEditMode.swift */,
+				B4F1A00062B058D89BA1ED02 /* UnreadableFilesSheet.swift */,
 			);
 			path = Sheets;
 			sourceTree = "<group>";
@@ -785,6 +788,7 @@
 				8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */,
 				A21DBD43D194DFEB77A0DC78 /* TransferViewModel.swift in Sources */,
 				FA5BA2A86E85CD12D7EFE614 /* UIStrings.swift in Sources */,
+				CA4825B83DBA48B44DE72C58 /* UnreadableFilesSheet.swift in Sources */,
 				1E5E93C12E83641D2E9FA332 /* VerifyMode.swift in Sources */,
 				1777544B7D467D923D430A7F /* WebhookService.swift in Sources */,
 				0A072FA0A742F50215424112 /* WindowTitleSetter.swift in Sources */,
