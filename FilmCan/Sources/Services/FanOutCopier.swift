@@ -157,6 +157,10 @@ actor FanOutCopier {
         var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .overwrite
         var duplicateCounterTemplate: String = "_001"
         var duplicateResolver: (@Sendable ([ConflictScanner.Conflict]) async -> OrganizationPreset.DuplicatePolicy)?
+        /// Called when enumeration finds unreadable items. Receives the list of unreadable paths.
+        /// Return true to continue (skipping those items), false to abort.
+        /// When nil and unreadable items exist, run throws `Error.sourceReadFailed`.
+        var unreadableHandler: (@Sendable ([String]) async -> Bool)? = nil
         #if DEBUG
         var _testForceDestReadHashNil: Bool = false
         #endif
@@ -465,6 +469,17 @@ actor FanOutCopier {
         // A directory root yields one PlannedFile per regular file under it.
         let enumResult = await FileEnumerator.enumerateFiles(sources: config.sources, preset: config.organizationPreset)
         let entries = enumResult.entries
+
+        if !enumResult.unreadable.isEmpty {
+            if let handler = config.unreadableHandler {
+                guard await handler(enumResult.unreadable) else { throw CancellationError() }
+            } else {
+                let listed = enumResult.unreadable.prefix(5).joined(separator: ", ")
+                throw Error.sourceReadFailed(
+                    "Cannot read \(enumResult.unreadable.count) item(s): \(listed)")
+            }
+        }
+
         guard !entries.isEmpty else {
             throw Error.sourceReadFailed(config.sources.first ?? "")
         }

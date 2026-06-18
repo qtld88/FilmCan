@@ -158,4 +158,110 @@ final class CustomCopierServiceE2ETests: XCTestCase {
                           "MHL must reference the suffixed filename")
         }
     }
+
+    // MARK: - Unreadable files
+
+    func test_unreadableHandler_cancelAbortsRun() async throws {
+        let tmp = try makeTmpDir()
+        let src = tmp.appendingPathComponent("src")
+        let dst = tmp.appendingPathComponent("dst")
+        try FileManager.default.createDirectory(at: src, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dst, withIntermediateDirectories: true)
+        try Data("readable".utf8).write(to: src.appendingPathComponent("readable.mov"))
+
+        let locked = src.appendingPathComponent("locked")
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        try Data("secret".utf8).write(to: locked.appendingPathComponent("secret.mov"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
+
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: tmp)
+        }
+
+        var handlerCalled = false
+        let svc = CustomCopierService()
+        do {
+            _ = try await svc.runCopyFanOut(
+                sources: [src.path],
+                fanOutDestinations: [DestWriter.Config(destPath: dst.path, displayName: "dst",
+                                                        verifyMode: .fast,
+                                                        requiresFullFsync: false)],
+                configName: "",
+                organizationPreset: nil,
+                copyFolderContents: false,
+                useHashListPrecheck: false,
+                hashListPath: nil,
+                fileOrdering: .defaultOrder,
+                duplicatePolicy: .overwrite,
+                duplicateCounterTemplate: "_001",
+                duplicateResolver: nil,
+                verifyMode: .fast,
+                dryRun: false,
+                hashListStyle: .ascMHL,
+                unreadableHandler: { @Sendable paths async -> Bool in
+                    handlerCalled = true
+                    let resolvedLocked = URL(fileURLWithPath: locked.path).resolvingSymlinksInPath().path
+                    XCTAssertTrue(paths.contains(where: { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path == resolvedLocked }),
+                                  "handler must receive the locked dir path")
+                    return false  // cancel
+                },
+                progressHandler: nil
+            )
+            XCTFail("run should have thrown when handler returns false")
+        } catch {
+            // Expected — cancelled
+        }
+
+        XCTAssertTrue(handlerCalled, "unreadableHandler must be called")
+        let dstContents = (try? FileManager.default.contentsOfDirectory(atPath: dst.path)) ?? []
+        XCTAssertTrue(dstContents.filter { !$0.hasPrefix(".") }.isEmpty,
+                      "no files should be copied when user cancels")
+    }
+
+    func test_unreadableHandler_confirmProceedsWithReadableFiles() async throws {
+        let tmp = try makeTmpDir()
+        let src = tmp.appendingPathComponent("src")
+        let dst = tmp.appendingPathComponent("dst")
+        try FileManager.default.createDirectory(at: src, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dst, withIntermediateDirectories: true)
+        try Data("readable content".utf8).write(to: src.appendingPathComponent("readable.mov"))
+
+        let locked = src.appendingPathComponent("locked")
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        try Data("secret".utf8).write(to: locked.appendingPathComponent("secret.mov"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
+
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: tmp)
+        }
+
+        let svc = CustomCopierService()
+        _ = try await svc.runCopyFanOut(
+            sources: [src.path],
+            fanOutDestinations: [DestWriter.Config(destPath: dst.path, displayName: "dst",
+                                                    verifyMode: .fast,
+                                                    requiresFullFsync: false)],
+            configName: "",
+            organizationPreset: nil,
+            copyFolderContents: false,
+            useHashListPrecheck: false,
+            hashListPath: nil,
+            fileOrdering: .defaultOrder,
+            duplicatePolicy: .overwrite,
+            duplicateCounterTemplate: "_001",
+            duplicateResolver: nil,
+            verifyMode: .fast,
+            dryRun: false,
+            hashListStyle: .ascMHL,
+            unreadableHandler: { @Sendable _ async -> Bool in true },  // confirm
+            progressHandler: nil
+        )
+
+        // "src" basename → files land at dst/src/readable.mov
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: dst.appendingPathComponent("src/readable.mov").path),
+            "readable file must be copied when user confirms")
+    }
 }
