@@ -120,6 +120,10 @@ struct CopyResult: Sendable {
     let jobStartTime: Date
     /// The copy was aborted mid-file by the user — skip verification entirely.
     let cancelledEarly: Bool
+    /// The source root name (for MHL writer lookup in the verify lane).
+    let rootName: String
+    /// Source mtime at copy time; carried to the verify lane for MHL entries.
+    let srcMtime: Int64?
 }
 
 // MARK: - FanOutCopier
@@ -146,6 +150,16 @@ actor FanOutCopier {
         var forceRecopy: Bool = false
         /// Polled cooperatively to abort the run when the user hits Stop.
         var shouldCancel: (@Sendable () -> Bool)?
+        /// When true, resume re-hashes the current source and compares to the recorded
+        /// manifest hash before skipping — cryptographic certainty at the cost of a full
+        /// re-read. When false (default), resume trusts a size+mtime match.
+        var reVerifyExistingOnResume: Bool = false
+        var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .overwrite
+        var duplicateCounterTemplate: String = "_001"
+        var duplicateResolver: (@Sendable ([ConflictScanner.Conflict]) async -> OrganizationPreset.DuplicatePolicy)?
+        #if DEBUG
+        var _testForceDestReadHashNil: Bool = false
+        #endif
     }
 
     enum Error: Swift.Error, LocalizedError {
@@ -155,6 +169,7 @@ actor FanOutCopier {
         case sourceCorruption(String)
         case insufficientSpace(destPath: String, available: Int64, required: Int64)
         case destinationUnwritable(String)
+        case duplicateSourceNames([String])
 
         var errorDescription: String? {
             switch self {
@@ -170,6 +185,8 @@ actor FanOutCopier {
                 return "Not enough space on \"\(dest)\" — \(reqMB) MB needed, \(avMB) MB available. Free space before backing up."
             case .destinationUnwritable(let path):
                 return "Cannot write to \"\((path as NSString).lastPathComponent)\". Check the drive is connected and not read-only."
+            case .duplicateSourceNames(let names):
+                return "Two or more sources resolve to the same destination folder: \(names.joined(separator: ", ")). Rename one so each lands in its own folder."
             }
         }
     }
@@ -180,10 +197,17 @@ actor FanOutCopier {
     private struct PlannedFile {
         let rootPath: String
         let rootName: String
+        /// Normalized absolute source path — unique per source root, used as map key.
+        let rootId: String
         let absPath: String
         let relPath: String
         let size: Int64
     }
+
+    /// Resolved duplicate policy (after optional pre-flight `.ask` prompt).
+    private var conflictPolicy: OrganizationPreset.DuplicatePolicy = .overwrite
+    /// Set of resolved paths that had an unmanifested collision pre-flight.
+    private var conflictPaths: Set<String> = []
 
     private var completedFilesByDest: [String: Int] = [:]
     private var verifiedFilesByDest: [String: Int] = [:]
@@ -233,6 +257,9 @@ actor FanOutCopier {
     private func finalizedBytesForDest(_ destPath: String) -> Int64 {
         finalizedBytesByDest[destPath] ?? 0
     }
+
+    func isConflict(path: String) -> Bool { conflictPaths.contains(path) }
+    func conflictPolicyValue() -> OrganizationPreset.DuplicatePolicy { conflictPolicy }
 
     /// The exact path a planned file is written to at a destination, accounting
     /// for the organization preset and copy-folder-contents. Pure (no I/O); the
@@ -315,13 +342,13 @@ actor FanOutCopier {
     /// (relPath for directory roots, basename for flat-file roots).
     nonisolated static func loadExistingMHLEntries(
         destPath: String, rootName: String, rollFolder: String
-    ) -> [(fileName: String, hash: String, size: Int64)] {
+    ) -> [(fileName: String, hash: String, size: Int64, mtime: Int64?)] {
         let ascDir = ascMHLDir(rollFolder: rollFolder)
         // Use the latest manifest ON DISK (sealed or partial) so a run resumes after
         // a cancelled run whose generation was written but not chained.
         if let latest = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir),
            let entries = try? ASCMHLReader.read(url: ascDir.appendingPathComponent(latest)) {
-            return entries.map { (fileName: $0.relPath, hash: $0.hash, size: $0.size ?? 0) }
+            return entries.map { (fileName: $0.relPath, hash: $0.hash, size: $0.size ?? 0, mtime: $0.mtime) }
         }
         let legacy = URL(fileURLWithPath: destPath)
             .appendingPathComponent(".filmcan").appendingPathComponent("hashlists")
@@ -334,10 +361,10 @@ actor FanOutCopier {
     }
 
     /// Minimal parser for the old <file name=".."><hash>..</hash></file> format.
-    /// (The legacy format carried no size, so size is reported as 0.)
-    nonisolated private static func parseLegacyMHL(_ data: Data) -> [(fileName: String, hash: String, size: Int64)] {
+    /// (The legacy format carried no size or mtime, so both are reported as 0/nil.)
+    nonisolated private static func parseLegacyMHL(_ data: Data) -> [(fileName: String, hash: String, size: Int64, mtime: Int64?)] {
         guard let xml = String(data: data, encoding: .utf8) else { return [] }
-        var out: [(String, String, Int64)] = []
+        var out: [(String, String, Int64, Int64?)] = []
         let ns = xml as NSString
         let pattern = #"<file name=\"(.*?)\"><hash>(.*?)</hash></file>"#
         guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else { return [] }
@@ -350,7 +377,7 @@ actor FanOutCopier {
                 .replacingOccurrences(of: "&quot;", with: "\"")
                 .replacingOccurrences(of: "&apos;", with: "'")
             let hash = ns.substring(with: m.range(at: 2))
-            out.append((name, hash, 0))
+            out.append((name, hash, 0, nil))
         }
         return out
     }
@@ -446,6 +473,7 @@ actor FanOutCopier {
             return PlannedFile(
                 rootPath: entry.sourceRoot,
                 rootName: rootName,
+                rootId: (entry.sourceRoot as NSString).standardizingPath,
                 absPath: entry.sourcePath,
                 relPath: entry.sourceIsDirectory ? entry.relativePath : "",
                 size: entry.size
@@ -475,9 +503,9 @@ actor FanOutCopier {
         func rootPath(for rootName: String) -> String {
             allPlannedFiles.first(where: { $0.rootName == rootName })?.rootPath ?? rootName
         }
-        var existingMHLByDest: [String: [String: [(fileName: String, hash: String, size: Int64)]]] = [:]
+        var existingMHLByDest: [String: [String: [(fileName: String, hash: String, size: Int64, mtime: Int64?)]]] = [:]
         for dest in config.destinations {
-            var byRoot: [String: [(fileName: String, hash: String, size: Int64)]] = [:]
+            var byRoot: [String: [(fileName: String, hash: String, size: Int64, mtime: Int64?)]] = [:]
             for root in allRootNames {
                 let rf = Self.resolveRollFolder(
                     destRoot: dest.destPath, rootName: root, rootPath: rootPath(for: root),
@@ -495,20 +523,55 @@ actor FanOutCopier {
         // Per-destination resume: a file already recorded AND present at a given
         // destination is skipped FOR THAT DESTINATION only; it is still copied to any
         // destination missing it. `forceRecopy` needs everything everywhere.
-        func destsNeeding(_ f: PlannedFile) -> [DestWriter.Config] {
+        // Size+mtime are validated so a source modified in place (same name, different
+        // content) is correctly detected as changed. `reVerifyExistingOnResume` adds
+        // a full re-hash for cryptographic certainty.
+        func destsNeeding(_ f: PlannedFile) async -> [DestWriter.Config] {
             if config.forceRecopy { return config.destinations }
             let name = plannedSourceName(f)
+            var sourceHashForReverify: String?
+            if config.reVerifyExistingOnResume {
+                sourceHashForReverify = await Self.rereadHashDetached(
+                    url: URL(fileURLWithPath: f.absPath), chunkSz: 8 * 1024 * 1024)
+            }
             return config.destinations.filter { dest in
-                guard existingMHLByDest[dest.destPath]?[f.rootName]?.contains(where: { $0.fileName == name }) == true
-                else { return true }   // not recorded → needs copy
+                guard let recorded = existingMHLByDest[dest.destPath]?[f.rootName]?
+                    .first(where: { $0.fileName == name })
+                else { return true }  // not recorded → needs copy
                 let path = Self.resolveDestFilePath(
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
                     metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath))
-                return !FileManager.default.fileExists(atPath: path)   // present → skip
+                guard FileManager.default.fileExists(atPath: path) else { return true }  // missing → copy
+                // Compare planned size (max(logical, allocated)) — the same value stored by
+                // FileEnumerator and therefore in the MHL. recorded.size == 0 means legacy
+                // MHL format which carried no size; skip the check in that case.
+                if recorded.size != 0, recorded.size != f.size { return true }
+                if config.reVerifyExistingOnResume {
+                    return sourceHashForReverify?.lowercased() != recorded.hash.lowercased()
+                }
+                return false
             }
         }
+
+        // Duplicate-source preflight: two DIRECTORY sources that resolve to the same
+        // destination root folder would silently merge their contents. Flat-file sources
+        // are excluded — they write individual files to the dest root and don't collide.
+        let resolvedRootsForCollision = config.sources.compactMap { src -> String? in
+            let rn = (src as NSString).lastPathComponent
+            guard directoryRoots.contains(rn) else { return nil }
+            return Self.resolveRollFolder(
+                destRoot: config.destinations.first?.destPath ?? "",
+                rootName: rn, rootPath: src,
+                isDirectoryRoot: true,
+                preset: config.organizationPreset,
+                copyFolderContents: config.copyFolderContents,
+                date: jobStartTime, metadata: config.shootMetadata,
+                mediaKind: mediaKind(forRoot: src))
+        }
+        let nameCollisions = SourceCollisionValidator.collisions(resolvedRoots: resolvedRootsForCollision)
+        if !nameCollisions.isEmpty { throw Error.duplicateSourceNames(nameCollisions) }
 
         // Writability preflight: a destination that can't be written (disconnected
         // or read-only) aborts the whole run before any data is copied, with a clear
@@ -527,7 +590,7 @@ actor FanOutCopier {
         var plannedFiles: [PlannedFile] = []
         var neededDestsByPlan: [[DestWriter.Config]] = []
         for f in allPlannedFiles {
-            let needed = destsNeeding(f)
+            let needed = await destsNeeding(f)
             let neededSet = Set(needed.map { $0.destPath })
             for dest in config.destinations {
                 if neededSet.contains(dest.destPath) {
@@ -642,9 +705,45 @@ actor FanOutCopier {
                     return FileManager.default.fileExists(atPath: destFile)
                 }
                 if !present.isEmpty {
-                    await writer.seed(present.map { MHLEntry(relPath: $0.fileName, size: $0.size, hash: $0.hash) })
+                    await writer.seed(present.map { MHLEntry(relPath: $0.fileName, size: $0.size, hash: $0.hash, mtime: $0.mtime) })
                 }
             }
+        }
+
+        // ConflictScanner: detect unmanifested destination files that would be silently
+        // overwritten. Resolved once before copy starts; policy stored in actor state so
+        // DestWriter can honor it per-file without a mid-copy prompt.
+        let plannedTargets: [ConflictScanner.Target] = plannedFiles.flatMap { f in
+            config.destinations.map { dest in
+                let resolved = Self.resolveDestFilePath(
+                    destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
+                    relPath: f.relPath, preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath))
+                return ConflictScanner.Target(
+                    destPath: dest.destPath, rootName: f.rootName,
+                    fileName: plannedSourceName(f), resolvedPath: resolved)
+            }
+        }
+        var manifestedRelPathsByDestRoot: [String: Set<String>] = [:]
+        for (destPath, byRoot) in existingMHLByDest {
+            for (rootName, entries) in byRoot {
+                let key = ConflictScanner.key(destPath: destPath, rootName: rootName)
+                manifestedRelPathsByDestRoot[key] = Set(entries.map { $0.fileName })
+            }
+        }
+        let conflicts = ConflictScanner.scan(
+            plannedTargets: plannedTargets,
+            manifestedRelPathsByDestRoot: manifestedRelPathsByDestRoot)
+        if !conflicts.isEmpty {
+            let resolvedPolicy: OrganizationPreset.DuplicatePolicy
+            if let resolver = config.duplicateResolver {
+                resolvedPolicy = await resolver(conflicts)
+            } else {
+                resolvedPolicy = config.duplicatePolicy
+            }
+            self.conflictPolicy = resolvedPolicy
+            self.conflictPaths = Set(conflicts.map { $0.resolvedPath })
         }
 
         // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
@@ -655,7 +754,7 @@ actor FanOutCopier {
         // N+1 is still copying. The lane is serial → the verify bar stays
         // monotonic.
         let verifyChannel = BoundedChannel<CopyResult>(capacity: 64)
-        async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(verifyChannel)
+        async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(verifyChannel, sharedMHLsByDest: sharedMHLsByDest)
 
         var copyError: (any Swift.Error)?
         do {
@@ -761,11 +860,29 @@ actor FanOutCopier {
 
     /// Single serial verify lane: pulls copied files in order and verifies each,
     /// running concurrently with the copy of later files.
-    private func drainVerifies(_ channel: BoundedChannel<CopyResult>) async -> [PerSourceOutcome] {
+    private func drainVerifies(
+        _ channel: BoundedChannel<CopyResult>,
+        sharedMHLsByDest: [String: [String: any MHLWriting]]
+    ) async -> [PerSourceOutcome] {
         var out: [PerSourceOutcome] = []
         var it = channel.makeAsyncIterator()
-        while let copyResult = try? await it.next() {
-            out.append(await verifySource(copyResult))
+        while let c = try? await it.next() {
+            let outcome = await verifySource(c)
+            // Append MHL ONLY after verify passes — never before. If the file was
+            // deleted (nil hash, hash mismatch, source corruption) no entry is written.
+            if !outcome.sourceCorrupted {
+                let failed = outcome.verifyFailedDestPaths
+                for r in c.writerResults where r.success && r.filesTransferred > 0 && !failed.contains(r.destPath) {
+                    if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
+                        try? await writer.append(
+                            relPath: c.sourceName, size: c.sourceSize,
+                            hash: r.destHashFromStream ?? c.verifiedSourceHash,
+                            mtime: c.srcMtime)
+                        try? await writer.flush()
+                    }
+                }
+            }
+            out.append(outcome)
         }
         return out
     }
@@ -975,9 +1092,26 @@ actor FanOutCopier {
                 }
 
                 let destHash = destHasher.finalize().hexString
+                // Conflict: check if this resolved path is a pre-flight conflict and apply policy.
+                let conflictPolicy: OrganizationPreset.DuplicatePolicy =
+                    await self.isConflict(path: destFileURL.path)
+                        ? await self.conflictPolicyValue()
+                        : .overwrite
                 do {
-                    try await writer.finalize(fileHash: destHash, sourceSize: sourceSize)
-                    try await writer.appendMHL(hash: destHash, fileName: sourceName, size: sourceSize)
+                    try await writer.finalize(
+                        fileHash: destHash, sourceSize: sourceSize,
+                        conflictPolicy: conflictPolicy,
+                        counterTemplate: config.duplicateCounterTemplate)
+                    // MHL is appended in the verify lane AFTER paranoid re-read, not here.
+                } catch is DestWriter.SkippedDueToConflict {
+                    // File pre-existed and policy was skip — treat as if already present.
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: true, bytesTransferred: 0, filesTransferred: 0,
+                        durationSec: 0, mhlPath: nil, failureReason: nil,
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                        writtenFilePath: destFileURL.path
+                    )
                 } catch {
                     await emitFailed(.ioError(error.localizedDescription))
                     return DestWriterResult(
@@ -1096,6 +1230,9 @@ actor FanOutCopier {
             throw Error.sourceReadFailed(sourcePath)
         }
 
+        let srcMtime = ((try? FileManager.default.attributesOfItem(atPath: sourcePath))?[.modificationDate] as? Date)
+            .map { Int64($0.timeIntervalSince1970) }
+
         return CopyResult(
             sourcePath: sourcePath,
             sourceURL: sourceURL,
@@ -1112,7 +1249,9 @@ actor FanOutCopier {
             filesTotalByDest: filesTotalByDest,
             skippedByDest: skippedByDest,
             jobStartTime: jobStartTime,
-            cancelledEarly: config.shouldCancel?() == true
+            cancelledEarly: config.shouldCancel?() == true,
+            rootName: rootName,
+            srcMtime: srcMtime
         )
     }
 
@@ -1245,6 +1384,9 @@ actor FanOutCopier {
                     let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
                     let destPath = r.destPath
                     group.addTask {
+                        #if DEBUG
+                        if self.config._testForceDestReadHashNil { return (destPath, nil) }
+                        #endif
                         let hash = await Self.rereadHashDetached(url: destFileURL, chunkSz: c.chunkSz)
                         return (destPath, hash)
                     }
@@ -1255,7 +1397,10 @@ actor FanOutCopier {
                         verifyFailed.insert(destPath)
                         if let wp = writtenPathByDest[destPath] { try? fm.removeItem(atPath: wp) }
                     } else if hash == nil {
+                        // nil hash (read failure or test seam): treat as verify failure,
+                        // delete the written file so the manifest is never poisoned.
                         verifyFailed.insert(destPath)
+                        if let wp = writtenPathByDest[destPath] { try? fm.removeItem(atPath: wp) }
                     }
                     let verifyDestStatus: DestStatus
                     let newVerifiedBytes: Int64
