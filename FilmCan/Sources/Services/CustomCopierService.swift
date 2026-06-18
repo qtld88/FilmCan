@@ -843,6 +843,7 @@ class CustomCopierService: ObservableObject, TransferService {
         shootMetadata: ShootMetadata = .empty,
         sourceMediaKinds: [String: SourceMediaKind] = [:],
         hashListStyle: HashListStyle = .ascMHL,
+        reVerifyExistingOnResume: Bool = false,
         progressHandler: (@Sendable ([DestProgress]) -> Void)?,
         webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
         aggregatedWebhookHandler: (@Sendable ([DestResult], String) -> Void)? = nil
@@ -872,7 +873,8 @@ class CustomCopierService: ObservableObject, TransferService {
             sourceMediaKinds: sourceMediaKinds,
             hashListStyle: hashListStyle,
             forceRecopy: forceRecopy,
-            shouldCancel: { cancellationState.isCancelledNow() }
+            shouldCancel: { cancellationState.isCancelledNow() },
+            reVerifyExistingOnResume: reVerifyExistingOnResume
         )
 
         let copier = FanOutCopier(config: fanOutConfig)

@@ -180,6 +180,11 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    var reVerifyExistingOnResume: Bool {
+        get { config.reVerifyExistingOnResume }
+        set { config.reVerifyExistingOnResume = newValue; save() }
+    }
+
     var hashListStyle: HashListStyle {
         get { config.hashListStyle }
         set { config.hashListStyle = newValue; save() }

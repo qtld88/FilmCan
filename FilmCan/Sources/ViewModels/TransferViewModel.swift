@@ -990,6 +990,7 @@ class TransferViewModel: ObservableObject {
                                              unit: config.unit, cameraFormat: config.cameraFormat),
                 sourceMediaKinds: effectiveSourceMediaKinds(for: config, sources: sources),
                 hashListStyle: config.hashListStyle,
+                reVerifyExistingOnResume: config.reVerifyExistingOnResume,
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
                     Task { @MainActor in

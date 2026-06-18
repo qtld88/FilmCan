@@ -692,6 +692,28 @@ extension BackupEditorView {
             hashListStyleRow
 
             optionRow(
+                icon: "checkmark.shield",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Re-verify on resume",
+                subtitle: "",
+                isOn: $viewModel.reVerifyExistingOnResume,
+                textWidth: basicOptionTextWidth,
+                info: InfoPopoverContent(
+                    title: "Re-verify existing files on resume",
+                    description: "When resuming a backup, re-read and hash each already-copied source file to confirm it hasn't changed since the last run.",
+                    options: [
+                        .init("Off (trust size)",
+                              good: ["Fast resume — skips based on file size match"],
+                              bad: ["Won't catch same-size content changes"]),
+                        .init("On (re-hash source)",
+                              good: ["Detects same-size file replacements cryptographically"],
+                              bad: ["Slower — re-reads every already-backed-up file"])
+                    ],
+                    notes: ["Use when card contents may have been silently corrupted or replaced with same-size data."]
+                )
+            )
+
+            optionRow(
                 icon: "arrow.triangle.2.circlepath",
                 iconColor: FilmCanTheme.textSecondary,
                 title: "Force re-copy",

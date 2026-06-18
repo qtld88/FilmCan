@@ -41,6 +41,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var destinationAutoDetectPatterns: [String] = []
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .ask
     var duplicateCounterTemplate: String = "_001"
+    var reVerifyExistingOnResume: Bool = false
     var organizationFolderTemplate: String = ""
     var organizationRenameTemplate: String = ""
     var organizationUseFolderTemplate: Bool = false
@@ -104,6 +105,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         destinationAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .destinationAutoDetectPatterns) ?? []
         duplicatePolicy = try c.decodeIfPresent(OrganizationPreset.DuplicatePolicy.self, forKey: .duplicatePolicy) ?? .ask
         duplicateCounterTemplate = try c.decodeIfPresent(String.self, forKey: .duplicateCounterTemplate) ?? "_001"
+        reVerifyExistingOnResume = try c.decodeIfPresent(Bool.self, forKey: .reVerifyExistingOnResume) ?? false
         organizationFolderTemplate = try c.decodeIfPresent(String.self, forKey: .organizationFolderTemplate) ?? ""
         organizationRenameTemplate = try c.decodeIfPresent(String.self, forKey: .organizationRenameTemplate) ?? ""
         organizationUseFolderTemplate = try c.decodeIfPresent(Bool.self, forKey: .organizationUseFolderTemplate)
@@ -169,6 +171,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(destinationAutoDetectPatterns, forKey: .destinationAutoDetectPatterns)
         try c.encode(duplicatePolicy, forKey: .duplicatePolicy)
         try c.encode(duplicateCounterTemplate, forKey: .duplicateCounterTemplate)
+        try c.encode(reVerifyExistingOnResume, forKey: .reVerifyExistingOnResume)
         try c.encode(organizationFolderTemplate, forKey: .organizationFolderTemplate)
         try c.encode(organizationRenameTemplate, forKey: .organizationRenameTemplate)
         try c.encode(organizationUseFolderTemplate, forKey: .organizationUseFolderTemplate)
@@ -204,7 +207,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate
         case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy
-        case duplicatePolicy, duplicateCounterTemplate
+        case duplicatePolicy, duplicateCounterTemplate, reVerifyExistingOnResume
         case organizationFolderTemplate, organizationRenameTemplate
         case organizationUseFolderTemplate, organizationUseRenameTemplate
         case organizationRenameOnlyPatterns
