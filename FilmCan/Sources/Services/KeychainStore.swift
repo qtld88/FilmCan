@@ -6,17 +6,23 @@ struct KeychainStore {
 
     init(service: String = "com.filmcan.app") { self.service = service }
 
-    func set(_ value: String, for account: String) {
+    @discardableResult
+    func set(_ value: String, for account: String) -> Bool {
         let data = Data(value.utf8)
-        let query: [String: Any] = [
+        let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        SecItemDelete(query as CFDictionary)
-        var add = query
+        SecItemDelete(base as CFDictionary)   // ok if errSecItemNotFound
+        var add = base
         add[kSecValueData as String] = data
-        SecItemAdd(add as CFDictionary, nil)
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        let status = SecItemAdd(add as CFDictionary, nil)
+        if status != errSecSuccess {
+            DebugLog.warn("Keychain set failed for \(account): OSStatus \(status)")
+        }
+        return status == errSecSuccess
     }
 
     func get(_ account: String) -> String? {

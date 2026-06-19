@@ -16,6 +16,16 @@ final class SecretsNetworkTests: XCTestCase {
         XCTAssertNil(store.get("k1"))
     }
 
+    func testKeychainSetReturnsSuccessAndRoundTrips() {
+        let store = KeychainStore(service: "com.filmcan.test.\(UUID().uuidString)")
+        let account = "webhookToken"
+        defer { store.delete(account) }
+        XCTAssertTrue(store.set("s3cr3t", for: account))
+        XCTAssertEqual(store.get(account), "s3cr3t")
+        XCTAssertTrue(store.set("rotated", for: account))   // overwrite path
+        XCTAssertEqual(store.get(account), "rotated")
+    }
+
     func test_webhook_validatesHttpsOnly() {
         XCTAssertTrue(WebhookService.isAllowedURL("https://example.com/hook"))
         XCTAssertFalse(WebhookService.isAllowedURL("http://example.com/hook"))
