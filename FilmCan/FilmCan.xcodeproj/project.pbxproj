@@ -51,7 +51,6 @@
 		5510B5B1330752EBEEB968E6 /* OrphanCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */; };
 		57BA4BC4B86BCAE146F33A32 /* DestinationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1EF3014920FF86C66BBDA1F /* DestinationListView.swift */; };
 		58B0C02F251AA3212196E62C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3536A61B485A79461038B1C /* Constants.swift */; };
-		5DECD6CD2594574259237074 /* CustomCopierSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */; };
 		60328CEF84C73456E58A6D6C /* OrphanCleanerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */; };
 		63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A206C11337F2DF884AF7C3C /* StreamingHasher.swift */; };
 		63FFD96CEAF608C299F8CFA8 /* ASCMHLConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E297808A920BE36CE33E0B /* ASCMHLConformanceTests.swift */; };
@@ -101,6 +100,7 @@
 		B19AE709208AE950F333B225 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C1983264D0443559124CDB6 /* Assets.xcassets */; };
 		B367BE269DB7059A5820B67D /* LogFolderNamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3622B8C4F47A914F473D8798 /* LogFolderNamer.swift */; };
 		B554D2819BD859BE97459AB4 /* OrganizationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D28EDE431F28873920B2B30 /* OrganizationSettingsView.swift */; };
+		B6CAC1814763C6C420BA5980 /* CancellationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAFAD6C66A15CFFEE76EF71F /* CancellationState.swift */; };
 		B78B3C4D3E7FDF4D5F69F570 /* NetflixNameValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5DEA0246D51FEB546D543EE /* NetflixNameValidatorTests.swift */; };
 		B87287240EDD773DD9A52D7A /* RobustnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DC61B02A850124F701EBC8C /* RobustnessTests.swift */; };
 		BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF50C40E7C0C3EE500EFA4C1 /* ColorHex.swift */; };
@@ -260,13 +260,13 @@
 		B4F1A00062B058D89BA1ED02 /* UnreadableFilesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnreadableFilesSheet.swift; sourceTree = "<group>"; };
 		B8EAD261337C6BEE4032A23E /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BAC7101BE8E60A311B55D57A /* InfoPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoPopover.swift; sourceTree = "<group>"; };
+		BAFAD6C66A15CFFEE76EF71F /* CancellationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CancellationState.swift; sourceTree = "<group>"; };
 		BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLReaderTests.swift; sourceTree = "<group>"; };
 		C639F55EAD692B4FDA94F547 /* TransferHistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferHistoryEntry.swift; sourceTree = "<group>"; };
 		C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutProgressBar.swift; sourceTree = "<group>"; };
 		C6DAECC7717B5F2550472F23 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		CA472985C7AB10A3B859755A /* OrganizationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationSheet.swift; sourceTree = "<group>"; };
 		CB7BCF3596001402A6F510FC /* DestResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestResult.swift; sourceTree = "<group>"; };
-		CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierSupport.swift; sourceTree = "<group>"; };
 		CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupConfiguration.swift; sourceTree = "<group>"; };
 		CE87AE92E6D0FD2C5F1566BA /* TitlebarAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitlebarAccessory.swift; sourceTree = "<group>"; };
 		CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrphanCleanerTests.swift; sourceTree = "<group>"; };
@@ -331,10 +331,10 @@
 				9516D730EDD86DA944200527 /* ASCMHLReader.swift */,
 				DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */,
 				13273CE3DB6E17D073212DFE /* BoundedChannel.swift */,
+				BAFAD6C66A15CFFEE76EF71F /* CancellationState.swift */,
 				64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */,
 				8AF95B7C89A071A16B63AAA0 /* ConflictScanner.swift */,
 				FEAB41177986B7BBED498656 /* CustomCopierService.swift */,
-				CDAD78C1830A94AAAF3FF49D /* CustomCopierSupport.swift */,
 				2314F69E3FD8DCE91282F1FA /* DestWriter.swift */,
 				205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */,
 				18663FD23B1C73B08D717384 /* DryRunPlanner.swift */,
@@ -716,12 +716,12 @@
 				939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */,
 				F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */,
 				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,
+				B6CAC1814763C6C420BA5980 /* CancellationState.swift in Sources */,
 				BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */,
 				2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */,
 				CC9CDD4A5E70CB6B2BDA8920 /* ConflictScanner.swift in Sources */,
 				58B0C02F251AA3212196E62C /* Constants.swift in Sources */,
 				0BD143F4349CB68832E1D2EA /* CustomCopierService.swift in Sources */,
-				5DECD6CD2594574259237074 /* CustomCopierSupport.swift in Sources */,
 				EC5874CE48288D04FD140DD1 /* DebugLog.swift in Sources */,
 				E899FC2861C89B39CCA30A36 /* DefaultExcludes.swift in Sources */,
 				B199DE45F6E02002B8A84B9F /* DestPickerView.swift in Sources */,

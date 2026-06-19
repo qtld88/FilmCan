@@ -35,6 +35,24 @@ final class SecretsNetworkTests: XCTestCase {
         XCTAssertTrue(WebhookService.isAllowedURL("http://127.0.0.1:8080/hook"))
     }
 
+    func test_webhook_redirectPolicy_blocksCrossHostAndDowngrade() {
+        // Same host, still https → follow (token stays with the approved host).
+        XCTAssertTrue(WebhookService.shouldFollowRedirect(
+            originalHost: "ntfy.example.com", to: "https://ntfy.example.com/topic"))
+        // Different host → block (would leak the bearer token).
+        XCTAssertFalse(WebhookService.shouldFollowRedirect(
+            originalHost: "ntfy.example.com", to: "https://evil.example.net/topic"))
+        // Same host but https→http downgrade → block (cleartext token).
+        XCTAssertFalse(WebhookService.shouldFollowRedirect(
+            originalHost: "ntfy.example.com", to: "http://ntfy.example.com/topic"))
+        // Localhost http stays allowed on the same host.
+        XCTAssertTrue(WebhookService.shouldFollowRedirect(
+            originalHost: "localhost", to: "http://localhost:8080/topic"))
+        // Missing original host → block.
+        XCTAssertFalse(WebhookService.shouldFollowRedirect(
+            originalHost: nil, to: "https://ntfy.example.com/topic"))
+    }
+
     func test_webhook_masksPathsByDefault() {
         let full = "/Volumes/CARD/A001/clip.mov"
         XCTAssertEqual(WebhookService.maskedField(path: full, includeFull: false), "clip.mov")

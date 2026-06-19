@@ -871,11 +871,7 @@ class TransferViewModel: ObservableObject {
     }
 
     private func applyTemplate(_ template: String, replacements: [String: String]) -> String {
-        var result = template
-        for (key, value) in replacements {
-            result = result.replacingOccurrences(of: key, with: value)
-        }
-        return result
+        OrganizationTemplate.substituteTokens(template, values: replacements)
     }
 
     func cancelRunFromDuplicatePrompt() {
@@ -1470,48 +1466,6 @@ class TransferViewModel: ObservableObject {
         return false
     }
 
-    private func generateHashList(
-        result: TransferResult,
-        sources: [String],
-        destination: String,
-        algorithm: FilmCanHashAlgorithm
-    ) async -> (String, [String])? {
-        let roots = hashRoots(result: result, sources: sources, destination: destination)
-        let hasTransfers = !result.transferredPaths.isEmpty
-        if !hasTransfers && result.usedItemizedOutput {
-            return nil
-        }
-        if !hasTransfers && roots.isEmpty {
-            return nil
-        }
-        let fileName = HashListNamer.makeFileName(
-            configName: result.configurationName,
-            destination: destination,
-            sources: sources,
-            algorithm: algorithm
-        )
-        let outputDir = FilmCanPaths.hashListPath(for: destination)
-        let outputPath = (outputDir as NSString).appendingPathComponent(fileName)
-        let created = await Task.detached(priority: .utility) {
-            if hasTransfers {
-                return HashListBuilder.generateHashList(
-                    files: result.transferredPaths,
-                    outputPath: outputPath,
-                    useAbsolutePaths: true,
-                    algorithm: algorithm
-                )?.outputPath
-            }
-            return HashListBuilder.generateHashList(
-                roots: roots,
-                outputPath: outputPath,
-                useAbsolutePaths: true,
-                algorithm: algorithm
-            )?.outputPath
-        }.value
-        guard let path = created else { return nil }
-        return (path, hasTransfers ? [] : roots)
-    }
-
     private func hashRoots(result: TransferResult, sources: [String], destination: String) -> [String] {
         var roots: [String] = []
         for source in sources {
@@ -1523,29 +1477,6 @@ class TransferViewModel: ObservableObject {
             roots = [destination]
         }
         return roots
-    }
-
-    private func recordOrganizationReuseIfNeeded(
-        result: TransferResult,
-        destination: String,
-        configId: UUID,
-        preset: OrganizationPreset?
-    ) {
-        guard result.success, let preset, !result.organizationRoots.isEmpty else { return }
-        let storage = AppState.shared.storage
-        guard var updated = storage.configurations.first(where: { $0.id == configId }) else { return }
-        var info = updated.organizationReuseByDestination[destination]
-        if info?.presetId != preset.id {
-            info = OrganizationReuseInfo(presetId: preset.id, sourceRoots: [:])
-        }
-        if info == nil {
-            info = OrganizationReuseInfo(presetId: preset.id, sourceRoots: [:])
-        }
-        for (source, root) in result.organizationRoots {
-            info?.sourceRoots[source] = root
-        }
-        updated.organizationReuseByDestination[destination] = info
-        storage.update(updated)
     }
 
     private func recordHistory(
@@ -1618,59 +1549,6 @@ class TransferViewModel: ObservableObject {
         storage.appendHistory(entry, retentionLimit: historyRetentionLimit)
     }
 
-    private func generateBackupHashList(
-        config: BackupConfiguration,
-        sources: [String],
-        results: [TransferResult]
-    ) async -> (path: String, roots: [String])? {
-        let transferredFiles = results.flatMap { $0.transferredPaths }
-        if transferredFiles.isEmpty && results.contains(where: { $0.usedItemizedOutput }) {
-            return nil
-        }
-        var roots: [String] = []
-        for result in results {
-            for source in sources {
-                if let root = result.organizationRoots[source], !roots.contains(root) {
-                    roots.append(root)
-                }
-            }
-            if roots.isEmpty {
-                if !roots.contains(result.destination) {
-                    roots.append(result.destination)
-                }
-            }
-        }
-        guard !roots.isEmpty || !transferredFiles.isEmpty else { return nil }
-        let fileName = HashListNamer.makeFileName(
-            configName: config.name,
-            destination: "AllDestinations",
-            sources: sources,
-            algorithm: .xxh128
-        )
-        let baseDir = config.destinationPaths.first ?? FileManager.default.homeDirectoryForCurrentUser.path
-        let outputDir = FilmCanPaths.hashListPath(for: baseDir)
-        let outputPath = (outputDir as NSString).appendingPathComponent(fileName)
-        let task = Task.detached(priority: .utility) {
-            if !transferredFiles.isEmpty {
-                return HashListBuilder.generateHashList(
-                    files: transferredFiles,
-                    outputPath: outputPath,
-                    useAbsolutePaths: true,
-                    algorithm: .xxh128
-                )?.outputPath
-            }
-            return HashListBuilder.generateHashList(
-                roots: roots,
-                outputPath: outputPath,
-                useAbsolutePaths: true,
-                algorithm: .xxh128
-            )?.outputPath
-        }
-        let created = await task.value
-        guard let path = created else { return nil }
-        return (path, transferredFiles.isEmpty ? roots : [])
-    }
-    
     func cancel() {
         currentService?.cancel()
     }
@@ -1771,8 +1649,6 @@ class TransferViewModel: ObservableObject {
     ) async -> [(fileName: String, success: Bool)] {
         guard let siblingMHL = sibling.mhlPath else { return [] }
         let mhlURL = URL(fileURLWithPath: siblingMHL)
-        let siblingRoot = sibling.destinationPath
-        let failedRoot = failed.destinationPath
 
         let entries: [ASCMHLReader.Entry]
         do {
@@ -1780,22 +1656,58 @@ class TransferViewModel: ObservableObject {
         } catch {
             return []
         }
+        guard !entries.isEmpty else { return [] }
+
+        // The manifest lives at <rollFolder>/ascmhl/<name>.mhl and each entry's
+        // relPath is relative to <rollFolder>, NOT the dest root. Derive both roll
+        // folders so organized (Netflix) layouts repair into the correct nested
+        // path rather than joining relPath onto the bare dest root.
+        let siblingRoot = sibling.destinationPath
+        let failedRoot = failed.destinationPath
+        let siblingRoll = mhlURL.deletingLastPathComponent().deletingLastPathComponent().path
+        let relRoll = siblingRoll.hasPrefix(siblingRoot)
+            ? String(siblingRoll.dropFirst(siblingRoot.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            : ""
+        let failedRoll = relRoll.isEmpty
+            ? failedRoot
+            : (failedRoot as NSString).appendingPathComponent(relRoll)
+
+        // exFAT/USB destinations (often the very drive that failed) need F_FULLFSYNC.
+        let requiresFullFsync = DriveSpeedClassifier.requiresFullFsync(
+            DriveSpeedClassifier.info(for: failedRoot))
 
         let source = SiblingDestSource()
         var results: [(fileName: String, success: Bool)] = []
+        var copied: [MHLEntry] = []
         for entry in entries {
-            let siblingFilePath = (siblingRoot as NSString).appendingPathComponent(entry.relPath)
-            let failedFilePath = (failedRoot as NSString).appendingPathComponent(entry.relPath)
+            let siblingFilePath = (siblingRoll as NSString).appendingPathComponent(entry.relPath)
+            let failedFilePath = (failedRoll as NSString).appendingPathComponent(entry.relPath)
             do {
                 try await source.copyFromSibling(
                     fileName: entry.relPath,
                     from: siblingFilePath,
                     to: failedFilePath,
-                    expectedHash: entry.hash
+                    expectedHash: entry.hash,
+                    requiresFullFsync: requiresFullFsync
                 )
                 results.append((entry.relPath, true))
+                copied.append(MHLEntry(relPath: entry.relPath, size: entry.size ?? 0,
+                                       hash: entry.hash, mtime: entry.mtime))
             } catch {
                 results.append((entry.relPath, false))
+            }
+        }
+
+        // Chain of custody: seal a fresh ASC MHL generation for the repaired
+        // destination so it isn't left certified-but-manifestless (its prior run
+        // wrote only a partial, un-chained generation). Only when EVERY file landed
+        // and hash-verified — a partial repair must never seal a manifest.
+        if !copied.isEmpty, results.allSatisfy({ $0.success }) {
+            let ascDir = URL(fileURLWithPath: failedRoll).appendingPathComponent("ascmhl")
+            let rollName = (failedRoll as NSString).lastPathComponent
+            if let writer = try? ASCMHLWriter(ascmhlDir: ascDir, rollName: rollName) {
+                await writer.seed(copied)
+                try? await writer.seal()
             }
         }
         return results

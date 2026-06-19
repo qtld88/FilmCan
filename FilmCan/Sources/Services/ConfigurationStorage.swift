@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 class ConfigurationStorage: ObservableObject {
     static let shared = ConfigurationStorage()
     
@@ -489,9 +490,11 @@ class ConfigurationStorage: ObservableObject {
     }
 
     private func seedTotalTransferCountIfNeeded() {
-        let stored = userDefaults.integer(forKey: totalTransferCountKey)
-        if userDefaults.object(forKey: totalTransferCountKey) == nil || stored < transferHistory.count {
-            totalTransferCount = transferHistory.count
-        }
+        // Seed the lifetime counter ONCE (first launch / migration) from the
+        // existing history. Never reseed afterwards: the counter tracks backups
+        // actually performed, so importing history or trimming retention must not
+        // inflate or reset it — it only moves via incrementTotalTransferCount().
+        guard userDefaults.object(forKey: totalTransferCountKey) == nil else { return }
+        totalTransferCount = transferHistory.count
     }
 }

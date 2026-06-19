@@ -106,6 +106,19 @@ final class RepairFailedDestTests: XCTestCase {
         // Parent TransferResult.destinationResults[1] should now be marked success.
         let updated = vm.results.first?.destinationResults.first(where: { $0.destinationPath == failedRoot.path })
         XCTAssertEqual(updated?.success, true, "Failed dest entry should flip to success after repair")
+
+        // C-1: the repaired destination must receive its own sealed ASC MHL
+        // generation (chain of custody), not be left certified-but-manifestless.
+        let failedAsc = failedRoot.appendingPathComponent("ascmhl")
+        XCTAssertTrue(
+            fm.fileExists(atPath: failedAsc.appendingPathComponent("ascmhl_chain.xml").path),
+            "Repaired dest should have a sealed ASC MHL chain")
+        let latest = try XCTUnwrap(ASCMHLChain.latestManifestPath(ascmhlDir: failedAsc),
+                                   "Repaired dest should have a chained manifest")
+        let repairedEntries = try ASCMHLReader.read(url: failedAsc.appendingPathComponent(latest))
+        XCTAssertEqual(Set(repairedEntries.map { $0.relPath }), ["a.bin", "b.bin"])
+        XCTAssertEqual(repairedEntries.first(where: { $0.relPath == "a.bin" })?.hash, h1)
+        XCTAssertEqual(repairedEntries.first(where: { $0.relPath == "b.bin" })?.hash, h2)
     }
 
     /// Source branch: when the original source is still mounted, repair should

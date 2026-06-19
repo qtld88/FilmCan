@@ -61,10 +61,10 @@ actor DestWriter {
         self.requiresFullFsync = requiresFullFsync
         self.mhlWriter = sharedMHLWriter
 
-        try setupTempFile()
+        try await setupTempFile()
     }
 
-    private func setupTempFile() throws {
+    private func setupTempFile() async throws {
         let destURL = URL(fileURLWithPath: destPath)
         let parent = destURL.deletingLastPathComponent()
         try fm.createDirectory(at: parent, withIntermediateDirectories: true)
@@ -73,12 +73,16 @@ actor DestWriter {
         let tempName = ".filmcan-\(uuid)-\(destURL.lastPathComponent)"
         let tempURL = parent.appendingPathComponent(tempName)
 
+        // Register the name BEFORE the file exists on disk, so a concurrent run's
+        // OrphanCleaner can never see this temp un-registered and delete it
+        // mid-write (TOCTOU). Unregister on the create-failure path.
+        await OrphanCleaner.shared.registerActive(tempName)
         guard fm.createFile(atPath: tempURL.path, contents: nil) else {
+            await OrphanCleaner.shared.unregisterActive(tempName)
             throw WriterError.createFailed(tempURL.path)
         }
         tempFileURL = tempURL
         self.tempName = tempName
-        Task { await OrphanCleaner.shared.registerActive(tempName) }
 
         let handle = try FileHandle(forWritingTo: tempURL)
         // F_NOCACHE: backup writes are write-once and not re-read on this path

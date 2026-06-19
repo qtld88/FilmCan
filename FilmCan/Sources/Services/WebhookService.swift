@@ -1,5 +1,35 @@
 import Foundation
 
+/// Refuses to follow a redirect to a different host (or to a no-longer-allowed
+/// URL). `URLSession` otherwise re-sends the request — including the
+/// `Authorization: Bearer` header and any user-supplied auth headers — to the
+/// redirect target, which an attacker-controlled 30x could use to exfiltrate the
+/// token. Same-host redirects that remain https/localhost are allowed.
+private final class WebhookRedirectGuard: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        if WebhookService.shouldFollowRedirect(
+            originalHost: task.originalRequest?.url?.host, to: request.url?.absoluteString) {
+            completionHandler(request)
+        } else {
+            completionHandler(nil)   // stop here; never forward credentials cross-host
+        }
+    }
+}
+
+enum WebhookHTTP {
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        return URLSession(configuration: config, delegate: WebhookRedirectGuard(), delegateQueue: nil)
+    }()
+}
+
 struct WebhookService {
     static func isAllowedURL(_ urlString: String) -> Bool {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -8,6 +38,17 @@ struct WebhookService {
         if scheme == "https" { return true }
         if scheme == "http", host == "localhost" || host == "127.0.0.1" { return true }
         return false
+    }
+
+    /// Redirect policy for credentialed notification requests: follow only when the
+    /// target stays on the same host AND remains an allowed (https / localhost) URL.
+    /// Anything else could leak the bearer token / auth headers to another host.
+    static func shouldFollowRedirect(originalHost: String?, to target: String?) -> Bool {
+        guard let target, isAllowedURL(target),
+              let originalHost = originalHost?.lowercased(),
+              let newHost = URL(string: target.trimmingCharacters(in: .whitespacesAndNewlines))?.host?.lowercased(),
+              originalHost == newHost else { return false }
+        return true
     }
 
     static func maskedField(path: String, includeFull: Bool) -> String {
@@ -45,7 +86,7 @@ struct WebhookService {
         let details = fields.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
         let body = details.isEmpty ? message : "\(message)\n\n\(details)"
         request.httpBody = body.data(using: .utf8)
-        URLSession.shared.dataTask(with: request) { _, response, error in
+        WebhookHTTP.session.dataTask(with: request) { _, response, error in
             if let error { DebugLog.warn("ntfy send failed: \(error.localizedDescription)") }
             else if let code = (response as? HTTPURLResponse)?.statusCode, code >= 400 {
                 DebugLog.warn("ntfy send HTTP \(code)")
@@ -71,7 +112,7 @@ struct WebhookService {
             return
         }
         request.httpBody = body
-        URLSession.shared.dataTask(with: request) { _, response, error in
+        WebhookHTTP.session.dataTask(with: request) { _, response, error in
             if let error { DebugLog.warn("webhook send failed: \(error.localizedDescription)") }
             else if let code = (response as? HTTPURLResponse)?.statusCode, code >= 400 {
                 DebugLog.warn("webhook send HTTP \(code)")

@@ -59,4 +59,18 @@ final class OrganizationTemplateTokenTests: XCTestCase {
             metadata: ShootMetadata(episode: "", day: "DAY01", unit: "", cameraFormat: "ARRI"))
         XCTAssertEqual(r.folderPath, "20260616_DAY01/Camera_Media/ARRI")
     }
+
+    // M-4: single-pass substitution is order-independent and must NOT re-expand a
+    // value that happens to contain another token literal.
+    func test_substituteTokens_doesNotReExpandSubstitutedValue() {
+        let out = OrganizationTemplate.substituteTokens(
+            "{source}_{date}", values: ["{source}": "{date}", "{date}": "20260620"])
+        XCTAssertEqual(out, "{date}_20260620")
+    }
+
+    func test_substituteTokens_leavesUnknownTokensLiteral() {
+        XCTAssertEqual(
+            OrganizationTemplate.substituteTokens("{x}/{date}", values: ["{date}": "D"]),
+            "{x}/D")
+    }
 }

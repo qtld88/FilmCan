@@ -862,12 +862,19 @@ actor FanOutCopier {
                 }
             }
         }
-        for destMHLs in sharedMHLsByDest.values {
-            for writer in destMHLs.values {
-                if wasCancelled {
-                    try? await writer.finalizeAsPartial(reason: "Run cancelled or failed before completion")
-                } else {
-                    try? await writer.seal()
+        for (destPath, destMHLs) in sharedMHLsByDest {
+            for (rootName, writer) in destMHLs {
+                do {
+                    if wasCancelled {
+                        try await writer.finalizeAsPartial(reason: "Run cancelled or failed before completion")
+                    } else {
+                        try await writer.seal()
+                    }
+                } catch {
+                    // Don't fail the whole run on a manifest-finalize error, but never
+                    // swallow it silently — the manifest is the deliverable, so a seal
+                    // failure must be diagnosable in release builds.
+                    DebugLog.error("MHL \(wasCancelled ? "partial-finalize" : "seal") failed for \(rootName) at \(destPath): \(error.localizedDescription)")
                 }
             }
         }
@@ -898,11 +905,17 @@ actor FanOutCopier {
                     #endif
                     if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
                         do {
+                            // No per-file flush: `append` already renders a checkpoint
+                            // every `Constants.mhlFlushEveryFiles` files and `seal()`
+                            // writes the complete manifest at the end. Flushing every
+                            // file rewrote the entire growing manifest N times — O(N²)
+                            // disk writes on rolls with thousands of clips. A crash now
+                            // costs at most a few already-copied files being re-copied
+                            // on resume (safe), not data loss.
                             try await writer.append(
                                 relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
                                 hash: r.destHashFromStream ?? c.verifiedSourceHash,
                                 mtime: c.srcMtime)
-                            try await writer.flush()
                         } catch {
                             appendFailed.insert(r.destPath)
                         }
