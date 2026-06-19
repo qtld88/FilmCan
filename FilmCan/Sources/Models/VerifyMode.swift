@@ -20,7 +20,7 @@ enum VerifyMode: String, Codable, CaseIterable, Identifiable {
         case .paranoid:
             return "Re-reads source from disk after copy and verifies all destinations bit-for-bit. Catches in-memory corruption. Recommended."
         case .fast:
-            return "Verifies destinations against the source hash computed during the copy. No re-read — about twice as fast. Use for scratch copies."
+            return "Re-reads each destination from disk and verifies it against the source hash from the copy. Skips the source re-read paranoid does, so ~twice as fast — but does not catch in-memory source corruption."
         case .off:
             return "No verification. Fastest, but a write error or corruption won't be detected."
         }

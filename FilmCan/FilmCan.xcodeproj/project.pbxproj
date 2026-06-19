@@ -68,6 +68,7 @@
 		818A3B2F83A72582CF1CB60D /* FlowLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */; };
 		84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */; };
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
+		8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209A0A98482A692929BD2180 /* FastVerifyTests.swift */; };
 		8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */; };
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
 		8DF8D007DFC3E0509BAAACCB /* SecretsNetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBDF7051DA56C935FDB1E25A /* SecretsNetworkTests.swift */; };
@@ -172,6 +173,7 @@
 		1D28EDE431F28873920B2B30 /* OrganizationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationSettingsView.swift; sourceTree = "<group>"; };
 		1D33906FE8BD0F1A2C8192DF /* FilmCan.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FilmCan.entitlements; sourceTree = "<group>"; };
 		205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedClassifier.swift; sourceTree = "<group>"; };
+		209A0A98482A692929BD2180 /* FastVerifyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastVerifyTests.swift; sourceTree = "<group>"; };
 		2314F69E3FD8DCE91282F1FA /* DestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestWriter.swift; sourceTree = "<group>"; };
 		2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupConfigurationCodableTests.swift; sourceTree = "<group>"; };
 		244ADA509455AE3EBC04AC4D /* ExplodeFanOutResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplodeFanOutResultTests.swift; sourceTree = "<group>"; };
@@ -396,6 +398,7 @@
 				28B96018630A1BE87D3AE467 /* FanOutCopierIntegrationTests.swift */,
 				A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */,
 				3066C90EFA131CD742855EB5 /* FanOutCopierTests.swift */,
+				209A0A98482A692929BD2180 /* FastVerifyTests.swift */,
 				E47CF7DDB3A7E4B996579E0F /* Info.plist */,
 				EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */,
 				D5DEA0246D51FEB546D543EE /* NetflixNameValidatorTests.swift */,
@@ -673,6 +676,7 @@
 				0E5C6DCD8EF03EDC8D4A1CC8 /* FanOutCopierIntegrationTests.swift in Sources */,
 				99F49C12806796F55D999CEE /* FanOutCopierSafetyTests.swift in Sources */,
 				A6588DD8301CC2D89C181486 /* FanOutCopierTests.swift in Sources */,
+				8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */,
 				138FE41894080BDF18228786 /* LegacyCleanupTests.swift in Sources */,
 				B78B3C4D3E7FDF4D5F69F570 /* NetflixNameValidatorTests.swift in Sources */,
 				E913256E07143EBE91685672 /* NetflixPresetTests.swift in Sources */,

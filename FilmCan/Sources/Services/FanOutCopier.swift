@@ -1341,69 +1341,72 @@ actor FanOutCopier {
             }
         }
 
-        guard config.verifyMode == .paranoid else {
-            return PerSourceOutcome(
-                sourcePath: c.sourcePath, writerResults: c.writerResults,
-                verifyFailedDestPaths: verifyFailed, sourceCorrupted: false
-            )
-        }
-
-        // Give drives that don't reliably honor F_FULLFSYNC time to flush their
-        // write cache before the paranoid re-read. Without this, the re-read can
-        // return stale data and produce a false hash mismatch.
-        let hasFullFsyncDest = config.destinations.contains { $0.requiresFullFsync }
-        if hasFullFsyncDest {
-            try? await Task.sleep(for: .seconds(1))
-        }
-
-        // Cancel can land during the settle delay.
-        if config.shouldCancel?() == true {
-            let cancelled = await emitCancelled()
-            return PerSourceOutcome(
-                sourcePath: c.sourcePath, writerResults: c.writerResults,
-                verifyFailedDestPaths: verifyFailed.union(cancelled), sourceCorrupted: false
-            )
-        }
-
-        // Emit verify-start progress for each successful destination.
-        for r in c.writerResults where r.success {
-            let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
-            var prog = DestProgress(
-                id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
-                status: .active, bytesTotal: dTotal,
-                filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid
-            )
-            prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
-            prog.filesCompleted = await self.completedFilesForDest(r.destPath)
-            prog.verifyBytesTotal = dTotal
-            prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
-            prog.currentFile = "Verifying \(c.sourceName)…"
-            let se = await self.combinedThroughputETA(
-                destPath: r.destPath, copyDoneNow: nil,
-                copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
-            prog.speedBytesPerSecond = se.speed
-            prog.estimatedTimeRemaining = se.eta
-            prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
-            config.progressHandler?(prog)
-        }
-
+        // Paranoid only: settle delay + re-read the SOURCE from disk to catch
+        // in-memory corruption. Fast mode trusts the copy-time source hash but
+        // still re-reads every destination below.
         var corrupted = false
-        let sourceHashFromDisk = await rereadHash(url: c.sourceURL, chunkSz: c.chunkSz)
-        if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
-            corrupted = true
+        if config.verifyMode == .paranoid {
+            // Give drives that don't reliably honor F_FULLFSYNC time to flush their
+            // write cache before the paranoid re-read. Without this, the re-read can
+            // return stale data and produce a false hash mismatch.
+            let hasFullFsyncDest = config.destinations.contains { $0.requiresFullFsync }
+            if hasFullFsyncDest {
+                try? await Task.sleep(for: .seconds(1))
+            }
+
+            // Cancel can land during the settle delay.
+            if config.shouldCancel?() == true {
+                let cancelled = await emitCancelled()
+                return PerSourceOutcome(
+                    sourcePath: c.sourcePath, writerResults: c.writerResults,
+                    verifyFailedDestPaths: verifyFailed.union(cancelled), sourceCorrupted: false
+                )
+            }
+
+            // Emit verify-start progress for each successful destination.
             for r in c.writerResults where r.success {
-                try? fm.removeItem(atPath: r.writtenFilePath)
-                verifyFailed.insert(r.destPath)
-                // Flip the card to red now; the run also aborts with a corruption error.
+                let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
                 var prog = DestProgress(
                     id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
-                    status: .failed(.verify), bytesTotal: c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources,
-                    filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid)
-                prog.currentFile = "Source read error — retry"
+                    status: .active, bytesTotal: dTotal,
+                    filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid
+                )
+                prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
+                prog.filesCompleted = await self.completedFilesForDest(r.destPath)
+                prog.verifyBytesTotal = dTotal
+                prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
+                prog.currentFile = "Verifying \(c.sourceName)…"
+                let se = await self.combinedThroughputETA(
+                    destPath: r.destPath, copyDoneNow: nil,
+                    copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
+                prog.speedBytesPerSecond = se.speed
+                prog.estimatedTimeRemaining = se.eta
                 prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
                 config.progressHandler?(prog)
             }
-        } else {
+
+            let sourceHashFromDisk = await rereadHash(url: c.sourceURL, chunkSz: c.chunkSz)
+            if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
+                corrupted = true
+                for r in c.writerResults where r.success {
+                    try? fm.removeItem(atPath: r.writtenFilePath)
+                    verifyFailed.insert(r.destPath)
+                    // Flip the card to red now; the run also aborts with a corruption error.
+                    var prog = DestProgress(
+                        id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                        status: .failed(.verify), bytesTotal: c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources,
+                        filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid)
+                    prog.currentFile = "Source read error — retry"
+                    prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
+                    config.progressHandler?(prog)
+                }
+            }
+        }
+
+        // Re-read every destination from disk (fast AND paranoid) and compare to
+        // the copy-time source hash. Fast skips source re-read above but must still
+        // verify the written bytes aren't corrupted on disk.
+        if !corrupted {
             let writtenPathByDest: [String: String] = Dictionary(
                 uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.writtenFilePath) }
             )
