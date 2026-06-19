@@ -42,4 +42,31 @@ final class CopyEnginePersistenceTests: XCTestCase {
         let config = try JSONDecoder().decode(BackupConfiguration.self, from: json)
         XCTAssertEqual(config.engineOptions, EngineOptions())
     }
+
+    func testEntitlementsIsValidPlist() throws {
+        let here = URL(fileURLWithPath: #filePath)
+        let entitlements = here
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/FilmCan.entitlements")
+        let data = try Data(contentsOf: entitlements)
+        let obj = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        XCTAssertNotNil(obj as? [String: Any])
+    }
+
+    func testSaveEncodesAllBeforeWriting() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("filmcan-save-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let store = ConfigurationStorage(baseDirectory: dir)
+        var cfg = BackupConfiguration()
+        cfg.name = "Cfg A"
+        store.add(cfg)
+        XCTAssertTrue(store.save())
+
+        let reloaded = ConfigurationStorage(baseDirectory: dir)
+        reloaded.load()
+        XCTAssertEqual(reloaded.configurations.map(\.name), ["Cfg A"])
+    }
 }

@@ -168,11 +168,13 @@ class ConfigurationStorage: ObservableObject {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = .prettyPrinted
-            let data = try encoder.encode(configurations)
-            try writeWithBackup(data, to: configFileURL, backupURL: configBackupFileURL)
-            let presetData = try encoder.encode(organizationPresets)
-            try writeWithBackup(presetData, to: presetsFileURL, backupURL: presetsBackupFileURL)
+            // Encode ALL three before any write so an encode error can't leave a
+            // partially-updated set on disk.
+            let configData  = try encoder.encode(configurations)
+            let presetData  = try encoder.encode(organizationPresets)
             let historyData = try encoder.encode(transferHistory)
+            try writeWithBackup(configData,  to: configFileURL,  backupURL: configBackupFileURL)
+            try writeWithBackup(presetData,  to: presetsFileURL, backupURL: presetsBackupFileURL)
             try writeWithBackup(historyData, to: historyFileURL, backupURL: historyBackupFileURL)
             lastSaveError = nil
             return true
