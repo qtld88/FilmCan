@@ -1430,7 +1430,7 @@ actor FanOutCopier {
                 uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.writtenFilePath) }
             )
             await withTaskGroup(of: (String, String?).self) { group in
-                for r in c.writerResults where r.success && !verifyFailed.contains(r.destPath) {
+                for r in c.writerResults where r.success && r.filesTransferred > 0 && !verifyFailed.contains(r.destPath) {
                     let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
                     let destPath = r.destPath
                     group.addTask {
