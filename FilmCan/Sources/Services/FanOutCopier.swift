@@ -163,6 +163,7 @@ actor FanOutCopier {
         var unreadableHandler: (@Sendable ([String]) async -> Bool)? = nil
         #if DEBUG
         var _testForceDestReadHashNil: Bool = false
+        var _testForceMHLAppendFailure: Bool = false
         #endif
     }
 
@@ -887,15 +888,33 @@ actor FanOutCopier {
             // Append MHL ONLY after verify passes — never before. If the file was
             // deleted (nil hash, hash mismatch, source corruption) no entry is written.
             if !outcome.sourceCorrupted {
-                let failed = outcome.verifyFailedDestPaths
-                for r in c.writerResults where r.success && r.filesTransferred > 0 && !failed.contains(r.destPath) {
-                    if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
-                        try? await writer.append(
-                            relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
-                            hash: r.destHashFromStream ?? c.verifiedSourceHash,
-                            mtime: c.srcMtime)
-                        try? await writer.flush()
+                var appendFailed = outcome.verifyFailedDestPaths
+                for r in c.writerResults where r.success && r.filesTransferred > 0 && !appendFailed.contains(r.destPath) {
+                    #if DEBUG
+                    if config._testForceMHLAppendFailure {
+                        appendFailed.insert(r.destPath)
+                        continue
                     }
+                    #endif
+                    if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
+                        do {
+                            try await writer.append(
+                                relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
+                                hash: r.destHashFromStream ?? c.verifiedSourceHash,
+                                mtime: c.srcMtime)
+                            try await writer.flush()
+                        } catch {
+                            appendFailed.insert(r.destPath)
+                        }
+                    }
+                }
+                if appendFailed != outcome.verifyFailedDestPaths {
+                    out.append(PerSourceOutcome(
+                        sourcePath: outcome.sourcePath,
+                        writerResults: outcome.writerResults,
+                        verifyFailedDestPaths: appendFailed,
+                        sourceCorrupted: outcome.sourceCorrupted))
+                    continue
                 }
             }
             out.append(outcome)
