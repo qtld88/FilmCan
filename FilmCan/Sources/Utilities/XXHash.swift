@@ -1,13 +1,24 @@
 import Foundation
 import Darwin
 
+/// Mirrors C `XXH128_hash_t { XXH64_hash_t low64; XXH64_hash_t high64; }`.
+/// Must be top-level for use in `@convention(c)` function types.
+/// A two-field UInt64 aggregate uses the C integer-aggregate return ABI on
+/// both arm64 (x0/x1) and x86_64 (rax/rdx) — unlike SIMD2, whose vector ABI
+/// mismatches the C function and yields garbage on x86_64.
+struct XXH128Hash { var low64: UInt64; var high64: UInt64 }
+
 final class XXHash128Library {
     static let shared = XXHash128Library()
 
     typealias CreateState = @convention(c) () -> UnsafeMutableRawPointer?
     typealias Reset = @convention(c) (UnsafeMutableRawPointer?) -> UInt32
     typealias Update = @convention(c) (UnsafeMutableRawPointer?, UnsafeRawPointer?, Int) -> UInt32
-    typealias Digest = @convention(c) (UnsafeRawPointer?) -> SIMD2<UInt64>
+    // NSRange {Int location; Int length} is ObjC-representable and has the same
+    // two-integer-register ABI as C's XXH128_hash_t {uint64_t low64; uint64_t high64}.
+    // Direct use of a Swift struct in @convention(c) is rejected by the compiler
+    // despite being ABI-equivalent — this is a known Swift type-system limitation.
+    typealias Digest = @convention(c) (UnsafeRawPointer?) -> NSRange
     typealias FreeState = @convention(c) (UnsafeMutableRawPointer?) -> Void
 
     private let handle: UnsafeMutableRawPointer?
@@ -52,8 +63,11 @@ final class XXHash128Library {
         return updateFn(state, data, length) == 0
     }
 
-    func digest(_ state: UnsafeRawPointer?) -> SIMD2<UInt64> {
-        digestFn?(state) ?? SIMD2<UInt64>(0, 0)
+    func digest(_ state: UnsafeRawPointer?) -> XXH128Hash {
+        let range = digestFn?(state) ?? NSRange(location: 0, length: 0)
+        // NSRange.location maps to low64, NSRange.length maps to high64 (same registers).
+        return XXH128Hash(low64: UInt64(bitPattern: Int64(range.location)),
+                          high64: UInt64(bitPattern: Int64(range.length)))
     }
 
     func freeState(_ state: UnsafeMutableRawPointer?) {
@@ -122,11 +136,11 @@ final class XXHash128State {
         guard let state else { return Data() }
         let hash = library.digest(UnsafeRawPointer(state))
         freeIfNeeded()
-        var low = hash[0].littleEndian
-        var high = hash[1].littleEndian
-        var bytes = Data(bytes: &low, count: MemoryLayout<UInt64>.size)
-        bytes.append(Data(bytes: &high, count: MemoryLayout<UInt64>.size))
-        return bytes
+        var out = Data()
+        out.reserveCapacity(16)
+        withUnsafeBytes(of: hash.high64.bigEndian) { out.append(contentsOf: $0) }
+        withUnsafeBytes(of: hash.low64.bigEndian) { out.append(contentsOf: $0) }
+        return out
     }
 
     private func freeIfNeeded() {
