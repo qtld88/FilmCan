@@ -38,6 +38,7 @@ actor DestWriter {
     private let mhlWriter: (any MHLWriting)?
 
     private var tempFileURL: URL?
+    private var tempName: String?
     private var writeHandle: FileHandle?
     private var finalized = false
 
@@ -76,6 +77,8 @@ actor DestWriter {
             throw WriterError.createFailed(tempURL.path)
         }
         tempFileURL = tempURL
+        self.tempName = tempName
+        Task { await OrphanCleaner.shared.registerActive(tempName) }
 
         let handle = try FileHandle(forWritingTo: tempURL)
         // F_NOCACHE: backup writes are write-once and not re-read on this path
@@ -115,6 +118,7 @@ actor DestWriter {
             writeHandle = nil
             try? fm.removeItem(at: tempURL)
             tempFileURL = nil
+            if let n = tempName { Task { await OrphanCleaner.shared.unregisterActive(n) } }
             throw SkippedDueToConflict()
         }
 
@@ -158,6 +162,7 @@ actor DestWriter {
             throw WriterError.finalizeFailed("rename(2) failed for \(effectiveDestURL.path)")
         }
 
+        if let n = tempName { Task { await OrphanCleaner.shared.unregisterActive(n) } }
         return effectiveDestURL.path
     }
 
@@ -187,6 +192,9 @@ actor DestWriter {
         if !finalized, let tempURL = tempFileURL {
             try? writeHandle?.close()
             try? fm.removeItem(at: tempURL)
+        }
+        if let n = tempName {
+            Task { await OrphanCleaner.shared.unregisterActive(n) }
         }
     }
 }
