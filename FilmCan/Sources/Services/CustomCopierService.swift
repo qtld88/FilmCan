@@ -32,21 +32,20 @@ class CustomCopierService: ObservableObject, TransferService {
         lastEtaUpdate = .distantPast
         smoothedEta = nil
         creationDateCache.removeAll()
-        cancellationState.update(isCancelled: false, isPaused: false)
+        cancellationState.update(isCancelled: false)
     }
 
     func cancel() {
         isCancelled = true
         progress.isCancelled = true
         progress.isRunning = false
-        cancellationState.update(isCancelled: true, isPaused: isPaused)
+        cancellationState.update(isCancelled: true)
     }
 
     func pause() {
         isPaused = true
         progress.isPaused = true
         progress.isRunning = false
-        cancellationState.update(isCancelled: isCancelled, isPaused: true)
     }
 
 

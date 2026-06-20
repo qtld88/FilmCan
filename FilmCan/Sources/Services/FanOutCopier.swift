@@ -40,6 +40,9 @@ struct DestResultBuilder {
     var mhlPaths: [String] = []
     var totalDuration: TimeInterval = 0
     var verificationFailed: Bool = false
+    /// Set when seal() failed after a clean copy+verify — surfaces as a non-fatal
+    /// warning, never flips `success`.
+    var manifestUnsealedReason: String? = nil
     /// Names of files actually copied this run (for a truthful transferred-items list).
     var transferredNames: [String] = []
 
@@ -71,6 +74,12 @@ struct DestResultBuilder {
         if !failures.contains(.userCancel) { failures.append(.userCancel) }
     }
 
+    /// Manifest seal failed after a clean copy+verify. Records the reason WITHOUT
+    /// touching `success` — the footage is intact, only the deliverable is missing.
+    mutating func markManifestUnsealed(_ reason: String) {
+        if manifestUnsealedReason == nil { manifestUnsealedReason = reason }
+    }
+
     func build(skipped: Int = 0) -> DestResult {
         DestResult(
             destinationPath: destPath,
@@ -82,6 +91,7 @@ struct DestResultBuilder {
             bytesTransferred: totalBytes,
             failureReason: verificationFailed ? .verify : failures.first,
             mhlPath: mhlPaths.first,
+            manifestUnsealedReason: manifestUnsealedReason,
             durationSec: totalDuration,
             verifyMode: verifyMode,
             transferredFileNames: transferredNames
@@ -873,8 +883,12 @@ actor FanOutCopier {
                 } catch {
                     // Don't fail the whole run on a manifest-finalize error, but never
                     // swallow it silently — the manifest is the deliverable, so a seal
-                    // failure must be diagnosable in release builds.
+                    // failure must be diagnosable in release builds AND surfaced to the
+                    // operator (the copy verified; only the manifest is missing).
                     DebugLog.error("MHL \(wasCancelled ? "partial-finalize" : "seal") failed for \(rootName) at \(destPath): \(error.localizedDescription)")
+                    if !wasCancelled {
+                        builders[destPath]?.markManifestUnsealed(error.localizedDescription)
+                    }
                 }
             }
         }

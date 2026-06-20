@@ -908,6 +908,17 @@ class TransferViewModel: ObservableObject {
         }.value
     }
 
+    /// User-facing warning for a destination that copied and verified cleanly but
+    /// whose ASC MHL manifest could not be sealed. Reassures that the footage is
+    /// safe and points at the fix (re-run regenerates the manifest only).
+    static func manifestUnsealedWarning(_ reason: String?) -> String? {
+        guard let reason, !reason.isEmpty else { return nil }
+        return "Files copied and verified, but the ASC MHL manifest couldn’t be written "
+            + "(\(reason)). Your footage is safe and hash-verified — only the "
+            + "chain-of-custody manifest is incomplete. Re-run the backup for this "
+            + "destination to regenerate it."
+    }
+
     func explodeFanOutResult(_ fanOut: TransferResult, configName: String) -> [TransferResult] {
         fanOut.destinationResults.map { dr in
             var r = TransferResult(
@@ -917,7 +928,7 @@ class TransferViewModel: ObservableObject {
                 endTime: fanOut.endTime,
                 success: dr.success,
                 errorMessage: dr.success ? nil : dr.failureReason?.displayMessage,
-                warningMessage: nil,
+                warningMessage: Self.manifestUnsealedWarning(dr.manifestUnsealedReason),
                 filesTransferred: dr.filesTransferred,
                 bytesTransferred: dr.bytesTransferred,
                 totalBytes: dr.bytesTransferred,
