@@ -30,6 +30,7 @@ final class RobustnessTests: XCTestCase {
 
     // MARK: - Task 2: ConfigurationStorage surfaces save failure
 
+    @MainActor
     func test_save_reportsFailureOnUnwritableDir() throws {
         if getuid() == 0 { throw XCTSkip("perms not enforced as root") }
         let ro = tempDir()

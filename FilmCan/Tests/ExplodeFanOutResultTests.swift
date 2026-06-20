@@ -53,6 +53,46 @@ final class ExplodeFanOutResultTests: XCTestCase {
         XCTAssertEqual(r2.destinationResults[0].destinationPath, "/Volumes/CARD_B")
     }
 
+    // A clean copy+verify whose manifest failed to seal must stay success=true with
+    // NO error, but surface a non-fatal warning carrying the seal reason.
+    func test_explodeFanOutResult_manifestUnsealedSurfacesWarningNotFailure() {
+        let vm = TransferViewModel()
+        let now = Date()
+
+        var dr = DestResult(destinationPath: "/Volumes/CARD_A", displayName: "CARD_A")
+        dr.success = true
+        dr.filesTransferred = 5
+        dr.bytesTransferred = 500_000
+        dr.verifyMode = .paranoid
+        dr.manifestUnsealedReason = "disk full"
+
+        var fanOut = TransferResult(
+            configurationName: "Cfg", destination: dr.destinationPath,
+            startTime: now, endTime: now, success: true)
+        fanOut.destinationResults = [dr]
+
+        let r = vm.explodeFanOutResult(fanOut, configName: "Cfg")[0]
+        XCTAssertTrue(r.success, "Manifest seal failure must not fail the destination")
+        XCTAssertNil(r.errorMessage)
+        let warning = try? XCTUnwrap(r.warningMessage)
+        XCTAssertNotNil(warning)
+        XCTAssertTrue(warning?.contains("disk full") == true,
+                      "Warning should carry the seal reason")
+        XCTAssertTrue(warning?.contains("safe") == true,
+                      "Warning should reassure the footage is safe")
+    }
+
+    func test_explodeFanOutResult_noWarningWhenManifestSealed() {
+        let vm = TransferViewModel()
+        var dr = DestResult(destinationPath: "/Volumes/X", displayName: "X")
+        dr.success = true
+        var fanOut = TransferResult(
+            configurationName: "Cfg", destination: "/Volumes/X",
+            startTime: Date(), endTime: Date(), success: true)
+        fanOut.destinationResults = [dr]
+        XCTAssertNil(vm.explodeFanOutResult(fanOut, configName: "Cfg")[0].warningMessage)
+    }
+
     func test_explodeFanOutResult_preservesTimestamps() {
         let vm = TransferViewModel()
         let start = Date(timeIntervalSinceReferenceDate: 1_000_000)

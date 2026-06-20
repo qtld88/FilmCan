@@ -32,10 +32,15 @@ actor SiblingDestSource {
             guard let hasher = XXH128StreamingHasher() else {
                 throw Error.readFailed("XXH128 unavailable")
             }
-            while true {
-                guard let data = try handle.read(upToCount: 4 * 1024 * 1024) else { break }
+            // Drain the autorelease pool per chunk: FileHandle.read returns
+            // autoreleased Data that would otherwise accumulate for the whole file
+            // (multi-GB), driving system memory pressure — the same hazard the
+            // fan-out engine guards against in rereadHashDetached.
+            while try autoreleasepool(invoking: {
+                guard let data = try handle.read(upToCount: 4 * 1024 * 1024), !data.isEmpty else { return false }
                 hasher.update(data: data)
-            }
+                return true
+            }) {}
             let hash = hasher.finalize().hexString
             if hash == expectedHash {
                 return candidate
@@ -44,7 +49,7 @@ actor SiblingDestSource {
         return nil
     }
 
-    func copyFromSibling(fileName: String, from sourcePath: String, to destPath: String, expectedHash: String, chunkSize: Int = 4 * 1024 * 1024) async throws {
+    func copyFromSibling(fileName: String, from sourcePath: String, to destPath: String, expectedHash: String, requiresFullFsync: Bool, chunkSize: Int = 4 * 1024 * 1024) async throws {
         let fm = FileManager.default
         guard fm.fileExists(atPath: sourcePath) else {
             throw Error.noSiblingFound(fileName)
@@ -70,12 +75,24 @@ actor SiblingDestSource {
             try? fm.removeItem(at: tempURL)
             throw Error.readFailed("XXH128 unavailable")
         }
-        while true {
-            guard let data = try srcHandle.read(upToCount: chunkSize) else { break }
+        // Per-chunk autorelease drain (see findVerifiedSibling): repairing a
+        // multi-hundred-GB clip would otherwise grow resident memory by the full
+        // file size and crash under memory pressure.
+        while try autoreleasepool(invoking: {
+            guard let data = try srcHandle.read(upToCount: chunkSize), !data.isEmpty else { return false }
             try destHandle.write(contentsOf: data)
             hasher.update(data: data)
+            return true
+        }) {}
+        // exFAT/USB/SD destinations (often the drive that just failed) don't honor
+        // a plain fsync — flush with F_FULLFSYNC there, matching DestWriter.
+        if requiresFullFsync {
+            if fcntl(destHandle.fileDescriptor, F_FULLFSYNC) == -1 {
+                try destHandle.synchronize()
+            }
+        } else {
+            try destHandle.synchronize()
         }
-        try destHandle.synchronize()
 
         let actualHash = hasher.finalize().hexString
         guard actualHash == expectedHash else {

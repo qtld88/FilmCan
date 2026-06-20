@@ -53,6 +53,7 @@ final class CopyEnginePersistenceTests: XCTestCase {
         XCTAssertNotNil(obj as? [String: Any])
     }
 
+    @MainActor
     func testSaveEncodesAllBeforeWriting() throws {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("filmcan-save-\(UUID().uuidString)")

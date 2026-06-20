@@ -44,8 +44,10 @@ final class FanOutCopierSafetyTests: XCTestCase {
     // MARK: - Performance regression
 
     /// Pure copy throughput (fast verify = no re-read). Catches the F_NOCACHE
-    /// regression that capped SSD→SSD at ~160 MB/s. Floor is deliberately well
-    /// below real Apple-SSD speed (multi-GB/s) but well above the bug.
+    /// regression that capped SSD→SSD at ~160 MB/s. Floor is 200 MB/s: comfortably
+    /// above the bug (~160) yet below healthy-but-loaded throughput (~300+ measured
+    /// on a busy machine), so it flags the regression without flaking under CI load.
+    /// A higher floor (400) tripped on machine contention alone.
     func test_perf_throughput_fastMode_aboveFloor() async throws {
         let sizeBytes = 128 * 1024 * 1024 // 128 MB
         let sourceURL = tmpDir.appendingPathComponent("perf-source.bin")
@@ -77,7 +79,7 @@ final class FanOutCopierSafetyTests: XCTestCase {
         print(String(format: "⏱  fan-out copy throughput: %.0f MB/s (%d MB in %.3fs)",
                      mbps, sizeBytes / (1024 * 1024), elapsed))
 
-        XCTAssertGreaterThan(mbps, 400,
+        XCTAssertGreaterThan(mbps, 200,
             "Copy throughput \(Int(mbps)) MB/s below floor — possible F_NOCACHE / caching regression")
     }
 

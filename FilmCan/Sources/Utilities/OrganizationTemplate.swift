@@ -184,11 +184,32 @@ enum OrganizationTemplate {
     }
 
     private static func applyTokens(_ template: String, values: [String: String], allowPathSeparators: Bool) -> String {
-        var result = template
-        for (token, value) in values {
-            result = result.replacingOccurrences(of: token, with: value)
+        sanitizeTemplate(substituteTokens(template, values: values), allowPathSeparators: allowPathSeparators)
+    }
+
+    /// Single-pass `{token}` substitution: scans the template once and replaces each
+    /// recognized token WITHOUT re-scanning the substituted text. Makes the result
+    /// order-independent (the previous dictionary-iteration replace was not) and
+    /// prevents a value that contains another token literal (e.g. a file named
+    /// "{date}") from being re-expanded.
+    static func substituteTokens(_ template: String, values: [String: String]) -> String {
+        guard template.contains("{") else { return template }
+        var out = ""
+        out.reserveCapacity(template.count)
+        var i = template.startIndex
+        while i < template.endIndex {
+            if template[i] == "{", let close = template[i...].firstIndex(of: "}") {
+                let token = String(template[i...close])
+                if let value = values[token] {
+                    out += value
+                    i = template.index(after: close)
+                    continue
+                }
+            }
+            out.append(template[i])
+            i = template.index(after: i)
         }
-        return sanitizeTemplate(result, allowPathSeparators: allowPathSeparators)
+        return out
     }
 
     private static func sanitizeTemplate(_ value: String, allowPathSeparators: Bool) -> String {
