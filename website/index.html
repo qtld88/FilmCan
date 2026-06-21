@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FilmCan — verified camera-card backup for macOS</title>
+<meta name="description" content="FilmCan copies your camera media to multiple drives in one pass, hash-verifies every byte, and writes the manifests — so you know the backup is good before you wipe the card.">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="FilmCan — verified camera-card backup for macOS">
+<meta property="og:description" content="Backup camera cards. Verified. To every drive at once.">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="#" style="text-decoration:none"><img src="assets/icon.png" alt="FilmCan icon">FilmCan</a>
+  <div class="links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#faq">FAQ</a>
+    <a href="#support">Support</a>
+    <!-- Docs nav slot reserved for phase 2: <a href="docs/">Docs</a> -->
+    <a class="btn" href="#download">Download</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="badge">Free · GPL-3.0 · macOS 13+</span>
+  <h1>Backup camera cards.<br><span class="yellow">Verified.</span> To every drive at once.</h1>
+  <p class="lead">FilmCan copies your media to multiple drives in a single pass, hash-verifies every byte, and writes the manifests — so you know the backup is good before you wipe the card.</p>
+  <div class="cta">
+    <a class="btn" id="dl-hero" href="https://github.com/qtld88/FilmCan/releases">⬇ Download for macOS</a>
+    <a class="btn ghost" href="https://github.com/qtld88/FilmCan">View on GitHub</a>
+  </div>
+  <div class="meta" id="meta-hero">Universal · macOS 13 Ventura or later</div>
+  <img class="shot" src="assets/screenshot-main.png" alt="FilmCan app showing a backup copying to two drives, hash-verified.">
+</div></header>
+
+<section id="how"><div class="wrap">
+  <span class="eyebrow">How it works</span>
+  <h2 class="sec">Four steps to a safe backup</h2>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Add sources</h3><p>Drag your card or folder into Copy From.</p></div>
+    <div class="step"><div class="n">2</div><h3>Add destinations</h3><p>Drop one or more drives into Save To. More drives = redundancy.</p></div>
+    <div class="step"><div class="n">3</div><h3>Run</h3><p>One pass copies to every destination at once.</p></div>
+    <div class="step"><div class="n">4</div><h3>Verify</h3><p>Hash-checks every byte and writes the manifest.</p></div>
+  </div>
+</div></section>
+
+<section id="features"><div class="wrap">
+  <span class="eyebrow">Features</span>
+  <h2 class="sec">Built for the DIT cart</h2>
+  <div class="feat">
+    <div class="fc"><div class="ic">🗂️</div><h3>Fan-out copy</h3><p>N sources → M drives, read once, written everywhere in a single pass.</p></div>
+    <div class="fc"><div class="ic">✅</div><h3>xxHash128 verify</h3><p>Fast or Paranoid re-read. ASC MHL plus chain manifests.</p></div>
+    <div class="fc"><div class="ic">⏯️</div><h3>Stop &amp; resume</h3><p>Clean stop, no partial files. Re-run skips what's already safe.</p></div>
+    <div class="fc"><div class="ic">🎬</div><h3>Netflix Ingest</h3><p>Camera/Sound routing, roll folders, report scaffolds.</p></div>
+    <div class="fc"><div class="ic">📁</div><h3>Organization presets</h3><p>Auto folder structure by date, episode, unit, and format.</p></div>
+    <div class="fc"><div class="ic">🔒</div><h3>Local &amp; private</h3><p>No file uploads. Transfers stay on your machine.</p></div>
+  </div>
+</div></section>
+
+<section id="download"><div class="wrap">
+  <div class="dl">
+    <h2>Download FilmCan</h2>
+    <p class="sub">Free and open source. Universal build for Apple Silicon &amp; Intel.</p>
+    <div class="cta">
+      <a class="btn" id="dl-main" href="https://github.com/qtld88/FilmCan/releases">⬇ Download (.dmg)</a>
+      <a class="btn ghost" href="https://github.com/qtld88/FilmCan/releases">All releases / older versions</a>
+    </div>
+    <div class="meta" id="meta-download">Requires macOS 13 Ventura or later</div>
+  </div>
+</div></section>
+
+<section id="faq"><div class="wrap">
+  <span class="eyebrow">Q&amp;A</span>
+  <h2 class="sec">Frequently asked</h2>
+  <div class="faq">
+    <details class="qa"><summary><button type="button">Is it free?<span class="plus">+</span></button></summary><div class="ans"><p>Yes. GPL-3.0 licensed and fully open source.</p></div></details>
+    <details class="qa"><summary><button type="button">Does it work with my camera?<span class="plus">+</span></button></summary><div class="ans"><p>Any camera that mounts as storage — RED, ARRI, Sony, Canon, Panasonic, Blackmagic, GoPro, and more.</p></div></details>
+    <details class="qa"><summary><button type="button">Does it upload anything?<span class="plus">+</span></button></summary><div class="ans"><p>No file uploads. Transfers stay local; optional notifications send status metadata only.</p></div></details>
+    <details class="qa"><summary><button type="button">Can I stop and resume?<span class="plus">+</span></button></summary><div class="ans"><p>Yes. Stop is clean with no partial files, and re-running skips files already backed up to every destination.</p></div></details>
+    <details class="qa"><summary><button type="button">How does verification work?<span class="plus">+</span></button></summary><div class="ans"><p>Fast checks the hash computed during copy; Paranoid re-reads every file from disk. FilmCan uses xxHash128.</p></div></details>
+    <details class="qa"><summary><button type="button">Which macOS is supported?<span class="plus">+</span></button></summary><div class="ans"><p>macOS 13.0 (Ventura) and later.</p></div></details>
+  </div>
+</div></section>
+
+<section id="support"><div class="wrap">
+  <span class="eyebrow">Get in touch · Support the project</span>
+  <h2 class="sec">Contact &amp; donate</h2>
+  <div class="cols">
+    <div class="box">
+      <h3>Contact</h3>
+      <a class="line" href="mailto:qtld@pm.me">✉ qtld@pm.me</a>
+      <a class="line" href="https://github.com/qtld88/FilmCan">🐙 github.com/qtld88/FilmCan</a>
+      <a class="line" href="https://github.com/qtld88/FilmCan/issues">🐞 Report a bug / request a feature</a>
+    </div>
+    <div class="box">
+      <h3>Donate</h3>
+      <p class="sub" style="font-size:14px;margin-bottom:8px">FilmCan is free. Support keeps it going.</p>
+      <a class="line" href="https://github.com/sponsors/qtld88">❤ GitHub Sponsors</a>
+      <a class="line" href="https://ko-fi.com/filmcan">☕ Ko-fi · ko-fi.com/filmcan</a>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div>© 2026 FilmCan · GPL-3.0</div>
+  <div>
+    <a href="https://github.com/qtld88/FilmCan">GitHub</a> ·
+    <a href="mailto:qtld@pm.me">Email</a>
+  </div>
+</div></footer>
+
+<script src="main.js"></script>
+</body>
+</html>
