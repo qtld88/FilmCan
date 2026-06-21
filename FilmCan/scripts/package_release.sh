@@ -56,7 +56,7 @@ DIST_DIR="${ROOT_DIR}/dist"
 STAGE_DIR="${DIST_DIR}/stage"
 DMG_PATH="${DIST_DIR}/FilmCan.dmg"
 DMG_TEMP="${DIST_DIR}/FilmCan-temp.dmg"
-REPO_ROOT="$(git -C "$ROOT_DIR" rev-parse --show-toplevel)"
+REPO_ROOT="$(git -C "$ROOT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 CUSTOMIZE_DMG=1
 MOUNT_DIR=""
 MOUNT_DEVICE=""
@@ -71,6 +71,13 @@ emit_version_json() {
     return
   fi
   local versioned_dmg="FilmCan-${version}-universal.dmg"
+  local versioned_dmg_path="${DIST_DIR}/${versioned_dmg}"
+  cp "$DMG_PATH" "$versioned_dmg_path"
+  echo "Created: ${versioned_dmg_path}"
+  if [ -z "$REPO_ROOT" ]; then
+    echo "warning: REPO_ROOT is empty (not a git repo?) — website/version.json not updated" >&2
+    return
+  fi
   local tag="Release_${version}"
   local out="${REPO_ROOT}/website/version.json"
   printf '{\n  "version": "%s",\n  "tag": "%s",\n  "dmg": "%s"\n}\n' \
