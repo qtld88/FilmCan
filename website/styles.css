@@ -41,6 +41,7 @@ section{padding:64px 0;border-top:1px solid var(--stroke)}
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
 .step{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:22px}
 .step .n{width:30px;height:30px;border-radius:8px;background:var(--yellow);color:#1B1B1B;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.step .n.auto{background:var(--green);color:#fff}
 .step h3{font-size:17px;margin-bottom:6px}
 .step p{font-size:14px;color:rgba(244,242,238,.65)}
 .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
