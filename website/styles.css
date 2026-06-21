@@ -46,7 +46,10 @@ section{padding:64px 0;border-top:1px solid var(--stroke)}
 .step p{font-size:14px;color:rgba(244,242,238,.65)}
 .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
 .fc{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:22px}
-.fc .ic{font-size:22px;margin-bottom:10px}
+.fc .tile{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(255,201,0,.10);border:1px solid rgba(255,201,0,.22);margin-bottom:14px}
+.fc .tile svg{width:27px;height:27px;overflow:visible}
+.fc .tile svg path,.fc .tile svg circle{fill:var(--yellow);stroke:none}
+.fc .tile svg .ink{filter:url(#ink)}
 .fc h3{font-size:16px;margin-bottom:6px}
 .fc p{font-size:13.5px;color:rgba(244,242,238,.65)}
 
