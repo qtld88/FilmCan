@@ -54,7 +54,7 @@ section{padding:64px 0;border-top:1px solid var(--stroke)}
 .fc p{font-size:13.5px;color:rgba(244,242,238,.65)}
 
 /* DOWNLOAD */
-.dl{background:linear-gradient(135deg,#2A2A2A,#222);border:1px solid var(--stroke2);border-radius:18px;padding:44px;text-align:center}
+.dl{padding:8px 0;text-align:center}
 .dl h2{font-size:30px;font-weight:700;margin-bottom:8px}
 .dl .cta{display:flex;gap:14px;justify-content:center;margin:22px 0 10px}
 
