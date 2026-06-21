@@ -56,9 +56,34 @@ DIST_DIR="${ROOT_DIR}/dist"
 STAGE_DIR="${DIST_DIR}/stage"
 DMG_PATH="${DIST_DIR}/FilmCan.dmg"
 DMG_TEMP="${DIST_DIR}/FilmCan-temp.dmg"
+REPO_ROOT="$(git -C "$ROOT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 CUSTOMIZE_DMG=1
 MOUNT_DIR=""
 MOUNT_DEVICE=""
+
+emit_version_json() {
+  local app_plist="${APP_ARM64}/Contents/Info.plist"
+  local version
+  version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$app_plist" 2>/dev/null \
+    || defaults read "$app_plist" CFBundleShortVersionString 2>/dev/null)"
+  if [ -z "$version" ]; then
+    echo "warning: could not read version from ${app_plist} — website/version.json not updated" >&2
+    return
+  fi
+  local versioned_dmg="FilmCan-${version}-universal.dmg"
+  local versioned_dmg_path="${DIST_DIR}/${versioned_dmg}"
+  cp "$DMG_PATH" "$versioned_dmg_path"
+  echo "Created: ${versioned_dmg_path}"
+  if [ -z "$REPO_ROOT" ]; then
+    echo "warning: REPO_ROOT is empty (not a git repo?) — website/version.json not updated" >&2
+    return
+  fi
+  local tag="Release_${version}"
+  local out="${REPO_ROOT}/website/version.json"
+  printf '{\n  "version": "%s",\n  "tag": "%s",\n  "dmg": "%s"\n}\n' \
+    "$version" "$tag" "$versioned_dmg" > "$out"
+  echo "Updated: ${out} (version=${version}, dmg=${versioned_dmg})"
+}
 
 ensure_not_open() {
   local file="$1"
@@ -228,6 +253,7 @@ rm -f "$DMG_PATH"
 if [ "$CUSTOMIZE_DMG" -eq 0 ]; then
   create_udzo "$DMG_PATH"
   echo "Created: ${DMG_PATH}"
+  emit_version_json
   exit 0
 fi
 
@@ -296,6 +322,7 @@ if [ "$CUSTOMIZE_DMG" -eq 0 ]; then
   rm -f "$DMG_TEMP"
   create_udzo "$DMG_PATH"
   echo "Created: ${DMG_PATH}"
+  emit_version_json
   exit 0
 fi
 
@@ -352,9 +379,11 @@ if [ "$CONVERT_OK" -ne 1 ]; then
   rm -f "$DMG_TEMP"
   create_udzo "$DMG_PATH"
   echo "Created: ${DMG_PATH}"
+  emit_version_json
   exit 0
 fi
 
 rm -f "$DMG_TEMP"
 
 echo "Created: ${DMG_PATH}"
+emit_version_json
