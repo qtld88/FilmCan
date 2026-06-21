@@ -71,8 +71,8 @@ section{padding:64px 0;border-top:1px solid var(--stroke)}
 @keyframes faqreveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 
 /* CONTACT / DONATE */
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px}
-.box{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:26px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:30px}
+.box{padding:4px 0}
 .box h3{font-size:18px;margin-bottom:10px}
 .box a.line{text-decoration:none;display:block;padding:10px 0;border-bottom:1px solid var(--stroke);font-size:14px}
 .box a.line:last-child{border-bottom:none}
