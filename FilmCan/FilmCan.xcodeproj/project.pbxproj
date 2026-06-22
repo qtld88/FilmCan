@@ -31,6 +31,7 @@
 		1E64C22B5381774E5D73BA7C /* InlineFanOutProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */; };
 		1FDBC1FC2134CD17CA9D1995 /* Hashing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A1BB108A96290E666D66D7 /* Hashing.swift */; };
 		2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */; };
+		2C545EDA05D8310438D2A384 /* NotificationDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */; };
 		2E372B345407C3DFAE943E92 /* BackupConfigurationCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */; };
 		31751F288510D7BF06F7DF9B /* DryRunSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25785302A4FCE3EF859B358F /* DryRunSheet.swift */; };
 		33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */; };
@@ -253,6 +254,7 @@
 		9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEditorViewModel.swift; sourceTree = "<group>"; };
 		A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyBackedUpSheet.swift; sourceTree = "<group>"; };
 		A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierServiceE2ETests.swift; sourceTree = "<group>"; };
+		A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDispatcher.swift; sourceTree = "<group>"; };
 		A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierSafetyTests.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
 		AB0DE00B31C198D55826941B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
@@ -356,6 +358,7 @@
 				75DFBCD664B68D864309A2C9 /* KeychainStore.swift */,
 				43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */,
 				4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */,
+				A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */,
 				69275D7B8B574E36B94814D5 /* NotificationService.swift */,
 				26B11F28CFE5DF0FB03C3D73 /* NotificationSummaryBuilder.swift */,
 				7566396CD057E1EEC15A9834 /* OrphanCleaner.swift */,
@@ -793,6 +796,7 @@
 				8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */,
 				170A04CEAB4882CBFA7D184A /* NetflixValidationSheet.swift in Sources */,
 				CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */,
+				2C545EDA05D8310438D2A384 /* NotificationDispatcher.swift in Sources */,
 				017252CB409DF5109BFB09CA /* NotificationService.swift in Sources */,
 				C287BAF47C32F8F94376CA9C /* NotificationSettings.swift in Sources */,
 				0AE139929E270723A3B6510F /* NotificationSummaryBuilder.swift in Sources */,

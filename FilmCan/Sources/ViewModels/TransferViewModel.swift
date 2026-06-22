@@ -207,10 +207,18 @@ class TransferViewModel: ObservableObject {
                     results: perDestResults,
                     preset: organizationPreset
                 )
-                await sendSourceNotifications(
+                await NotificationDispatcher.sendSource(
                     source: sources.first ?? "",
                     config: activeConfig,
-                    results: perDestResults
+                    results: perDestResults,
+                    settings: makeNotificationSettings(),
+                    summaryFor: { [self] result in
+                        await self.destinationNotificationSummary(
+                            source: sources.first ?? "",
+                            config: activeConfig,
+                            result: result
+                        )
+                    }
                 )
             }
         }
@@ -608,122 +616,6 @@ class TransferViewModel: ObservableObject {
             .filter { !$0.isEmpty }
     }
 
-    private func sendSourceNotifications(
-        source: String,
-        config: BackupConfiguration,
-        results: [TransferResult]
-    ) async {
-        if config.webhookTemplateFormatVersion >= 2 {
-            await sendAggregatedNotifications(source: source, config: config, results: results)
-            return
-        }
-        for result in results {
-            let summary = await destinationNotificationSummary(
-                source: source,
-                config: config,
-                result: result
-            )
-            guard !summary.wasPaused else { continue }
-
-            if summary.allSuccess && notifyOnComplete {
-                NotificationService.shared.notify(
-                    title: summary.title,
-                    body: summary.body
-                )
-            } else if !summary.allSuccess && notifyOnError {
-                NotificationService.shared.notify(
-                    title: summary.title,
-                    body: summary.body
-                )
-            }
-
-            if ntfyEnabled, !ntfyURL.isEmpty {
-                sendNtfySummary(summary: summary)
-            }
-            if webhookEnabled, !webhookURL.isEmpty {
-                sendWebhookSummary(summary: summary)
-            }
-        }
-    }
-
-    /// v2: one aggregated event per backup-run covering ALL destinations.
-    private func sendAggregatedNotifications(
-        source: String,
-        config: BackupConfiguration,
-        results: [TransferResult]
-    ) async {
-        guard !results.isEmpty else { return }
-        let wasPaused = results.contains { $0.wasPaused }
-        if wasPaused { return }
-
-        let anyFailed = results.contains { !$0.success }
-        let allSuccess = !anyFailed
-        let sourceName = (source as NSString).lastPathComponent
-        let totalBytes = results.reduce(Int64(0)) { $0 + $1.bytesTransferred }
-        let bytesText = FilmCanFormatters.bytes(totalBytes, style: .decimal)
-        let destSummary = results.map { r in
-            let mark = r.success ? "✓" : "✗"
-            let name = (r.destination as NSString).lastPathComponent
-            return "\(name) \(mark)"
-        }.joined(separator: ", ")
-        let status = anyFailed ? "Done with failures" : "Done"
-        let title = "\(sourceName) → \(config.name): \(status)"
-        let body = "\(destSummary) — \(bytesText)"
-
-        if allSuccess && notifyOnComplete {
-            NotificationService.shared.notify(title: title, body: body)
-        } else if !allSuccess && notifyOnError {
-            NotificationService.shared.notify(title: title, body: body)
-        }
-        if ntfyEnabled, !ntfyURL.isEmpty {
-            let ntfyToken = KeychainStore().get("ntfyBearerToken")
-            WebhookService.sendNtfy(
-                urlString: ntfyURL,
-                bearerToken: ntfyToken,
-                title: title,
-                message: body,
-                fields: [
-                    "Source": sourceName,
-                    "Config": config.name,
-                    "DestinationsSummary": destSummary,
-                    "AnyFailed": anyFailed ? "true" : "false",
-                    "AllSucceeded": allSuccess ? "true" : "false",
-                    "TotalBytes": bytesText,
-                    "DestinationCount": "\(results.count)"
-                ]
-            )
-        }
-        if webhookEnabled, !webhookURL.isEmpty {
-            let webhookHeadersText = KeychainStore().get("webhookHeaders") ?? ""
-            WebhookService.sendJSON(
-                urlString: webhookURL,
-                headers: WebhookService.parseHeaders(from: webhookHeadersText),
-                payload: [
-                    "title": title,
-                    "message": body,
-                    "templateFormatVersion": 2,
-                    "source": sourceName,
-                    "config": config.name,
-                    "destinationCount": results.count,
-                    "anyFailed": anyFailed,
-                    "allSucceeded": allSuccess,
-                    "totalBytes": totalBytes,
-                    "destinations": results.map { r in
-                        [
-                            "name": (r.destination as NSString).lastPathComponent,
-                            "path": WebhookService.maskedField(path: r.destination, includeFull: webhookIncludeFullPaths),
-                            "success": r.success,
-                            "bytesTransferred": r.bytesTransferred,
-                            "filesTransferred": r.filesTransferred,
-                            "errorMessage": r.errorMessage ?? "",
-                            "wasVerified": r.wasVerified
-                        ] as [String: Any]
-                    }
-                ]
-            )
-        }
-    }
-
     private func destinationNotificationSummary(
         source: String,
         config: BackupConfiguration,
@@ -758,30 +650,6 @@ class TransferViewModel: ObservableObject {
             ntfyTitleTemplate: ntfyTitleTemplate, ntfyMessageTemplate: ntfyMessageTemplate,
             webhookEnabled: webhookEnabled, webhookURL: webhookURL,
             webhookIncludeFullPaths: webhookIncludeFullPaths)
-    }
-
-    private func sendNtfySummary(summary: NotificationSummaryBuilder.DestinationNotificationSummary) {
-        let ntfyToken = KeychainStore().get("ntfyBearerToken")
-        WebhookService.sendNtfy(
-            urlString: ntfyURL,
-            bearerToken: ntfyToken,
-            title: summary.messageTitle,
-            message: summary.messageBody,
-            fields: [:]
-        )
-    }
-
-    private func sendWebhookSummary(summary: NotificationSummaryBuilder.DestinationNotificationSummary) {
-        let webhookHeadersText = KeychainStore().get("webhookHeaders") ?? ""
-        WebhookService.sendJSON(
-            urlString: webhookURL,
-            headers: WebhookService.parseHeaders(from: webhookHeadersText),
-            payload: [
-                "title": summary.messageTitle,
-                "message": summary.messageBody,
-                "fields": summary.fields
-            ]
-        )
     }
 
     func cancelRunFromDuplicatePrompt() {
