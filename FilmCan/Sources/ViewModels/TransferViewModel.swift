@@ -69,7 +69,9 @@ class TransferViewModel: ObservableObject {
         let verificationWeightedProgress: Double
     }
     
-    @Published var duplicates = DuplicatePromptCoordinator()
+    // Not @Published: never reassigned, and view refresh is driven by the
+    // objectWillChange bridge in init. Accessed only via the forwarders below.
+    private let duplicates = DuplicatePromptCoordinator()
     private var duplicatesObserver: AnyCancellable?
 
     private let historyRecorder = HistoryRecorder()
@@ -793,20 +795,8 @@ class TransferViewModel: ObservableObject {
         }
     }
 
-    private func visibleTransferredCount(from paths: [String]) -> Int {
-        HistoryRecorder.visibleTransferredCount(from: paths)
-    }
-
     private func countVisibleFiles(sources: [String]) async -> Int {
         await HistoryRecorder.countVisibleFiles(sources: sources)
-    }
-
-    private nonisolated static func isHiddenPath(_ path: String) -> Bool {
-        HistoryRecorder.isHiddenPath(path)
-    }
-
-    private func hashRoots(result: TransferResult, sources: [String], destination: String) -> [String] {
-        HistoryRecorder.hashRoots(result: result, sources: sources, destination: destination)
     }
 
     private func recordHistory(
