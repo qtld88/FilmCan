@@ -70,6 +70,7 @@ class TransferViewModel: ObservableObject {
         let verificationWeightedProgress: Double
     }
     
+    private let historyRecorder = HistoryRecorder()
     private var config: BackupConfiguration?
     private var transferStartTime: Date?
     private var lastRunContext: RunContext?
@@ -653,15 +654,8 @@ class TransferViewModel: ObservableObject {
         }.value
     }
 
-    /// User-facing warning for a destination that copied and verified cleanly but
-    /// whose ASC MHL manifest could not be sealed. Reassures that the footage is
-    /// safe and points at the fix (re-run regenerates the manifest only).
     static func manifestUnsealedWarning(_ reason: String?) -> String? {
-        guard let reason, !reason.isEmpty else { return nil }
-        return "Files copied and verified, but the ASC MHL manifest couldn’t be written "
-            + "(\(reason)). Your footage is safe and hash-verified — only the "
-            + "chain-of-custody manifest is incomplete. Re-run the backup for this "
-            + "destination to regenerate it."
+        HistoryRecorder.manifestUnsealedWarning(reason)
     }
 
     func explodeFanOutResult(_ fanOut: TransferResult, configName: String) -> [TransferResult] {
@@ -855,60 +849,19 @@ class TransferViewModel: ObservableObject {
     }
 
     private func visibleTransferredCount(from paths: [String]) -> Int {
-        paths.reduce(0) { count, path in
-            Self.isHiddenPath(path) ? count : count + 1
-        }
+        HistoryRecorder.visibleTransferredCount(from: paths)
     }
 
     private func countVisibleFiles(sources: [String]) async -> Int {
-        await Task.detached(priority: .utility) {
-            var total = 0
-            let fm = FileManager.default
-            for source in sources {
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: source, isDirectory: &isDir) else { continue }
-                if !isDir.boolValue {
-                    if !Self.isHiddenPath(source) { total += 1 }
-                    continue
-                }
-                let rootURL = URL(fileURLWithPath: source)
-                let enumerator = fm.enumerator(
-                    at: rootURL,
-                    includingPropertiesForKeys: [.isDirectoryKey],
-                    options: [.skipsPackageDescendants]
-                )
-                while let fileURL = enumerator?.nextObject() as? URL {
-                    if let values = try? fileURL.resourceValues(forKeys: [.isDirectoryKey]),
-                       values.isDirectory == true {
-                        continue
-                    }
-                    let path = fileURL.standardizedFileURL.path
-                    if Self.isHiddenPath(path) { continue }
-                    if fileURL.lastPathComponent == ".DS_Store" { continue }
-                    total += 1
-                }
-            }
-            return total
-        }.value
+        await HistoryRecorder.countVisibleFiles(sources: sources)
     }
 
     private nonisolated static func isHiddenPath(_ path: String) -> Bool {
-        if FilmCanPaths.isHidden(path) { return true }
-        let components = path.split(separator: "/")
-        return components.contains { $0.hasPrefix(".") }
+        HistoryRecorder.isHiddenPath(path)
     }
 
     private func hashRoots(result: TransferResult, sources: [String], destination: String) -> [String] {
-        var roots: [String] = []
-        for source in sources {
-            if let root = result.organizationRoots[source], !roots.contains(root) {
-                roots.append(root)
-            }
-        }
-        if roots.isEmpty {
-            roots = [destination]
-        }
-        return roots
+        HistoryRecorder.hashRoots(result: result, sources: sources, destination: destination)
     }
 
     private func recordHistory(
@@ -918,67 +871,15 @@ class TransferViewModel: ObservableObject {
         preset: OrganizationPreset?
     ) async {
         guard !results.isEmpty else { return }
-        let storage = AppState.shared.storage
-        let start = results.map { $0.startTime }.min() ?? (transferStartTime ?? Date())
-        let end = results.compactMap { $0.endTime }.max() ?? Date()
-        let success = results.allSatisfy { $0.success }
-        let presetName = preset?.name
-        let backupHashPath: String? = nil
-        let backupHashRoots: [String] = []
-        var recordedResults = results
-        for index in recordedResults.indices {
-            if recordedResults[index].visibleFilesTransferred != nil
-                && recordedResults[index].visibleFilesSkipped != nil {
-                continue
-            }
-            if let logFile = recordedResults[index].logFilePath {
-                let rootsForLog = hashRoots(
-                    result: recordedResults[index],
-                    sources: sources,
-                    destination: recordedResults[index].destination
-                )
-                let parsed = LogItemizeParser.parseTransferredPaths(
-                    logFile: logFile,
-                    roots: rootsForLog,
-                    fallbackRoot: recordedResults[index].destination
-                )
-                if parsed.sawItemize {
-                    recordedResults[index].transferredPaths = parsed.paths
-                    recordedResults[index].usedItemizedOutput = true
-                }
-            }
-            if recordedResults[index].success, !recordedResults[index].transferredPaths.isEmpty {
-                let visibleTransferred = visibleTransferredCount(from: recordedResults[index].transferredPaths)
-                let visibleTotal = await countVisibleFiles(sources: sources)
-                recordedResults[index].visibleFilesTransferred = visibleTransferred
-                recordedResults[index].visibleFilesSkipped = max(0, visibleTotal - visibleTransferred)
-            }
-        }
-        var entry = TransferHistoryEntry(
-            configId: config.id,
-            configName: config.name,
-            startedAt: start,
-            endedAt: end,
-            success: success,
+        let ctx = await historyRecorder.record(
+            config: config,
             sources: sources,
-            destinations: config.destinationPaths,
-            results: recordedResults.map { TransferResultRecord(from: $0) },
-            options: TransferOptionsSnapshot(config: config, presetName: presetName),
-            hashListPath: backupHashPath,
-            hashRoots: backupHashRoots
+            results: results,
+            preset: preset,
+            transferStartTime: transferStartTime,
+            retentionLimit: historyRetentionLimit
         )
-        let ctx = RunContext(
-            organizationPresetId: config.selectedOrganizationPresetId,
-            cameraFolderTemplate: config.cameraFolderTemplate,
-            soundFolderTemplate: config.soundFolderTemplate,
-            copyFolderContents: config.copyFolderContents,
-            sourceMediaKinds: config.sourceMediaKinds,
-            duplicatePolicy: config.duplicatePolicy,
-            hashListStyle: config.hashListStyle
-        )
-        entry.runContext = ctx
         lastRunContext = ctx
-        storage.appendHistory(entry, retentionLimit: historyRetentionLimit)
     }
 
     func cancel() {
