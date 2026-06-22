@@ -65,6 +65,7 @@
 		712C89C119B957716D4B9AEB /* PreviewCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40F951445F8238F0B740353 /* PreviewCalculator.swift */; };
 		7191245AD630701955CB29ED /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1146F690162AC3EE569EFBB /* SourceListView.swift */; };
 		73DA82CDD34327AFDB1104C4 /* MHLWriting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */; };
+		7E135086E0399B9B614CF679 /* BackupLogWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */; };
 		7E7F9A215F183FD32052AF27 /* AppIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = E25E2599CEF3906032A4D5A9 /* AppIcon.png */; };
 		7F60BFED71DF221F0DE7E195 /* DestResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBAF7A0A4796303A8E24EE4B /* DestResultRow.swift */; };
 		7F628CD5790C2B611BEA65BB /* FileChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */; };
@@ -112,6 +113,7 @@
 		BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */; };
 		BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867AFB25988C222B6A24039C /* PreviewInfo.swift */; };
 		C287BAF47C32F8F94376CA9C /* NotificationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383ACFF923DEBEC571A967AB /* NotificationSettings.swift */; };
+		C46ED6D795647E028D695967 /* BackupLogWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA33115E34C847104B67968D /* BackupLogWriterTests.swift */; };
 		C5261D4C4443DBE1151C16AB /* ASCMHLChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */; };
 		C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */; };
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
@@ -256,6 +258,7 @@
 		A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierServiceE2ETests.swift; sourceTree = "<group>"; };
 		A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDispatcher.swift; sourceTree = "<group>"; };
 		A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierSafetyTests.swift; sourceTree = "<group>"; };
+		AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupLogWriter.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
 		AB0DE00B31C198D55826941B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		AB4BE7FDB8F045263D4E2883 /* LogFileNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogFileNamer.swift; sourceTree = "<group>"; };
@@ -286,6 +289,7 @@
 		D5DEA0246D51FEB546D543EE /* NetflixNameValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetflixNameValidatorTests.swift; sourceTree = "<group>"; };
 		D93FFA7594374B35EFD1117A /* DonationPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DonationPromptView.swift; sourceTree = "<group>"; };
 		DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLWriter.swift; sourceTree = "<group>"; };
+		DA33115E34C847104B67968D /* BackupLogWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupLogWriterTests.swift; sourceTree = "<group>"; };
 		DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineFanOutProgress.swift; sourceTree = "<group>"; };
 		DBAF7A0A4796303A8E24EE4B /* DestResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestResultRow.swift; sourceTree = "<group>"; };
 		DBDF7051DA56C935FDB1E25A /* SecretsNetworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretsNetworkTests.swift; sourceTree = "<group>"; };
@@ -315,6 +319,7 @@
 		1A3AE896260F508D68713690 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */,
 				01775FD7053AF831126757D6 /* C4Hash.swift */,
 				B8EAD261337C6BEE4032A23E /* DebugLog.swift */,
 				C76A38CE57BBBB5588E7A674 /* DriveEjector.swift */,
@@ -408,6 +413,7 @@
 				BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */,
 				84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */,
 				2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */,
+				DA33115E34C847104B67968D /* BackupLogWriterTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
 				03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
@@ -691,6 +697,7 @@
 				4536D8AE58C4A2678A9723B6 /* ASCMHLReaderTests.swift in Sources */,
 				46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */,
 				2E372B345407C3DFAE943E92 /* BackupConfigurationCodableTests.swift in Sources */,
+				C46ED6D795647E028D695967 /* BackupLogWriterTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
 				84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
@@ -737,6 +744,7 @@
 				541F1E7A97B9DAC792BC5912 /* BackupEditorViewModel.swift in Sources */,
 				DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */,
 				939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */,
+				7E135086E0399B9B614CF679 /* BackupLogWriter.swift in Sources */,
 				F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */,
 				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,
 				B6CAC1814763C6C420BA5980 /* CancellationState.swift in Sources */,
