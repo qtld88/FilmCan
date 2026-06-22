@@ -13,6 +13,7 @@ struct SourceListView: View {
     @State private var dragPayload: String? = nil
     @State private var draggingDriveId: String? = nil
     @State private var draggingPath: String? = nil
+    @State private var ejectErrorMessage: String? = nil
     var showsTitle: Bool = true
     var headerView: AnyView? = nil
     var footerView: AnyView? = nil
@@ -75,9 +76,17 @@ struct SourceListView: View {
             .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDrop(providers: providers)
             }
+            .alert("Couldn't eject drive", isPresented: Binding(
+                get: { ejectErrorMessage != nil },
+                set: { if !$0 { ejectErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { ejectErrorMessage = nil }
+            } message: {
+                Text(ejectErrorMessage ?? "")
+            }
         }
     }
-    
+
     private var emptyDropZone: some View {
         VStack(spacing: 16) {
             Image(systemName: "folder.badge.plus")
@@ -464,26 +473,39 @@ struct SourceListView: View {
         sources.removeAll { driveId(for: $0) == driveGroupId }
     }
 
+    // Eject FIRST, then drop the config entry on success. Removing before the
+    // device is gone lets the timer-based drive refresh re-add the still-mounted
+    // card. If eject fails we keep the entry and surface why.
     private func removeAndEjectDriveGroup(_ driveGroupId: String, paths: [SourcePath]) {
-        removeDriveGroup(driveGroupId)
-        ejectDriveGroup(paths: paths)
+        guard let firstPath = paths.first?.path else { return }
+        ejectVolume(for: firstPath) { removeDriveGroup(driveGroupId) }
     }
 
+    // Plain eject: keep the entry in the backup so it shows as offline once the
+    // card is gone (summary.isConnected flips false on the unmount notification).
     private func ejectDriveGroup(paths: [SourcePath]) {
         guard let firstPath = paths.first?.path else { return }
         ejectVolume(for: firstPath)
     }
 
     private func removeAndEjectSource(_ path: String) {
-        removeSource(path)
-        ejectVolume(for: path)
+        ejectVolume(for: path) { removeSource(path) }
     }
 
-    private func ejectVolume(for path: String) {
-        guard let root = volumeRootPath(for: path) else { return }
+    private func ejectVolume(for path: String, onSuccess: (() -> Void)? = nil) {
+        guard let root = volumeRootPath(for: path) else {
+            ejectErrorMessage = "This source isn't on an ejectable volume."
+            return
+        }
         let url = URL(fileURLWithPath: root)
-        Task {
-            try? NSWorkspace.shared.unmountAndEjectDevice(at: url)
+        Task { @MainActor in
+            switch await DriveEjector.eject(volumeURL: url) {
+            case .success:
+                onSuccess?()
+            case .failure(let error):
+                ejectErrorMessage = error.errorDescription
+                DebugLog.warn("Eject failed for \(root): \(error)")
+            }
         }
     }
 
