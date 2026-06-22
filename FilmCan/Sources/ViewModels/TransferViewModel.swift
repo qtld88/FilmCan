@@ -724,26 +724,11 @@ class TransferViewModel: ObservableObject {
         }
     }
 
-    private struct DestinationNotificationSummary {
-        let title: String
-        let body: String
-        let messageTitle: String
-        let messageBody: String
-        let fields: [String: String]
-        let allSuccess: Bool
-        let wasPaused: Bool
-    }
-
     private func destinationNotificationSummary(
         source: String,
         config: BackupConfiguration,
         result: TransferResult
-    ) async -> DestinationNotificationSummary {
-        let wasPaused = result.wasPaused
-        let isCancelled = (result.errorMessage ?? "").lowercased().contains("cancelled")
-        let allSuccess = result.success && !isCancelled
-        let sourceName = (source as NSString).lastPathComponent
-        let destinationName = (result.destination as NSString).lastPathComponent
+    ) async -> NotificationSummaryBuilder.DestinationNotificationSummary {
         let transferred = result.visibleFilesTransferred ?? result.filesTransferred
         let skipped = result.visibleFilesSkipped ?? result.filesSkipped
         var totalFiles = max(transferred + skipped, 0)
@@ -756,72 +741,26 @@ class TransferViewModel: ObservableObject {
                 PreviewCalculator.calculateTotalsAndSizes(for: [source]).0
             }.value
         }
-        let bytesText = FilmCanFormatters.bytes(totalBytes, style: .decimal)
-        let durationText = durationString(for: [result]) ?? "0s"
-
-        let backupAction: String
-        if !result.success || isCancelled {
-            backupAction = "failed to back up"
-        } else if result.isAlreadyAtDestination {
-            backupAction = "already in place"
-        } else {
-            backupAction = "backed up"
-        }
-
-        let backupStatus: String
-        let backupDetails: String
-        if result.success && !isCancelled {
-            backupStatus = "Done."
-            backupDetails = "No backup failed."
-        } else if isCancelled {
-            backupStatus = "Cancelled by user."
-            backupDetails = "1 destination(s) failed. 1 cancelled by user."
-        } else {
-            backupStatus = "Failed."
-            backupDetails = result.errorMessage ?? "Backup failed."
-        }
-
-        let title = "\(sourceName)'s backup for \(config.name): \(backupStatus)"
-        let body = "\(bytesText) (\(totalFiles) files) from \(sourceName) has been \(backupAction) to \(destinationName) in \(durationText)."
-
-        let sourcesText = formatQuotedList([source])
-        let destinationsText = formatQuotedList(config.destinationPaths)
-        let template = ntfyMessageTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
-        let titleTemplate = ntfyTitleTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
-        let replacements: [String: String] = [
-            "{movie}": config.name,
-            "{source}": sourceName,
-            "{destination}": destinationName,
-            "{sources}": sourcesText,
-            "{destinations}": destinationsText,
-            "{backupAction}": backupAction,
-            "{bytes}": bytesText,
-            "{files}": "\(totalFiles)",
-            "{duration}": durationText,
-            "{backupStatus}": backupStatus,
-            "{backupDetails}": backupDetails
-        ]
-
-        let messageTitle = titleTemplate.isEmpty
-            ? title
-            : applyTemplate(titleTemplate, replacements: replacements)
-
-        let messageBody = template.isEmpty
-            ? body
-            : applyTemplate(template, replacements: replacements)
-
-        return DestinationNotificationSummary(
-            title: title,
-            body: body,
-            messageTitle: messageTitle,
-            messageBody: messageBody,
-            fields: replacements,
-            allSuccess: allSuccess,
-            wasPaused: wasPaused
+        return NotificationSummaryBuilder.destinationSummary(
+            source: source,
+            config: config,
+            result: result,
+            totalFiles: totalFiles,
+            totalBytes: totalBytes,
+            settings: makeNotificationSettings()
         )
     }
 
-    private func sendNtfySummary(summary: DestinationNotificationSummary) {
+    private func makeNotificationSettings() -> NotificationSettings {
+        NotificationSettings(
+            notifyOnComplete: notifyOnComplete, notifyOnError: notifyOnError,
+            ntfyEnabled: ntfyEnabled, ntfyURL: ntfyURL,
+            ntfyTitleTemplate: ntfyTitleTemplate, ntfyMessageTemplate: ntfyMessageTemplate,
+            webhookEnabled: webhookEnabled, webhookURL: webhookURL,
+            webhookIncludeFullPaths: webhookIncludeFullPaths)
+    }
+
+    private func sendNtfySummary(summary: NotificationSummaryBuilder.DestinationNotificationSummary) {
         let ntfyToken = KeychainStore().get("ntfyBearerToken")
         WebhookService.sendNtfy(
             urlString: ntfyURL,
@@ -832,7 +771,7 @@ class TransferViewModel: ObservableObject {
         )
     }
 
-    private func sendWebhookSummary(summary: DestinationNotificationSummary) {
+    private func sendWebhookSummary(summary: NotificationSummaryBuilder.DestinationNotificationSummary) {
         let webhookHeadersText = KeychainStore().get("webhookHeaders") ?? ""
         WebhookService.sendJSON(
             urlString: webhookURL,
@@ -843,35 +782,6 @@ class TransferViewModel: ObservableObject {
                 "fields": summary.fields
             ]
         )
-    }
-
-    private func formatQuotedList(_ paths: [String]) -> String {
-        let names = paths.map { "\"\(($0 as NSString).lastPathComponent)\"" }
-        if names.isEmpty { return "No items" }
-        if names.count == 1 { return names[0] }
-        if names.count == 2 { return "\(names[0]) and \(names[1])" }
-        let head = names.prefix(3).joined(separator: ", ")
-        let remaining = names.count - 3
-        if remaining > 0 {
-            return "\(head), and \(remaining) others"
-        }
-        return head
-    }
-
-    private func durationString(for results: [TransferResult]) -> String? {
-        let durations = results.compactMap { $0.duration }
-        guard !durations.isEmpty else { return nil }
-        let total = durations.reduce(0, +)
-        let hours = Int(total) / 3600
-        let minutes = (Int(total) % 3600) / 60
-        let seconds = Int(total) % 60
-        if hours > 0 { return String(format: "%dh %dm %ds", hours, minutes, seconds) }
-        if minutes > 0 { return String(format: "%dm %ds", minutes, seconds) }
-        return String(format: "%ds", seconds)
-    }
-
-    private func applyTemplate(_ template: String, replacements: [String: String]) -> String {
-        OrganizationTemplate.substituteTokens(template, values: replacements)
     }
 
     func cancelRunFromDuplicatePrompt() {
