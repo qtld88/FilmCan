@@ -925,70 +925,8 @@ class TransferViewModel: ObservableObject {
         failed: DestResult,
         sibling: DestResult
     ) async -> [(fileName: String, success: Bool)] {
-        guard let siblingMHL = sibling.mhlPath else { return [] }
-        let mhlURL = URL(fileURLWithPath: siblingMHL)
-
-        let entries: [ASCMHLReader.Entry]
-        do {
-            entries = try ASCMHLReader.read(url: mhlURL)
-        } catch {
-            return []
-        }
-        guard !entries.isEmpty else { return [] }
-
-        // The manifest lives at <rollFolder>/ascmhl/<name>.mhl and each entry's
-        // relPath is relative to <rollFolder>, NOT the dest root. Derive both roll
-        // folders so organized (Netflix) layouts repair into the correct nested
-        // path rather than joining relPath onto the bare dest root.
-        let siblingRoot = sibling.destinationPath
-        let failedRoot = failed.destinationPath
-        let siblingRoll = mhlURL.deletingLastPathComponent().deletingLastPathComponent().path
-        let relRoll = siblingRoll.hasPrefix(siblingRoot)
-            ? String(siblingRoll.dropFirst(siblingRoot.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            : ""
-        let failedRoll = relRoll.isEmpty
-            ? failedRoot
-            : (failedRoot as NSString).appendingPathComponent(relRoll)
-
-        // exFAT/USB destinations (often the very drive that failed) need F_FULLFSYNC.
-        let requiresFullFsync = DriveSpeedClassifier.requiresFullFsync(
-            DriveSpeedClassifier.info(for: failedRoot))
-
-        let source = SiblingDestSource()
-        var results: [(fileName: String, success: Bool)] = []
-        var copied: [MHLEntry] = []
-        for entry in entries {
-            let siblingFilePath = (siblingRoll as NSString).appendingPathComponent(entry.relPath)
-            let failedFilePath = (failedRoll as NSString).appendingPathComponent(entry.relPath)
-            do {
-                try await source.copyFromSibling(
-                    fileName: entry.relPath,
-                    from: siblingFilePath,
-                    to: failedFilePath,
-                    expectedHash: entry.hash,
-                    requiresFullFsync: requiresFullFsync
-                )
-                results.append((entry.relPath, true))
-                copied.append(MHLEntry(relPath: entry.relPath, size: entry.size ?? 0,
-                                       hash: entry.hash, mtime: entry.mtime))
-            } catch {
-                results.append((entry.relPath, false))
-            }
-        }
-
-        // Chain of custody: seal a fresh ASC MHL generation for the repaired
-        // destination so it isn't left certified-but-manifestless (its prior run
-        // wrote only a partial, un-chained generation). Only when EVERY file landed
-        // and hash-verified — a partial repair must never seal a manifest.
-        if !copied.isEmpty, results.allSatisfy({ $0.success }) {
-            let ascDir = URL(fileURLWithPath: failedRoll).appendingPathComponent("ascmhl")
-            let rollName = (failedRoll as NSString).lastPathComponent
-            if let writer = try? ASCMHLWriter(ascmhlDir: ascDir, rollName: rollName) {
-                await writer.seed(copied)
-                try? await writer.seal()
-            }
-        }
-        return results
+        let outcome = await RepairCoordinator.repairFromSibling(failed: failed, sibling: sibling)
+        return outcome.perFile
     }
 
     /// User-facing entry-point invoked by `FailedDestRetryPanel`'s onRepair closure.
@@ -1003,62 +941,32 @@ class TransferViewModel: ObservableObject {
     ) async -> Bool {
         switch choice {
         case .fromSibling:
-            let perFile = await retryFailedDestinationFromSibling(failed: failed, sibling: sibling)
-            let allOK = !perFile.isEmpty && perFile.allSatisfy { $0.success }
-            if allOK {
-                patchDestResultToSuccess(destPath: failed.destinationPath, filesTransferred: perFile.count)
+            let outcome = await RepairCoordinator.repairFromSibling(failed: failed, sibling: sibling)
+            if outcome.allOK {
+                patchDestResultToSuccess(destPath: failed.destinationPath, filesTransferred: outcome.fileCount)
             }
-            return allOK
+            return outcome.allOK
         case .fromSource:
             let sources = currentSources
             guard !sources.isEmpty else { return false }
-            // Sanity check: every source path must still exist on disk before we attempt re-copy.
-            let fm = FileManager.default
-            for path in sources {
-                if !fm.fileExists(atPath: path) { return false }
-            }
-            let info = DriveSpeedClassifier.info(for: failed.destinationPath)
-            let destCfg = DestWriter.Config(
-                destPath: failed.destinationPath,
-                displayName: failed.displayName,
-                verifyMode: failed.verifyMode,
-                requiresFullFsync: DriveSpeedClassifier.requiresFullFsync(info),
-                chunkSize: nil
-            )
             let repairCtx = lastRunContext
             let repairPreset = repairCtx.flatMap { resolvedPreset(from: $0) }
-            let service = CustomCopierService()
-            let recovered: TransferResult
-            do {
-                recovered = try await service.runCopyFanOut(
-                    sources: sources,
-                    fanOutDestinations: [destCfg],
-                    configName: "repair",
-                    organizationPreset: repairPreset,
-                    copyFolderContents: repairCtx?.copyFolderContents ?? false,
-                    useHashListPrecheck: false,
-                    hashListPath: nil,
-                    fileOrdering: .defaultOrder,
-                    duplicatePolicy: repairCtx?.duplicatePolicy ?? .ask,
-                    duplicateCounterTemplate: "",
-                    duplicateResolver: nil,
-                    verifyMode: failed.verifyMode,
-                    dryRun: false,
-                    sourceMediaKinds: repairCtx?.sourceMediaKinds ?? [:],
-                    hashListStyle: repairCtx?.hashListStyle ?? .ascMHL,
-                    progressHandler: nil
-                )
-            } catch {
-                return false
-            }
-            let allOK = recovered.destinationResults.allSatisfy { $0.success }
-            if allOK {
+            let outcome = await RepairCoordinator.repairFromSource(
+                failed: failed,
+                sources: sources,
+                organizationPreset: repairPreset,
+                copyFolderContents: repairCtx?.copyFolderContents ?? false,
+                duplicatePolicy: repairCtx?.duplicatePolicy ?? .ask,
+                sourceMediaKinds: repairCtx?.sourceMediaKinds ?? [:],
+                hashListStyle: repairCtx?.hashListStyle ?? .ascMHL
+            )
+            if outcome.allOK {
                 patchDestResultToSuccess(
                     destPath: failed.destinationPath,
-                    filesTransferred: recovered.filesTransferred
+                    filesTransferred: outcome.filesTransferred
                 )
             }
-            return allOK
+            return outcome.allOK
         }
     }
 
