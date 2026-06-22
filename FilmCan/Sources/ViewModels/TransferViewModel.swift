@@ -29,7 +29,6 @@ class TransferViewModel: ObservableObject {
     @Published var allDestinations: [String] = []
     @Published var isParallelRun: Bool = false
     @Published var cancelledDestinations: Set<String> = []
-    @Published var activeDuplicatePrompt: DuplicatePrompt? = nil
     /// Set when a Run found everything already backed up (nothing to copy). The
     /// UI shows an "already backed up" popup instead of adding a history card.
     @Published var alreadyBackedUp: AlreadyBackedUpInfo? = nil
@@ -70,19 +69,16 @@ class TransferViewModel: ObservableObject {
         let verificationWeightedProgress: Double
     }
     
+    @Published var duplicates = DuplicatePromptCoordinator()
+    private var duplicatesObserver: AnyCancellable?
+
     private let historyRecorder = HistoryRecorder()
     private var config: BackupConfiguration?
     private var transferStartTime: Date?
     private var lastRunContext: RunContext?
     private var isPausingAll: Bool = false
     private var activeServices: [TransferService] = []
-    private var cachedDuplicateResolution: DuplicateResolution? = nil
-    private var pendingDuplicatePrompts: [PendingDuplicatePrompt] = []
-    private var activeDuplicateContinuation: CheckedContinuation<DuplicateResolution, Never>? = nil
-    private var isShowingDuplicatePrompt: Bool = false
     private var duplicatePromptCancelled: Bool = false
-    @Published var pendingUnreadableFiles: [String] = []
-    private var unreadableContinuation: CheckedContinuation<Bool, Never>?
     private var destinationProgressCancellables: [String: AnyCancellable] = [:]
     private var progressBinding: AnyCancellable? = nil
     private var currentService: TransferService? = nil
@@ -90,13 +86,9 @@ class TransferViewModel: ObservableObject {
     private var concurrentWorkers: [UUID: TransferViewModel] = [:]
     private var concurrentWorkerCancellables: [UUID: Set<AnyCancellable>] = [:]
 
-    private struct PendingDuplicatePrompt {
-        let prompt: DuplicatePrompt
-        let continuation: CheckedContinuation<DuplicateResolution, Never>
-    }
-    
     init(isBackgroundWorker: Bool = false) {
         self.isBackgroundWorker = isBackgroundWorker
+        duplicatesObserver = duplicates.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
     
     func startTransfer(config: BackupConfiguration) async {
@@ -138,7 +130,7 @@ class TransferViewModel: ObservableObject {
         isParallelRun = activeConfig.runInParallel
         activeServices = []
         currentService = nil
-        resetDuplicatePromptState()
+        duplicates.reset()
         duplicatePromptCancelled = false
         
         // Mark as used
@@ -434,17 +426,18 @@ class TransferViewModel: ObservableObject {
         )
     }
 
+    var activeDuplicatePrompt: DuplicatePrompt? {
+        get { duplicates.activeDuplicatePrompt }
+        set { duplicates.activeDuplicatePrompt = newValue }
+    }
+
+    var pendingUnreadableFiles: [String] {
+        get { duplicates.pendingUnreadableFiles }
+        set { duplicates.pendingUnreadableFiles = newValue }
+    }
+
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
-        if let cached = cachedDuplicateResolution {
-            return cached
-        }
-        return await withCheckedContinuation { continuation in
-            let pending = PendingDuplicatePrompt(prompt: prompt, continuation: continuation)
-            pendingDuplicatePrompts.append(pending)
-            if !isShowingDuplicatePrompt {
-                presentNextDuplicatePrompt()
-            }
-        }
+        await duplicates.resolveDuplicate(prompt: prompt)
     }
 
     @MainActor
@@ -453,51 +446,7 @@ class TransferViewModel: ObservableObject {
         applyToAll: Bool,
         counterTemplate: String? = nil
     ) {
-        let resolution = DuplicateResolution(
-            action: action,
-            applyToAll: applyToAll,
-            counterTemplate: counterTemplate
-        )
-        if applyToAll {
-            cachedDuplicateResolution = resolution
-        }
-
-        activeDuplicatePrompt = nil
-        activeDuplicateContinuation?.resume(returning: resolution)
-        activeDuplicateContinuation = nil
-
-        if applyToAll {
-            let pending = pendingDuplicatePrompts
-            pendingDuplicatePrompts.removeAll()
-            isShowingDuplicatePrompt = false
-            pending.forEach { $0.continuation.resume(returning: resolution) }
-            return
-        }
-
-        if pendingDuplicatePrompts.isEmpty {
-            isShowingDuplicatePrompt = false
-            return
-        }
-        presentNextDuplicatePrompt()
-    }
-
-    private func presentNextDuplicatePrompt() {
-        guard !pendingDuplicatePrompts.isEmpty else {
-            isShowingDuplicatePrompt = false
-            return
-        }
-        let next = pendingDuplicatePrompts.removeFirst()
-        activeDuplicateContinuation = next.continuation
-        activeDuplicatePrompt = next.prompt
-        isShowingDuplicatePrompt = true
-    }
-
-    private func resetDuplicatePromptState() {
-        activeDuplicatePrompt = nil
-        cachedDuplicateResolution = nil
-        pendingDuplicatePrompts = []
-        activeDuplicateContinuation = nil
-        isShowingDuplicatePrompt = false
+        duplicates.submitDuplicateResolution(action: action, applyToAll: applyToAll, counterTemplate: counterTemplate)
     }
 
     private func resolveOrganizationPreset(for config: BackupConfiguration) -> OrganizationPreset? {
@@ -623,15 +572,12 @@ class TransferViewModel: ObservableObject {
     func cancelRunFromDuplicatePrompt() {
         duplicatePromptCancelled = true
         cancelAll()
-        submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
+        duplicates.submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
     }
 
     @MainActor
     func resolveUnreadable(proceed: Bool) {
-        let c = unreadableContinuation
-        unreadableContinuation = nil
-        pendingUnreadableFiles = []
-        c?.resume(returning: proceed)
+        duplicates.resolveUnreadable(proceed: proceed)
     }
 
     /// Re-verify an already-backed-up config against its hash lists (the same
@@ -772,8 +718,7 @@ class TransferViewModel: ObservableObject {
                     return await withCheckedContinuation { continuation in
                         Task { @MainActor [weak self] in
                             guard let self else { continuation.resume(returning: false); return }
-                            self.unreadableContinuation = continuation
-                            self.pendingUnreadableFiles = paths
+                            self.duplicates.setUnreadableContinuation(continuation, paths: paths)
                         }
                     }
                 },

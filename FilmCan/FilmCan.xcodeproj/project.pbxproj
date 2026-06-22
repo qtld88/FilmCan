@@ -23,6 +23,7 @@
 		1777544B7D467D923D430A7F /* WebhookService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */; };
 		178F4B6B36FD3B5548F3E219 /* OrganizationTemplateTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802D5EC223B6B2F4CB3CF764 /* OrganizationTemplateTokenTests.swift */; };
 		18135282F61724B8A532D032 /* TransferProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297A6705D2E34EA8E454FB3B /* TransferProgress.swift */; };
+		1A27694F65DDE9D6A6EECCA8 /* DuplicatePromptCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86A607F0938B68118BC36B7 /* DuplicatePromptCoordinator.swift */; };
 		1AB7A04FDB21CBA5B2E08A68 /* FanOutProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */; };
 		1B52DDDFB277C55474E5E9C2 /* FileEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E84E2F5E2941DED39DB6EDD /* FileEnumerator.swift */; };
 		1C2114C8AA26EBA5F1A302BD /* TransferHistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C639F55EAD692B4FDA94F547 /* TransferHistoryEntry.swift */; };
@@ -286,6 +287,7 @@
 		C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutProgressBar.swift; sourceTree = "<group>"; };
 		C6DAECC7717B5F2550472F23 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		C76A38CE57BBBB5588E7A674 /* DriveEjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveEjector.swift; sourceTree = "<group>"; };
+		C86A607F0938B68118BC36B7 /* DuplicatePromptCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePromptCoordinator.swift; sourceTree = "<group>"; };
 		CA472985C7AB10A3B859755A /* OrganizationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationSheet.swift; sourceTree = "<group>"; };
 		CB7BCF3596001402A6F510FC /* DestResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestResult.swift; sourceTree = "<group>"; };
 		CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupConfiguration.swift; sourceTree = "<group>"; };
@@ -529,6 +531,7 @@
 			children = (
 				9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */,
 				055EDD97F97AA298D2F9CA2A /* BackupListViewModel.swift */,
+				C86A607F0938B68118BC36B7 /* DuplicatePromptCoordinator.swift */,
 				13D3F43F96E0A035C1266F8F /* TransferViewModel.swift */,
 				1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */,
 			);
@@ -781,6 +784,7 @@
 				392EFFD780CF6346123B3FA7 /* DryRunReport.swift in Sources */,
 				31751F288510D7BF06F7DF9B /* DryRunSheet.swift in Sources */,
 				3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */,
+				1A27694F65DDE9D6A6EECCA8 /* DuplicatePromptCoordinator.swift in Sources */,
 				CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */,
 				AC0D7BA40F0814AB5305A2ED /* EngineOptions.swift in Sources */,
 				8FA18785A60525202826D859 /* ExFATBanner.swift in Sources */,
