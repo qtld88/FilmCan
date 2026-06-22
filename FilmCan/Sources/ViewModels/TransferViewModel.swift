@@ -516,7 +516,7 @@ class TransferViewModel: ObservableObject {
             && !config.offOrganizationFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasRename = config.offOrganizationUseRenameTemplate
             && !config.offOrganizationRenameTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasPatterns = hasCustomFilterPatterns(
+        let hasPatterns = SourceFilterMatching.hasCustomFilterPatterns(
             include: config.offOrganizationIncludePatterns,
             exclude: config.offOrganizationExcludePatterns,
             copyOnly: config.offOrganizationCopyOnlyPatterns
@@ -567,7 +567,7 @@ class TransferViewModel: ObservableObject {
         guard !patterns.isEmpty else { return kinds }
         for src in sources where kinds[src] == nil {
             let names = [(src as NSString).lastPathComponent, volumeName(forPath: src)]
-            if patterns.contains(where: { p in names.contains { matchesPattern($0, pattern: p) } }) {
+            if patterns.contains(where: { p in names.contains { SourceFilterMatching.matchesPattern($0, pattern: p) } }) {
                 kinds[src] = .sound
             }
         }
@@ -581,39 +581,6 @@ class TransferViewModel: ObservableObject {
             return name
         }
         return (path as NSString).lastPathComponent
-    }
-
-    private func matchesPattern(_ name: String, pattern: String) -> Bool {
-        let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        if trimmed.contains("*") {
-            let escaped = NSRegularExpression.escapedPattern(for: trimmed)
-            let regex = "^" + escaped.replacingOccurrences(of: "\\*", with: ".*") + "$"
-            return name.range(of: regex, options: [.regularExpression, .caseInsensitive]) != nil
-        }
-        return name.range(of: trimmed, options: .caseInsensitive) != nil
-    }
-
-    private func hasCustomFilterPatterns(
-        include: [String],
-        exclude: [String],
-        copyOnly: [String]
-    ) -> Bool {
-        let normalizedInclude = normalizedPatterns(include)
-        let normalizedCopyOnly = normalizedPatterns(copyOnly)
-        if !normalizedInclude.isEmpty || !normalizedCopyOnly.isEmpty {
-            return true
-        }
-        let normalizedExclude = normalizedPatterns(exclude)
-        let defaultSet = Set(DefaultExcludes.patterns)
-        let nonDefaultExcludes = normalizedExclude.filter { !defaultSet.contains($0) }
-        return !nonDefaultExcludes.isEmpty
-    }
-
-    private func normalizedPatterns(_ patterns: [String]) -> [String] {
-        patterns
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
     }
 
     private func destinationNotificationSummary(
