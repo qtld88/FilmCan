@@ -3,6 +3,25 @@
 Run this checklist on a fresh, signed build before every release. Each row is
 one independent test. Tick the box only after the result column matches.
 
+## ⛔ RELEASE GATE — non-negotiable
+
+**No release ships until the Gate block below is run on a real build and every
+box is ticked.** Green unit tests + static review are NOT sufficient: every
+defect in 1.3.2 (wrong default verify mode, false "not enough space" on the
+internal drive, frozen progress bar) passed all unit tests and code review
+because they only manifest at runtime, on real volumes, with the UI rendered.
+Unit tests run in temp dirs on one volume and never render SwiftUI — they
+structurally cannot catch these. The smoke run is the only thing that can.
+
+| # | Gate check (run the actual .app) | Expected | Pass? |
+|---|---|---|---|
+| G1 | **New-tab default verify mode.** Create a brand-new backup tab, open Options → Verification. | Mode reads **Fast** by default (never Paranoid). | ☐ |
+| G2 | **Space preflight vs Finder (internal drive).** Pick a destination on the internal APFS drive. Note Finder's "Available". Start a copy whose size is comfortably under Finder-free but possibly over strict statfs (e.g. 15 GB when Finder shows >40 GB free). | No false "Not enough space"; the number FilmCan shows is within a few % of Finder's Available, not tens of GB lower. Job runs. | ☐ |
+| G3 | **Live progress movement.** Start a ≥10 GB copy to a real EXTERNAL drive (ideally a slow/HDD one). Watch the destination card for the first 30 s. | The copy bar, byte counter, speed, and ETA all visibly advance within a few seconds and keep moving — never frozen at 0 while bytes are clearly being written. | ☐ |
+| G4 | **Throughput sanity.** During G3, compare observed MB/s to the drive's known write speed. | Within ~2× of the drive's real speed; not pathologically stalled by backpressure. | ☐ |
+
+If any Gate row fails, the release is blocked — fix and re-run, do not ship.
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.

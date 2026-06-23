@@ -9,5 +9,8 @@ struct EngineOptions: Equatable, Codable {
     var fileOrdering: FileOrdering = .defaultOrder
     var parallelCopyEnabled: Bool = true
     var customVerifyEnabled: Bool = true
-    var verificationMode: VerifyMode = .paranoid
+    // New backups default to Fast verify (size+xxh128 on the copied stream).
+    // Paranoid (re-read both sides from disk) is opt-in — it roughly halves
+    // throughput, so it must never be the silent default for a fresh tab.
+    var verificationMode: VerifyMode = .fast
 }

@@ -128,32 +128,40 @@ enum DriveUtilities {
         return (total, liveAvailableBytes(for: path))
     }
 
-    /// Free space that reflects deletions and Trash emptying *immediately*.
+    /// Best estimate of how many bytes a backup can actually write here.
     ///
-    /// `statfs` (via `attributesOfFileSystem`) reads the live free-block count
-    /// from the mounted filesystem. `volumeAvailableCapacityForImportantUsage`
-    /// is intentionally last: it is a cached/laggy macOS metric that factors in
-    /// purgeable space and OS reservations, so it keeps reporting a drive as
-    /// "full" for a while after the user frees space. Preferring statfs fixes the
-    /// "emptied the drive but FilmCan still shows it full" report.
+    /// Two macOS metrics disagree and each is wrong in one direction:
+    ///   - `statfs` `.systemFreeSize` updates immediately on delete but, on APFS,
+    ///     EXCLUDES purgeable space — it under-reports (e.g. 11 GB when Finder
+    ///     shows 65 GB), which falsely blocks a copy that would succeed.
+    ///   - `volumeAvailableCapacityForImportantUsage` matches Finder and includes
+    ///     reclaimable/purgeable space, but is cached and lags for a while after
+    ///     the user frees space — it over-reports "full" right after a delete.
+    ///
+    /// Taking the MAX of the two is correct in both directions: right after a
+    /// delete statfs is the higher (fresh) value; in the purgeable case
+    /// ImportantUsage is the higher (Finder-matching) value. This fixes both the
+    /// "emptied the drive but still shows full" report AND the false
+    /// "Not enough space" that blocked valid backups to the internal drive.
     static func liveAvailableBytes(for path: String) -> Int64? {
-        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
-           let cap = attrs[.systemFreeSize] as? Int64,
-           cap > 0 {
-            return cap
+        var best: Int64? = nil
+        func consider(_ value: Int64?) {
+            guard let value, value > 0 else { return }
+            best = max(best ?? 0, value)
+        }
+
+        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path) {
+            consider(attrs[.systemFreeSize] as? Int64)
         }
         let url = URL(fileURLWithPath: path)
-        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
-           let cap = values.volumeAvailableCapacity,
-           cap > 0 {
-            return Int64(cap)
+        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]) {
+            consider(values.volumeAvailableCapacityForImportantUsage)
         }
-        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
-           let cap = values.volumeAvailableCapacityForImportantUsage,
-           cap > 0 {
-            return Int64(cap)
+        if best == nil,
+           let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]) {
+            consider(values.volumeAvailableCapacity.map(Int64.init))
         }
-        return nil
+        return best
     }
 
     static func isExFAT(path: String) -> Bool {
