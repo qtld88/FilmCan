@@ -666,7 +666,7 @@ actor FanOutCopier {
                 bytesTotal: fullJobBytes, filesTotal: fullJobFiles, verifyMode: dest.verifyMode)
             prog.bytesCompleted = sBytes
             prog.filesCompleted = sFiles
-            prog.verifyBytesTotal = dest.verifyMode == .paranoid ? fullJobBytes : 0
+            prog.verifyBytesTotal = dest.verifyMode == .off ? 0 : fullJobBytes
             prog.verifyBytesCompleted = sBytes
             prog.filesSkipped = sFiles
             config.progressHandler?(prog)
@@ -1072,7 +1072,7 @@ actor FanOutCopier {
                         status: .failed(reason), bytesTotal: destBytesTotal,
                         filesTotal: destFilesTotal, verifyMode: destCfg.verifyMode)
                     prog.bytesCompleted = await self.finalizedBytesForDest(destCfg.destPath)
-                    prog.verifyBytesTotal = destCfg.verifyMode == .paranoid ? destBytesTotal : 0
+                    prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
                     prog.verifyBytesCompleted = await self.verifiedBytesForDest(destCfg.destPath)
                     prog.currentFile = sourceName
                     prog.filesSkipped = destSkipped
@@ -1144,8 +1144,12 @@ actor FanOutCopier {
                                     prog.bytesCompleted = copiedSoFar
                                     prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                                     prog.currentFile = sourceName
-                                    prog.verifyBytesTotal = paranoid ? destBytesTotal : 0
-                                    prog.verifyBytesCompleted = verifiedAtStart
+                                    // Fast verifies the stream inline as it copies, so the
+                                    // green bar tracks copy progress (user sees it being
+                                    // checked the whole time). Paranoid verifies in a later
+                                    // pass, so its green bar stays frozen during copy.
+                                    prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
+                                    prog.verifyBytesCompleted = destCfg.verifyMode == .fast ? copiedSoFar : verifiedAtStart
                                     let se = await self.combinedThroughputETA(
                                         destPath: destCfg.destPath,
                                         copyDoneNow: prog.bytesCompleted,
@@ -1244,8 +1248,8 @@ actor FanOutCopier {
                 prog.bytesCompleted = copiedAtDone
                 prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                 prog.currentFile = sourceName
-                prog.verifyBytesTotal = paranoidDone ? destBytesTotal : 0
-                prog.verifyBytesCompleted = verifiedAtStart
+                prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
+                prog.verifyBytesCompleted = destCfg.verifyMode == .fast ? copiedAtDone : verifiedAtStart
                 let se = await self.combinedThroughputETA(
                     destPath: destCfg.destPath,
                     copyDoneNow: prog.bytesCompleted,
@@ -1392,7 +1396,7 @@ actor FanOutCopier {
                 )
                 prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
                 prog.filesCompleted = await self.completedFilesForDest(r.destPath)
-                prog.verifyBytesTotal = r.verifyMode == .paranoid ? dTotal : 0
+                prog.verifyBytesTotal = r.verifyMode == .off ? 0 : dTotal
                 prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
                 prog.currentFile = "Stopped"
                 prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
@@ -1496,11 +1500,9 @@ actor FanOutCopier {
             let writtenPathByDest: [String: String] = Dictionary(
                 uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.writtenFilePath) }
             )
-            // This re-read runs for fast AND paranoid. The green verify overlay,
-            // however, is a paranoid-only signal (copy-phase emits zero it for
-            // fast). Emitting verifyBytesTotal > 0 here for a fast dest made the
-            // green bar flash in and out as fast/verify emits alternated. Gate
-            // the verify bar on each dest's real mode to keep it steady.
+            // This re-read runs for fast AND paranoid. The green verify bar is
+            // shown in both modes (only .off hides it); gate on each dest's real
+            // mode so an .off dest stays green-free and the bar never flickers.
             let verifyModeByDest: [String: VerifyMode] = Dictionary(
                 uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.verifyMode) }
             )
@@ -1548,7 +1550,7 @@ actor FanOutCopier {
                     )
                     prog.bytesCompleted = await self.finalizedBytesForDest(destPath)
                     prog.filesCompleted = await self.completedFilesForDest(destPath)
-                    prog.verifyBytesTotal = destVerifyMode == .paranoid ? dTotal : 0
+                    prog.verifyBytesTotal = destVerifyMode == .off ? 0 : dTotal
                     prog.verifyBytesCompleted = newVerifiedBytes
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
                     let se = await self.combinedThroughputETA(
