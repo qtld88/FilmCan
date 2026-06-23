@@ -107,33 +107,49 @@ extension BackupEditorView {
         }
     }
 
-    func checkSpaceBeforeTransfer() -> [(destination: String, needed: Int64, available: Int64)] {
-        var insufficient: [(String, Int64, Int64)] = []
+    func checkSpaceBeforeTransfer() -> [(destination: String, needed: Int64, available: Int64, writableNow: Int64)] {
+        var atRisk: [(String, Int64, Int64, Int64)] = []
         let requiredBytes = previewInfo.totalBytes
-        
+
         guard requiredBytes > 0 else { return [] }
-        
+
         for dest in viewModel.destinations {
-            let capacity = DriveUtilities.capacity(for: dest)
-            guard let available = capacity.available else { continue }
-            if requiredBytes > available {
-                insufficient.append((dest, requiredBytes, available))
+            // Optimistic (Finder, includes purgeable) vs immediately-writable
+            // (statfs, excludes purgeable). Warn when the job won't fit in what's
+            // writable RIGHT NOW — that's the real ENOSPC risk, whether the drive
+            // is genuinely full or just looks free because of local snapshots.
+            let available = DriveUtilities.liveAvailableBytes(for: dest) ?? 0
+            let writableNow = DriveUtilities.immediatelyWritableBytes(for: dest) ?? available
+            if requiredBytes > writableNow {
+                atRisk.append((dest, requiredBytes, available, writableNow))
             }
         }
-        
-        return insufficient
+
+        return atRisk
     }
 
-    func buildSpaceWarningMessage(_ destinations: [(destination: String, needed: Int64, available: Int64)]) -> String {
+    func buildSpaceWarningMessage(_ destinations: [(destination: String, needed: Int64, available: Int64, writableNow: Int64)]) -> String {
         if destinations.count == 1 {
             let dest = destinations[0]
             let name = (dest.destination as NSString).lastPathComponent
             let neededStr = FilmCanFormatters.bytes(dest.needed, style: .file)
-            let availableStr = FilmCanFormatters.bytes(dest.available, style: .file)
-            return "Not enough space on \(name).\n\nNeeded: \(neededStr)\nAvailable: \(availableStr)\n\nThe backup may fail or be incomplete."
+            let writableStr = FilmCanFormatters.bytes(dest.writableNow, style: .file)
+            // Purgeable trap: Finder shows enough, but most of it is snapshots/
+            // caches not usable right now. A real backup needs real bytes.
+            if dest.available >= dest.needed && dest.available > dest.writableNow {
+                let finderStr = FilmCanFormatters.bytes(dest.available, style: .file)
+                return """
+                \(name) shows \(finderStr) free, but only \(writableStr) is usable right now.
+
+                The rest is held by local snapshots, caches, or files macOS hasn't released. Finder can "copy" same-disk files instantly by sharing data (a clone), but a backup must write real, independent bytes — so it needs real free space.
+
+                The backup may fail partway. To free space: empty the Trash, run Disk Utility → First Aid, or `tmutil thinlocalsnapshots / 0 4` — or back up to another drive.
+                """
+            }
+            return "Not enough space on \(name).\n\nNeeded: \(neededStr)\nUsable now: \(writableStr)\n\nThe backup may fail or be incomplete."
         } else {
             let names = destinations.map { ($0.destination as NSString).lastPathComponent }.joined(separator: ", ")
-            return "Not enough space on \(destinations.count) destinations: \(names).\n\nThe backup may fail or be incomplete on these drives."
+            return "Some destinations may not have enough usable space right now: \(names).\n\nFinder may show more free space than is immediately usable (local snapshots/caches). The backup may fail or be incomplete on these drives."
         }
     }
 }

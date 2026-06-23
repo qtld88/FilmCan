@@ -195,9 +195,9 @@ actor FanOutCopier {
                 return "Source corruption detected during copy — RAM or source drive issue. Retry recommended. (\(s))"
             case .insufficientSpace(let path, let available, let required):
                 let dest = (path as NSString).lastPathComponent
-                let avMB = available / (1024 * 1024)
-                let reqMB = required / (1024 * 1024)
-                return "Not enough space on \"\(dest)\" — \(reqMB) MB needed, \(avMB) MB available. Free space before backing up."
+                let av = FilmCanFormatters.bytes(available, style: .file)
+                let req = FilmCanFormatters.bytes(required, style: .file)
+                return "Not enough space on \"\(dest)\" — needs \(req), only \(av) is writable right now. Finder may show more free space, but most of it is held by local snapshots or caches that couldn't be reclaimed. Free space (empty Trash, remove files, or delete snapshots) or pick another drive."
             case .destinationUnwritable(let path):
                 return "Cannot write to \"\((path as NSString).lastPathComponent)\". Check the drive is connected and not read-only."
             case .duplicateSourceNames(let names):
@@ -680,21 +680,24 @@ actor FanOutCopier {
         let totalBytesAllSources = fullJobBytes
 
         // Pre-flight: ensure each destination has room for the bytes it STILL needs.
-        // Optimistic + no-fail space pre-flight. We gate on the Finder-matching
-        // figure (includes purgeable) so we don't false-block on a Mac carrying
-        // snapshots. But if the bytes immediately writable RIGHT NOW (statfs) are
-        // short, we proactively reclaim purgeable space (thin local snapshots) so
-        // the copy actually has room and doesn't die mid-write with ENOSPC. Only
-        // if even the optimistic figure can't fit do we block up front.
+        // Space pre-flight. Gate on the optimistic, Finder-matching figure
+        // (includes purgeable: snapshots/caches macOS reclaims on demand) so we
+        // behave like Finder and don't false-block a drive that only LOOKS full.
+        // We do NOT thin snapshots here — Finder doesn't, and a real copy makes
+        // the kernel reclaim purgeable as it writes. Only block if even the
+        // optimistic figure can't fit (the drive is genuinely out of room). If a
+        // write still hits ENOSPC mid-copy (purgeable couldn't be freed fast
+        // enough), the dest fails fast and clean (see the copy loop's dead-dest
+        // handling) rather than churning. The editor surfaces a softer,
+        // overridable "purgeable space" warning before the run.
+        let mb = { (b: Int64) in b / (1024 * 1024) }
         for dest in config.destinations {
             let need = neededBytesByDest[dest.destPath] ?? 0
             guard need > 0 else { continue }
             let writableNow = DriveUtilities.immediatelyWritableBytes(for: dest.destPath) ?? 0
-            if writableNow < need {
-                PurgeableSpace.ensureWritable(need, at: dest.destPath)
-            }
-            if let available = DriveUtilities.liveAvailableBytes(for: dest.destPath),
-               available < need {
+            let available = DriveUtilities.liveAvailableBytes(for: dest.destPath) ?? writableNow
+            DebugLog.info("FanOutCopier preflight \(dest.destPath): need \(mb(need)) MB, immediately-writable \(mb(writableNow)) MB, Finder/optimistic \(mb(available)) MB")
+            if available < need {
                 throw Error.insufficientSpace(
                     destPath: dest.destPath, available: available, required: need)
             }

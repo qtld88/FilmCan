@@ -129,13 +129,13 @@ enum DriveUtilities {
     }
 
     /// Optimistic free space — matches what Finder shows, INCLUDING purgeable
-    /// space (local snapshots, evictable caches) that macOS can reclaim on
-    /// demand. Used for the destination capacity display and the space gate, so
-    /// FilmCan does not false-block a copy on the common case of a Mac carrying
-    /// snapshots that would be reclaimed fine. The engine pairs this with a
-    /// proactive purgeable reclaim (see `PurgeableSpace`) so the optimism is
-    /// backed by actually freeing the space before writing, rather than letting
-    /// a copy start and die mid-write with ENOSPC.
+    /// space (local snapshots, evictable caches) that macOS reclaims on demand
+    /// during a real write. Used for the destination capacity display and the
+    /// engine space gate, so FilmCan behaves like Finder and does not false-block
+    /// a drive that only LOOKS full. When immediately-writable space (statfs,
+    /// `immediatelyWritableBytes`) is short of the optimistic figure, the editor
+    /// shows an overridable "purgeable space" warning so the user understands a
+    /// real backup needs real bytes.
     static func liveAvailableBytes(for path: String) -> Int64? {
         let url = URL(fileURLWithPath: path)
         if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
