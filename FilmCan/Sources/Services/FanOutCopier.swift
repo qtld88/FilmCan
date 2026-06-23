@@ -797,14 +797,33 @@ actor FanOutCopier {
             try await withThrowingTaskGroup(of: CopyResult.self) { group in
                 var iter = plannedFiles.enumerated().makeIterator()
                 var inFlight = 0
+                // Dests that hit a fatal write error (e.g. ENOSPC). Later files are
+                // not attempted to them — otherwise every remaining file spawns a
+                // writer that fails again, flooding the UI with red flashes for
+                // seconds before the run stops. Local to the loop (the task-group
+                // body is nonisolated, so this avoids actor-isolation hops).
+                var deadDestPaths: Set<String> = []
 
                 func enqueueNext() -> Bool {
                     // Stop starting new files once the user cancels.
                     if config.shouldCancel?() == true { return false }
-                    guard let (index, file) = iter.next() else { return false }
-                    let absURL = URL(fileURLWithPath: file.absPath)
-                    let cumBefore = cumulativeBeforeFile[index]
-                    let needed = neededDestsByPlan[index]
+                    // Skip files whose target dests have all fatally failed (e.g.
+                    // ran out of space) — don't keep spawning writers that fail.
+                    while let (index, file) = iter.next() {
+                        let needed = neededDestsByPlan[index].filter {
+                            !deadDestPaths.contains($0.destPath)
+                        }
+                        guard !needed.isEmpty else { continue }
+                        let absURL = URL(fileURLWithPath: file.absPath)
+                        let cumBefore = cumulativeBeforeFile[index]
+                        return enqueueFile(index: index, file: file, absURL: absURL,
+                                           cumBefore: cumBefore, needed: needed)
+                    }
+                    return false
+                }
+
+                func enqueueFile(index: Int, file: PlannedFile, absURL: URL,
+                                 cumBefore: Int64, needed: [DestWriter.Config]) -> Bool {
                     group.addTask { [self] in
                         try await copySource(
                             sourceURL: absURL,
@@ -838,6 +857,14 @@ actor FanOutCopier {
                 while inFlight > 0 {
                     guard let copyResult = try await group.next() else { break }
                     inFlight -= 1
+                    // A dest that failed to WRITE this file (e.g. ENOSPC) is dead
+                    // for the rest of the job — mark it so enqueueNext stops
+                    // sending it further files.
+                    for w in copyResult.writerResults where !w.success && w.failureReason != nil {
+                        if deadDestPaths.insert(w.destPath).inserted {
+                            DebugLog.warn("FanOutCopier: destination fatally failed, skipping remaining files: \(w.destPath)")
+                        }
+                    }
                     try? await verifyChannel.send(copyResult)
                     _ = enqueueNext()
                 }
@@ -1129,6 +1156,7 @@ actor FanOutCopier {
                                 }
                             } catch {
                                 writeFailed = .ioError(error.localizedDescription)
+                                DebugLog.error("FanOutCopier: write failed on \(destCfg.destPath) for \(sourceName) after \(totalBytes / (1024 * 1024)) MB: \(error.localizedDescription)")
                                 await channel.finish()
                             }
                         }

@@ -26,9 +26,13 @@ enum PurgeableSpace {
         // Ask for the shortfall plus a 2 GB margin so the write has headroom.
         let shortfall = targetBytes - writable
         let request = shortfall + 2 * 1024 * 1024 * 1024
+        let mb = { (b: Int64) in b / (1024 * 1024) }
+        DebugLog.info("PurgeableSpace: need \(mb(targetBytes)) MB, only \(mb(writable)) MB immediately writable on \(mount) — thinning local snapshots for \(mb(request)) MB")
         thinLocalSnapshots(mount: mount, purgeBytes: request)
 
-        return DriveUtilities.immediatelyWritableBytes(for: path) ?? writable
+        let after = DriveUtilities.immediatelyWritableBytes(for: path) ?? writable
+        DebugLog.info("PurgeableSpace: after reclaim \(mb(after)) MB immediately writable (freed ~\(mb(after - writable)) MB)")
+        return after
     }
 
     /// `tmutil thinlocalsnapshots <mount> <purgeBytes> <urgency>`. Urgency 4 is
