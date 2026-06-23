@@ -75,6 +75,7 @@
 		7F628CD5790C2B611BEA65BB /* FileChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */; };
 		818A3B2F83A72582CF1CB60D /* FlowLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */; };
 		84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */; };
+		8727BF2458A4A950BE3184E3 /* PurgeableSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1546165A08C8DA4E0C804B3D /* PurgeableSpace.swift */; };
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
 		8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209A0A98482A692929BD2180 /* FastVerifyTests.swift */; };
 		8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */; };
@@ -183,6 +184,7 @@
 		1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TransferViewModel+Presentation.swift"; sourceTree = "<group>"; };
 		13273CE3DB6E17D073212DFE /* BoundedChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedChannel.swift; sourceTree = "<group>"; };
 		13D3F43F96E0A035C1266F8F /* TransferViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferViewModel.swift; sourceTree = "<group>"; };
+		1546165A08C8DA4E0C804B3D /* PurgeableSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurgeableSpace.swift; sourceTree = "<group>"; };
 		18663FD23B1C73B08D717384 /* DryRunPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunPlanner.swift; sourceTree = "<group>"; };
 		1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedChannelTests.swift; sourceTree = "<group>"; };
 		1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLinkView.swift; sourceTree = "<group>"; };
@@ -349,6 +351,7 @@
 				EE1226492995F5E55F0C261F /* LogItemizeParser.swift */,
 				AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */,
 				78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */,
+				1546165A08C8DA4E0C804B3D /* PurgeableSpace.swift */,
 				9A872C6782B426B22FE8EEDC /* SourceFilterMatching.swift */,
 				5A206C11337F2DF884AF7C3C /* StreamingHasher.swift */,
 				EB457DCE07BC5C884750E430 /* UIStrings.swift */,
@@ -837,6 +840,7 @@
 				5510B5B1330752EBEEB968E6 /* OrphanCleaner.swift in Sources */,
 				712C89C119B957716D4B9AEB /* PreviewCalculator.swift in Sources */,
 				BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */,
+				8727BF2458A4A950BE3184E3 /* PurgeableSpace.swift in Sources */,
 				40FA5D85515E21FADAFE1D60 /* QuickTourView.swift in Sources */,
 				D4A34195B903A7F572296066 /* RepairCoordinator.swift in Sources */,
 				C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */,

@@ -680,11 +680,20 @@ actor FanOutCopier {
         let totalBytesAllSources = fullJobBytes
 
         // Pre-flight: ensure each destination has room for the bytes it STILL needs.
-        // Live statfs free space (not the cached ImportantUsage metric) so a drive
-        // the user just cleared isn't falsely reported as full.
+        // Optimistic + no-fail space pre-flight. We gate on the Finder-matching
+        // figure (includes purgeable) so we don't false-block on a Mac carrying
+        // snapshots. But if the bytes immediately writable RIGHT NOW (statfs) are
+        // short, we proactively reclaim purgeable space (thin local snapshots) so
+        // the copy actually has room and doesn't die mid-write with ENOSPC. Only
+        // if even the optimistic figure can't fit do we block up front.
         for dest in config.destinations {
             let need = neededBytesByDest[dest.destPath] ?? 0
-            if need > 0, let available = DriveUtilities.liveAvailableBytes(for: dest.destPath),
+            guard need > 0 else { continue }
+            let writableNow = DriveUtilities.immediatelyWritableBytes(for: dest.destPath) ?? 0
+            if writableNow < need {
+                PurgeableSpace.ensureWritable(need, at: dest.destPath)
+            }
+            if let available = DriveUtilities.liveAvailableBytes(for: dest.destPath),
                available < need {
                 throw Error.insufficientSpace(
                     destPath: dest.destPath, available: available, required: need)
@@ -1456,6 +1465,14 @@ actor FanOutCopier {
             let writtenPathByDest: [String: String] = Dictionary(
                 uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.writtenFilePath) }
             )
+            // This re-read runs for fast AND paranoid. The green verify overlay,
+            // however, is a paranoid-only signal (copy-phase emits zero it for
+            // fast). Emitting verifyBytesTotal > 0 here for a fast dest made the
+            // green bar flash in and out as fast/verify emits alternated. Gate
+            // the verify bar on each dest's real mode to keep it steady.
+            let verifyModeByDest: [String: VerifyMode] = Dictionary(
+                uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.verifyMode) }
+            )
             await withTaskGroup(of: (String, String?).self) { group in
                 for r in c.writerResults where r.success && r.filesTransferred > 0 && !verifyFailed.contains(r.destPath) {
                     let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
@@ -1491,15 +1508,16 @@ actor FanOutCopier {
                         newVerifiedBytes = await self.verifiedBytesForDest(destPath)
                         verifyDestStatus = .failed(.verify)
                     }
+                    let destVerifyMode = verifyModeByDest[destPath] ?? config.verifyMode
                     var prog = DestProgress(
                         id: destPath, displayName: (destPath as NSString).lastPathComponent,
                         status: verifyDestStatus,
                         bytesTotal: dTotal, filesTotal: c.filesTotalByDest[destPath] ?? c.totalSources,
-                        verifyMode: .paranoid
+                        verifyMode: destVerifyMode
                     )
                     prog.bytesCompleted = await self.finalizedBytesForDest(destPath)
                     prog.filesCompleted = await self.completedFilesForDest(destPath)
-                    prog.verifyBytesTotal = dTotal
+                    prog.verifyBytesTotal = destVerifyMode == .paranoid ? dTotal : 0
                     prog.verifyBytesCompleted = newVerifiedBytes
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
                     let se = await self.combinedThroughputETA(

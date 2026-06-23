@@ -128,40 +128,45 @@ enum DriveUtilities {
         return (total, liveAvailableBytes(for: path))
     }
 
-    /// Best estimate of how many bytes a backup can actually write here.
-    ///
-    /// Two macOS metrics disagree and each is wrong in one direction:
-    ///   - `statfs` `.systemFreeSize` updates immediately on delete but, on APFS,
-    ///     EXCLUDES purgeable space — it under-reports (e.g. 11 GB when Finder
-    ///     shows 65 GB), which falsely blocks a copy that would succeed.
-    ///   - `volumeAvailableCapacityForImportantUsage` matches Finder and includes
-    ///     reclaimable/purgeable space, but is cached and lags for a while after
-    ///     the user frees space — it over-reports "full" right after a delete.
-    ///
-    /// Taking the MAX of the two is correct in both directions: right after a
-    /// delete statfs is the higher (fresh) value; in the purgeable case
-    /// ImportantUsage is the higher (Finder-matching) value. This fixes both the
-    /// "emptied the drive but still shows full" report AND the false
-    /// "Not enough space" that blocked valid backups to the internal drive.
+    /// Optimistic free space — matches what Finder shows, INCLUDING purgeable
+    /// space (local snapshots, evictable caches) that macOS can reclaim on
+    /// demand. Used for the destination capacity display and the space gate, so
+    /// FilmCan does not false-block a copy on the common case of a Mac carrying
+    /// snapshots that would be reclaimed fine. The engine pairs this with a
+    /// proactive purgeable reclaim (see `PurgeableSpace`) so the optimism is
+    /// backed by actually freeing the space before writing, rather than letting
+    /// a copy start and die mid-write with ENOSPC.
     static func liveAvailableBytes(for path: String) -> Int64? {
-        var best: Int64? = nil
-        func consider(_ value: Int64?) {
-            guard let value, value > 0 else { return }
-            best = max(best ?? 0, value)
-        }
-
-        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path) {
-            consider(attrs[.systemFreeSize] as? Int64)
-        }
         let url = URL(fileURLWithPath: path)
-        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]) {
-            consider(values.volumeAvailableCapacityForImportantUsage)
+        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+           let cap = values.volumeAvailableCapacityForImportantUsage,
+           cap > 0 {
+            return cap
         }
-        if best == nil,
-           let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]) {
-            consider(values.volumeAvailableCapacity.map(Int64.init))
+        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
+           let cap = attrs[.systemFreeSize] as? Int64,
+           cap > 0 {
+            return cap
         }
-        return best
+        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
+           let cap = values.volumeAvailableCapacity,
+           cap > 0 {
+            return Int64(cap)
+        }
+        return nil
+    }
+
+    /// Bytes writable RIGHT NOW without macOS reclaiming anything — `statfs`
+    /// live free-block count, which on APFS excludes purgeable space. Used only
+    /// to decide whether a proactive purgeable reclaim is needed before copying;
+    /// NOT for the user-facing capacity display.
+    static func immediatelyWritableBytes(for path: String) -> Int64? {
+        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
+           let cap = attrs[.systemFreeSize] as? Int64,
+           cap > 0 {
+            return cap
+        }
+        return nil
     }
 
     static func isExFAT(path: String) -> Bool {
