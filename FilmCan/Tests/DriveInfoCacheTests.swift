@@ -48,4 +48,23 @@ final class DriveInfoCacheTests: XCTestCase {
         XCTAssertNotNil(info)
         XCTAssertEqual(info?.summary.name, "Drive")
     }
+
+    // Root-cause regression: the cache must key by PATH, not by volume id.
+    // Keying by volume id forced `info(for:)`/`prime`/`invalidate` to call
+    // DriveUtilities.driveId -> summary(for:) — a synchronous disk stat on the
+    // main thread on every lookup, which defeated the cache and re-introduced the
+    // nav hangs. Two distinct paths on the SAME volume (two temp dirs) must be
+    // independent cache entries: invalidating one must not evict the other.
+    func test_keyedByPath_notVolumeId() async {
+        let cache = DriveInfoCache()
+        let a = tempDir()
+        let b = tempDir()   // same volume as `a`, different path
+        await cache.populateNow(path: a)
+        await cache.populateNow(path: b)
+        XCTAssertNotNil(cache.info(for: a))
+        XCTAssertNotNil(cache.info(for: b))
+        cache.invalidate(path: a)
+        XCTAssertNil(cache.info(for: a))
+        XCTAssertNotNil(cache.info(for: b))
+    }
 }

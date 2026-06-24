@@ -19,31 +19,35 @@ struct DriveInfoSnapshot {
 final class DriveInfoCache: ObservableObject {
     static let shared = DriveInfoCache()
 
-    @Published private var entries: [String: DriveInfoSnapshot] = [:]   // keyed by volume id
+    // Keyed by PATH, not volume id. Volume id requires `DriveUtilities.summary`
+    // (a disk stat) to compute — keying by it would force a synchronous main-
+    // thread stat on every lookup, defeating the cache. The volume id still
+    // lives inside each snapshot's `summary.id` for view-side dedup.
+    @Published private var entries: [String: DriveInfoSnapshot] = [:]
     private var inFlight: Set<String> = []
     private let capacityTTL: TimeInterval = 5
 
-    /// Synchronous read. Returns cached info or nil. On miss or stale capacity,
-    /// schedules an off-main populate (does not block).
+    /// Synchronous read — never touches the disk on the main thread. Returns
+    /// cached info or nil. On miss or stale capacity, schedules an off-main
+    /// populate (does not block).
     func info(for path: String) -> DriveInfoSnapshot? {
-        let id = DriveUtilities.driveId(for: path)
-        guard let existing = entries[id] else {
-            schedulePopulate(path: path, id: id)
+        guard let existing = entries[path] else {
+            schedulePopulate(path: path)
             return nil
         }
         if isCapacityStale(fetchedAt: existing.capacityFetchedAt, ttl: capacityTTL) {
-            schedulePopulate(path: path, id: id)
+            schedulePopulate(path: path)
         }
         return existing
     }
 
     /// Prime several paths at once (call on appear / drive-refresh).
     func prime(_ paths: [String]) {
-        for path in paths { schedulePopulate(path: path, id: DriveUtilities.driveId(for: path)) }
+        for path in paths { schedulePopulate(path: path) }
     }
 
     func invalidate(path: String) {
-        entries.removeValue(forKey: DriveUtilities.driveId(for: path))
+        entries.removeValue(forKey: path)
     }
 
     func invalidateAll() {
@@ -54,24 +58,23 @@ final class DriveInfoCache: ObservableObject {
         Date().timeIntervalSince(fetchedAt) > ttl
     }
 
-    private func schedulePopulate(path: String, id: String) {
-        guard !inFlight.contains(id) else { return }
-        inFlight.insert(id)
+    private func schedulePopulate(path: String) {
+        guard !inFlight.contains(path) else { return }
+        inFlight.insert(path)
         Task.detached(priority: .utility) {
             let info = Self.fetch(path: path)
             await MainActor.run {
-                self.entries[id] = info
-                self.inFlight.remove(id)
+                self.entries[path] = info
+                self.inFlight.remove(path)
             }
         }
     }
 
     /// Synchronous populate for tests — performs the fetch and stores it.
     func populateNow(path: String) async {
-        let id = DriveUtilities.driveId(for: path)
         let info = await Task.detached(priority: .utility) { Self.fetch(path: path) }.value
-        entries[id] = info
-        inFlight.remove(id)
+        entries[path] = info
+        inFlight.remove(path)
     }
 
     /// Off-main disk work. Never throws; degrades to a placeholder on failure.
