@@ -211,83 +211,87 @@ extension BackupEditorView {
     }
 
     private func sourceDriveNodesAndTotal() -> (nodes: [FlowLinkView.FlowNode], totalBytes: Int64) {
-        var sizes: [String: Int64] = [:]
-        var names: [String: String] = [:]
-        var totals: [String: Int64] = [:]
-        var available: [String: Int64] = [:]
-        var order: [String] = []
-        for source in viewModel.sourcePaths {
-            let summary = DriveUtilities.summary(for: source)
-            if sizes[summary.id] == nil {
-                order.append(summary.id)
-                sizes[summary.id] = 0
-                names[summary.id] = summary.name
-                if transferViewModel.isTransferActive(for: viewModel.config.id),
-                   let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
-                    totals[summary.id] = snapshot.totalBytes ?? 0
-                    available[summary.id] = snapshot.availableBytes ?? 0
-                } else {
-                    let capacity = DriveUtilities.capacity(for: source)
-                    totals[summary.id] = capacity.total ?? 0
-                    available[summary.id] = capacity.available ?? 0
+        PerfSignpost.region("sourceDriveNodes") {
+            var sizes: [String: Int64] = [:]
+            var names: [String: String] = [:]
+            var totals: [String: Int64] = [:]
+            var available: [String: Int64] = [:]
+            var order: [String] = []
+            for source in viewModel.sourcePaths {
+                let summary = DriveUtilities.summary(for: source)
+                if sizes[summary.id] == nil {
+                    order.append(summary.id)
+                    sizes[summary.id] = 0
+                    names[summary.id] = summary.name
+                    if transferViewModel.isTransferActive(for: viewModel.config.id),
+                       let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
+                        totals[summary.id] = snapshot.totalBytes ?? 0
+                        available[summary.id] = snapshot.availableBytes ?? 0
+                    } else {
+                        let capacity = DriveUtilities.capacity(for: source)
+                        totals[summary.id] = capacity.total ?? 0
+                        available[summary.id] = capacity.available ?? 0
+                    }
+                }
+                // Green "to copy" amount must reflect the actual enumerated content
+                // (excludes Trash, other files on the volume), not the whole-drive
+                // used space. Fall back to drive-used only if content hasn't been
+                // measured yet (e.g. preview still loading on a root volume).
+                let contentSize = previewInfo.sourceSizes[source] ?? 0
+                if contentSize > 0 {
+                    sizes[summary.id] = (sizes[summary.id] ?? 0) + contentSize
+                } else if summary.isRoot,
+                          (sizes[summary.id] ?? 0) == 0,
+                          let total = totals[summary.id],
+                          let avail = available[summary.id] {
+                    sizes[summary.id] = max(total - avail, 0)
                 }
             }
-            // Green "to copy" amount must reflect the actual enumerated content
-            // (excludes Trash, other files on the volume), not the whole-drive
-            // used space. Fall back to drive-used only if content hasn't been
-            // measured yet (e.g. preview still loading on a root volume).
-            let contentSize = previewInfo.sourceSizes[source] ?? 0
-            if contentSize > 0 {
-                sizes[summary.id] = (sizes[summary.id] ?? 0) + contentSize
-            } else if summary.isRoot,
-                      (sizes[summary.id] ?? 0) == 0,
-                      let total = totals[summary.id],
-                      let avail = available[summary.id] {
-                sizes[summary.id] = max(total - avail, 0)
+            let nodes = order.map { id in
+                FlowLinkView.FlowNode(
+                    id: id,
+                    name: names[id] ?? "Drive",
+                    sizeBytes: sizes[id] ?? 0,
+                    totalBytes: totals[id],
+                    availableBytes: available[id]
+                )
             }
+            let totalBytes = nodes.reduce(Int64(0)) { $0 + $1.sizeBytes }
+            return (nodes, totalBytes)
         }
-        let nodes = order.map { id in
-            FlowLinkView.FlowNode(
-                id: id,
-                name: names[id] ?? "Drive",
-                sizeBytes: sizes[id] ?? 0,
-                totalBytes: totals[id],
-                availableBytes: available[id]
-            )
-        }
-        let totalBytes = nodes.reduce(Int64(0)) { $0 + $1.sizeBytes }
-        return (nodes, totalBytes)
     }
 
     private func destinationDriveNodes() -> [FlowLinkView.FlowNode] {
-        var available: [String: Int64] = [:]
-        var totals: [String: Int64] = [:]
-        var names: [String: String] = [:]
-        var order: [String] = []
-        for destination in viewModel.destinations {
-            let summary = DriveUtilities.summary(for: destination)
-            if available[summary.id] == nil {
-                order.append(summary.id)
-                if transferViewModel.isTransferActive(for: viewModel.config.id),
-                   let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
-                    totals[summary.id] = snapshot.totalBytes ?? 0
-                    available[summary.id] = snapshot.availableBytes ?? 0
-                } else {
-                    let capacity = DriveUtilities.capacity(for: destination)
-                    totals[summary.id] = capacity.total ?? 0
-                    available[summary.id] = capacity.available ?? 0
+        PerfSignpost.region("destinationDriveNodes") {
+            var available: [String: Int64] = [:]
+            var totals: [String: Int64] = [:]
+            var names: [String: String] = [:]
+            var order: [String] = []
+            for destination in viewModel.destinations {
+                let summary = DriveUtilities.summary(for: destination)
+                if available[summary.id] == nil {
+                    order.append(summary.id)
+                    if transferViewModel.isTransferActive(for: viewModel.config.id),
+                       let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
+                        totals[summary.id] = snapshot.totalBytes ?? 0
+                        available[summary.id] = snapshot.availableBytes ?? 0
+                    } else {
+                        let capacity = DriveUtilities.capacity(for: destination)
+                        totals[summary.id] = capacity.total ?? 0
+                        available[summary.id] = capacity.available ?? 0
+                    }
+                    names[summary.id] = summary.name
                 }
-                names[summary.id] = summary.name
             }
-        }
-        return order.map { id in
-            FlowLinkView.FlowNode(
-                id: id,
-                name: names[id] ?? "Drive",
-                sizeBytes: 0,
-                totalBytes: totals[id],
-                availableBytes: available[id] ?? 0
-            )
+            return order.map { id in
+                FlowLinkView.FlowNode(
+                    id: id,
+                    name: names[id] ?? "Drive",
+                    sizeBytes: 0,
+                    totalBytes: totals[id],
+                    availableBytes: available[id] ?? 0
+                )
+            }
         }
     }
 

@@ -199,7 +199,9 @@ struct BackupEditorView: View {
             isPresetNameFocused = false
         }
         .onChange(of: config) { updated in
-            viewModel.syncFromStorage(updated)
+            PerfSignpost.region("onChange.config") {
+                viewModel.syncFromStorage(updated)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyRunNow)) { _ in
             guard !transferViewModel.isTransferActive(for: viewModel.config.id) else { return }

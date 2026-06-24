@@ -84,20 +84,22 @@ extension BackupEditorView {
     }
 
     func refreshAllDriveData(force: Bool = false, includePreview: Bool = true) {
-        let now = Date()
-        if !force, now.timeIntervalSince(lastDriveRefresh) < 3 {
-            return
-        }
-        lastDriveRefresh = now
-        if includePreview {
-            refreshPreview()
-        }
-        viewModel.refreshAutoDetectedSources()
-        viewModel.refreshAutoDetectedSoundSources()
-        viewModel.refreshAutoDetectedDestinations()
-        driveRefreshCounter &+= 1
-        if includePreview {
-            transferViewModel.clearLastRun(for: viewModel.config.id)
+        PerfSignpost.region("refreshAllDriveData") {
+            let now = Date()
+            if !force, now.timeIntervalSince(lastDriveRefresh) < 3 {
+                return
+            }
+            lastDriveRefresh = now
+            if includePreview {
+                refreshPreview()
+            }
+            viewModel.refreshAutoDetectedSources()
+            viewModel.refreshAutoDetectedSoundSources()
+            viewModel.refreshAutoDetectedDestinations()
+            driveRefreshCounter &+= 1
+            if includePreview {
+                transferViewModel.clearLastRun(for: viewModel.config.id)
+            }
         }
     }
 
