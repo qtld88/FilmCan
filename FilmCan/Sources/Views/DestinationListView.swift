@@ -1030,8 +1030,10 @@ struct DestinationListView: View {
                     total = cap
                 }
             }
-            // Live free space (statfs-first) so emptying the drive's Trash is
-            // reflected on refresh, not the cached ImportantUsage value.
+            // Free space served from DriveInfoCache (off-main) to avoid a
+            // per-render disk stat. Cached for the cache's capacity TTL (~5s) and
+            // re-fetched whenever the drive list is primed/refreshed, so emptying
+            // the Trash is reflected on the next refresh or within the TTL.
             var available: Int64? = cached?.liveAvailableBytes ?? DriveUtilities.liveAvailableBytes(for: path)
 
             if isActiveTransfer,
