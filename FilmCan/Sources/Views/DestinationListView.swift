@@ -1005,7 +1005,6 @@ struct DestinationListView: View {
     }
 
     private func driveSummaries(for destinations: [String]) -> [DriveSummary] {
-        PerfSignpost.region("destListSummaries") {
         var summaries: [String: DriveSummary] = [:]
         var order: [String] = []
 
@@ -1046,7 +1045,7 @@ struct DestinationListView: View {
             let isRoot = summary.isRoot
             let entry = DestinationPath(path: path, isRoot: isRoot)
             
-            let connection = connectionStatus(for: path, summary: summary, cached: cached)
+            let connection = connectionStatus(for: path, summary: summary)
 
             if summaries[volumeId] == nil {
                 order.append(volumeId)
@@ -1077,13 +1076,11 @@ struct DestinationListView: View {
         }
         
         return order.compactMap { summaries[$0] }
-        }
     }
 
-    private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot?) -> (isConnected: Bool, message: String) {
+    private func connectionStatus(for path: String, summary: DriveUtilities.Summary) -> (isConnected: Bool, message: String) {
         if let root = volumeRootPath(for: path) {
-            let rootConnected = cached?.rootExists ?? FileManager.default.fileExists(atPath: root)
-            if rootConnected {
+            if FileManager.default.fileExists(atPath: root) {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
                     return (true, "Read-only\(formatLabel)")
@@ -1092,8 +1089,7 @@ struct DestinationListView: View {
             }
             return (false, "Drive not connected")
         }
-        let pathConnected = cached?.pathExists ?? FileManager.default.fileExists(atPath: path)
-        if pathConnected {
+        if FileManager.default.fileExists(atPath: path) {
             if summary.isReadOnly == true {
                 let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
                 return (true, "Read-only\(formatLabel)")

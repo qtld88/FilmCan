@@ -325,53 +325,49 @@ struct SourceListView: View {
     }
     
     private func getFileMetadata(_ path: String) -> FileMetadata {
-        PerfSignpost.region("getFileMetadata") {
-            let name = (path as NSString).lastPathComponent
-            // Existence / directory flag / size come from DriveInfoCache (off-main);
-            // fall back to a synchronous stat only on a cold miss.
-            let cached = DriveInfoCache.shared.info(for: path)
-            let exists: Bool
-            let isDirectory: Bool
-            if let cached {
-                exists = cached.pathExists
-                isDirectory = cached.isDirectory
-            } else {
-                var isDir: ObjCBool = false
-                exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-                isDirectory = isDir.boolValue
-            }
-
-            guard exists else { return FileMetadata(name: name, isDirectory: false) }
-
-            if !isDirectory {
-                if let sizeHint = sourceSizes[path] {
-                    return FileMetadata(
-                        name: name, isDirectory: false, size: sizeHint,
-                        formattedSize: FilmCanFormatters.bytes(sizeHint, style: .file))
-                }
-                let size = cached?.fileSize
-                    ?? ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64)
-                if let size {
-                    return FileMetadata(
-                        name: name, isDirectory: false, size: size,
-                        formattedSize: FilmCanFormatters.bytes(size, style: .file))
-                }
-                return FileMetadata(name: name, isDirectory: false)
-            }
-
-            if let sizeHint = sourceSizes[path] {
-                let countHint = sourceItemCounts[path]
-                return FileMetadata(
-                    name: name, isDirectory: true, size: sizeHint,
-                    formattedSize: FilmCanFormatters.bytes(sizeHint, style: .file),
-                    itemCount: countHint)
-            }
-            return FileMetadata(name: name, isDirectory: true)
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: path, isDirectory: &isDir) else {
+            return FileMetadata(name: (path as NSString).lastPathComponent, isDirectory: false)
         }
+        
+        let name = (path as NSString).lastPathComponent
+        
+        if !isDir.boolValue {
+            if let sizeHint = sourceSizes[path] {
+                return FileMetadata(
+                    name: name,
+                    isDirectory: false,
+                    size: sizeHint,
+                    formattedSize: FilmCanFormatters.bytes(sizeHint, style: .file)
+                )
+            }
+            if let attrs = try? fm.attributesOfItem(atPath: path),
+               let size = attrs[.size] as? Int64 {
+                return FileMetadata(
+                    name: name,
+                    isDirectory: false,
+                    size: size,
+                    formattedSize: FilmCanFormatters.bytes(size, style: .file)
+                )
+            }
+            return FileMetadata(name: name, isDirectory: false)
+        }
+        
+        if let sizeHint = sourceSizes[path] {
+            let countHint = sourceItemCounts[path]
+            return FileMetadata(
+                name: name,
+                isDirectory: true,
+                size: sizeHint,
+                formattedSize: FilmCanFormatters.bytes(sizeHint, style: .file),
+                itemCount: countHint
+            )
+        }
+        return FileMetadata(name: name, isDirectory: true)
     }
 
     private func driveSummaries(for sources: [String]) -> [SourceDriveSummary] {
-        PerfSignpost.region("sourceListSummaries") {
         var summaries: [String: SourceDriveSummary] = [:]
         var order: [String] = []
 
@@ -383,8 +379,8 @@ struct SourceListView: View {
             let isExternal = summary.isExternal
             let isRoot = summary.isRoot
             let entry = SourcePath(path: path, isRoot: isRoot)
-            let connection = connectionStatus(for: path, summary: summary, cached: cached)
-
+            let connection = connectionStatus(for: path, summary: summary)
+            
             if summaries[volumeId] == nil {
                 order.append(volumeId)
                 summaries[volumeId] = SourceDriveSummary(
@@ -406,13 +402,11 @@ struct SourceListView: View {
         }
         
         return order.compactMap { summaries[$0] }
-        }
     }
 
-    private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot?) -> (isConnected: Bool, message: String) {
+    private func connectionStatus(for path: String, summary: DriveUtilities.Summary) -> (isConnected: Bool, message: String) {
         if let root = volumeRootPath(for: path) {
-            let rootConnected = cached?.rootExists ?? FileManager.default.fileExists(atPath: root)
-            if rootConnected {
+            if FileManager.default.fileExists(atPath: root) {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
                     return (true, "Read-only\(formatLabel)")
@@ -421,8 +415,7 @@ struct SourceListView: View {
             }
             return (false, "Drive not connected")
         }
-        let pathConnected = cached?.pathExists ?? FileManager.default.fileExists(atPath: path)
-        if pathConnected {
+        if FileManager.default.fileExists(atPath: path) {
             if summary.isReadOnly == true {
                 let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
                 return (true, "Read-only\(formatLabel)")

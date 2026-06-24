@@ -9,13 +9,6 @@ struct DriveInfoSnapshot {
     var liveAvailableBytes: Int64?
     var immediatelyWritableBytes: Int64?
     var capacityFetchedAt: Date
-    // Per-path filesystem facts so list rows don't stat on every render:
-    // path existence (connection), volume-root existence (drive connected),
-    // directory flag and file size (source row metadata).
-    var pathExists: Bool = false
-    var rootExists: Bool = false
-    var isDirectory: Bool = false
-    var fileSize: Int64? = nil
 }
 
 /// Caches drive metadata so view bodies never hit the disk synchronously. Reads
@@ -86,21 +79,6 @@ final class DriveInfoCache: ObservableObject {
 
     /// Off-main disk work. Never throws; degrades to a placeholder on failure.
     nonisolated private static func fetch(path: String) -> DriveInfoSnapshot {
-        let fm = FileManager.default
-        var isDir: ObjCBool = false
-        let pathExists = fm.fileExists(atPath: path, isDirectory: &isDir)
-        let isDirectory = isDir.boolValue
-        let rootExists: Bool
-        if let root = DriveUtilities.volumeRootPath(for: path) {
-            rootExists = fm.fileExists(atPath: root)
-        } else {
-            rootExists = pathExists
-        }
-        var fileSize: Int64? = nil
-        if pathExists && !isDirectory {
-            fileSize = (try? fm.attributesOfItem(atPath: path))?[.size] as? Int64
-        }
-
         let summary = DriveUtilities.summary(for: path)
         let capacity = DriveUtilities.capacity(for: path)
         let exfat = DriveUtilities.isExFAT(path: path)
@@ -111,15 +89,11 @@ final class DriveInfoCache: ObservableObject {
                     id: path, name: "Drive", isExternal: false, isRoot: false,
                     formatDescription: nil, fileSystemType: nil, isReadOnly: nil),
                 isExFAT: false, totalBytes: nil, liveAvailableBytes: nil,
-                immediatelyWritableBytes: nil, capacityFetchedAt: Date(),
-                pathExists: pathExists, rootExists: rootExists,
-                isDirectory: isDirectory, fileSize: fileSize)
+                immediatelyWritableBytes: nil, capacityFetchedAt: Date())
         }
         return DriveInfoSnapshot(
             summary: summary, isExFAT: exfat,
             totalBytes: capacity.total, liveAvailableBytes: capacity.available,
-            immediatelyWritableBytes: writable, capacityFetchedAt: Date(),
-            pathExists: pathExists, rootExists: rootExists,
-            isDirectory: isDirectory, fileSize: fileSize)
+            immediatelyWritableBytes: writable, capacityFetchedAt: Date())
     }
 }

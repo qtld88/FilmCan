@@ -203,7 +203,7 @@ enum DriveUtilities {
         return normalizedPath == expectedRoot
     }
 
-    static func volumeRootPath(for path: String) -> String? {
+    private static func volumeRootPath(for path: String) -> String? {
         let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
         guard components.count >= 3, components[1] == "Volumes" else { return nil }
         return "/Volumes/\(components[2])"
