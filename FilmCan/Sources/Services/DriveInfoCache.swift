@@ -27,8 +27,11 @@ final class DriveInfoCache: ObservableObject {
     /// schedules an off-main populate (does not block).
     func info(for path: String) -> DriveInfoSnapshot? {
         let id = DriveUtilities.driveId(for: path)
-        let existing = entries[id]
-        if existing == nil || isCapacityStale(fetchedAt: existing!.capacityFetchedAt, ttl: capacityTTL) {
+        guard let existing = entries[id] else {
+            schedulePopulate(path: path, id: id)
+            return nil
+        }
+        if isCapacityStale(fetchedAt: existing.capacityFetchedAt, ttl: capacityTTL) {
             schedulePopulate(path: path, id: id)
         }
         return existing
