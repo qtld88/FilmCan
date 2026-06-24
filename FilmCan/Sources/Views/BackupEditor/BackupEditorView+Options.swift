@@ -106,22 +106,12 @@ extension BackupEditorView {
         DefaultExcludes.patterns
     }
 
-    private func normalizedPatterns(_ patterns: [String]) -> [String] {
-        patterns
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
     private func hasCustomFilterPatterns(_ preset: OrganizationPreset) -> Bool {
-        let include = normalizedPatterns(preset.includePatterns)
-        let copyOnly = normalizedPatterns(preset.copyOnlyPatterns)
-        if !include.isEmpty || !copyOnly.isEmpty {
-            return true
-        }
-        let exclude = normalizedPatterns(preset.excludePatterns)
-        let defaultSet = Set(defaultExcludePatterns)
-        let nonDefaultExcludes = exclude.filter { !defaultSet.contains($0) }
-        return !nonDefaultExcludes.isEmpty
+        SourceFilterMatching.hasCustomFilterPatterns(
+            include: preset.includePatterns,
+            exclude: preset.excludePatterns,
+            copyOnly: preset.copyOnlyPatterns
+        )
     }
 
     private func excludePatternsBinding(
