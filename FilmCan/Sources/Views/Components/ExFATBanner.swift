@@ -8,7 +8,7 @@ struct ExFATBanner: View {
             guard dp.requiresFullFsync else { return false }
             switch dp.status {
             case .pending, .active: return true
-            case .complete, .failed: return false
+            case .preparing, .complete, .failed: return false
             }
         }
     }

@@ -29,6 +29,13 @@ struct InlineFanOutProgress: View {
         return min(99, Int(pct.rounded(.towardZero)))
     }
 
+    /// Percent label text. Blank during preparing (no bytes counted yet — a "0%"
+    /// would read as stalled).
+    private var percentText: String {
+        if case .preparing = progress.status { return "—" }
+        return "\(combinedPercent)%"
+    }
+
     /// Copy for this dest is done but verification is still running (no copy to
     /// show alongside — e.g. the final file's verify pass).
     private var isVerifyOnly: Bool {
@@ -100,7 +107,7 @@ struct InlineFanOutProgress: View {
                                   verifyFraction: verifyFraction,
                                   status: progress.status)
                     .frame(maxWidth: .infinity)
-                Text("\(combinedPercent)%")
+                Text(percentText)
                     .font(FilmCanFont.label(15))
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .monospacedDigit()
@@ -171,6 +178,13 @@ struct InlineFanOutProgress: View {
             Text("Waiting…")
                 .font(FilmCanFont.label(10))
                 .foregroundColor(FilmCanTheme.textTertiary)
+        case .preparing:
+            HStack(spacing: 4) {
+                ProgressView().progressViewStyle(.circular).controlSize(.mini)
+                Text("Preparing…")
+                    .font(FilmCanFont.label(10))
+                    .foregroundColor(FilmCanTheme.textSecondary)
+            }
         case .failed(let reason):
             badge(icon: "exclamationmark.triangle.fill", text: reason.displayMessage, color: FilmCanTheme.brandRed)
         case .active:

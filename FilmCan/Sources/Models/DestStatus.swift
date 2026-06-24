@@ -2,6 +2,10 @@ import Foundation
 
 enum DestStatus: Equatable {
     case pending
+    /// Run started, engine is enumerating sources / scanning resume state — no
+    /// bytes are moving yet. Shown so the card isn't a dead 0% bar during the
+    /// pre-flight gap (which can be >10s on slow disks).
+    case preparing
     case active
     case complete
     case failed(DestFailureReason)

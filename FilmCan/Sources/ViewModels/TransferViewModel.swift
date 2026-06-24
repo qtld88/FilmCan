@@ -134,7 +134,24 @@ class TransferViewModel: ObservableObject {
         currentService = nil
         duplicates.reset()
         duplicatePromptCancelled = false
-        
+
+        // Seed a Preparing row per destination so each card shows immediate
+        // feedback during the engine pre-flight (orphan clean, source enumeration,
+        // resume-MHL scan, writability probe) — which can run >10s on slow disks
+        // before the first byte moves. The engine's first real progress emit
+        // overwrites these by id.
+        if !isBackgroundWorker {
+            let prepVerifyMode = activeConfig.engineOptions.verificationMode
+            progress.perDestProgress = activeConfig.destinationPaths.map { destPath in
+                DestProgress(
+                    id: destPath,
+                    displayName: (destPath as NSString).lastPathComponent,
+                    status: .preparing,
+                    verifyMode: prepVerifyMode
+                )
+            }
+        }
+
         // Mark as used
         AppState.shared.storage.markAsUsed(activeConfig)
         

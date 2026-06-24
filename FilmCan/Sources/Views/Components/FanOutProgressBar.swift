@@ -14,6 +14,7 @@ struct FanOutProgressBar: View {
         case .complete:  return FilmCanTheme.brandGreen
         case .failed:    return FilmCanTheme.brandRed
         case .pending:   return Color.gray.opacity(0.4)
+        case .preparing: return Color.gray.opacity(0.4)
         }
     }
 
@@ -23,6 +24,7 @@ struct FanOutProgressBar: View {
         case .complete: return FilmCanTheme.brandGreen
         case .failed:   return FilmCanTheme.brandRed
         case .pending:  return .clear
+        case .preparing: return .clear
         }
     }
 
