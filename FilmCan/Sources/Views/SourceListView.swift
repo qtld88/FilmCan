@@ -4,6 +4,7 @@ import AppKit
 
 struct SourceListView: View {
     @Binding var sources: [String]
+    @ObservedObject private var driveCache = DriveInfoCache.shared
     var refreshToken: Int = 0
     var sourceSizes: [String: Int64] = [:]
     var sourceItemCounts: [String: Int] = [:]

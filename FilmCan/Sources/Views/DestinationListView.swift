@@ -6,6 +6,7 @@ struct DestinationListView: View {
     @Binding var destinations: [String]
     @ObservedObject var transferViewModel: TransferViewModel
     @ObservedObject var progress: TransferProgress
+    @ObservedObject private var driveCache = DriveInfoCache.shared
     var refreshToken: Int = 0
     @State private var isDropTargeted: Bool = false
     @State private var dragPayload: String? = nil
