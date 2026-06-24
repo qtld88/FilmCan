@@ -90,7 +90,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         notificationService.ensureAuthorized()
 
         #if DEBUG
-        MainThreadWatchdog.shared.start()
+        // Skip under XCTest — the background timer firing into the test host's
+        // launch/teardown intermittently crashed the runner at bootstrap.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            MainThreadWatchdog.shared.start()
+        }
         #endif
     }
 

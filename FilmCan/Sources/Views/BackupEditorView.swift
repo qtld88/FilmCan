@@ -35,6 +35,7 @@ struct BackupEditorView: View {
     @State var netflixValidation: NetflixValidationInfo?
     @State var lastDriveRefresh: Date = .distantPast
     @State var driveRefreshCounter: Int = 0
+    @ObservedObject private var driveCache = DriveInfoCache.shared
     let optionToggleWidth: CGFloat = 60
     let optionMenuWidth: CGFloat = 140
     let optionTextWidth: CGFloat = 320
@@ -78,6 +79,15 @@ struct BackupEditorView: View {
         self.onToggleHistory = onToggleHistory
     }
     
+    private func editorDidAppear() {
+        refreshPreview()
+        DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
+        viewModel.refreshAutoDetectedSources()
+        viewModel.refreshAutoDetectedSoundSources()
+        viewModel.refreshAutoDetectedDestinations()
+        viewModel.enforceCustomEngineDefaultsIfNeeded()
+    }
+
     var body: some View {
         GeometryReader { proxy in
             editorContent(proxy: proxy)
@@ -153,13 +163,7 @@ struct BackupEditorView: View {
         } message: {
             Text(deleteWarningMessage)
         }
-        .onAppear {
-            refreshPreview()
-            viewModel.refreshAutoDetectedSources()
-            viewModel.refreshAutoDetectedSoundSources()
-            viewModel.refreshAutoDetectedDestinations()
-            viewModel.enforceCustomEngineDefaultsIfNeeded()
-        }
+        .onAppear(perform: editorDidAppear)
         .onChange(of: viewModel.sourcePaths) { _ in refreshPreview() }
         .onChange(of: viewModel.sourceAutoDetectEnabled) { enabled in
             if enabled {
