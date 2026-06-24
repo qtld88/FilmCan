@@ -1005,47 +1005,32 @@ struct DestinationListView: View {
     }
 
     private func driveSummaries(for destinations: [String]) -> [DriveSummary] {
+        PerfSignpost.region("destListSummaries") {
         var summaries: [String: DriveSummary] = [:]
         var order: [String] = []
 
         for path in destinations {
+            // All metadata from DriveInfoCache (off-main). Cold miss returns a
+            // placeholder with nil capacity ("—") until the populate fills it in;
+            // never a synchronous disk stat on the main thread.
             let cached = DriveInfoCache.shared.info(for: path)
-            let summary = cached?.summary ?? DriveUtilities.summary(for: path)
+            let summary = cached.summary
             let volumeId = summary.id
             let name = summary.name
             let isExternal = summary.isExternal
-            var total: Int64? = cached?.totalBytes
-            if total == nil {
-                let url = URL(fileURLWithPath: path)
-                let values = try? url.resourceValues(forKeys: [
-                    .volumeTotalCapacityKey
-                ])
-                if let values,
-                   let cap = values.volumeTotalCapacity,
-                   cap > 0 {
-                    total = Int64(cap)
-                } else if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
-                          let cap = attrs[.systemSize] as? Int64,
-                          cap > 0 {
-                    total = cap
-                }
-            }
-            // Free space served from DriveInfoCache (off-main) to avoid a
-            // per-render disk stat. Cached for the cache's capacity TTL (~5s) and
-            // re-fetched whenever the drive list is primed/refreshed, so emptying
-            // the Trash is reflected on the next refresh or within the TTL.
-            var available: Int64? = cached?.liveAvailableBytes ?? DriveUtilities.liveAvailableBytes(for: path)
+            var total: Int64? = cached.totalBytes
+            var available: Int64? = cached.liveAvailableBytes
 
             if isActiveTransfer,
                let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
                 total = snapshot.totalBytes
                 available = snapshot.availableBytes
             }
-            
+
             let isRoot = summary.isRoot
             let entry = DestinationPath(path: path, isRoot: isRoot)
-            
-            let connection = connectionStatus(for: path, summary: summary)
+
+            let connection = connectionStatus(for: path, summary: summary, cached: cached)
 
             if summaries[volumeId] == nil {
                 order.append(volumeId)
@@ -1076,11 +1061,12 @@ struct DestinationListView: View {
         }
         
         return order.compactMap { summaries[$0] }
+        }
     }
 
-    private func connectionStatus(for path: String, summary: DriveUtilities.Summary) -> (isConnected: Bool, message: String) {
-        if let root = volumeRootPath(for: path) {
-            if FileManager.default.fileExists(atPath: root) {
+    private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot) -> (isConnected: Bool, message: String) {
+        if volumeRootPath(for: path) != nil {
+            if cached.rootExists {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
                     return (true, "Read-only\(formatLabel)")
@@ -1089,7 +1075,7 @@ struct DestinationListView: View {
             }
             return (false, "Drive not connected")
         }
-        if FileManager.default.fileExists(atPath: path) {
+        if cached.pathExists {
             if summary.isReadOnly == true {
                 let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
                 return (true, "Read-only\(formatLabel)")
@@ -1270,10 +1256,6 @@ struct DestinationListView: View {
         DriveUtilities.driveId(for: path)
     }
 
-    private func availableSpace(at path: String) -> Int64? {
-        DriveInfoCache.shared.info(for: path)?.liveAvailableBytes ?? DriveUtilities.liveAvailableBytes(for: path)
-    }
-    
     private func selectDestination(at index: Int) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false

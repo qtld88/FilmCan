@@ -90,6 +90,9 @@ extension BackupEditorView {
                 return
             }
             lastDriveRefresh = now
+            // Re-fetch drive metadata off-main so capacity/connection stay fresh
+            // (info(for:) only auto-fetches on a miss, never on a hit).
+            DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
             if includePreview {
                 refreshPreview()
             }

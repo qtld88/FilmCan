@@ -219,7 +219,7 @@ extension BackupEditorView {
             var order: [String] = []
             for source in viewModel.sourcePaths {
                 let cached = DriveInfoCache.shared.info(for: source)
-                let summary = cached?.summary ?? DriveUtilities.summary(for: source)
+                let summary = cached.summary
                 if sizes[summary.id] == nil {
                     order.append(summary.id)
                     sizes[summary.id] = 0
@@ -229,9 +229,8 @@ extension BackupEditorView {
                         totals[summary.id] = snapshot.totalBytes ?? 0
                         available[summary.id] = snapshot.availableBytes ?? 0
                     } else {
-                        let cap = cached == nil ? DriveUtilities.capacity(for: source) : nil
-                        totals[summary.id] = cached?.totalBytes ?? cap?.total ?? 0
-                        available[summary.id] = cached?.liveAvailableBytes ?? cap?.available ?? 0
+                        totals[summary.id] = cached.totalBytes ?? 0
+                        available[summary.id] = cached.liveAvailableBytes ?? 0
                     }
                 }
                 // Green "to copy" amount must reflect the actual enumerated content
@@ -270,7 +269,7 @@ extension BackupEditorView {
             var order: [String] = []
             for destination in viewModel.destinations {
                 let cached = DriveInfoCache.shared.info(for: destination)
-                let summary = cached?.summary ?? DriveUtilities.summary(for: destination)
+                let summary = cached.summary
                 if available[summary.id] == nil {
                     order.append(summary.id)
                     if transferViewModel.isTransferActive(for: viewModel.config.id),
@@ -278,9 +277,8 @@ extension BackupEditorView {
                         totals[summary.id] = snapshot.totalBytes ?? 0
                         available[summary.id] = snapshot.availableBytes ?? 0
                     } else {
-                        let cap = cached == nil ? DriveUtilities.capacity(for: destination) : nil
-                        totals[summary.id] = cached?.totalBytes ?? cap?.total ?? 0
-                        available[summary.id] = cached?.liveAvailableBytes ?? cap?.available ?? 0
+                        totals[summary.id] = cached.totalBytes ?? 0
+                        available[summary.id] = cached.liveAvailableBytes ?? 0
                     }
                     names[summary.id] = summary.name
                 }
@@ -310,8 +308,7 @@ extension BackupEditorView {
         guard !fulfilledDestinations.isEmpty else { return [] }
         var destinationsByDrive: [String: [String]] = [:]
         for destination in viewModel.destinations {
-            let cached = DriveInfoCache.shared.info(for: destination)
-            let summary = cached?.summary ?? DriveUtilities.summary(for: destination)
+            let summary = DriveInfoCache.shared.info(for: destination).summary
             destinationsByDrive[summary.id, default: []].append(destination)
         }
 
