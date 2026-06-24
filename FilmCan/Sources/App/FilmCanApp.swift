@@ -88,7 +88,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Request authorization
         notificationService.ensureAuthorized()
-        
+
+        #if DEBUG
+        MainThreadWatchdog.shared.start()
+        #endif
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
