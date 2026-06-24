@@ -1008,27 +1008,30 @@ struct DestinationListView: View {
         var order: [String] = []
 
         for path in destinations {
-            let url = URL(fileURLWithPath: path)
-            let values = try? url.resourceValues(forKeys: [
-                .volumeTotalCapacityKey
-            ])
-            let summary = DriveUtilities.summary(for: path)
+            let cached = DriveInfoCache.shared.info(for: path)
+            let summary = cached?.summary ?? DriveUtilities.summary(for: path)
             let volumeId = summary.id
             let name = summary.name
             let isExternal = summary.isExternal
-            var total: Int64? = nil
-            if let values,
-               let cap = values.volumeTotalCapacity,
-               cap > 0 {
-                total = Int64(cap)
-            } else if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
-                      let cap = attrs[.systemSize] as? Int64,
-                      cap > 0 {
-                total = cap
+            var total: Int64? = cached?.totalBytes
+            if total == nil {
+                let url = URL(fileURLWithPath: path)
+                let values = try? url.resourceValues(forKeys: [
+                    .volumeTotalCapacityKey
+                ])
+                if let values,
+                   let cap = values.volumeTotalCapacity,
+                   cap > 0 {
+                    total = Int64(cap)
+                } else if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: path),
+                          let cap = attrs[.systemSize] as? Int64,
+                          cap > 0 {
+                    total = cap
+                }
             }
             // Live free space (statfs-first) so emptying the drive's Trash is
             // reflected on refresh, not the cached ImportantUsage value.
-            var available: Int64? = DriveUtilities.liveAvailableBytes(for: path)
+            var available: Int64? = cached?.liveAvailableBytes ?? DriveUtilities.liveAvailableBytes(for: path)
 
             if isActiveTransfer,
                let snapshot = transferViewModel.driveCapacitySnapshot[summary.id] {
@@ -1265,7 +1268,7 @@ struct DestinationListView: View {
     }
 
     private func availableSpace(at path: String) -> Int64? {
-        DriveUtilities.liveAvailableBytes(for: path)
+        DriveInfoCache.shared.info(for: path)?.liveAvailableBytes ?? DriveUtilities.liveAvailableBytes(for: path)
     }
     
     private func selectDestination(at index: Int) {

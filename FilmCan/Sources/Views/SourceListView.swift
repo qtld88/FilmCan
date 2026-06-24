@@ -369,9 +369,10 @@ struct SourceListView: View {
     private func driveSummaries(for sources: [String]) -> [SourceDriveSummary] {
         var summaries: [String: SourceDriveSummary] = [:]
         var order: [String] = []
-        
+
         for path in sources {
-            let summary = DriveUtilities.summary(for: path)
+            let cached = DriveInfoCache.shared.info(for: path)
+            let summary = cached?.summary ?? DriveUtilities.summary(for: path)
             let volumeId = summary.id
             let name = summary.name
             let isExternal = summary.isExternal

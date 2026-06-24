@@ -8,8 +8,8 @@ struct BackupEditorView: View {
     let isHistoryVisible: Bool
     let onToggleHistory: () -> Void
     @EnvironmentObject var appState: AppState
-    
-    
+
+
 
     @State var showFolderPicker = false
     @State var folderPickerMode: FolderPickerMode = .destination
