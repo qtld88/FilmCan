@@ -1082,9 +1082,6 @@ actor FanOutCopier {
                 // chunk spawned thousands of progress Tasks per file, flooding the
                 // main thread. The per-file copy-done emit below is always sent.
                 var lastEmit = Date.distantPast
-                // Snapshot verified bytes at the start of this source so copy-phase
-                // progress emits keep the verify bar frozen at the right position.
-                let verifiedAtStart = await self.verifiedBytesForDest(destCfg.destPath)
 
                 guard let destHasher = XXH128StreamingHasher() else {
                     await channel.finish()
@@ -1144,12 +1141,13 @@ actor FanOutCopier {
                                     prog.bytesCompleted = copiedSoFar
                                     prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                                     prog.currentFile = sourceName
-                                    // Fast verifies the stream inline as it copies, so the
-                                    // green bar tracks copy progress (user sees it being
-                                    // checked the whole time). Paranoid verifies in a later
-                                    // pass, so its green bar stays frozen during copy.
+                                    // Green = bytes whose verification is CONFIRMED by the
+                                    // verify lane (re-read + hash compare), so it TRAILS the
+                                    // yellow copy bar in both Fast and Paranoid. On a big
+                                    // single file, yellow fills first, then green fills behind
+                                    // it — a visible two-phase copy→verify progression.
                                     prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
-                                    prog.verifyBytesCompleted = destCfg.verifyMode == .fast ? copiedSoFar : verifiedAtStart
+                                    prog.verifyBytesCompleted = await self.verifiedBytesForDest(destCfg.destPath)
                                     let se = await self.combinedThroughputETA(
                                         destPath: destCfg.destPath,
                                         copyDoneNow: prog.bytesCompleted,
@@ -1249,7 +1247,7 @@ actor FanOutCopier {
                 prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
-                prog.verifyBytesCompleted = destCfg.verifyMode == .fast ? copiedAtDone : verifiedAtStart
+                prog.verifyBytesCompleted = await self.verifiedBytesForDest(destCfg.destPath)
                 let se = await self.combinedThroughputETA(
                     destPath: destCfg.destPath,
                     copyDoneNow: prog.bytesCompleted,
