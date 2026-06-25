@@ -140,47 +140,6 @@ extension BackupEditorView {
         return AnyView(row)
     }
 
-    private func advancedOptionRow(
-        icon: String? = nil,
-        iconColor: Color = .secondary,
-        title: String,
-        subtitle: String,
-        titleColor: Color = .primary,
-        subtitleColor: Color = .secondary,
-        isOn: Binding<Bool>,
-        helpText: String? = nil
-    ) -> some View {
-        let row = HStack(spacing: optionSpacing) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(iconColor)
-                    .frame(width: 32)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(FilmCanFont.label(13))
-                    .foregroundColor(titleColor)
-                Text(subtitle)
-                    .font(FilmCanFont.body(11))
-                    .foregroundColor(subtitleColor)
-            }
-            .frame(width: resolvedTextWidth(optionTextWidth), alignment: .leading)
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .scaleEffect(0.8)
-                .tint(FilmCanTheme.toggleTint)
-                .frame(width: optionToggleWidth, alignment: .leading)
-        }
-
-        if let helpText {
-            return AnyView(row.help(helpText))
-        }
-        return AnyView(row)
-    }
-
     private func disclosureCard<Content: View>(
         title: String,
         icon: String? = nil,
@@ -446,7 +405,7 @@ extension BackupEditorView {
         case .source:
             SourceOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
         case .logs:
-            logsContent
+            LogsOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
         case .destinations:
             EmptyView()
         }
@@ -484,30 +443,6 @@ extension BackupEditorView {
         let reserved = optionIconWidth + optionSpacing * 2 + textWidth + 16
         let maxForMenu = max(minWidth, available - reserved)
         return min(base, maxForMenu)
-    }
-
-    private var logsContent: some View {
-        LogSettingsView(
-            logEnabled: Binding(
-                get: { viewModel.logEnabled },
-                set: { viewModel.logEnabled = $0 }
-            ),
-            logLocation: Binding(
-                get: { viewModel.logLocation },
-                set: { viewModel.logLocation = $0 }
-            ),
-            customLogPath: Binding(
-                get: { viewModel.customLogPath },
-                set: { viewModel.customLogPath = $0 }
-            ),
-            logFileNameTemplate: Binding(
-                get: { viewModel.logFileNameTemplate },
-                set: { viewModel.logFileNameTemplate = $0 }
-            ),
-            configName: viewModel.name,
-            sampleDestination: viewModel.destinations.first ?? "Destination",
-            showHeader: false
-        )
     }
 
     var nameRow: some View {

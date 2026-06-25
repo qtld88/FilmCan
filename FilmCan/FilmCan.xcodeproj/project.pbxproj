@@ -113,6 +113,7 @@
 		ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE87AE92E6D0FD2C5F1566BA /* TitlebarAccessory.swift */; };
 		ADD84C805512EEC84CD93FFA /* RepairFailedDestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F772B2D53DF92EE1BA0929C9 /* RepairFailedDestTests.swift */; };
 		ADE31DDEE0B65D6199D89613 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EB91D5AC324DFAEC3E376F /* SettingsView.swift */; };
+		AF683945DDE046A3AB1C236F /* LogsOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6794CD2A43286C823FE41E30 /* LogsOptionsView.swift */; };
 		B040EBA5373475073E32D8B1 /* MHLAppendFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47D2A112F945F989A5E2A3A3 /* MHLAppendFailureTests.swift */; };
 		B199DE45F6E02002B8A84B9F /* DestPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF6668045A55C3936ACEFFF /* DestPickerView.swift */; };
 		B19AE709208AE950F333B225 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C1983264D0443559124CDB6 /* Assets.xcassets */; };
@@ -245,6 +246,7 @@
 		64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunReport.swift; sourceTree = "<group>"; };
 		64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStorage.swift; sourceTree = "<group>"; };
 		65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChooserView.swift; sourceTree = "<group>"; };
+		6794CD2A43286C823FE41E30 /* LogsOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsOptionsView.swift; sourceTree = "<group>"; };
 		68D90641C9B9019E8312A23E /* OrganizationPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationPreset.swift; sourceTree = "<group>"; };
 		69275D7B8B574E36B94814D5 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		6C58BD6BBAE45AB2BED7FDAA /* DestStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestStatus.swift; sourceTree = "<group>"; };
@@ -622,6 +624,7 @@
 			children = (
 				7F725B4EA67B79A41B4614F3 /* BasicOptionsView.swift */,
 				5CFCE6A38FFA62F38F063BF7 /* DestinationsOptionsView.swift */,
+				6794CD2A43286C823FE41E30 /* LogsOptionsView.swift */,
 				E92942B1079C0E1E3FE6545A /* OptionsShared.swift */,
 				3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */,
 				C52D0096DF4C754581380449 /* SourceOptionsView.swift */,
@@ -872,6 +875,7 @@
 				B367BE269DB7059A5820B67D /* LogFolderNamer.swift in Sources */,
 				AA7B2EE04F2D592BD7230742 /* LogItemizeParser.swift in Sources */,
 				9363B1B33C0AD9FFD34477E3 /* LogSettingsView.swift in Sources */,
+				AF683945DDE046A3AB1C236F /* LogsOptionsView.swift in Sources */,
 				73DA82CDD34327AFDB1104C4 /* MHLWriting.swift in Sources */,
 				2A332D2274013BB431B0EF92 /* MainThreadWatchdog.swift in Sources */,
 				A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */,
