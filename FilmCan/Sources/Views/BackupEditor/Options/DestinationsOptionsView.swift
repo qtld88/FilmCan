@@ -2,8 +2,15 @@ import SwiftUI
 
 struct DestinationsOptionsView: View {
     @ObservedObject var model: OrganizationEditorModel
-    @ObservedObject var viewModel: BackupEditorViewModel
+    // Plain (UNobserved) reference — passed down to the auto-detect child only.
+    // The heavy org body must NOT subscribe to viewModel, so a viewModel publish
+    // (e.g. the 6s drive refresh) skips this view; the nested
+    // DestinationAutoDetectSection observes viewModel and updates on its own.
+    let viewModel: BackupEditorViewModel
     let availableWidth: CGFloat
+    /// Destination count for the Netflix readiness hint, passed as a value so an
+    /// unrelated viewModel publish (unchanged count) doesn't rebuild this view.
+    let destinationCount: Int
 
     @State private var showRenameOnlyPatterns = false
     @State private var isFolderDropTargeted = false
@@ -12,7 +19,7 @@ struct DestinationsOptionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             netflixMetadataSection
-            autoDetectSection
+            DestinationAutoDetectSection(viewModel: viewModel, availableWidth: availableWidth)
             organizationOptionsContent
         }
     }
@@ -81,7 +88,7 @@ struct DestinationsOptionsView: View {
 
     @ViewBuilder
     private var netflixReadinessHint: some View {
-        let count = viewModel.destinations.count
+        let count = destinationCount
         HStack(spacing: 6) {
             Image(systemName: count < 3 ? "exclamationmark.triangle.fill" : "info.circle")
                 .foregroundColor(count < 3 ? .orange : FilmCanTheme.textTertiary)
@@ -90,68 +97,6 @@ struct DestinationsOptionsView: View {
                 .foregroundColor(FilmCanTheme.textSecondary)
         }
         .padding(.top, 2)
-    }
-
-    // MARK: - Auto-detect destinations
-
-    private var autoDetectSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            let destinationAutoDetectInfo = InfoPopoverContent(
-                title: "Auto-detect destinations",
-                description: "Scans connected drives and automatically adds destinations whose names or subfolders match your patterns.",
-                pros: [
-                    "Hands-free destination selection",
-                    "Avoids missing a backup drive"
-                ],
-                cons: [
-                    "Broad patterns can add the wrong drive",
-                    "May select a drive with low space"
-                ]
-            )
-
-            optionsRow(
-                icon: "externaldrive",
-                iconColor: FilmCanTheme.textSecondary,
-                title: "Auto-detect destinations",
-                subtitle: "",
-                isOn: $viewModel.destinationAutoDetectEnabled,
-                textWidth: OptionsLayout.basicTextWidth,
-                info: destinationAutoDetectInfo,
-                availableWidth: availableWidth
-            )
-
-            if viewModel.destinationAutoDetectEnabled {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Text("Drive and folder names to detect")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        InfoPopoverButton(
-                            content: InfoPopoverContent(
-                                title: "Drive and folder names to detect",
-                                description: "Enter a drive name or a drive/folder path (Drive/Folder). Files are ignored. Wildcards (*) are supported.",
-                                notes: [
-                                    "ARRI card example for backup drives: `ARRI_BACKUP*`.",
-                                    "Drive folder path example: `MEDIA/ARRI` matches MEDIA/ARRI.",
-                                    "File names like `A001C001_240101_0010.MOV` are matched in file patterns, not here."
-                                ]
-                            )
-                        )
-                    }
-                    PatternEditor(
-                        title: "",
-                        placeholder: "BACKUP\nRAID*\nMEDIA*/Projects",
-                        patterns: Binding(
-                            get: { viewModel.destinationAutoDetectPatterns },
-                            set: { viewModel.destinationAutoDetectPatterns = $0 }
-                        ),
-                        showsTitle: false
-                    )
-                }
-                .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
-                .padding(.top, 4)
-            }
-        }
     }
 
     // MARK: - Organization options
@@ -346,6 +291,76 @@ struct DestinationsOptionsView: View {
                 Text("Select a preset to edit destination organization settings.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+/// The destination auto-detect rows. Split into its own view that observes
+/// `viewModel` so that toggling/editing it updates live, WITHOUT making the heavy
+/// `DestinationsOptionsView` (which observes only the org model) depend on
+/// `viewModel` — a viewModel publish (e.g. the 6s drive refresh) re-renders only
+/// this small section, not the whole organization editor.
+struct DestinationAutoDetectSection: View {
+    @ObservedObject var viewModel: BackupEditorViewModel
+    let availableWidth: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            let destinationAutoDetectInfo = InfoPopoverContent(
+                title: "Auto-detect destinations",
+                description: "Scans connected drives and automatically adds destinations whose names or subfolders match your patterns.",
+                pros: [
+                    "Hands-free destination selection",
+                    "Avoids missing a backup drive"
+                ],
+                cons: [
+                    "Broad patterns can add the wrong drive",
+                    "May select a drive with low space"
+                ]
+            )
+
+            optionsRow(
+                icon: "externaldrive",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Auto-detect destinations",
+                subtitle: "",
+                isOn: $viewModel.destinationAutoDetectEnabled,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: destinationAutoDetectInfo,
+                availableWidth: availableWidth
+            )
+
+            if viewModel.destinationAutoDetectEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text("Drive and folder names to detect")
+                            .font(FilmCanFont.label(13))
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                        InfoPopoverButton(
+                            content: InfoPopoverContent(
+                                title: "Drive and folder names to detect",
+                                description: "Enter a drive name or a drive/folder path (Drive/Folder). Files are ignored. Wildcards (*) are supported.",
+                                notes: [
+                                    "ARRI card example for backup drives: `ARRI_BACKUP*`.",
+                                    "Drive folder path example: `MEDIA/ARRI` matches MEDIA/ARRI.",
+                                    "File names like `A001C001_240101_0010.MOV` are matched in file patterns, not here."
+                                ]
+                            )
+                        )
+                    }
+                    PatternEditor(
+                        title: "",
+                        placeholder: "BACKUP\nRAID*\nMEDIA*/Projects",
+                        patterns: Binding(
+                            get: { viewModel.destinationAutoDetectPatterns },
+                            set: { viewModel.destinationAutoDetectPatterns = $0 }
+                        ),
+                        showsTitle: false
+                    )
+                }
+                .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
+                .padding(.top, 4)
             }
         }
     }

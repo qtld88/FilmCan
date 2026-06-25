@@ -457,7 +457,7 @@ extension BackupEditorView {
             // first visit and keep it mounted (height 0 when not selected) so later
             // tab switches and open/close toggles don't pay the mount/teardown cost.
             if didLoadDestinations {
-                DestinationsOptionsView(model: organizationModel, viewModel: viewModel, availableWidth: effectiveOptionsWidth)
+                DestinationsOptionsView(model: organizationModel, viewModel: viewModel, availableWidth: effectiveOptionsWidth, destinationCount: viewModel.destinations.count)
                     .frame(height: selectedOptionsTab == .destinations ? nil : 0, alignment: .top)
                     .clipped()
                     .opacity(selectedOptionsTab == .destinations ? 1 : 0)
