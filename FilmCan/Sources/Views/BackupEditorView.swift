@@ -25,9 +25,6 @@ struct BackupEditorView: View {
     @State var deleteWarningMessage = ""
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
-    @State var showCopyOnlyPatterns = false
-    @State var showIncludePatterns = false
-    @State var showExcludePatterns = false
     @State var isOptionsCollapsed = true
     @State var didLoadDestinations = false
     @State var netflixValidation: NetflixValidationInfo?
