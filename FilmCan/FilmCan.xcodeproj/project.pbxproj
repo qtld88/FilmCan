@@ -138,6 +138,7 @@
 		CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */; };
 		CE71DF4B0FEBA73F5CA51E9F /* DuplicatePromptSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */; };
 		CF26D25B0D58A7227FCA5275 /* HashListWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493E9CCA8A02D3E16ADEB97C /* HashListWriter.swift */; };
+		CFC88464B146F97B0339EB3A /* OptionsShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92942B1079C0E1E3FE6545A /* OptionsShared.swift */; };
 		D3EA072D2E95C262F7C2657C /* TransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA563679AEE01B0FF5D12CB7 /* TransferService.swift */; };
 		D4A34195B903A7F572296066 /* RepairCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C3508A68EC6274A181D2B6E /* RepairCoordinator.swift */; };
 		D4D1CA5AB6031337836735E1 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75DFBCD664B68D864309A2C9 /* KeychainStore.swift */; };
@@ -325,6 +326,7 @@
 		E47CF7DDB3A7E4B996579E0F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E6B27306257A56E2C8B8AF2B /* LogItemizeParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogItemizeParserTests.swift; sourceTree = "<group>"; };
 		E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEditorView.swift; sourceTree = "<group>"; };
+		E92942B1079C0E1E3FE6545A /* OptionsShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionsShared.swift; sourceTree = "<group>"; };
 		EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryRepairSheet.swift; sourceTree = "<group>"; };
 		EA563679AEE01B0FF5D12CB7 /* TransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferService.swift; sourceTree = "<group>"; };
 		EB457DCE07BC5C884750E430 /* UIStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStrings.swift; sourceTree = "<group>"; };
@@ -612,6 +614,7 @@
 		FA58EC4DC6F1057F19E96073 /* Options */ = {
 			isa = PBXGroup;
 			children = (
+				E92942B1079C0E1E3FE6545A /* OptionsShared.swift */,
 				3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */,
 			);
 			path = Options;
@@ -868,6 +871,7 @@
 				017252CB409DF5109BFB09CA /* NotificationService.swift in Sources */,
 				C287BAF47C32F8F94376CA9C /* NotificationSettings.swift in Sources */,
 				0AE139929E270723A3B6510F /* NotificationSummaryBuilder.swift in Sources */,
+				CFC88464B146F97B0339EB3A /* OptionsShared.swift in Sources */,
 				C9B6517A45A66E6D9CC179FF /* OrganizationEditorModel.swift in Sources */,
 				5479C010F2A311E752679B2F /* OrganizationPreset.swift in Sources */,
 				B554D2819BD859BE97459AB4 /* OrganizationSettingsView.swift in Sources */,
