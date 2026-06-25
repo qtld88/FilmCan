@@ -4,6 +4,7 @@ import Foundation
 struct BackupEditorView: View {
     let config: BackupConfiguration
     @StateObject var viewModel: BackupEditorViewModel
+    @StateObject var organizationModel: OrganizationEditorModel
     @ObservedObject var transferViewModel: TransferViewModel
     let isHistoryVisible: Bool
     let onToggleHistory: () -> Void
@@ -24,12 +25,9 @@ struct BackupEditorView: View {
     @State var deleteWarningMessage = ""
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
-    @State var isFolderDropTargeted = false
-    @State var isRenameDropTargeted = false
     @State var showCopyOnlyPatterns = false
     @State var showIncludePatterns = false
     @State var showExcludePatterns = false
-    @State var showRenameOnlyPatterns = false
     @State var isOptionsCollapsed = true
     @State var didLoadDestinations = false
     @State var netflixValidation: NetflixValidationInfo?
@@ -73,7 +71,9 @@ struct BackupEditorView: View {
         onToggleHistory: @escaping () -> Void
     ) {
         self.config = config
-        _viewModel = StateObject(wrappedValue: BackupEditorViewModel(config: config))
+        let vm = BackupEditorViewModel(config: config)
+        _viewModel = StateObject(wrappedValue: vm)
+        _organizationModel = StateObject(wrappedValue: OrganizationEditorModel(viewModel: vm))
         self.transferViewModel = transferViewModel
         self.isHistoryVisible = isHistoryVisible
         self.onToggleHistory = onToggleHistory
@@ -206,6 +206,7 @@ struct BackupEditorView: View {
             PerfSignpost.region("onChange.config") {
                 viewModel.syncFromStorage(updated)
             }
+            organizationModel.objectWillChange.send()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyRunNow)) { _ in
             guard !transferViewModel.isTransferActive(for: viewModel.config.id) else { return }

@@ -20,6 +20,7 @@
 		0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93FFA7594374B35EFD1117A /* DonationPromptView.swift */; };
 		0E5C6DCD8EF03EDC8D4A1CC8 /* FanOutCopierIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B96018630A1BE87D3AE467 /* FanOutCopierIntegrationTests.swift */; };
 		138FE41894080BDF18228786 /* LegacyCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */; };
+		16BBD578A2200A6CFF0C0C0D /* DestinationsOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFCE6A38FFA62F38F063BF7 /* DestinationsOptionsView.swift */; };
 		170A04CEAB4882CBFA7D184A /* NetflixValidationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B24A04D94C538092C852CA0 /* NetflixValidationSheet.swift */; };
 		1777544B7D467D923D430A7F /* WebhookService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */; };
 		178F4B6B36FD3B5548F3E219 /* OrganizationTemplateTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802D5EC223B6B2F4CB3CF764 /* OrganizationTemplateTokenTests.swift */; };
@@ -232,6 +233,7 @@
 		5C4300AAEA574C2EA24D846C /* SpaceAndDefaultsRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceAndDefaultsRegressionTests.swift; sourceTree = "<group>"; };
 		5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FailedDestRetryPanel.swift; sourceTree = "<group>"; };
 		5CC7B2B17992A10576B84599 /* DefaultExcludes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultExcludes.swift; sourceTree = "<group>"; };
+		5CFCE6A38FFA62F38F063BF7 /* DestinationsOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestinationsOptionsView.swift; sourceTree = "<group>"; };
 		5D381B8072A51ACE5CDEE958 /* DuplicatePromptSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePromptSheet.swift; sourceTree = "<group>"; };
 		5E84E2F5E2941DED39DB6EDD /* FileEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileEnumerator.swift; sourceTree = "<group>"; };
 		5F292B5657EF98C29383419C /* XXHashCanonicalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XXHashCanonicalTests.swift; sourceTree = "<group>"; };
@@ -614,6 +616,7 @@
 		FA58EC4DC6F1057F19E96073 /* Options */ = {
 			isa = PBXGroup;
 			children = (
+				5CFCE6A38FFA62F38F063BF7 /* DestinationsOptionsView.swift */,
 				E92942B1079C0E1E3FE6545A /* OptionsShared.swift */,
 				3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */,
 			);
@@ -821,6 +824,7 @@
 				AB7A8CF9DC4FAA379BE7064B /* DestStatus.swift in Sources */,
 				4E3F4192B4F29DD714EC6682 /* DestWriter.swift in Sources */,
 				57BA4BC4B86BCAE146F33A32 /* DestinationListView.swift in Sources */,
+				16BBD578A2200A6CFF0C0C0D /* DestinationsOptionsView.swift in Sources */,
 				0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */,
 				94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */,
 				A29FDCB8A2EE46E85F197C4E /* DriveEjector.swift in Sources */,
