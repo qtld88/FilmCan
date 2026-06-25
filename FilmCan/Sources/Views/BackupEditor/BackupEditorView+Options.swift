@@ -207,8 +207,8 @@ extension BackupEditorView {
             .opacity(isOptionsCollapsed ? 0 : 1)
             .allowsHitTesting(!isOptionsCollapsed)
         }
-        .onAppear { if selectedOptionsTab == .destinations { didLoadDestinations = true } }
-        .onChange(of: selectedOptionsTab) { if $0 == .destinations { didLoadDestinations = true } }
+        .onAppear { if selectedOptionsTab == .destinations { scheduleDestinationsLoad() } }
+        .onChange(of: selectedOptionsTab) { if $0 == .destinations { scheduleDestinationsLoad() } }
         .padding(12)
         .background(FilmCanTheme.settingsCard)
         .cornerRadius(10)
@@ -384,9 +384,16 @@ extension BackupEditorView {
             if selectedOptionsTab != .destinations {
                 nonDestinationsContent
             }
-            // Destinations carries the heavy organization editor. Build it once on
-            // first visit and keep it mounted (height 0 when not selected) so later
-            // tab switches and open/close toggles don't pay the mount/teardown cost.
+            // Destinations carries the heavy organization editor. Its first-display
+            // build + AppKit constraint layout is the felt nav lag, so mounting is
+            // deferred one runloop (scheduleDestinationsLoad) — the tab highlights and
+            // this spinner paint instantly, then the heavy form fades in next frame.
+            if selectedOptionsTab == .destinations && !didLoadDestinations {
+                destinationsLoadingPlaceholder
+            }
+            // Build it once on first visit and keep it mounted (height 0 when not
+            // selected) so later tab switches and open/close toggles don't re-pay
+            // the mount/teardown cost.
             if didLoadDestinations {
                 DestinationsOptionsView(model: organizationModel, viewModel: viewModel, availableWidth: effectiveOptionsWidth, destinationCount: viewModel.destinations.count)
                     .frame(height: selectedOptionsTab == .destinations ? nil : 0, alignment: .top)
@@ -395,6 +402,24 @@ extension BackupEditorView {
                     .allowsHitTesting(selectedOptionsTab == .destinations)
             }
         }
+    }
+
+    private var destinationsLoadingPlaceholder: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .controlSize(.small)
+            Spacer()
+        }
+        .frame(height: 120, alignment: .center)
+    }
+
+    /// Defer mounting the heavy Destinations editor to the next runloop so the tab
+    /// selection (highlight + expand + spinner) paints first — the click feels
+    /// instant even though the form's layout cost is unchanged.
+    private func scheduleDestinationsLoad() {
+        guard !didLoadDestinations else { return }
+        DispatchQueue.main.async { didLoadDestinations = true }
     }
 
     @ViewBuilder

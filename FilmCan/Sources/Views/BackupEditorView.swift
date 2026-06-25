@@ -27,6 +27,10 @@ struct BackupEditorView: View {
     @FocusState var isPresetNameFocused: Bool
     @State var isOptionsCollapsed = true
     @State var didLoadDestinations = false
+    // Defer the options card mount one runloop after the editor appears so a
+    // Film-tab switch (.id(config.id) rebuilds the whole editor) paints the
+    // overview instantly; the heavy options tree fades in next frame.
+    @State var optionsReady = false
     @State var netflixValidation: NetflixValidationInfo?
     @State var lastDriveRefresh: Date = .distantPast
     @State var driveRefreshCounter: Int = 0
@@ -77,6 +81,7 @@ struct BackupEditorView: View {
     }
     
     private func editorDidAppear() {
+        DispatchQueue.main.async { optionsReady = true }
         refreshPreview()
         DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
         viewModel.refreshAutoDetectedSources()
@@ -233,7 +238,11 @@ struct BackupEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 overviewSection(isWide: isOverviewWide)
-                optionsSection()
+                if optionsReady {
+                    optionsSection()
+                } else {
+                    optionsMountPlaceholder
+                }
             }
             .padding(contentPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -245,5 +254,15 @@ struct BackupEditorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(FilmCanTheme.backgroundGradient)
+    }
+
+    private var optionsMountPlaceholder: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .controlSize(.small)
+            Spacer()
+        }
+        .frame(height: 80, alignment: .center)
     }
 }
