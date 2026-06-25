@@ -88,22 +88,31 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
    - **Still TODO:** vendor `libxxhash.0.dylib` standalone, then stop bundling the
      rsync binary (see Known Weak Areas #7).
 
-7. **BackupEditor options god-view — nav-speed bottleneck** (found 2026-06-24)
-   - The remaining UI lag (Destinations Options card slow to open; first open of a
-     never-opened Film tab slow; periodic stalls) is **SwiftUI view-body
-     construction + layout on the main thread**, not disk. Confirmed with the
-     DEBUG `MainThreadWatchdog` + `PerfSignpost` harness: every residual stall is
-     `region='idle'` (outside the instrumented drive/list regions), ~100–550ms.
-   - Causes: `BackupEditorView+Options.swift` is a ~1500-line god-view; the
-     Destinations tab (`destinationsContent`/`organizationOptionsContent`) is a
-     large always-mounted tree (TextEditors, two token grids, disclosure groups);
-     `MainView.swift:153` puts `.id(config.id)` on the editor (full teardown +
-     rebuild per tab switch); `MainView.swift:39` posts `.filmCanDriveListChanged`
-     every 6s → `refreshAllDriveData` → full editor re-render.
-   - Fix direction (needs its own spec/plan — do NOT hack inline): decompose the
-     god-view into small `Equatable` subviews so SwiftUI skips unchanged subtrees;
-     lazy-build/gate the heavy organization editor; reconsider `.id(config.id)`
-     and the 6s blanket refresh.
-   - Tool already in place: the `MainThreadWatchdog`/`PerfSignpost` harness
-     (DEBUG-only) on the `perf/nav-speed-audit` branch — reuse it to attribute and
-     verify the decomposition. Disk-side wins (DriveInfoCache) already landed.
+7. **BackupEditor nav-speed — first-display layout cost** (found 2026-06-24, root-caused via `sample` 2026-06-25)
+   - Felt lag = opening the **Destinations Options card** and **first open of a
+     never-opened Film tab**. A `sample` of the main thread during the lag proves
+     the dominant cost (~1140/3313 samples) is one path:
+     `display-cycle → CA::Transaction::commit → NSWindow _layoutViewTree →
+     NSView constraint layout → NSHostingView.layout() → SwiftUI ViewGraph render`
+     — i.e. **SwiftUI body build + AppKit constraint layout of a large view tree
+     on first display.** No single FilmCan function is hot (cost is diffuse across
+     ~40 rows, 2×13 token chips, disclosure groups, text fields).
+   - **Correction:** an earlier hypothesis blamed a 6s refresh timer
+     (`MainView.swift:39`) and unrelated-rebuild churn. The idle `sample` disproves
+     it — idle is ~2865/3453 in `mach_msg` (asleep). The lag is on-interaction
+     first-display layout, NOT periodic churn.
+   - **Done on `perf/nav-speed-audit`:** options god-view decomposed into per-tab
+     child views (`BasicOptionsView`/`SourceOptionsView`/`LogsOptionsView`/
+     `DestinationsOptionsView`) + `OrganizationEditorModel` + `OptionsShared`.
+     This is good structure but does NOT reduce first-display layout cost (the
+     displayed tree is the same size) — so it did not change the felt lag.
+   - **Actual fix direction (measure each with `sample`, one at a time):** reduce
+     the view-tree built/laid-out on first display — defer heavy sub-sections of
+     the Destinations content (e.g. the two `TokenFlowLayout` chip grids behind a
+     disclosure; build org options lazily), flatten deep `VStack` nesting, and
+     reconsider `.id(config.id)` in `MainView.swift:153` (full editor rebuild per
+     tab switch). `LazyVStack` at the editor scroll won't help — it has only 2
+     children; the cost is inside the options card.
+   - Tools: DEBUG `MainThreadWatchdog`/`PerfSignpost` harness + `sample <pid> 5`
+     (the watchdog says *when*; `sample` says *where* — use `sample`, the cost is
+     in `idle`/layout that signposts can't wrap).
