@@ -128,6 +128,7 @@
 		C5261D4C4443DBE1151C16AB /* ASCMHLChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */; };
 		C82897983E4544827E6DC81A /* RetryRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */; };
 		C8875012D6788AFF721233E8 /* BackupEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D8F9C9A90E797C0E56D797 /* BackupEditorView.swift */; };
+		C9B6517A45A66E6D9CC179FF /* OrganizationEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */; };
 		C9BB15A21E833EA6850E5D34 /* BackupEditorView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */; };
 		CA4825B83DBA48B44DE72C58 /* UnreadableFilesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F1A00062B058D89BA1ED02 /* UnreadableFilesSheet.swift */; };
 		CB10BBAE07DBB48A5E304FA0 /* AlreadyBackedUpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */; };
@@ -143,6 +144,7 @@
 		D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */; };
 		D7A83CF121B3D61390AF5391 /* DestResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7BCF3596001402A6F510FC /* DestResult.swift */; };
 		DA54C6EDDF200DBCBDCE5DC8 /* LogItemizeParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B27306257A56E2C8B8AF2B /* LogItemizeParserTests.swift */; };
+		DBA7D9E0DFB4180122247E1D /* OrganizationEditorModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF371D249BB433DDD658E2F5 /* OrganizationEditorModelTests.swift */; };
 		DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB49243153FED4BA9A4594E /* BackupListView.swift */; };
 		E19CFCE13B1A1F1155F2AF57 /* FolderPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F3544361F9AB588C49995D /* FolderPickerSheet.swift */; };
 		E3339064DFC685E6CCD9EABF /* OrganizationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA472985C7AB10A3B859755A /* OrganizationSheet.swift */; };
@@ -214,6 +216,7 @@
 		383ACFF923DEBEC571A967AB /* NotificationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettings.swift; sourceTree = "<group>"; };
 		3C3502BD9707954651E53BAE /* SourceCollisionValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceCollisionValidator.swift; sourceTree = "<group>"; };
 		3D2147830DD49FC39B828D61 /* HashListBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListBuilder.swift; sourceTree = "<group>"; };
+		3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationEditorModel.swift; sourceTree = "<group>"; };
 		40E6C2BF26C154734D9112D1 /* FileOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOrdering.swift; sourceTree = "<group>"; };
 		43A1BB108A96290E666D66D7 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
 		43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLWriting.swift; sourceTree = "<group>"; };
@@ -327,6 +330,7 @@
 		EB457DCE07BC5C884750E430 /* UIStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStrings.swift; sourceTree = "<group>"; };
 		EE1226492995F5E55F0C261F /* LogItemizeParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogItemizeParser.swift; sourceTree = "<group>"; };
 		EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyCleanupTests.swift; sourceTree = "<group>"; };
+		EF371D249BB433DDD658E2F5 /* OrganizationEditorModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationEditorModelTests.swift; sourceTree = "<group>"; };
 		F40F951445F8238F0B740353 /* PreviewCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCalculator.swift; sourceTree = "<group>"; };
 		F570E4E93F3AA7F0C77ECF02 /* ASCMHLChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLChainTests.swift; sourceTree = "<group>"; };
 		F772B2D53DF92EE1BA0929C9 /* RepairFailedDestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepairFailedDestTests.swift; sourceTree = "<group>"; };
@@ -431,6 +435,7 @@
 				DFFB79AB2FFE42115A5A8329 /* BackupEditorView+Actions.swift */,
 				9B7A7EDDA19A0713A93A6DA4 /* BackupEditorView+Options.swift */,
 				5633209606F4327D6FE158AA /* BackupEditorView+Overview.swift */,
+				FA58EC4DC6F1057F19E96073 /* Options */,
 			);
 			path = BackupEditor;
 			sourceTree = "<group>";
@@ -466,6 +471,7 @@
 				D5DEA0246D51FEB546D543EE /* NetflixNameValidatorTests.swift */,
 				FA912365575B6BB6724929CD /* NetflixPresetTests.swift */,
 				86874FB4B41C8C4E64B2722C /* NotificationSummaryBuilderTests.swift */,
+				EF371D249BB433DDD658E2F5 /* OrganizationEditorModelTests.swift */,
 				802D5EC223B6B2F4CB3CF764 /* OrganizationTemplateTokenTests.swift */,
 				CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */,
 				744CAA8F663737AD61C511BD /* PerfSignpostTests.swift */,
@@ -601,6 +607,14 @@
 				07A9EC23F618959F4233E19D /* FilmCanTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		FA58EC4DC6F1057F19E96073 /* Options */ = {
+			isa = PBXGroup;
+			children = (
+				3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */,
+			);
+			path = Options;
 			sourceTree = "<group>";
 		};
 		FABA49DA596481CB4AE0DE58 /* App */ = {
@@ -755,6 +769,7 @@
 				B78B3C4D3E7FDF4D5F69F570 /* NetflixNameValidatorTests.swift in Sources */,
 				E913256E07143EBE91685672 /* NetflixPresetTests.swift in Sources */,
 				0B6DEAC3522E2426A725B5C5 /* NotificationSummaryBuilderTests.swift in Sources */,
+				DBA7D9E0DFB4180122247E1D /* OrganizationEditorModelTests.swift in Sources */,
 				178F4B6B36FD3B5548F3E219 /* OrganizationTemplateTokenTests.swift in Sources */,
 				60328CEF84C73456E58A6D6C /* OrphanCleanerTests.swift in Sources */,
 				9B7A90C434B9D3D530770EA7 /* PerfSignpostTests.swift in Sources */,
@@ -853,6 +868,7 @@
 				017252CB409DF5109BFB09CA /* NotificationService.swift in Sources */,
 				C287BAF47C32F8F94376CA9C /* NotificationSettings.swift in Sources */,
 				0AE139929E270723A3B6510F /* NotificationSummaryBuilder.swift in Sources */,
+				C9B6517A45A66E6D9CC179FF /* OrganizationEditorModel.swift in Sources */,
 				5479C010F2A311E752679B2F /* OrganizationPreset.swift in Sources */,
 				B554D2819BD859BE97459AB4 /* OrganizationSettingsView.swift in Sources */,
 				E3339064DFC685E6CCD9EABF /* OrganizationSheet.swift in Sources */,
