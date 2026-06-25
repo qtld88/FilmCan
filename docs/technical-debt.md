@@ -87,3 +87,23 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
    - ~~Delete the rsync engine code + UI.~~ Done in 1.2.x.
    - **Still TODO:** vendor `libxxhash.0.dylib` standalone, then stop bundling the
      rsync binary (see Known Weak Areas #7).
+
+7. **BackupEditor options god-view — nav-speed bottleneck** (found 2026-06-24)
+   - The remaining UI lag (Destinations Options card slow to open; first open of a
+     never-opened Film tab slow; periodic stalls) is **SwiftUI view-body
+     construction + layout on the main thread**, not disk. Confirmed with the
+     DEBUG `MainThreadWatchdog` + `PerfSignpost` harness: every residual stall is
+     `region='idle'` (outside the instrumented drive/list regions), ~100–550ms.
+   - Causes: `BackupEditorView+Options.swift` is a ~1500-line god-view; the
+     Destinations tab (`destinationsContent`/`organizationOptionsContent`) is a
+     large always-mounted tree (TextEditors, two token grids, disclosure groups);
+     `MainView.swift:153` puts `.id(config.id)` on the editor (full teardown +
+     rebuild per tab switch); `MainView.swift:39` posts `.filmCanDriveListChanged`
+     every 6s → `refreshAllDriveData` → full editor re-render.
+   - Fix direction (needs its own spec/plan — do NOT hack inline): decompose the
+     god-view into small `Equatable` subviews so SwiftUI skips unchanged subtrees;
+     lazy-build/gate the heavy organization editor; reconsider `.id(config.id)`
+     and the 6s blanket refresh.
+   - Tool already in place: the `MainThreadWatchdog`/`PerfSignpost` harness
+     (DEBUG-only) on the `perf/nav-speed-audit` branch — reuse it to attribute and
+     verify the decomposition. Disk-side wins (DriveInfoCache) already landed.
