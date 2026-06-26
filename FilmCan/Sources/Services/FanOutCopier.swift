@@ -1661,34 +1661,57 @@ actor FanOutCopier {
         return (speed, eta)
     }
 
-    nonisolated private func rereadHash(url: URL, chunkSz: Int) async -> String? {
-        await Self.rereadHashDetached(url: url, chunkSz: chunkSz)
+    nonisolated private func rereadHash(
+        url: URL, chunkSz: Int,
+        onProgress: (@Sendable (Int64) async -> Void)? = nil
+    ) async -> String? {
+        await Self.rereadHashDetached(url: url, chunkSz: chunkSz, onProgress: onProgress)
     }
 
-    nonisolated private static func rereadHashDetached(url: URL, chunkSz: Int) async -> String? {
+    /// Re-reads `url` with caching disabled and returns its xxh128 hex hash.
+    /// `onProgress`, if provided, is called with the cumulative bytes read so far
+    /// each time another `reportEveryBytes` have been read (and once more at EOF if
+    /// the tail since the last report is non-empty). Throttling by bytes (not time)
+    /// keeps reporting deterministic and the hash loop tight.
+    nonisolated static func rereadHashDetached(
+        url: URL, chunkSz: Int,
+        reportEveryBytes: Int64 = 16 * 1024 * 1024,
+        onProgress: (@Sendable (Int64) async -> Void)? = nil
+    ) async -> String? {
         await Task.detached(priority: .utility) {
             guard FileManager.default.fileExists(atPath: url.path),
                   let handle = try? FileHandle(forReadingFrom: url) else { return nil }
             defer { try? handle.close() }
             _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
             guard let hasher = XXH128StreamingHasher() else { return nil }
+            var readSoFar: Int64 = 0
+            var lastReported: Int64 = 0
             // This is a tight synchronous loop with no `await` to drain the
             // autorelease pool, so FileHandle.read's autoreleased Data would
             // accumulate for the ENTIRE file (observed: 2 dests + source re-read
             // ~= 3x a multi-GB clip = >15 GB). Drain per chunk.
             while true {
-                let done = autoreleasepool { () -> Bool in
+                let chunkLen = autoreleasepool { () -> Int in
                     if #available(macOS 10.15.4, *) {
-                        guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { return true }
+                        guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { return 0 }
                         hasher.update(data: data)
+                        return data.count
                     } else {
                         let data = handle.readData(ofLength: chunkSz)
-                        if data.isEmpty { return true }
+                        if data.isEmpty { return 0 }
                         hasher.update(data: data)
+                        return data.count
                     }
-                    return false
                 }
-                if done { break }
+                if chunkLen == 0 { break }
+                readSoFar += Int64(chunkLen)
+                if let onProgress, readSoFar - lastReported >= reportEveryBytes {
+                    lastReported = readSoFar
+                    await onProgress(readSoFar)
+                }
+            }
+            if let onProgress, readSoFar > lastReported {
+                await onProgress(readSoFar)
             }
             return hasher.finalize().hexString
         }.value
