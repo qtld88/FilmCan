@@ -70,7 +70,16 @@ struct InlineFanOutProgress: View {
     /// ticking clock would change the digits every second, which the engine
     /// throttle is specifically there to avoid.
     private var etaText: String {
-        guard let eta = progress.estimatedTimeRemaining, eta > 0 else { return "—" }
+        Self.etaLabel(eta: progress.estimatedTimeRemaining, status: progress.status)
+    }
+
+    /// Pure ETA label. While actively copying with no estimate yet (first seconds),
+    /// shows "Estimating…" rather than a dash so the user knows a value is coming.
+    static func etaLabel(eta: TimeInterval?, status: DestStatus) -> String {
+        guard let eta, eta > 0 else {
+            if case .active = status { return "Estimating…" }
+            return "—"
+        }
         let secs = Int(eta.rounded())
         if secs < 60 { return "\(secs)s left" }
         if secs < 3600 { return String(format: "%dm left", (secs + 30) / 60) }
