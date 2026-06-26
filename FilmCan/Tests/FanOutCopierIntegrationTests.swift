@@ -1,6 +1,11 @@
 import XCTest
 @testable import FilmCan
 
+private actor VerifyEmitCollector {
+    var verify: [Int64] = []
+    func add(_ v: Int64) { verify.append(v) }
+}
+
 final class FanOutCopierIntegrationTests: XCTestCase {
 
     var tmpDir: URL!
@@ -778,5 +783,48 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let r2 = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
         XCTAssertEqual(r2.first?.filesSkipped, 2, "legacy fallback: both files should be skipped")
         XCTAssertEqual(r2.first?.filesTransferred, 0, "legacy fallback: nothing should be transferred")
+    }
+
+    func test_paranoidVerify_reportsContinuousVerifyBytes() async throws {
+        let fm = FileManager.default
+
+        // One large file (32 MiB) so its re-read crosses several report intervals (16 MiB each).
+        let sourceURL = tmpDir.appendingPathComponent("big.bin")
+        let sourceData = Data((0..<(32 * 1024 * 1024)).map { _ in UInt8.random(in: 0...255) })
+        try sourceData.write(to: sourceURL)
+
+        let dest1 = tmpDir.appendingPathComponent("d1")
+        try fm.createDirectory(at: dest1, withIntermediateDirectories: true)
+
+        // Capture every emitted verifyBytesCompleted value, in order.
+        let emits = VerifyEmitCollector()
+
+        let config = FanOutCopier.Configuration(
+            sources: [sourceURL.path],
+            destinations: [
+                DestWriter.Config(destPath: dest1.path, displayName: "D1",
+                                  verifyMode: .paranoid, requiresFullFsync: false,
+                                  chunkSize: 65536)
+            ],
+            verifyMode: .paranoid,
+            mhlBasePath: tmpDir.path,
+            dryRun: false,
+            progressHandler: { prog in
+                Task { await emits.add(prog.verifyBytesCompleted) }
+            }
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results.allSatisfy { $0.success })
+
+        // Allow the detached emit Tasks to drain.
+        try await Task.sleep(for: .milliseconds(200))
+        let verify = await emits.verify
+
+        // Distinct increasing verify values BETWEEN 0 and the full file size prove
+        // the signal is continuous, not a single whole-file jump.
+        let mid = verify.filter { $0 > 0 && $0 < Int64(32 * 1024 * 1024) }
+        XCTAssertFalse(mid.isEmpty, "expected sub-file verify progress, got steps: \(Set(verify).sorted())")
+        XCTAssertEqual(verify, verify.sorted(), "verify bytes must be monotonic")
     }
 }

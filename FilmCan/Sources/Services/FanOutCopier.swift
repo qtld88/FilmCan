@@ -227,6 +227,12 @@ actor FanOutCopier {
     private var completedFilesByDest: [String: Int] = [:]
     private var verifiedFilesByDest: [String: Int] = [:]
     private var verifiedBytesByDest: [String: Int64] = [:]
+    /// Bytes of the CURRENT file's verify re-read streamed so far at each dest.
+    /// Smooths the verify signal: `verifiedBytesByDest` (confirmed) only grows one
+    /// whole file at a time, so the combined-throughput ETA used to swing. The
+    /// estimator and green bar read `confirmed + in-flight`; in-flight resets to 0
+    /// the instant the confirmed total absorbs the file (no double-count, no dip).
+    private var verifyInFlightByDest: [String: Int64] = [:]
     /// Bytes FINALIZED (written, fsync'd and renamed to their final path) at each
     /// destination so far — i.e. what Finder shows. The copy bar reports this plus
     /// the in-flight bytes of the *current* file only, so it never overstates by the
@@ -259,6 +265,19 @@ actor FanOutCopier {
 
     private func verifiedBytesForDest(_ destPath: String) -> Int64 {
         verifiedBytesByDest[destPath] ?? 0
+    }
+
+    /// Sets the current file's in-flight verify bytes for `destPath` and returns
+    /// the combined confirmed + in-flight total (what the green bar / ETA show).
+    private func recordVerifyInFlight(destPath: String, bytesThisFile: Int64) -> Int64 {
+        verifyInFlightByDest[destPath] = bytesThisFile
+        return (verifiedBytesByDest[destPath] ?? 0) + bytesThisFile
+    }
+
+    /// Resets in-flight verify bytes for `destPath` to 0 (call as the file's
+    /// confirmed bytes are recorded, or when its verify ends in failure).
+    private func clearVerifyInFlight(destPath: String) {
+        verifyInFlightByDest[destPath] = 0
     }
 
     /// Adds `bytes` to the per-dest finalized total (called once a file is renamed
@@ -453,6 +472,7 @@ actor FanOutCopier {
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
+        verifyInFlightByDest.removeAll()
         finalizedBytesByDest.removeAll()
         copyDoneByDest.removeAll()
         combinedSamplesByDest.removeAll()
@@ -1512,7 +1532,32 @@ actor FanOutCopier {
                         #if DEBUG
                         if self.config._testForceDestReadHashNil { return (destPath, nil) }
                         #endif
-                        let hash = await Self.rereadHashDetached(url: destFileURL, chunkSz: c.chunkSz)
+                        let dTotal = c.bytesTotalByDest[destPath] ?? c.totalBytesAllSources
+                        let mode = verifyModeByDest[destPath] ?? self.config.verifyMode
+                        let filesTotal = c.filesTotalByDest[destPath] ?? c.totalSources
+                        let hash = await Self.rereadHashDetached(
+                            url: destFileURL, chunkSz: c.chunkSz,
+                            onProgress: { read in
+                                let combined = await self.recordVerifyInFlight(
+                                    destPath: destPath, bytesThisFile: read)
+                                var prog = DestProgress(
+                                    id: destPath,
+                                    displayName: (destPath as NSString).lastPathComponent,
+                                    status: .active, bytesTotal: dTotal,
+                                    filesTotal: filesTotal, verifyMode: mode)
+                                prog.bytesCompleted = await self.finalizedBytesForDest(destPath)
+                                prog.filesCompleted = await self.completedFilesForDest(destPath)
+                                prog.verifyBytesTotal = mode == .off ? 0 : dTotal
+                                prog.verifyBytesCompleted = combined
+                                prog.currentFile = "Verifying \(c.sourceName)…"
+                                let se = await self.combinedThroughputETA(
+                                    destPath: destPath, copyDoneNow: nil,
+                                    copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
+                                prog.speedBytesPerSecond = se.speed
+                                prog.estimatedTimeRemaining = se.eta
+                                prog.filesSkipped = c.skippedByDest[destPath] ?? 0
+                                self.config.progressHandler?(prog)
+                            })
                         return (destPath, hash)
                     }
                 }
@@ -1530,6 +1575,10 @@ actor FanOutCopier {
                     let verifyDestStatus: DestStatus
                     let newVerifiedBytes: Int64
                     let dTotal = c.bytesTotalByDest[destPath] ?? c.totalBytesAllSources
+                    // The file's verify re-read is done (match, mismatch, or nil):
+                    // drop its in-flight bytes. On a match the confirmed total below
+                    // absorbs the same sourceSize in the same actor hop — no dip.
+                    await self.clearVerifyInFlight(destPath: destPath)
                     if hashMatchesExpected {
                         let isLastVerify = await self.recordVerifyCompletion(
                             destPath: destPath, totalFiles: c.filesTotalByDest[destPath] ?? c.totalSources)
@@ -1604,7 +1653,7 @@ actor FanOutCopier {
             copyDoneByDest[destPath] = max(copyDoneByDest[destPath] ?? 0, c)
         }
         let copyDone = copyDoneByDest[destPath] ?? 0
-        let verifyDone = verifiedBytesByDest[destPath] ?? 0
+        let verifyDone = (verifiedBytesByDest[destPath] ?? 0) + (verifyInFlightByDest[destPath] ?? 0)
         let verifyTotal: Int64 = paranoid ? copyTotal : 0
         let combinedDone = copyDone + verifyDone
         let combinedTotal = copyTotal + verifyTotal
