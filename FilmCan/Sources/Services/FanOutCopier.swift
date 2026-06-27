@@ -477,6 +477,7 @@ actor FanOutCopier {
         copyDoneByDest.removeAll()
         combinedSamplesByDest.removeAll()
         etaEmitByDest.removeAll()
+        etaSmoothedThroughputByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
         await OrphanCleaner.shared.cleanOrphans(at: destURLs)
@@ -1621,27 +1622,24 @@ actor FanOutCopier {
 
     // Combined-throughput speed/ETA per destination.
     //
-    // The copy-only rate swings hard (~300<->180 MB/s) as verification, which
-    // overlaps copying via the pipeline, periodically steals disk bandwidth. But
-    // the *total* disk throughput — copy bytes + verify bytes moved per second —
-    // is roughly constant (the drive's bandwidth).
+    // ETA = remaining combined work ÷ throughput. Total work is known up front
+    // (copy in fast; copy + verify ≈ 2x in paranoid — see `combinedWork`). Verify
+    // overlaps copy via the pipeline and steals bandwidth in waves, so the raw rate
+    // ripples; at low % with huge remaining those ripples become large ETA swings.
     //
-    // A cumulative average since job start over-weights the fast cached opening
-    // and lags the real rate, so the ETA drifts (Finder-grade ETAs use a moving
-    // average of *recent* throughput). So we measure the combined throughput over
-    // a short sliding window: stable (combined is ~constant even in paranoid) and
-    // accurate within ~10s, with no early-history drift.
-    //
-    // Total work is known up front (copy + verify = ~2x data in paranoid), so
-    // remaining_work / windowed_throughput is honest from the start. Displayed
-    // speed is that throughput ÷ verify factor — the effective copy rate, which
-    // predicts the verify slowdown rather than showing the no-verify peak.
+    // Throughput is measured over a 30 s sliding window of combined work and then
+    // EMA-smoothed (`emaThroughput`) so the displayed ETA stays stable and converges
+    // rather than oscillating. Displayed speed is the smoothed throughput ÷ verify
+    // factor (the effective copy rate, which predicts the verify slowdown).
     private var copyDoneByDest: [String: Int64] = [:]
     private var combinedSamplesByDest: [String: [(t: Date, done: Int64)]] = [:]
     private var etaEmitByDest: [String: (t: Date, speed: Double, eta: TimeInterval?)] = [:]
+    /// EMA-smoothed combined throughput (bytes/sec) per dest, feeding the ETA.
+    private var etaSmoothedThroughputByDest: [String: Double] = [:]
     private let etaMinElapsed: TimeInterval = 2.0
     private let etaEmitInterval: TimeInterval = 3.0
-    private let throughputWindow: TimeInterval = 10.0
+    private let throughputWindow: TimeInterval = 30.0
+    private let emaAlpha: Double = 0.2
 
     /// `copyDoneNow` updates the stored copy progress (pass on copy emits, nil on
     /// verify emits). Reads live verified bytes from `verifiedBytesByDest`.
@@ -1679,7 +1677,8 @@ actor FanOutCopier {
             return (last.speed, last.eta)
         }
 
-        // Windowed throughput = work done across the retained window.
+        // Windowed throughput = work done across the retained window, then
+        // EMA-smoothed so a transient rate ripple does not swing the ETA.
         guard let oldest = samples.first else { return (0, nil) }
         let dt = now.timeIntervalSince(oldest.t)
         let db = combinedDone - oldest.done
@@ -1688,10 +1687,14 @@ actor FanOutCopier {
             if let last = etaEmitByDest[destPath] { return (last.speed, last.eta) }
             return (0, nil)
         }
+        let smoothed = Self.emaThroughput(
+            previous: etaSmoothedThroughputByDest[destPath],
+            raw: Double(db) / dt, alpha: emaAlpha)
+        etaSmoothedThroughputByDest[destPath] = smoothed
 
         let result = Self.computeCombinedSpeedETA(
             combinedDone: combinedDone, combinedTotal: combinedTotal,
-            copyTotal: copyTotal, throughput: Double(db) / dt)
+            copyTotal: copyTotal, throughput: smoothed)
         etaEmitByDest[destPath] = (now, result.speed, result.eta)
         return result
     }
@@ -1705,6 +1708,14 @@ actor FanOutCopier {
         let vDone: Int64 = paranoid ? verifyDone : 0
         let vTotal: Int64 = paranoid ? copyTotal : 0
         return (copyDone + vDone, copyTotal + vTotal)
+    }
+
+    /// Exponential moving average of throughput. First sample seeds the average;
+    /// later samples blend `alpha` of the raw windowed rate. Damps the ETA so a
+    /// transient rate ripple does not swing the displayed estimate.
+    static func emaThroughput(previous: Double?, raw: Double, alpha: Double) -> Double {
+        guard let previous else { return raw }
+        return previous + alpha * (raw - previous)
     }
 
     /// Pure speed/ETA math (no timing/throttle) so it can be unit-tested.

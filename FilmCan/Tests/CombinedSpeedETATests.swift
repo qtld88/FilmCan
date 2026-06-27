@@ -85,4 +85,18 @@ final class CombinedSpeedETATests: XCTestCase {
         XCTAssertEqual(w.done, 80, "paranoid: done = copy + verify")
         XCTAssertEqual(w.total, 200, "paranoid: total = copy + verify total")
     }
+
+    func test_emaThroughput_seedsWithFirstSample() {
+        XCTAssertEqual(FanOutCopier.emaThroughput(previous: nil, raw: 300, alpha: 0.2), 300, accuracy: 0.001)
+    }
+
+    func test_emaThroughput_blendsTowardRaw() {
+        // previous 100, raw 200, alpha 0.2 → 100 + 0.2*(200-100) = 120
+        XCTAssertEqual(FanOutCopier.emaThroughput(previous: 100, raw: 200, alpha: 0.2), 120, accuracy: 0.001)
+    }
+
+    func test_emaThroughput_dampsSpike() {
+        let smoothed = FanOutCopier.emaThroughput(previous: 100, raw: 200, alpha: 0.2)
+        XCTAssertLessThan(smoothed, 140, "spike should be damped, not followed")
+    }
 }
