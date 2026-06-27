@@ -71,4 +71,18 @@ final class CombinedSpeedETATests: XCTestCase {
         XCTAssertNil(FanOutCopier.computeCombinedSpeedETA(
             combinedDone: 0, combinedTotal: 100, copyTotal: 100, throughput: 100).eta)
     }
+
+    func test_combinedWork_fastMode_excludesVerify() {
+        let w = FanOutCopier.combinedWork(
+            copyDone: 50, copyTotal: 100, verifyDone: 30, paranoid: false)
+        XCTAssertEqual(w.done, 50, "fast: done is copy only")
+        XCTAssertEqual(w.total, 100, "fast: total is copy only")
+    }
+
+    func test_combinedWork_paranoid_includesVerifyBoth() {
+        let w = FanOutCopier.combinedWork(
+            copyDone: 50, copyTotal: 100, verifyDone: 30, paranoid: true)
+        XCTAssertEqual(w.done, 80, "paranoid: done = copy + verify")
+        XCTAssertEqual(w.total, 200, "paranoid: total = copy + verify total")
+    }
 }

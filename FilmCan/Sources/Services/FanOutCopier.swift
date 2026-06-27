@@ -1653,10 +1653,12 @@ actor FanOutCopier {
             copyDoneByDest[destPath] = max(copyDoneByDest[destPath] ?? 0, c)
         }
         let copyDone = copyDoneByDest[destPath] ?? 0
-        let verifyDone = (verifiedBytesByDest[destPath] ?? 0) + (verifyInFlightByDest[destPath] ?? 0)
-        let verifyTotal: Int64 = paranoid ? copyTotal : 0
-        let combinedDone = copyDone + verifyDone
-        let combinedTotal = copyTotal + verifyTotal
+        let verifyDoneRaw = (verifiedBytesByDest[destPath] ?? 0) + (verifyInFlightByDest[destPath] ?? 0)
+        let work = Self.combinedWork(
+            copyDone: copyDone, copyTotal: copyTotal,
+            verifyDone: verifyDoneRaw, paranoid: paranoid)
+        let combinedDone = work.done
+        let combinedTotal = work.total
         let now = Date()
 
         // Record a sample of cumulative combined work and keep a sliding window.
@@ -1692,6 +1694,17 @@ actor FanOutCopier {
             copyTotal: copyTotal, throughput: Double(db) / dt)
         etaEmitByDest[destPath] = (now, result.speed, result.eta)
         return result
+    }
+
+    /// Combined copy+verify work for the ETA model. Verify is counted in BOTH the
+    /// done and total figures only in paranoid mode; in fast mode it is excluded
+    /// from both (otherwise `done` inflates past `total` as verify trails copy).
+    static func combinedWork(
+        copyDone: Int64, copyTotal: Int64, verifyDone: Int64, paranoid: Bool
+    ) -> (done: Int64, total: Int64) {
+        let vDone: Int64 = paranoid ? verifyDone : 0
+        let vTotal: Int64 = paranoid ? copyTotal : 0
+        return (copyDone + vDone, copyTotal + vTotal)
     }
 
     /// Pure speed/ETA math (no timing/throttle) so it can be unit-tested.
