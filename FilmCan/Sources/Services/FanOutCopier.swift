@@ -1487,7 +1487,7 @@ actor FanOutCopier {
                 prog.currentFile = "Verifying \(c.sourceName)…"
                 let se = await self.combinedThroughputETA(
                     destPath: r.destPath, copyDoneNow: nil,
-                    copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
+                    copyTotal: dTotal, paranoid: r.verifyMode == .paranoid, jobStart: c.jobStartTime)
                 prog.speedBytesPerSecond = se.speed
                 prog.estimatedTimeRemaining = se.eta
                 prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
@@ -1553,7 +1553,7 @@ actor FanOutCopier {
                                 prog.currentFile = "Verifying \(c.sourceName)…"
                                 let se = await self.combinedThroughputETA(
                                     destPath: destPath, copyDoneNow: nil,
-                                    copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
+                                    copyTotal: dTotal, paranoid: mode == .paranoid, jobStart: c.jobStartTime)
                                 prog.speedBytesPerSecond = se.speed
                                 prog.estimatedTimeRemaining = se.eta
                                 prog.filesSkipped = c.skippedByDest[destPath] ?? 0
@@ -1603,7 +1603,7 @@ actor FanOutCopier {
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
                     let se = await self.combinedThroughputETA(
                         destPath: destPath, copyDoneNow: nil,
-                        copyTotal: dTotal, paranoid: true, jobStart: c.jobStartTime)
+                        copyTotal: dTotal, paranoid: destVerifyMode == .paranoid, jobStart: c.jobStartTime)
                     prog.speedBytesPerSecond = se.speed
                     prog.estimatedTimeRemaining = se.eta
                     prog.filesSkipped = c.skippedByDest[destPath] ?? 0

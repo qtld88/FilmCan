@@ -6,6 +6,11 @@ private actor VerifyEmitCollector {
     func add(_ v: Int64) { verify.append(v) }
 }
 
+private actor ETACollector {
+    var values: [TimeInterval] = []
+    func add(_ v: TimeInterval) { values.append(v) }
+}
+
 final class FanOutCopierIntegrationTests: XCTestCase {
 
     var tmpDir: URL!
@@ -826,5 +831,45 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let mid = verify.filter { $0 > 0 && $0 < Int64(32 * 1024 * 1024) }
         XCTAssertFalse(mid.isEmpty, "expected sub-file verify progress, got steps: \(Set(verify).sorted())")
         XCTAssertEqual(verify, verify.sorted(), "verify bytes must be monotonic")
+    }
+
+    func test_fastVerify_etaStaysSaneNoModelFlip() async throws {
+        let fm = FileManager.default
+
+        // Several MB-scale files in FAST mode so copy and verify emits interleave.
+        let srcDir = tmpDir.appendingPathComponent("src")
+        try fm.createDirectory(at: srcDir, withIntermediateDirectories: true)
+        for i in 0..<6 {
+            let f = srcDir.appendingPathComponent("clip\(i).bin")
+            try Data((0..<(2 * 1024 * 1024)).map { _ in UInt8.random(in: 0...255) }).write(to: f)
+        }
+        let dest1 = tmpDir.appendingPathComponent("d1")
+        try fm.createDirectory(at: dest1, withIntermediateDirectories: true)
+
+        let emits = ETACollector()
+
+        let config = FanOutCopier.Configuration(
+            sources: [srcDir.path],
+            destinations: [
+                DestWriter.Config(destPath: dest1.path, displayName: "D1",
+                                  verifyMode: .fast, requiresFullFsync: false,
+                                  chunkSize: 65536)
+            ],
+            verifyMode: .fast,
+            mhlBasePath: tmpDir.path,
+            dryRun: false,
+            progressHandler: { prog in
+                if let eta = prog.estimatedTimeRemaining {
+                    Task { await emits.add(eta) }
+                }
+            }
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results.allSatisfy { $0.success })
+        try await Task.sleep(for: .milliseconds(200))
+
+        let etas = await emits.values
+        XCTAssertTrue(etas.allSatisfy { $0 > 0 }, "no non-positive ETA, got: \(etas)")
     }
 }
