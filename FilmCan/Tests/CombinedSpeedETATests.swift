@@ -87,16 +87,29 @@ final class CombinedSpeedETATests: XCTestCase {
     }
 
     func test_emaThroughput_seedsWithFirstSample() {
-        XCTAssertEqual(FanOutCopier.emaThroughput(previous: nil, raw: 300, alpha: 0.2), 300, accuracy: 0.001)
+        XCTAssertEqual(
+            FanOutCopier.emaThroughput(previous: nil, raw: 300, alphaUp: 0.1, alphaDown: 0.4),
+            300, accuracy: 0.001)
     }
 
-    func test_emaThroughput_blendsTowardRaw() {
-        // previous 100, raw 200, alpha 0.2 → 100 + 0.2*(200-100) = 120
-        XCTAssertEqual(FanOutCopier.emaThroughput(previous: 100, raw: 200, alpha: 0.2), 120, accuracy: 0.001)
+    func test_emaThroughput_risingRate_blendsSlowly() {
+        // raw > previous → alphaUp: 100 + 0.1*(200-100) = 110
+        XCTAssertEqual(
+            FanOutCopier.emaThroughput(previous: 100, raw: 200, alphaUp: 0.1, alphaDown: 0.4),
+            110, accuracy: 0.001)
     }
 
-    func test_emaThroughput_dampsSpike() {
-        let smoothed = FanOutCopier.emaThroughput(previous: 100, raw: 200, alpha: 0.2)
-        XCTAssertLessThan(smoothed, 140, "spike should be damped, not followed")
+    func test_emaThroughput_fallingRate_blendsFast() {
+        // raw < previous → alphaDown: 200 + 0.4*(100-200) = 160
+        XCTAssertEqual(
+            FanOutCopier.emaThroughput(previous: 200, raw: 100, alphaUp: 0.1, alphaDown: 0.4),
+            160, accuracy: 0.001)
+    }
+
+    func test_emaThroughput_reactsFasterToSlowdownThanSpeedup() {
+        // Same ±100 step: falling moves the average more than rising (conservative).
+        let rose = FanOutCopier.emaThroughput(previous: 100, raw: 200, alphaUp: 0.1, alphaDown: 0.4)
+        let fell = FanOutCopier.emaThroughput(previous: 200, raw: 100, alphaUp: 0.1, alphaDown: 0.4)
+        XCTAssertLessThan(abs(rose - 100), abs(fell - 200), "slowdowns must track faster than speedups")
     }
 }

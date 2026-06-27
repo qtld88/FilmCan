@@ -1639,7 +1639,10 @@ actor FanOutCopier {
     private let etaMinElapsed: TimeInterval = 2.0
     private let etaEmitInterval: TimeInterval = 3.0
     private let throughputWindow: TimeInterval = 30.0
-    private let emaAlpha: Double = 0.2
+    // Asymmetric: slow to believe a higher rate (resist early write-cache-burst
+    // optimism), fast to believe a lower rate (climb to the true ETA quickly).
+    private let emaAlphaUp: Double = 0.1
+    private let emaAlphaDown: Double = 0.4
 
     /// `copyDoneNow` updates the stored copy progress (pass on copy emits, nil on
     /// verify emits). Reads live verified bytes from `verifiedBytesByDest`.
@@ -1689,7 +1692,7 @@ actor FanOutCopier {
         }
         let smoothed = Self.emaThroughput(
             previous: etaSmoothedThroughputByDest[destPath],
-            raw: Double(db) / dt, alpha: emaAlpha)
+            raw: Double(db) / dt, alphaUp: emaAlphaUp, alphaDown: emaAlphaDown)
         etaSmoothedThroughputByDest[destPath] = smoothed
 
         let result = Self.computeCombinedSpeedETA(
@@ -1710,11 +1713,17 @@ actor FanOutCopier {
         return (copyDone + vDone, copyTotal + vTotal)
     }
 
-    /// Exponential moving average of throughput. First sample seeds the average;
-    /// later samples blend `alpha` of the raw windowed rate. Damps the ETA so a
-    /// transient rate ripple does not swing the displayed estimate.
-    static func emaThroughput(previous: Double?, raw: Double, alpha: Double) -> Double {
+    /// Asymmetric exponential moving average of throughput. First sample seeds the
+    /// average. Afterwards it reacts FAST to slowdowns (`alphaDown`, raw < previous)
+    /// and SLOW to speedups (`alphaUp`, raw > previous). This biases the estimate
+    /// conservative: the ETA climbs quickly toward the truth when the real sustained
+    /// rate is lower than an early write-cache burst, but resists optimism from
+    /// transient fast spikes — the behaviour a backup tool's ETA should have.
+    static func emaThroughput(
+        previous: Double?, raw: Double, alphaUp: Double, alphaDown: Double
+    ) -> Double {
         guard let previous else { return raw }
+        let alpha = raw > previous ? alphaUp : alphaDown
         return previous + alpha * (raw - previous)
     }
 
