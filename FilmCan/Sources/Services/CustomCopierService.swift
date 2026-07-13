@@ -70,6 +70,7 @@ class CustomCopierService: ObservableObject, TransferService {
         hashListStyle: HashListStyle = .ascMHL,
         reVerifyExistingOnResume: Bool = false,
         unreadableHandler: (@Sendable ([String]) async -> Bool)? = nil,
+        rollIdentityHandler: (@Sendable (FanOutCopier.RollIdentityQuery) async -> Bool)? = nil,
         progressHandler: (@Sendable ([DestProgress]) -> Void)?,
         webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
         aggregatedWebhookHandler: (@Sendable ([DestResult], String) -> Void)? = nil
@@ -106,6 +107,7 @@ class CustomCopierService: ObservableObject, TransferService {
         fanOutConfig.duplicatePolicy = duplicatePolicy
         fanOutConfig.duplicateCounterTemplate = duplicateCounterTemplate
         fanOutConfig.unreadableHandler = unreadableHandler
+        fanOutConfig.rollIdentityHandler = rollIdentityHandler
         if let duplicateResolver {
             fanOutConfig.duplicateResolver = { @Sendable conflicts in
                 guard let first = conflicts.first else { return duplicatePolicy }

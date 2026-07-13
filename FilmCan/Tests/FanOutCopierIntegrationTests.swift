@@ -522,6 +522,199 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         )
     }
 
+    /// Two directory sources sharing a basename ("DJI") must land in DISTINCT roll
+    /// folders with their own ascmhl/ — never merged into one `<dest>/DJI/`.
+    func test_twoSourcesSameBasename_doNotMerge() async throws {
+        let fm = FileManager.default
+        let cardA = tmpDir.appendingPathComponent("cardA/DJI")
+        let cardB = tmpDir.appendingPathComponent("cardB/DJI")
+        try fm.createDirectory(at: cardA, withIntermediateDirectories: true)
+        try fm.createDirectory(at: cardB, withIntermediateDirectories: true)
+        try Data((0..<40_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardA.appendingPathComponent("A001.mov"))
+        try Data((0..<40_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardB.appendingPathComponent("B001.mov"))
+
+        let dest = tmpDir.appendingPathComponent("merge-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let config = FanOutCopier.Configuration(
+            sources: [cardA.path, cardB.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: "D",
+                                  verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil)
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results.allSatisfy { $0.success })
+
+        // Sorted by source path: cardA/DJI keeps "DJI", cardB/DJI → "DJI-2".
+        let djiA = dest.appendingPathComponent("DJI")
+        let djiB = dest.appendingPathComponent("DJI-2")
+        XCTAssertTrue(fm.fileExists(atPath: djiA.appendingPathComponent("A001.mov").path))
+        XCTAssertTrue(fm.fileExists(atPath: djiB.appendingPathComponent("B001.mov").path))
+        // No conflation across the two cards.
+        XCTAssertFalse(fm.fileExists(atPath: djiA.appendingPathComponent("B001.mov").path))
+        XCTAssertFalse(fm.fileExists(atPath: djiB.appendingPathComponent("A001.mov").path))
+        // Each roll has its own ascmhl/.
+        XCTAssertTrue(ascMHLExists(ascmhlDir: djiA.appendingPathComponent("ascmhl")))
+        XCTAssertTrue(ascMHLExists(ascmhlDir: djiB.appendingPathComponent("ascmhl")))
+    }
+
+    /// copyFolderContents normally dumps a card's contents flat into the dest root (no
+    /// roll folder). Two same-named cards would then overwrite each other. The
+    /// disambiguated duplicate must instead be folded under its unique name — no merge,
+    /// no forced rename. Both cards carry a same-named file with distinct content.
+    func test_copyFolderContents_sameBasename_doNotMerge() async throws {
+        let fm = FileManager.default
+        let cardA = tmpDir.appendingPathComponent("cardA/DJI")
+        let cardB = tmpDir.appendingPathComponent("cardB/DJI")
+        try fm.createDirectory(at: cardA, withIntermediateDirectories: true)
+        try fm.createDirectory(at: cardB, withIntermediateDirectories: true)
+        let bytesA = Data((0..<40_000).map { _ in UInt8.random(in: 0...255) })
+        let bytesB = Data((0..<40_000).map { _ in UInt8.random(in: 0...255) })
+        try bytesA.write(to: cardA.appendingPathComponent("CLIP.mov"))
+        try bytesB.write(to: cardB.appendingPathComponent("CLIP.mov"))
+
+        let dest = tmpDir.appendingPathComponent("contents-dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        var config = FanOutCopier.Configuration(
+            sources: [cardA.path, cardB.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: "D",
+                                  verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil)
+        config.copyFolderContents = true
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results.allSatisfy { $0.success })
+
+        // Card A (kept "DJI") dumps flat; card B ("DJI-2") is folded under its unique name.
+        let flat = dest.appendingPathComponent("CLIP.mov")
+        let folded = dest.appendingPathComponent("DJI-2/CLIP.mov")
+        XCTAssertTrue(fm.fileExists(atPath: flat.path))
+        XCTAssertTrue(fm.fileExists(atPath: folded.path))
+        // Neither card's content was clobbered by the other.
+        XCTAssertEqual(try Data(contentsOf: flat), bytesA)
+        XCTAssertEqual(try Data(contentsOf: folded), bytesB)
+    }
+
+    // MARK: - Cross-run same-name card identity
+
+    private func crossRunConfig(source: URL, dest: URL,
+                                handler: (@Sendable (FanOutCopier.RollIdentityQuery) async -> Bool)?) -> FanOutCopier.Configuration {
+        var c = FanOutCopier.Configuration(
+            sources: [source.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: "D",
+                                  verifyMode: .fast, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil)
+        c.rollIdentityHandler = handler
+        return c
+    }
+
+    /// Two same-named cards backed up in SEPARATE runs: when the handler says "different
+    /// card", the second lands in its own roll (DJI-2) — never merged into the first.
+    func test_crossRun_handlerNewCard_savesSeparateRoll() async throws {
+        let fm = FileManager.default
+        let cardA = tmpDir.appendingPathComponent("cardA/DJI")
+        let cardB = tmpDir.appendingPathComponent("cardB/DJI")
+        try fm.createDirectory(at: cardA, withIntermediateDirectories: true)
+        try fm.createDirectory(at: cardB, withIntermediateDirectories: true)
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardA.appendingPathComponent("A001.mov"))
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardB.appendingPathComponent("B001.mov"))
+        let dest = tmpDir.appendingPathComponent("xdest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: crossRunConfig(source: cardA, dest: dest, handler: nil)).run()
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI/A001.mov").path))
+
+        _ = try await FanOutCopier(config: crossRunConfig(source: cardB, dest: dest, handler: { _ in false })).run()
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI-2/B001.mov").path))
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("DJI/B001.mov").path), "card B not merged into roll DJI")
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("DJI-2/A001.mov").path))
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI/A001.mov").path), "card A roll left intact")
+    }
+
+    /// Same volume UUID but a DIFFERENT source path (two staged folders on one shuttle
+    /// drive) is NOT the same card: with no handler the recommendation is newCard, so the
+    /// second run lands in DJI-2 rather than merging. Guards against the false-positive
+    /// where volume UUID alone conflated two distinct cards.
+    func test_crossRun_nilHandler_sameVolumeDifferentPath_savesSeparateRoll() async throws {
+        let fm = FileManager.default
+        let cardA = tmpDir.appendingPathComponent("cardA/DJI")
+        let cardB = tmpDir.appendingPathComponent("cardB/DJI")
+        try fm.createDirectory(at: cardA, withIntermediateDirectories: true)
+        try fm.createDirectory(at: cardB, withIntermediateDirectories: true)
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardA.appendingPathComponent("A001.mov"))
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardB.appendingPathComponent("B001.mov"))
+        let dest = tmpDir.appendingPathComponent("xdest2")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: crossRunConfig(source: cardA, dest: dest, handler: nil)).run()
+        _ = try await FanOutCopier(config: crossRunConfig(source: cardB, dest: dest, handler: nil)).run()
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI-2/B001.mov").path),
+                      "different source path on same volume → separate roll, not a merge")
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("DJI/B001.mov").path),
+                       "card B must not merge into card A's roll")
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI/A001.mov").path))
+    }
+
+    /// The genuine resume: the SAME source path re-run (a file added between runs) merges
+    /// into the existing roll — matching volume UUID AND path → resumeSameCard, silent.
+    func test_crossRun_nilHandler_sameSourcePath_resumes() async throws {
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("theCard/DJI")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("A001.mov"))
+        let dest = tmpDir.appendingPathComponent("xdest3")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: crossRunConfig(source: card, dest: dest, handler: nil)).run()
+        // Add a second clip to the same card and re-run the same source path.
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: card.appendingPathComponent("A002.mov"))
+        _ = try await FanOutCopier(config: crossRunConfig(source: card, dest: dest, handler: nil)).run()
+
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI/A001.mov").path))
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("DJI/A002.mov").path),
+                      "same path re-run resumes into the existing roll")
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("DJI-2").path),
+                       "no new roll for a genuine resume")
+    }
+
+    /// When the recommendation is newCard, the handler is consulted and receives the
+    /// clash details — the recommendation and the proposed "-N" name.
+    func test_crossRun_handlerReceivesNewCardRecommendationAndProposedName() async throws {
+        let fm = FileManager.default
+        let cardA = tmpDir.appendingPathComponent("cardA/DJI")
+        let cardB = tmpDir.appendingPathComponent("cardB/DJI")
+        try fm.createDirectory(at: cardA, withIntermediateDirectories: true)
+        try fm.createDirectory(at: cardB, withIntermediateDirectories: true)
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardA.appendingPathComponent("A001.mov"))
+        try Data((0..<20_000).map { _ in UInt8.random(in: 0...255) }).write(to: cardB.appendingPathComponent("B001.mov"))
+        let dest = tmpDir.appendingPathComponent("xdest4")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        _ = try await FanOutCopier(config: crossRunConfig(source: cardA, dest: dest, handler: nil)).run()
+
+        let captured = CapturedQuery()
+        _ = try await FanOutCopier(config: crossRunConfig(source: cardB, dest: dest, handler: { q in
+            await captured.store(q)
+            return false  // treat as new card
+        })).run()
+
+        let q = await captured.value
+        XCTAssertNotNil(q, "handler must be consulted for a newCard clash")
+        XCTAssertEqual(q?.recommendation, .newCard)
+        XCTAssertEqual(q?.proposedNewName, "DJI-2")
+        XCTAssertEqual(q?.rollName, "DJI")
+    }
+
+    private actor CapturedQuery {
+        private(set) var value: FanOutCopier.RollIdentityQuery?
+        func store(_ q: FanOutCopier.RollIdentityQuery) { value = q }
+    }
+
     func test_resume_recopiesIfDestinationFileWasDeleted() async throws {
         let fm = FileManager.default
         let card = tmpDir.appendingPathComponent("CARD3")

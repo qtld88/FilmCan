@@ -23,6 +23,8 @@ struct BackupEditorView: View {
     @State var spaceWarningMessage = ""
     @State var showDeleteWarning = false
     @State var deleteWarningMessage = ""
+    @State var showDuplicateNameWarning = false
+    @State var duplicateNameWarningMessage = ""
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
     @State var isOptionsCollapsed = true
@@ -119,6 +121,11 @@ struct BackupEditorView: View {
                 }
             )
         }
+        .sheet(item: $transferViewModel.activeRollIdentityPrompt) { prompt in
+            RollIdentitySheet(prompt: prompt) { isResume in
+                transferViewModel.submitRollIdentity(isResume: isResume)
+            }
+        }
         .sheet(item: $transferViewModel.alreadyBackedUp) { info in
             AlreadyBackedUpSheet(
                 info: info,
@@ -164,6 +171,12 @@ struct BackupEditorView: View {
             }
         } message: {
             Text(deleteWarningMessage)
+        }
+        .alert("Sources with the same name", isPresented: $showDuplicateNameWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Continue") { startTransfer(skipDuplicateNameWarning: true) }
+        } message: {
+            Text(duplicateNameWarningMessage)
         }
         .onAppear(perform: editorDidAppear)
         .onChange(of: viewModel.sourcePaths) { _ in refreshPreview() }

@@ -27,6 +27,8 @@ FilmCan/Sources/
 
 Local data lives in `~/Application Support`.
 
+`FilmCan/build/` (DerivedData) and `FilmCan/dist/` (staged .app, DMG) are local build artifacts — exclude them from searches.
+
 ## Key Commands
 
 | Action | Command |
@@ -34,11 +36,12 @@ Local data lives in `~/Application Support`.
 | Build/Run | Open `.xcodeproj` → Cmd+R |
 | Regenerate project | `xcodegen generate` (run in `FilmCan/`) |
 | Release build | `FilmCan/scripts/package_release.sh` (universal binary + customized DMG) |
-| QA checklist | `docs/qa.md` (manual tests — no automated test suite exists) |
+| Run tests | Xcode Cmd+U (`FilmCanTests` target). No shared scheme is committed — `xcodebuild test` only works after Xcode auto-generates one |
+| QA checklist | `docs/qa.md` + `docs/smoke-qa-checklist.md` (manual passes, complement the automated suite) |
 
 ## Architecture Notes
 
-- **Single copy engine**: `CustomCopierService` (the FilmCan Engine — Swift-only, no external deps), driving the `FanOutCopier` actor. Supports pause/resume and duplicate detection. The rsync engine (`RsyncService`) was fully removed in 1.2.x; no Homebrew rsync dependency remains.
+- **Single copy engine**: `CustomCopierService` (the FilmCan Engine — Swift-only, no external deps), driving the `FanOutCopier` actor. Supports pause/resume and duplicate detection. The rsync engine (`RsyncService`) was fully removed in 1.2.x — nothing shells out to rsync at runtime. **Build-time**, Homebrew rsync ≥ 3.4.0 is still required: the "Embed rsync" phase in `project.yml` harvests the binary + dylibs (incl. `libxxhash.0.dylib`) into `Resources/rsync/`.
 - **Fan-out engine**: `FanOutCopier` (Swift actor) handles N-sources → M-destinations in one pass. One `BoundedChannel<Chunk>` per destination; source is read once and broadcast. Paranoid verify re-reads both source and dest from disk with `F_NOCACHE`. See `docs/architecture.md`.
 - **Entry point**: `FilmCanApp.swift` — creates `MainView` window and `SettingsView`. No storyboards.
 - **No CI, no linter, no formatter, no pre-commit hooks** — bare Xcode project.
@@ -78,20 +81,14 @@ Local data lives in `~/Application Support`.
 
 Progress is mounted **inside each destination card** in `DestinationListView` — not in a separate block below.
 
-## Known Technical Debt (docs/technical-debt.md)
+## Known Technical Debt
 
-1. Progress/verification state scattered across services
-2. Duplicate detection branches intertwined in the FilmCan Engine path
-3. CustomCopierService / FanOutCopier complexity (single responsibility concerns)
-4. HistoryView mixes data logic and UI rendering
-5. Drive refresh timing is nondeterministic
-6. Log/hashlist lifecycle spread across multiple components
-7. The rsync engine (`RsyncService`) has now been fully removed; FilmCan no longer bundles or requires Homebrew rsync. (`MultiDestSummaryView` dead code was removed in 1.2.0.)
+`docs/technical-debt.md` is canonical — read it there, don't trust summaries copied elsewhere (this file's copy drifted once already). Headline areas: progress/verification state scattered, duplicate-detection branches intertwined, CustomCopierService/FanOutCopier complexity, HistoryView mixing logic and UI, nondeterministic drive refresh, log/hashlist lifecycle spread, dormant code.
 
 ## Conventions
 
 - SwiftUI with MVVM — views stay thin, logic in ViewModels/Services
 - No generated code beyond XcodeGen's project file
 - Privacy-sensitive APIs (camera, removable storage) — entitlements in `FilmCan.entitlements`
-- Release script creates notarized universal binary (arm64 + x86_64)
+- Release script (`scripts/package_release.sh`) creates a universal DMG (arm64 + x86_64), **ad-hoc codesigned only — NOT notarized** (no Apple creds or network needed; downloaders must right-click→Open past Gatekeeper)
 - Docs are in `docs/` — `architecture.md`, `technical-debt.md`, `qa.md`, `contributing.md`

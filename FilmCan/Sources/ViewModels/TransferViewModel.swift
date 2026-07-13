@@ -455,6 +455,16 @@ class TransferViewModel: ObservableObject {
         set { duplicates.pendingUnreadableFiles = newValue }
     }
 
+    var activeRollIdentityPrompt: RollIdentityPrompt? {
+        get { duplicates.activeRollIdentityPrompt }
+        set { duplicates.activeRollIdentityPrompt = newValue }
+    }
+
+    @MainActor
+    func submitRollIdentity(isResume: Bool) {
+        duplicates.submitRollIdentity(isResume: isResume)
+    }
+
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
         await duplicates.resolveDuplicate(prompt: prompt)
     }
@@ -740,6 +750,17 @@ class TransferViewModel: ObservableObject {
                             self.duplicates.setUnreadableContinuation(continuation, paths: paths)
                         }
                     }
+                },
+                rollIdentityHandler: { [weak self] query async -> Bool in
+                    guard let self else { return true }
+                    let prompt = RollIdentityPrompt(
+                        rollName: query.rollName,
+                        recommendation: query.recommendation,
+                        sourceVolumeName: query.sourceVolumeName,
+                        recordedVolumeName: query.recordedVolumeName,
+                        recordedLastSeen: query.recordedLastSeen,
+                        proposedNewName: query.proposedNewName)
+                    return await self.duplicates.resolveRollIdentity(prompt: prompt)
                 },
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }

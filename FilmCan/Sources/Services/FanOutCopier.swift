@@ -171,10 +171,28 @@ actor FanOutCopier {
         /// Return true to continue (skipping those items), false to abort.
         /// When nil and unreadable items exist, run throws `Error.sourceReadFailed`.
         var unreadableHandler: (@Sendable ([String]) async -> Bool)? = nil
+        /// Called when a same-named roll already exists at a destination from a prior
+        /// run. Receives the detected situation + recommendation; return true to RESUME
+        /// into the existing roll (same card), false to save this source as a fresh
+        /// "-N" roll (different card). When nil, the recommendation is applied silently.
+        var rollIdentityHandler: (@Sendable (RollIdentityQuery) async -> Bool)? = nil
         #if DEBUG
         var _testForceDestReadHashNil: Bool = false
         var _testForceMHLAppendFailure: Bool = false
         #endif
+    }
+
+    /// Describes a cross-run roll-name clash for the UI prompt: a roll with this name
+    /// already exists at a destination, and the engine has a recommendation for whether
+    /// the current source is the same card (resume) or a different one (new "-N" roll).
+    struct RollIdentityQuery: Sendable {
+        let rollName: String
+        let recommendation: RollIdentityRecommendation
+        let sourceVolumeName: String
+        let recordedVolumeName: String?
+        let recordedLastSeen: Date?
+        /// The name the source would take if treated as a different card (e.g. "DJI-2").
+        let proposedNewName: String
     }
 
     enum Error: Swift.Error, LocalizedError {
@@ -298,11 +316,132 @@ actor FanOutCopier {
     /// The exact path a planned file is written to at a destination, accounting
     /// for the organization preset and copy-folder-contents. Pure (no I/O); the
     /// caller creates the parent directory when actually writing.
+    /// Map each distinct source root path to a unique roll-folder name. Roots whose
+    /// basename is unique keep it; colliding basenames (e.g. two cards both named
+    /// "DJI") get a deterministic "-N" suffix assigned in sorted-path order, so the
+    /// same card always resolves to the same folder across runs (resume-safe). The
+    /// suffix is collision-checked against names already taken, so a literal root
+    /// named "DJI-2" never gets double-assigned.
+    nonisolated static func disambiguatedRootNames(sourceRoots: [String]) -> [String: String] {
+        var result: [String: String] = [:]
+        var used = Set<String>()
+        for root in Array(Set(sourceRoots)).sorted() {
+            let base = (root as NSString).lastPathComponent
+            var name = base
+            var n = 2
+            while used.contains(name) {
+                name = "\(base)-\(n)"
+                n += 1
+            }
+            used.insert(name)
+            result[root] = name
+        }
+        return result
+    }
+
+    /// The source volume's stable UUID, or nil if the filesystem doesn't expose one.
+    nonisolated static func sourceVolumeUUID(_ path: String) -> String? {
+        (try? URL(fileURLWithPath: path).resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString
+    }
+
+    /// The source volume's display name, falling back to the path's basename.
+    nonisolated static func sourceVolumeName(_ path: String) -> String {
+        (try? URL(fileURLWithPath: path).resourceValues(forKeys: [.volumeNameKey]))?.volumeName
+            ?? (path as NSString).lastPathComponent
+    }
+
+    /// True if a roll folder already holds a prior FilmCan backup (has an `ascmhl/` dir
+    /// or a roll identity sidecar) — i.e. a cross-run resume candidate, not a fresh path.
+    nonisolated static func rollFolderHasPriorBackup(_ rollFolder: String) -> Bool {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: rollFolder, isDirectory: &isDir), isDir.boolValue else { return false }
+        if fm.fileExists(atPath: ascMHLDir(rollFolder: rollFolder).path) { return true }
+        if fm.fileExists(atPath: RollIdentityStore.sidecarURL(rollFolder: rollFolder).path) { return true }
+        return false
+    }
+
+    /// Next free "base-N" (N ≥ 2) not already taken in this run.
+    nonisolated static func nextFreeName(base: String, avoiding: Set<String>) -> String {
+        var n = 2
+        while avoiding.contains("\(base)-\(n)") { n += 1 }
+        return "\(base)-\(n)"
+    }
+
+    /// The first destination at which a roll named `name` (resolved for `src`) already
+    /// holds a prior backup, paired with its recorded identity (nil if no sidecar).
+    private func firstExistingRoll(name: String, src: String, date: Date) -> (rollFolder: String, recorded: RollIdentity?)? {
+        for dest in config.destinations {
+            let rf = Self.resolveRollFolder(
+                destRoot: dest.destPath, rootName: name, rootPath: src,
+                isDirectoryRoot: true, preset: config.organizationPreset,
+                copyFolderContents: config.copyFolderContents, date: date,
+                metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: src))
+            if Self.rollFolderHasPriorBackup(rf) {
+                return (rf, RollIdentityStore.read(rollFolder: rf))
+            }
+        }
+        return nil
+    }
+
+    /// Adjust in-run roll names for cross-run collisions. For each directory source, if a
+    /// same-named roll already exists at a destination, decide resume-vs-new-card via the
+    /// source volume UUID (confirmed by the handler when present, else the recommendation
+    /// is applied). A "new card" verdict bumps to the next free "-N" name and re-checks.
+    private func resolveCrossRunRollNames(
+        inRunNames: [String: String],
+        dirSourceRoots: [String],
+        jobStartTime: Date
+    ) async -> [String: String] {
+        var assigned: [String: String] = [:]
+        var takenInRun = Set(inRunNames.values)
+        for src in dirSourceRoots.sorted() {
+            let base = (src as NSString).lastPathComponent
+            let curUUID = Self.sourceVolumeUUID(src)
+            let curPath = (src as NSString).standardizingPath
+            var candidate = inRunNames[src] ?? base
+            while let existing = firstExistingRoll(name: candidate, src: src, date: jobStartTime) {
+                let reco = RollIdentityResolver.recommend(
+                    recorded: existing.recorded, currentUUID: curUUID, currentPath: curPath)
+                let proposed = Self.nextFreeName(base: base, avoiding: takenInRun)
+                let isResume: Bool
+                // A confident same-card verdict resumes silently — the common cancel/finish
+                // and daily-incremental re-runs must not interrupt with a sheet. Only ask
+                // the handler when the engine is unsure (.unknown) or sees a different card.
+                if let handler = config.rollIdentityHandler, reco != .resumeSameCard {
+                    isResume = await handler(RollIdentityQuery(
+                        rollName: candidate,
+                        recommendation: reco,
+                        sourceVolumeName: Self.sourceVolumeName(src),
+                        recordedVolumeName: existing.recorded?.volumeName,
+                        recordedLastSeen: existing.recorded?.lastSeen,
+                        proposedNewName: proposed))
+                } else {
+                    isResume = RollIdentityResolver.defaultDecisionIsResume(reco)
+                }
+                if isResume { break }
+                candidate = proposed
+                takenInRun.insert(candidate)
+            }
+            assigned[src] = candidate
+            takenInRun.insert(candidate)
+        }
+        return assigned
+    }
+
     nonisolated static func resolveDestFilePath(
         destRoot: String, rootName: String, rootPath: String, relPath: String,
         preset: OrganizationPreset?, copyFolderContents: Bool, date: Date,
         metadata: ShootMetadata = .empty, mediaKind: SourceMediaKind = .camera
     ) -> String {
+        // A directory root's basename was disambiguated when two cards shared a name
+        // (e.g. two "DJI" → "DJI", "DJI-2"). `disambiguationSuffix` is the "-N" tail that
+        // was appended; empty when there was no collision. Only directory roots are
+        // disambiguated, so a flat-file root's renamed file name is never affected.
+        let sourceBase = (rootPath as NSString).lastPathComponent
+        let isDisambiguated = rootName != sourceBase
+        let disambiguationSuffix = (isDisambiguated && rootName.hasPrefix(sourceBase))
+            ? String(rootName.dropFirst(sourceBase.count)) : ""
         if let preset {
             let resolved = OrganizationTemplate.resolve(
                 preset: preset, sourcePath: rootPath, destinationRoot: destRoot,
@@ -310,17 +449,32 @@ actor FanOutCopier {
             let folderBase = resolved.folderPath.isEmpty
                 ? destRoot
                 : (destRoot as NSString).appendingPathComponent(resolved.folderPath)
+            // Preserve the rename template for a disambiguated duplicate: apply the
+            // template, then append the "-N" tail ("DJI_2026-07-12" → "DJI_2026-07-12-2")
+            // rather than dropping the template for a bare "DJI-2". Not disambiguated ⇒
+            // rename behavior unchanged.
+            let rollSegment: String
+            if !isDisambiguated {
+                rollSegment = resolved.renamedItem
+            } else if !disambiguationSuffix.isEmpty {
+                rollSegment = resolved.renamedItem + disambiguationSuffix
+            } else {
+                rollSegment = rootName
+            }
             if relPath.isEmpty {
-                return (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
-            } else if copyFolderContents {
+                return (folderBase as NSString).appendingPathComponent(rollSegment)
+            } else if copyFolderContents && !isDisambiguated {
                 return (folderBase as NSString).appendingPathComponent(relPath)
             } else {
-                let named = (folderBase as NSString).appendingPathComponent(resolved.renamedItem)
+                // copyFolderContents normally dumps contents flat (no roll folder), but a
+                // disambiguated duplicate MUST keep its own folder or the two same-named
+                // cards merge — fold it under its unique name rather than force a rename.
+                let named = (folderBase as NSString).appendingPathComponent(rollSegment)
                 return (named as NSString).appendingPathComponent(relPath)
             }
         } else if relPath.isEmpty {
             return (destRoot as NSString).appendingPathComponent(rootName)
-        } else if copyFolderContents {
+        } else if copyFolderContents && !isDisambiguated {
             return (destRoot as NSString).appendingPathComponent(relPath)
         } else {
             let named = (destRoot as NSString).appendingPathComponent(rootName)
@@ -429,17 +583,28 @@ actor FanOutCopier {
         for destCfg in config.destinations {
             var byRoot: [String: any MHLWriting] = [:]
             for rootName in rootNames {
+                let src = rootPaths[rootName] ?? rootName
+                let rollFolder = Self.resolveRollFolder(
+                    destRoot: destCfg.destPath, rootName: rootName, rootPath: src,
+                    isDirectoryRoot: directoryRoots.contains(rootName),
+                    preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: src))
+                // Stamp the source volume identity so a later run can distinguish a
+                // same-card resume from a different card that shares this roll name.
+                // Only directory roots own a roll folder; a flat-file root's "rollFolder"
+                // is the dest root, so stamping there would drop a stray sidecar.
+                if directoryRoots.contains(rootName) {
+                    RollIdentityStore.write(
+                        RollIdentity(volumeUUID: Self.sourceVolumeUUID(src),
+                                     volumeName: Self.sourceVolumeName(src),
+                                     sourcePath: (src as NSString).standardizingPath,
+                                     lastSeen: jobStartTime),
+                        rollFolder: rollFolder)
+                }
                 let writer: any MHLWriting
                 switch style {
                 case .ascMHL:
-                    let rollFolder = Self.resolveRollFolder(
-                        destRoot: destCfg.destPath, rootName: rootName,
-                        rootPath: rootPaths[rootName] ?? rootName,
-                        isDirectoryRoot: directoryRoots.contains(rootName),
-                        preset: config.organizationPreset,
-                        copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                        metadata: config.shootMetadata,
-                        mediaKind: mediaKind(forRoot: rootPaths[rootName] ?? rootName))
                     if isNetflix {
                         Self.scaffoldNetflixSiblings(destRoot: destCfg.destPath, rollFolder: rollFolder)
                     }
@@ -480,7 +645,6 @@ actor FanOutCopier {
         etaSmoothedThroughputByDest.removeAll()
 
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
-        await OrphanCleaner.shared.cleanOrphans(at: destURLs)
 
         let destInfos = config.destinations.map { DriveSpeedClassifier.info(for: $0.destPath) }
         let slowest = DriveSpeedClassifier.slowestDestClass(destInfos)
@@ -516,8 +680,24 @@ actor FanOutCopier {
             throw Error.sourceReadFailed(config.sources.first ?? "")
         }
 
+        // Wall-clock start, also the date used for organization-template path resolution
+        // so the resume presence-check and the actual copy agree.
+        let jobStartTime = Date()
+
+        // Distinct DIRECTORY roots that share a basename would otherwise collapse to one
+        // roll folder + one ascmhl/ (two cards conflated). Assign a unique name per such
+        // root. Flat-file roots keep their basename — disambiguation is folder-only, so
+        // file names are never mangled (same-named flat files are handled by dup detection).
+        let dirSourceRoots = Array(Set(entries.filter { $0.sourceIsDirectory }.map { $0.sourceRoot }))
+        let inRunRollNames = Self.disambiguatedRootNames(sourceRoots: dirSourceRoots)
+        // Cross-run: when a same-named roll already exists at a destination from a prior
+        // run, decide resume (same card) vs a fresh "-N" roll (different card) using the
+        // source volume UUID, optionally confirmed by the rollIdentityHandler.
+        let rollNameByRoot = await resolveCrossRunRollNames(
+            inRunNames: inRunRollNames, dirSourceRoots: dirSourceRoots, jobStartTime: jobStartTime)
         let allPlannedFiles: [PlannedFile] = entries.map { entry in
-            let rootName = (entry.sourceRoot as NSString).lastPathComponent
+            let base = (entry.sourceRoot as NSString).lastPathComponent
+            let rootName = entry.sourceIsDirectory ? (rollNameByRoot[entry.sourceRoot] ?? base) : base
             return PlannedFile(
                 rootPath: entry.sourceRoot,
                 rootName: rootName,
@@ -537,10 +717,6 @@ actor FanOutCopier {
             )
         }
 
-        // Wall-clock start, also used as the date for organization-template path
-        // resolution so the resume presence-check and the actual copy agree.
-        let jobStartTime = Date()
-
         // Resume skip: a file already recorded in EVERY destination's hash list
         // AND still present on disk there is not recopied. The MHL lives at
         // <dest>/.filmcan/hashlists/<rootName>.mhl — a stable, date-independent
@@ -552,6 +728,12 @@ actor FanOutCopier {
             allPlannedFiles.first(where: { $0.rootName == rootName })?.rootPath ?? rootName
         }
         var existingMHLByDest: [String: [String: [(fileName: String, hash: String, size: Int64, mtime: Int64?)]]] = [:]
+        // Directory roll folders get a recursive sweep (copy writes temps into their
+        // subtrees). A flat-file root's "roll folder" is the dest root (or a dated preset
+        // folder), so recursing it would re-walk the whole volume — the exact cost this
+        // scoping removed. Give those a shallow pass alongside the dest roots instead.
+        var recursiveRollFolders = Set<String>()
+        var shallowFolders = Set<String>()
         for dest in config.destinations {
             var byRoot: [String: [(fileName: String, hash: String, size: Int64, mtime: Int64?)]] = [:]
             for root in allRootNames {
@@ -561,10 +743,23 @@ actor FanOutCopier {
                     preset: config.organizationPreset, copyFolderContents: config.copyFolderContents,
                     date: jobStartTime, metadata: config.shootMetadata,
                     mediaKind: mediaKind(forRoot: rootPath(for: root)))
+                if directoryRoots.contains(root) {
+                    recursiveRollFolders.insert(rf)
+                } else {
+                    shallowFolders.insert(rf)
+                }
                 byRoot[root] = Self.loadExistingMHLEntries(destPath: dest.destPath, rootName: root, rollFolder: rf)
             }
             existingMHLByDest[dest.destPath] = byRoot
         }
+
+        // Remove crash-leftover temp files now that roll folders are known. Scoped to
+        // this job's directory roll folders (recursive) + a shallow pass on each dest root
+        // and flat-file parent — not a full-volume walk, which on a populated SSD
+        // dominated the "Preparing" phase.
+        await OrphanCleaner.shared.cleanOrphans(
+            rollFolders: recursiveRollFolders.map { URL(fileURLWithPath: $0) },
+            destRoots: destURLs + shallowFolders.map { URL(fileURLWithPath: $0) })
         func plannedSourceName(_ f: PlannedFile) -> String {
             f.relPath.isEmpty ? (f.absPath as NSString).lastPathComponent : f.relPath
         }
@@ -603,15 +798,17 @@ actor FanOutCopier {
             }
         }
 
-        // Duplicate-source preflight: two DIRECTORY sources that resolve to the same
-        // destination root folder would silently merge their contents. Flat-file sources
-        // are excluded — they write individual files to the dest root and don't collide.
-        let resolvedRootsForCollision = config.sources.compactMap { src -> String? in
-            let rn = (src as NSString).lastPathComponent
-            guard directoryRoots.contains(rn) else { return nil }
-            return Self.resolveRollFolder(
+        // Duplicate-source preflight: two DIRECTORY sources that STILL resolve to the
+        // same destination roll folder after disambiguation would merge their contents.
+        // Basename collisions (two cards named "DJI") are auto-resolved above — including
+        // in `copyFolderContents` mode, where a disambiguated duplicate is folded under
+        // its unique name instead of dumped flat — so this only fires for genuinely
+        // unresolvable merges (e.g. a preset folder template that collapses two
+        // distinct-basename sources to one path). Flat-file sources are excluded.
+        let resolvedRootsForCollision = rollNameByRoot.map { (src, name) in
+            Self.resolveRollFolder(
                 destRoot: config.destinations.first?.destPath ?? "",
-                rootName: rn, rootPath: src,
+                rootName: name, rootPath: src,
                 isDirectoryRoot: true,
                 preset: config.organizationPreset,
                 copyFolderContents: config.copyFolderContents,

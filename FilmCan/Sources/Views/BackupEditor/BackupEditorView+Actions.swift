@@ -36,7 +36,8 @@ extension BackupEditorView {
         startTransfer(skipNetflixValidation: true)
     }
 
-    func startTransfer(confirmedDelete: Bool = false, skipNetflixValidation: Bool = false) {
+    func startTransfer(confirmedDelete: Bool = false, skipNetflixValidation: Bool = false,
+                       skipDuplicateNameWarning: Bool = false) {
         guard viewModel.validate() else { return }
 
         if !skipNetflixValidation && isNetflixPresetSelected {
@@ -44,6 +45,18 @@ extension BackupEditorView {
             let issues = NetflixNameValidator.validate(rollNames: rolls)
             if !issues.isEmpty {
                 netflixValidation = NetflixValidationInfo(issues: issues)
+                return
+            }
+        }
+
+        // Same-named cards (e.g. two "DJI") are auto-saved to distinct roll folders
+        // (DJI, DJI-2) so they never merge. Netflix has its own stricter validator, so
+        // only warn here for the other presets. Informational — the engine handles it
+        // regardless; this just lets the user rename instead if they prefer.
+        if !skipDuplicateNameWarning && !isNetflixPresetSelected {
+            if let message = duplicateSourceNameWarning() {
+                duplicateNameWarningMessage = message
+                showDuplicateNameWarning = true
                 return
             }
         }
@@ -57,6 +70,35 @@ extension BackupEditorView {
         }
         
         beginTransfer()
+    }
+
+    /// If two or more DIRECTORY sources share a basename, returns a message describing
+    /// how the engine will disambiguate them (e.g. "DJI → DJI, DJI-2"). Nil if no clash.
+    func duplicateSourceNameWarning() -> String? {
+        let fm = FileManager.default
+        let dirSources = viewModel.sourcePaths.filter {
+            var isDir: ObjCBool = false
+            return fm.fileExists(atPath: $0, isDirectory: &isDir) && isDir.boolValue
+        }
+        let names = dirSources.map { ($0 as NSString).lastPathComponent }
+        let duplicates = Set(names.filter { name in names.filter { $0 == name }.count > 1 })
+        guard !duplicates.isEmpty else { return nil }
+
+        let map = FanOutCopier.disambiguatedRootNames(sourceRoots: dirSources)
+        let lines = duplicates.sorted().map { base -> String in
+            let assigned = dirSources
+                .filter { ($0 as NSString).lastPathComponent == base }
+                .sorted()
+                .compactMap { map[$0] }
+            return "• \(base) → " + assigned.joined(separator: ", ")
+        }
+        return """
+        Several sources share the same name. To keep each card separate — its own folder and checksum manifest — they'll be saved as:
+
+        \(lines.joined(separator: "\n"))
+
+        Continue, or cancel to rename them yourself.
+        """
     }
 
     func presentAddSourcePanel() {

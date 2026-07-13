@@ -253,9 +253,9 @@ final class DataIntegrityTests: XCTestCase {
             "unverified file must not be trusted on resume")
     }
 
-    // MARK: Task 7: duplicate source basenames blocked
+    // MARK: Task 7: duplicate source basenames auto-disambiguate (no merge)
 
-    func test_twoSourcesSameBasename_blocksRun() async throws {
+    func test_twoSourcesSameBasename_autoDisambiguates() async throws {
         let srcA = tempDir(); let srcB = tempDir(); let dst = tempDir()
         defer { [srcA, srcB, dst].forEach { try? FileManager.default.removeItem(at: $0) } }
         for base in [srcA, srcB] {
@@ -263,17 +263,20 @@ final class DataIntegrityTests: XCTestCase {
             try FileManager.default.createDirectory(at: card, withIntermediateDirectories: true)
             try Data(repeating: 0x01, count: 16).write(to: card.appendingPathComponent("clip.mov"))
         }
-        do {
-            _ = try await DataIntegrityHarness.run(
-                sources: [srcA.appendingPathComponent("A001").path,
-                          srcB.appendingPathComponent("A001").path],
-                dest: dst.path)
-            XCTFail("run must abort on duplicate source basenames")
-        } catch let e as FanOutCopier.Error {
-            if case .duplicateSourceNames = e { /* ok */ } else {
-                XCTFail("wrong error: \(e)")
-            }
-        }
+        let result = try await DataIntegrityHarness.run(
+            sources: [srcA.appendingPathComponent("A001").path,
+                      srcB.appendingPathComponent("A001").path],
+            dest: dst.path)
+        XCTAssertTrue(result.success, "two same-named cards copy successfully")
+
+        let fm = FileManager.default
+        // Both cards land in DISTINCT roll folders (A001 + A001-2), each with its files
+        // and its own ascmhl/ — never merged. (Which card gets which suffix depends on
+        // sorted source path, so assert on the set, not a fixed mapping.)
+        XCTAssertTrue(fm.fileExists(atPath: dst.appendingPathComponent("A001/clip.mov").path))
+        XCTAssertTrue(fm.fileExists(atPath: dst.appendingPathComponent("A001-2/clip.mov").path))
+        XCTAssertTrue(fm.fileExists(atPath: dst.appendingPathComponent("A001/ascmhl").path))
+        XCTAssertTrue(fm.fileExists(atPath: dst.appendingPathComponent("A001-2/ascmhl").path))
     }
 
     // MARK: P0 Bug 3.2 — increment policy must not clobber original via paranoid verify
