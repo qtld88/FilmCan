@@ -41,3 +41,9 @@ AGENTS.md
 
 # Superpowers brainstorm scratch
 .superpowers/
+
+# local venv for docs build script (CI installs its own deps)
+.venv-docs/
+
+# Generated docs (built via scripts/build_docs.py)
+website/docs/
