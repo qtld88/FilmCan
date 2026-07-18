@@ -1,7 +1,7 @@
 # Copy Engine
 
 FilmCan copies with one purpose-built engine: the **FilmCan Engine**, a fan-out
-copier designed for cinema rushes, read the source once, write to every
+copier designed for cinema rushes: read the source once, write to every
 destination at once, verify with cinema-grade hash lists, and recover a failed
 drive with one click.
 
@@ -29,7 +29,7 @@ drive with one click.
 ### Verify pipeline
 
 Verification runs on its own lane **while the next file is still copying**, so a
-paranoid re-read no longer roughly doubles the wall time, it mostly hides behind
+paranoid re-read no longer roughly doubles the wall time. It mostly hides behind
 the copy. Only the last file's verify tail runs alone (shown as "Verifying…").
 
 ---
@@ -48,15 +48,15 @@ For rushes from a master card you can't re-shoot, use **Paranoid**.
 
 ---
 
-## Resume, re-running skips what's already there
+## Resume: re-running skips what's already there
 
 Re-running a backup (including after **Stop**) does **not** recopy files that are
 already done. A file is skipped when it is recorded in **every** destination's
 hash list **and** still present on disk there. Only the remaining files are
-copied; the progress row reads *"Resuming, N already backed up, copying the
+copied; the progress row reads *"Resuming: N already backed up, copying the
 rest."*
 
-- If the whole backup is already present, no history card is added, an **Already
+- If the whole backup is already present, no history card is added. An **Already
   backed up** popup appears instead, with a **Verify data** button (the same
   hash-list check as History's *Check data*).
 - A file deleted from a destination is re-copied (presence is checked, not just
