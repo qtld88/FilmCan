@@ -16,18 +16,18 @@
 
 ## What It Does
 
-FilmCan backs up camera cards, rushes, folders, or files to multiple destinations with verification and organization presets—giving DITs, ACs, and cinematographers peace of mind through a purpose‑built fan‑out copy engine.
+FilmCan backs up camera cards, rushes, folders, or files to multiple destinations, with verification and organization presets. Built for DITs, ACs, and cinematographers, on a fan-out copy engine that reads each source once.
 
 - Copies multiple sources to multiple destinations in one pass (fan-out: source read once, broadcast to every drive)
 - Two verify modes: **fast** (stream hash during copy) and **paranoid** (post-copy re-read from disk, bypassing OS cache)
 - Honest writes on external/exFAT drives via `F_FULLFSYNC` (forces drive cache flush, not just OS buffers)
-- Per-destination ASC MHL hash lists with chain of custody, sealed at job end — validated against the reference `ascmhl` tool
+- Per-destination ASC MHL hash lists with chain of custody, sealed at job end, validated against the reference `ascmhl` tool
 - **Netflix Footage Ingest** preset: the required `Camera_Media` / `Sound_Media` / `Reports` structure, ASC MHL per roll, shoot-metadata folder tokens, and roll-name validation
-- **Camera + Sound in one run**: tag each source Camera or Sound (or auto-detect sound drives) — camera lands in `Camera_Media/`, sound in `Sound_Media/`, source read once
+- **Camera + Sound in one run**: tag each source Camera or Sound (or auto-detect sound drives). Camera lands in `Camera_Media/`, sound in `Sound_Media/`, source read once
 - Per-destination resume: a file already on one drive but missing from another is copied only where missing; the bar spans the whole job (reads 30/500, not 0/470)
-- Auto-detect drives, folders, files — handles cinema card directory trees (RDC, RDM, BRAW, .ari, R3D)
+- Auto-detect drives, folders, files. Handles cinema card directory trees (RDC, RDM, BRAW, .ari, R3D)
 - Live per-destination progress, "DO NOT UNPLUG" banner on slow-flush drives
-- One-click **Retry from sibling**: a failed drive rebuilds from a verified neighbor's MHL — no need to re-mount the card
+- One-click **Retry from sibling**: a failed drive rebuilds from a verified neighbor's MHL, no need to re-mount the card
 - Organizes files with custom folder presets (or a simple hidden hash list for non-delivery use)
 - Aggregated webhooks and ntfy push notifications
 
@@ -40,7 +40,7 @@ FilmCan backs up camera cards, rushes, folders, or files to multiple destination
 3. Drag drives into **Save To**
 4. Click **Run Now**
 
-Done. FilmCan copies, verify and save checksums.
+Done. FilmCan copies, verifies, and saves the checksums.
 
 [More details →](docs/quickstart.md)
 
@@ -76,7 +76,7 @@ Done. FilmCan copies, verify and save checksums.
 
 ## License
 
-GNU GPL v3.0 — see [LICENSE](LICENSE)
+GNU GPL v3.0. See [LICENSE](LICENSE)
 
 ---
 
