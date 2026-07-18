@@ -57,6 +57,8 @@ section{padding:64px 0;border-top:1px solid var(--stroke)}
 .dl{padding:8px 0;text-align:center}
 .dl h2{font-size:30px;font-weight:700;margin-bottom:8px}
 .dl .cta{display:flex;gap:14px;justify-content:center;margin:22px 0 10px}
+.dl .note{font-size:12.5px;line-height:1.5;color:rgba(244,242,238,.55);max-width:460px;margin:14px auto 0}
+.dl .note strong{color:var(--text);font-weight:600}
 
 /* FAQ */
 .faq{margin-top:30px;display:flex;flex-direction:column;gap:10px}
