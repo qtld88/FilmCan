@@ -32,7 +32,7 @@ Sound:
 - **🎥 video-camera** → Camera (lands in `Camera_Media/` under the Netflix preset)
 - **🔊 speaker** → Sound (lands in `Sound_Media/`)
 
-**Click the icon to switch** between the two — it's a toggle. Sources default to Camera.
+**Click the icon to switch** between the two, it's a toggle. Sources default to Camera.
 The **Save To** preview updates to show where each source will land. This only changes
 the destination folder; it has no effect unless you use a preset with separate camera
 and sound folders (e.g. **Netflix Ingest**).

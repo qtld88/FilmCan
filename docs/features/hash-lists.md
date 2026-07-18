@@ -29,7 +29,7 @@ always forces ASC MHL (the picker is locked).
 
 FilmCan writes a spec-faithful **ASC MHL v2.0** manifest per roll (xxHash128 /
 xxh3-128 file hashes), plus an `ascmhl_chain.xml` index recording each generation by
-its **C4** hash — a chain of custody accepted by the reference ASC MHL tooling.
+its **C4** hash, a chain of custody accepted by the reference ASC MHL tooling.
 
 ```xml
 <hashlist version="2.0" xmlns="urn:ASC:MHL:v2.0">
@@ -54,7 +54,7 @@ a new **sealed generation** to the roll's chain.
 
 ## Location
 
-**ASC MHL** — at each roll's `ascmhl/` folder (the roll = the source-root folder at
+**ASC MHL**, at each roll's `ascmhl/` folder (the roll = the source-root folder at
 the destination):
 
 ```
@@ -62,7 +62,7 @@ the destination):
 <destination>/<roll-folder>/ascmhl/ascmhl_chain.xml
 ```
 
-**Simple** — one hidden file per roll:
+**Simple**, one hidden file per roll:
 
 ```
 <destination>/.filmcan/hashlists/<roll>.mhl

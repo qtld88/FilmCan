@@ -28,10 +28,10 @@ Not officially supported. Local drives are recommended.
 ## Verification
 
 **How do I verify backups?**  
-Choose a Verification mode in Options — `Fast` (default) checks the hash computed during the copy; `Paranoid` re-reads every file from disk. FilmCan uses xxHash128.
+Choose a Verification mode in Options, `Fast` (default) checks the hash computed during the copy; `Paranoid` re-reads every file from disk. FilmCan uses xxHash128.
 
 **Can I stop and resume?**  
-Yes. Stop is clean (no partial files), and running again skips files already backed up to every destination and still present — only the rest is copied. See [Stop & Resume](./features/stop.md).
+Yes. Stop is clean (no partial files), and running again skips files already backed up to every destination and still present, only the rest is copied. See [Stop & Resume](./features/stop.md).
 
 **Hash lists?**  
 Yes. Created automatically unless Verification is Off. See [Hash Lists](./features/hash-lists.md).
@@ -77,7 +77,7 @@ Enable Full Disk Access:
 See [Troubleshooting](./troubleshooting.md).
 
 **Report a bug**  
-See [Contributing](./contributing.md) for bug reporting.
+See [Report a bug](https://github.com/qtld88/FilmCan/issues) for bug reporting.
 
 ---
 
@@ -85,4 +85,4 @@ See [Contributing](./contributing.md) for bug reporting.
 
 - [Quick Start](./quickstart.md)
 - [Troubleshooting](./troubleshooting.md)
-- [Support](./support.md)
+- [Support](/#support)

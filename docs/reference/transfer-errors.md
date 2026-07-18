@@ -36,7 +36,7 @@ When destinations do not have enough space, you’ll see one of:
 
 ## rsync Transfer Errors
 
-> The rsync engine was retired in FilmCan 1.2 and removed entirely — FilmCan no
+> The rsync engine was retired in FilmCan 1.2 and removed entirely, FilmCan no
 > longer bundles or requires Homebrew rsync. The rsync error sections below are
 > kept for historical reference and are no longer emitted by current builds.
 

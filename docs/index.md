@@ -2,19 +2,15 @@
 
 ---
 
-## Start Here
+## Getting started
 
 - [Installation](./installation.md)
 - [Quick Start](./quickstart.md)
-- [FAQ](./faq.md)
-- [Architecture](./architecture.md)
-
----
 
 ## Features
 
 - [Features Overview](./features/index.md)
-- [Copy Engines](./features/copy-engines.md)
+- [Copy Engine](./features/copy-engines.md)
 - [Netflix Ingest](./features/netflix-ingest.md)
 - [Destination Presets](./features/destination-presets.md)
 - [Transfer History](./features/transfer-history.md)
@@ -25,17 +21,18 @@
 - [Safe Checks](./features/safe-checks.md)
 - [Push Notifications](./features/push-notifications.md)
 - [Hash Lists](./features/hash-lists.md)
-- [Custom rsync Arguments](./features/custom-rsync.md)
 
----
+## Reference
+
+- [Transfer Errors](./reference/transfer-errors.md)
 
 ## Help
 
 - [Troubleshooting](./troubleshooting.md)
-- [Support](./support.md)
-- [Contributing](./contributing.md)
+- [FAQ](./faq.md)
+
+## About
+
 - [Privacy Policy](./privacy.md)
-- [QA Checklist](./qa.md)
-- [Technical Debt](./technical-debt.md)
-- [Roadmap](./roadmap.md)
 - [AI Usage](./ai-usage.md)
+- [Roadmap](./roadmap.md)

@@ -1,21 +1,16 @@
 # Copy Engine
 
 FilmCan copies with one purpose-built engine: the **FilmCan Engine**, a fan-out
-copier designed for cinema rushes — read the source once, write to every
+copier designed for cinema rushes, read the source once, write to every
 destination at once, verify with cinema-grade hash lists, and recover a failed
 drive with one click.
-
-> **The rsync engine was retired in FilmCan 1.2.** Earlier versions let you pick
-> between rsync and the FilmCan Engine. The engine picker is gone and the rsync
-> engine has been removed entirely — the FilmCan Engine handles every backup, with
-> no Homebrew rsync to install.
 
 ---
 
 ## How it works
 
 1. **Read source once.** A single read pipeline pulls each file from the card
-   with `F_NOCACHE` — bytes come straight off the device, not the OS cache, and
+   with `F_NOCACHE`, bytes come straight off the device, not the OS cache, and
    a huge offload doesn't fill RAM with cached source data.
 2. **Broadcast to every destination at once.** One bounded channel feeds a
    writer task per drive. The slowest drive sets the pace; faster drives idle
@@ -25,7 +20,7 @@ drive with one click.
    at finalize so the drive's onboard cache is flushed to media before the file
    is claimed done. Internal APFS uses a regular `synchronize()`.
 4. **Atomic finalize.** Each file is written to a hidden `.filmcan-<uuid>-<name>`
-   temp file, then `rename(2)`'d into place — never a half-written file at the
+   temp file, then `rename(2)`'d into place, never a half-written file at the
    destination.
 5. **Verify** (see modes below), overlapping the copy of the next file.
 6. **MHL per source root.** One sealed ASC-format `.mhl` per source root,
@@ -34,7 +29,7 @@ drive with one click.
 ### Verify pipeline
 
 Verification runs on its own lane **while the next file is still copying**, so a
-paranoid re-read no longer roughly doubles the wall time — it mostly hides behind
+paranoid re-read no longer roughly doubles the wall time, it mostly hides behind
 the copy. Only the last file's verify tail runs alone (shown as "Verifying…").
 
 ---
@@ -45,23 +40,23 @@ Pick in **Backup Editor → Options → Verification**.
 
 | Mode | Catches | Cost |
 |---|---|---|
-| **Off** | nothing | fastest — no hashing or checking |
-| **Fast** *(default for new projects)* | RAM bit-flips, PCI/USB corruption, partial writes — via the hash computed during the copy | none beyond the copy; no re-read |
-| **Paranoid** | all of Fast **+** drive-firmware silent corruption, OS-cache lies, bit rot at rest — re-reads every destination (and the source) from disk and re-hashes | extra disk I/O, mostly overlapped with copying |
+| **Off** | nothing | fastest, no hashing or checking |
+| **Fast** *(default for new projects)* | RAM bit-flips, PCI/USB corruption, partial writes, via the hash computed during the copy | none beyond the copy; no re-read |
+| **Paranoid** | all of Fast **+** drive-firmware silent corruption, OS-cache lies, bit rot at rest, re-reads every destination (and the source) from disk and re-hashes | extra disk I/O, mostly overlapped with copying |
 
 For rushes from a master card you can't re-shoot, use **Paranoid**.
 
 ---
 
-## Resume — re-running skips what's already there
+## Resume, re-running skips what's already there
 
 Re-running a backup (including after **Stop**) does **not** recopy files that are
 already done. A file is skipped when it is recorded in **every** destination's
 hash list **and** still present on disk there. Only the remaining files are
-copied; the progress row reads *"Resuming — N already backed up, copying the
+copied; the progress row reads *"Resuming, N already backed up, copying the
 rest."*
 
-- If the whole backup is already present, no history card is added — an **Already
+- If the whole backup is already present, no history card is added, an **Already
   backed up** popup appears instead, with a **Verify data** button (the same
   hash-list check as History's *Check data*).
 - A file deleted from a destination is re-copied (presence is checked, not just
@@ -81,14 +76,14 @@ source root. Hidden macOS junk (`.Spotlight-V100`, `.fseventsd`, `.DS_Store`,
 
 ---
 
-## Failed drives — one-click repair
+## Failed drives, one-click repair
 
 When a drive fails mid-copy or fails verify, a **Retry** button appears on its
 row, opening the repair sheet:
 
-- **From source** — re-runs the engine for that single drive, pulling from the
+- **From source**, re-runs the engine for that single drive, pulling from the
   original source(s) if still mounted.
-- **From sibling** — reads files from a verified neighbor drive's MHL, copies
+- **From sibling**, reads files from a verified neighbor drive's MHL, copies
   them to the failed drive, and hash-verifies each. The source card no longer
   needs to be mounted. Cinema-set workflow: keep going, fix the drive at lunch.
 
@@ -104,9 +99,9 @@ job succeeded.
   In-flight memory is just the per-destination ring buffer, clamped to
   `clamp(physRAM / 128, 32 MB, 96 MB)`.
 - **Multi-source concurrency** is capped to the number of distinct source
-  physical drives — three clips from one card copy sequentially (no
+  physical drives, three clips from one card copy sequentially (no
   head-thrashing); card-A and card-B copy in parallel.
-- **Chunk size** is chosen from the slowest destination's bus — 4 MB on slow
+- **Chunk size** is chosen from the slowest destination's bus, 4 MB on slow
   buses, up to 16 MB on Thunderbolt / internal.
 - **Live speed & ETA** use a moving average of recent combined (copy + verify)
   throughput, so the estimate is stable and honest from the first few seconds.

@@ -77,7 +77,7 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 - Choose **From sibling** to rebuild the failed drive from a verified neighbor's MHL (the source card no longer needs to be mounted)
 - Choose **From source** if the original card is still mounted and you want a fresh re-copy of just that drive
 - For rsync: re-copy the file, run **Disk Utility** > **First Aid**, try another drive
-- If re-checking from history passes, this was likely a drive write-cache timing issue — the drive didn't fully flush before verify ran. If it happens repeatedly on the same drive, check drive health.
+- If re-checking from history passes, this was likely a drive write-cache timing issue, the drive didn't fully flush before verify ran. If it happens repeatedly on the same drive, check drive health.
 
 **Hash list not found**
 - Confirm the destination is mounted and check `<destination>/.filmcan/hashlists/`
@@ -88,7 +88,7 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 **"DO NOT UNPLUG" banner stays on**
 - Some external/USB drives are flagged as requiring full cache flush (`F_FULLFSYNC`)
 - The banner clears once the drive's verify phase finishes
-- If it persists after the run completes, the drive's cache may not have flushed cleanly — see the os_log warnings in Console.app, filtered to subsystem `com.filmcan.app`
+- If it persists after the run completes, the drive's cache may not have flushed cleanly, see the os_log warnings in Console.app, filtered to subsystem `com.filmcan.app`
 
 ---
 
@@ -96,4 +96,4 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 
 - [FAQ](./faq.md)
 - [Transfer Errors Reference](./reference/transfer-errors.md)
-- [Report a bug](./contributing.md)
+- [Report a bug](https://github.com/qtld88/FilmCan/issues)

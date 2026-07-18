@@ -38,7 +38,7 @@ Download the latest DMG and drag it to **Applications** to replace.
 ## Uninstall
 
 1. Move FilmCan.app to Trash
-2. Optional — remove settings:
+2. Optional, remove settings:
    ```bash
    rm -rf ~/Library/Application\ Support/FilmCan
    ```

@@ -21,7 +21,7 @@ Thunderbolt SSDs.
 ### All destinations at once (parallel)
 
 Source is read once and broadcast to every destination in parallel. Throughput
-is set by the slowest drive — the others overlap their writes. One read pass per
+is set by the slowest drive, the others overlap their writes. One read pass per
 source regardless of destination count.
 
 ### One destination at a time (sequential)
@@ -56,8 +56,8 @@ failed drive can be repaired without restarting the others.
 
 If a drive fails mid-job, you don't have to start over. After the run, the failed row has a **Retry** button. Pressing it opens the repair sheet:
 
-- **From source** — if the original source(s) are still mounted, FilmCan re-runs the fan-out engine for that single drive.
-- **From sibling** — FilmCan reads the verified neighbor drive's MHL, copies each listed file to the failed drive, and hash-verifies as it goes. The source card no longer needs to be mounted. This is the cinema set workflow: keep going, fix the drive at lunch.
+- **From source**, if the original source(s) are still mounted, FilmCan re-runs the fan-out engine for that single drive.
+- **From sibling**, FilmCan reads the verified neighbor drive's MHL, copies each listed file to the failed drive, and hash-verifies as it goes. The source card no longer needs to be mounted. This is the cinema set workflow: keep going, fix the drive at lunch.
 
 The **From sibling** option only enables when at least one other destination from the same job succeeded.
 
@@ -65,7 +65,7 @@ The **From sibling** option only enables when at least one other destination fro
 
 ## Drive speed warning
 
-If FilmCan detects that destinations have very different expected throughputs (e.g. one Thunderbolt SSD and one USB-2 HDD), it shows a heads-up — the slow drive will pace the whole job in fan-out mode. The warning is informational; the copy proceeds.
+If FilmCan detects that destinations have very different expected throughputs (e.g. one Thunderbolt SSD and one USB-2 HDD), it shows a heads-up, the slow drive will pace the whole job in fan-out mode. The warning is informational; the copy proceeds.
 
 ---
 

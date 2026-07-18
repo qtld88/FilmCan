@@ -24,25 +24,25 @@ Result:
 ## Variables
 
 **Source / Destination**  
-`{source}` — original source name (file or folder)  
-`{sourceParent}` — parent folder name of the source  
-`{sourceDriveName}` — drive containing the source  
-`{destinationDriveName}` — drive containing the destination  
-`{destination}` — destination folder name
+`{source}`, original source name (file or folder)  
+`{sourceParent}`, parent folder name of the source  
+`{sourceDriveName}`, drive containing the source  
+`{destinationDriveName}`, drive containing the destination  
+`{destination}`, destination folder name
 
 **Dates / Time**  
-`{date}` — `YYYYMMDD`  
-`{time}` — `HHmmss`  
-`{datetime}` — `YYYYMMDD-HHmmss`  
-`{filecreationdate}` — file creation date (`YYYYMMDD`)  
-`{filemodifieddate}` — file modified date (`YYYYMMDD`)
+`{date}`, `YYYYMMDD`  
+`{time}`, `HHmmss`  
+`{datetime}`, `YYYYMMDD-HHmmss`  
+`{filecreationdate}`, file creation date (`YYYYMMDD`)  
+`{filemodifieddate}`, file modified date (`YYYYMMDD`)
 
 **File Info**  
-`{filename}` — source filename without extension  
-`{ext}` — file extension (includes the dot)
+`{filename}`, source filename without extension  
+`{ext}`, file extension (includes the dot)
 
 **Counter**  
-`{counter}` — incrementing counter (`001`, `002`, `003`…)
+`{counter}`, incrementing counter (`001`, `002`, `003`…)
 
 ---
 
