@@ -83,10 +83,10 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 - Confirm the destination is mounted and check `<destination>/.filmcan/hashlists/`
 - FilmCan Engine writes one MHL per source root (e.g. `CARD_A001.mhl`) aggregating every file
 - Re-run the backup to generate a new hash list
-- Hash lists are created automatically by FilmCan Engine, or when rsync verification is enabled
+- Hash lists are created automatically whenever hash verification is enabled
 
 **"DO NOT UNPLUG" banner stays on**
-- Some external/USB drives are flagged as requiring full cache flush (`F_FULLFSYNC`)
+- Some external/USB drives are flagged as needing a full cache flush before FilmCan trusts the write
 - The banner clears once the drive's verify phase finishes
 - If it persists after the run completes, the drive's cache may not have flushed cleanly, see the os_log warnings in Console.app, filtered to subsystem `com.filmcan.app`
 

@@ -9,19 +9,21 @@ drive with one click.
 
 ## How it works
 
-1. **Read source once.** A single read pipeline pulls each file from the card
-   with `F_NOCACHE`, bytes come straight off the device, not the OS cache, and
-   a huge offload doesn't fill RAM with cached source data.
+1. **Read source once.** A single read pass pulls each file straight off the
+   card, bypassing the Mac's memory cache, so a huge offload doesn't fill up
+   your RAM with cached data.
 2. **Broadcast to every destination at once.** One bounded channel feeds a
    writer task per drive. The slowest drive sets the pace; faster drives idle
-   briefly. Destination writes also use `F_NOCACHE` so a multi-hundred-GB copy
-   stays memory-bounded.
-3. **Honest writes.** On exFAT / external / USB drives, `F_FULLFSYNC` is invoked
-   at finalize so the drive's onboard cache is flushed to media before the file
-   is claimed done. Internal APFS uses a regular `synchronize()`.
-4. **Atomic finalize.** Each file is written to a hidden `.filmcan-<uuid>-<name>`
-   temp file, then `rename(2)`'d into place, never a half-written file at the
-   destination.
+   briefly. Destination writes bypass the memory cache too, so a
+   multi-hundred-GB copy stays memory-bounded.
+3. **Honest writes.** On exFAT, external, and USB drives, FilmCan forces the
+   drive's own cache to flush to the physical media before marking a file
+   done, so "copy finished" means the bytes are actually on the drive, not
+   just queued in a buffer. Internal drives use the Mac's normal, faster save
+   method, since they don't have this problem.
+4. **Atomic finalize.** Each file is written to a hidden temp file first, then
+   swapped into its final name only once it's complete, so you never see a
+   half-written file at the destination.
 5. **Verify** (see modes below), overlapping the copy of the next file.
 6. **MHL per source root.** One sealed ASC-format `.mhl` per source root,
    aggregating every file in that tree, at `<dest>/.filmcan/hashlists/<root>.mhl`.
@@ -43,8 +45,6 @@ Pick in **Backup Editor → Options → Verification**.
 | **Off** | nothing | fastest, no hashing or checking |
 | **Fast** *(default for new projects)* | RAM bit-flips, PCI/USB corruption, partial writes, via the hash computed during the copy | none beyond the copy; no re-read |
 | **Paranoid** | all of Fast **+** drive-firmware silent corruption, OS-cache lies, bit rot at rest, re-reads every destination (and the source) from disk and re-hashes | extra disk I/O, mostly overlapped with copying |
-
-For rushes from a master card you can't re-shoot, use **Paranoid**.
 
 ---
 
@@ -94,10 +94,10 @@ job succeeded.
 
 ## Performance & memory
 
-- **Memory-bounded.** Source reads and destination writes bypass the OS cache
-  (`F_NOCACHE`); the paranoid re-read drains its autorelease pool per chunk.
-  In-flight memory is just the per-destination ring buffer, clamped to
-  `clamp(physRAM / 128, 32 MB, 96 MB)`.
+- **Memory-bounded.** Source reads and destination writes bypass the Mac's
+  memory cache, and the paranoid re-read releases memory as it goes chunk by
+  chunk. In-flight memory is just a small per-destination buffer, capped
+  between 32 MB and 96 MB depending on how much RAM the Mac has.
 - **Multi-source concurrency** is capped to the number of distinct source
   physical drives, three clips from one card copy sequentially (no
   head-thrashing); card-A and card-B copy in parallel.

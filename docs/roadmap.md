@@ -6,6 +6,8 @@ Where FilmCan is heading. Not a promise of dates, a direction. Order is rough pr
 
 ## Shipped
 
+- **1.4.1**, same-name card disambiguation (two cards named the same no longer merge), smarter resume vs. new-card detection, faster startup cleanup on full drives.
+- **1.4.0**, stable and honest ETA (no more roller-coaster estimates), instant tab switching and options panels.
 - **1.3.0**, Netflix Camera/Sound routing (per-source toggle, sound auto-detect, editable folder templates), ASC MHL vs simple hidden hash list, per-destination resume + full-job progress, live per-destination failure surfacing.
 - **1.2.x**, Single Swift copy engine (FanOut), rsync engine removed, ASC MHL chain of custody.
 

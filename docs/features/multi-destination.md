@@ -45,14 +45,14 @@ failed drive can be repaired without restarting the others.
 ## Behavior
 
 - Each destination card shows its own progress bar, percent, bytes copied / total, speed, ETA, and verify phase
-- A drive that requires `F_FULLFSYNC` (typically exFAT, USB HDDs, some externals) shows an orange **DO NOT UNPLUG** badge while active
+- A drive that needs extra care to write safely (typically exFAT, USB HDDs, some externals) shows an orange **DO NOT UNPLUG** badge while active
 - Verification of one file overlaps the copy of the next (see [Copy Engines](./copy-engines.md#verify-pipeline))
 - If one destination fails, the others continue
 - When the run finishes with at least one failed destination, the **Retry repair panel** appears under the progress
 
 ---
 
-## Repair after a failure (FilmCan Engine only)
+## Repair after a failure
 
 If a drive fails mid-job, you don't have to start over. After the run, the failed row has a **Retry** button. Pressing it opens the repair sheet:
 

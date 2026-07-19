@@ -20,19 +20,6 @@
 
 ---
 
-## Common Workflows
-
-**DIT / Post**  
-Paranoid verification + cinema-grade MHL hash lists per source root
-
-**Camera Dept**  
-Fast verification + date presets + automatic copy mode
-
-**Producers / PMs**  
-Multi-destination + notifications + history
-
----
-
 ## Related
 
 - [Quick Start](../quickstart.md)
