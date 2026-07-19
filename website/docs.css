@@ -3,6 +3,7 @@ body.docs{padding:0}
 .docs-wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;display:grid;grid-template-columns:230px 1fr;gap:40px;align-items:start}
 
 /* SIDEBAR */
+/* 88px = 64px nav height + 1px border + 23px clearance */
 .sidebar{position:sticky;top:88px;font-size:14px;padding:24px 0 40px;max-height:calc(100vh - 100px);overflow-y:auto}
 .sidebar .home{display:block;font-weight:700;text-decoration:none;margin-bottom:16px;color:var(--text)}
 .sidebar .home.active{color:var(--yellow)}
