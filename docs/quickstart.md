@@ -41,13 +41,21 @@ Results appear in **Transfer History** (click the **clock** icon)
 
 ---
 
+## Optional: Basic options
+
+Want a bit more control before you run? Open **Options → Basic** and set:
+
+- **Verification**: Fast (default) or Paranoid, a full re-read after copy
+- **Duplicate policy**: what happens when a file already exists at the destination
+- **Copy mode**: all destinations at once, or one at a time
+
+[Learn more →](./features/options.md)
+
+---
+
 ## Optional: Organization
 
-Want files organized by date or card?
-
-1. Open the **Preset** menu in **Options**
-2. Choose a preset or create one
-3. Files get renamed/organized automatically
+Want files organized by date or card? Open **Options → Destinations** and set a **Folder template** for that destination, e.g. `{date}/{source}/`. No preset needed, just fill in the template.
 
 [Learn more →](./features/destination-presets.md)
 
