@@ -254,7 +254,7 @@ def build_docs(strings):
                 sidebar=sidebar(src, loc, titles[loc]),
                 body=body,
             )
-            dest_dir = DOCS_OUT if loc == DEFAULT_LOCALE else DOCS_OUT / loc
+            dest_dir = DOCS_OUT if loc == DEFAULT_LOCALE else OUT / loc / "docs"
             dest = dest_dir / out_path(src)
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(html, encoding="utf-8")
