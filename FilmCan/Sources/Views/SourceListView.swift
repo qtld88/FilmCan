@@ -280,6 +280,8 @@ struct SourceListView: View {
                     .foregroundColor(FilmCanTheme.textTertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+
+                CardSealBadge(sourcePath: source.path)
             }
 
             Spacer()
@@ -529,6 +531,35 @@ struct SourceListView: View {
         func performDrop(info: DropInfo) -> Bool {
             draggingPath = nil
             return true
+        }
+    }
+
+    private struct CardSealBadge: View {
+        let sourcePath: String
+        @State private var state: SealState = .none
+
+        var body: some View {
+            content
+                .font(FilmCanFont.body(11))
+                .task(id: sourcePath) {
+                    state = await CardSealService.evaluate(source: URL(fileURLWithPath: sourcePath))
+                }
+        }
+
+        @ViewBuilder
+        private var content: some View {
+            switch state {
+            case .sealed:
+                Label("Backed up & verified", systemImage: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+            case .broken(let added, let missing, let modified):
+                let n = added.count + missing.count + modified.count
+                Label("\(n) file\(n == 1 ? "" : "s") changed since backup",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+            case .none:
+                EmptyView()
+            }
         }
     }
 
