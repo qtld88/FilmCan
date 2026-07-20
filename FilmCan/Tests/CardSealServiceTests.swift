@@ -94,4 +94,37 @@ final class CardSealServiceTests: XCTestCase {
         let state = await CardSealService.evaluate(source: root)
         XCTAssertEqual(state, .none)
     }
+
+    // MARK: seal gate (decision C: all planned destinations verified)
+
+    func test_shouldSeal_trueOnlyWhenEveryPlannedDestVerified() {
+        let planned = ["/Volumes/A", "/Volumes/B"]
+
+        let allVerified = [
+            makeResult(dest: "/Volumes/A", success: true, verified: true),
+            makeResult(dest: "/Volumes/B", success: true, verified: true)
+        ]
+        XCTAssertTrue(CardSealService.shouldSeal(plannedDestinations: planned, results: allVerified))
+
+        let oneUnverified = [
+            makeResult(dest: "/Volumes/A", success: true, verified: true),
+            makeResult(dest: "/Volumes/B", success: true, verified: false)
+        ]
+        XCTAssertFalse(CardSealService.shouldSeal(plannedDestinations: planned, results: oneUnverified))
+
+        let oneFailed = [
+            makeResult(dest: "/Volumes/A", success: true, verified: true),
+            makeResult(dest: "/Volumes/B", success: false, verified: true)
+        ]
+        XCTAssertFalse(CardSealService.shouldSeal(plannedDestinations: planned, results: oneFailed))
+
+        XCTAssertFalse(CardSealService.shouldSeal(plannedDestinations: [], results: []))
+    }
+
+    private func makeResult(dest: String, success: Bool, verified: Bool) -> TransferResult {
+        var r = TransferResult(configurationName: "cfg", destination: dest, startTime: Date())
+        r.success = success
+        r.wasVerified = verified
+        return r
+    }
 }

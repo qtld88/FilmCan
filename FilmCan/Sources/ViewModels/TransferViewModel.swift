@@ -193,6 +193,13 @@ class TransferViewModel: ObservableObject {
                 perDestResults.append(contentsOf: groupResults)
             }
 
+            await sealVerifiedSources(
+                sources: sources,
+                plannedDestinations: destinations,
+                results: perDestResults,
+                preset: organizationPreset
+            )
+
             // Re-run of an already-complete backup: every destination skipped
             // every file (nothing copied). Don't add a history card — show an
             // "already backed up" popup instead.
@@ -358,6 +365,30 @@ class TransferViewModel: ObservableObject {
             }
         }
         driveCapacitySnapshot = snapshot
+    }
+
+    /// Seal each source card once the run is fully verified (best-effort — a seal
+    /// write failure is logged and never affects the backup result).
+    private func sealVerifiedSources(sources: [String],
+                                     plannedDestinations: [String],
+                                     results: [TransferResult],
+                                     preset: OrganizationPreset?) async {
+        guard CardSealService.shouldSeal(plannedDestinations: plannedDestinations, results: results)
+        else { return }
+        let verified = Array(Set(results.filter { $0.success && $0.wasVerified }.map { $0.destination }))
+        let mhlRef = results.first(where: { $0.hashListPath != nil })?.hashListPath
+        for source in sources {
+            do {
+                try await CardSealService.seal(
+                    source: URL(fileURLWithPath: source),
+                    preset: preset,
+                    destinationsVerified: verified,
+                    mhlRef: mhlRef
+                )
+            } catch {
+                DebugLog.warn("Card seal failed for \(source): \(error)")
+            }
+        }
     }
 
     func setVerifiedDestinations(_ destinations: Set<String>, for configId: UUID) {
