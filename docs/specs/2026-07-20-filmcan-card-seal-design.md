@@ -60,9 +60,10 @@ struct CardSeal: Codable {
 ```
 
 Notes:
-- `entries` is the **post-exclude** set, obtained by calling `FileEnumerator.enumerateFiles(sources:preset:)` (files only, `relPath`+`size`). Enumeration parity between seal time and evaluate time is guaranteed because the marker stores the three filter-pattern arrays and `evaluate` rebuilds a throwaway `OrganizationPreset` from them. This is why `SourceListView` (which has no preset) can still evaluate correctly.
+- `entries` is the **post-exclude** set, obtained by calling `FileEnumerator.enumerateFiles(sources:preset:)` and mapping each entry to `relPath`+`size`. `FileEnumerator` already emits only regular files (directories are skipped internally); its `sourceIsDirectory` flag describes the source *root*, not the entry, so it must not be used as a per-entry filter. Enumeration parity between seal time and evaluate time is guaranteed because the marker stores the three filter-pattern arrays and `evaluate` rebuilds a throwaway `OrganizationPreset` from them. This is why `SourceListView` (which has no preset) can still evaluate correctly.
 - `volumeUUID` sourced from `url.resourceValues(forKeys: [.volumeUUIDStringKey]).volumeUUIDString` (same key `DriveUtilities.summary` reads). On mismatch at read time → `.none`.
 - **No `mtime`.** Refinement from the approved design: `SourceFileEntry` carries no mtime, and exFAT's 2-second mtime granularity produces false `.broken`. `relPath` + `size` is sufficient for camera cards (append-only footage, new clips = new filenames).
+- **`size` is the logical byte size**, re-read via `.fileSizeKey` in `CardSealService.enumerate` — *not* `SourceFileEntry.size`, which is the allocated (block-rounded) size and would hide sub-block resizes.
 
 ### `CardSealService` (Service)
 
