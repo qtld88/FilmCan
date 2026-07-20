@@ -498,6 +498,16 @@ struct SourceListView: View {
         }
         let url = URL(fileURLWithPath: root)
         Task { @MainActor in
+            let state = await CardSealService.evaluate(source: URL(fileURLWithPath: path))
+            if state != .sealed {
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.messageText = "This card isn't sealed as backed-up"
+                alert.informativeText = "FilmCan hasn't verified a complete backup of this card, or its contents changed since the last backup. Eject anyway?"
+                alert.addButton(withTitle: "Eject Anyway")
+                alert.addButton(withTitle: "Cancel")
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+            }
             switch await DriveEjector.eject(volumeURL: url) {
             case .success:
                 onSuccess?()
