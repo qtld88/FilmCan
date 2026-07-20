@@ -129,6 +129,7 @@
 		BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */; };
 		BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867AFB25988C222B6A24039C /* PreviewInfo.swift */; };
 		C07E2057A9173CB6E455E864 /* SpaceAndDefaultsRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4300AAEA574C2EA24D846C /* SpaceAndDefaultsRegressionTests.swift */; };
+		C0D41E90912EE8216FC9D01F /* CardSeal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6FC1873384FD0889894E2C /* CardSeal.swift */; };
 		C287BAF47C32F8F94376CA9C /* NotificationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383ACFF923DEBEC571A967AB /* NotificationSettings.swift */; };
 		C46ED6D795647E028D695967 /* BackupLogWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA33115E34C847104B67968D /* BackupLogWriterTests.swift */; };
 		C5261D4C4443DBE1151C16AB /* ASCMHLChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */; };
@@ -155,6 +156,7 @@
 		DA54C6EDDF200DBCBDCE5DC8 /* LogItemizeParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B27306257A56E2C8B8AF2B /* LogItemizeParserTests.swift */; };
 		DBA7D9E0DFB4180122247E1D /* OrganizationEditorModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF371D249BB433DDD658E2F5 /* OrganizationEditorModelTests.swift */; };
 		DC0F966F95462C0BD85B2231 /* BackupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB49243153FED4BA9A4594E /* BackupListView.swift */; };
+		DEFA2C0E9571C5B04DF70788 /* CardSealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE4BBB2D2E9534130CB6CF3F /* CardSealTests.swift */; };
 		DF00E721769C210498AACBED /* InlineFanOutETALabelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9206A217BBA196D61CF9854B /* InlineFanOutETALabelTests.swift */; };
 		E19CFCE13B1A1F1155F2AF57 /* FolderPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F3544361F9AB588C49995D /* FolderPickerSheet.swift */; };
 		E3339064DFC685E6CCD9EABF /* OrganizationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA472985C7AB10A3B859755A /* OrganizationSheet.swift */; };
@@ -293,6 +295,7 @@
 		9A872C6782B426B22FE8EEDC /* SourceFilterMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterMatching.swift; sourceTree = "<group>"; };
 		9B7A7EDDA19A0713A93A6DA4 /* BackupEditorView+Options.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackupEditorView+Options.swift"; sourceTree = "<group>"; };
 		9C1983264D0443559124CDB6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		9C6FC1873384FD0889894E2C /* CardSeal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSeal.swift; sourceTree = "<group>"; };
 		9C7E8936CFBE0F758236B71B /* FilmCanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanApp.swift; sourceTree = "<group>"; };
 		9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEditorViewModel.swift; sourceTree = "<group>"; };
 		A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyBackedUpSheet.swift; sourceTree = "<group>"; };
@@ -328,6 +331,7 @@
 		CA472985C7AB10A3B859755A /* OrganizationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationSheet.swift; sourceTree = "<group>"; };
 		CB7BCF3596001402A6F510FC /* DestResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestResult.swift; sourceTree = "<group>"; };
 		CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupConfiguration.swift; sourceTree = "<group>"; };
+		CE4BBB2D2E9534130CB6CF3F /* CardSealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSealTests.swift; sourceTree = "<group>"; };
 		CE87AE92E6D0FD2C5F1566BA /* TitlebarAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitlebarAccessory.swift; sourceTree = "<group>"; };
 		CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrphanCleanerTests.swift; sourceTree = "<group>"; };
 		D2339F276B8D91A5D4667E75 /* RollIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollIdentity.swift; sourceTree = "<group>"; };
@@ -473,6 +477,7 @@
 				DA33115E34C847104B67968D /* BackupLogWriterTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
 				03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */,
+				CE4BBB2D2E9534130CB6CF3F /* CardSealTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
 				73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */,
 				7CDC23E435829755245312C4 /* CopyEnginePersistenceTests.swift */,
@@ -560,6 +565,7 @@
 			isa = PBXGroup;
 			children = (
 				CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */,
+				9C6FC1873384FD0889894E2C /* CardSeal.swift */,
 				B3536A61B485A79461038B1C /* Constants.swift */,
 				5CC7B2B17992A10576B84599 /* DefaultExcludes.swift */,
 				B25CADDC1BE66072D93ADFD6 /* DestProgress.swift */,
@@ -783,6 +789,7 @@
 				C46ED6D795647E028D695967 /* BackupLogWriterTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
 				84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */,
+				DEFA2C0E9571C5B04DF70788 /* CardSealTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
 				3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */,
 				513CC93966E9BF3EB6F46E6C /* CopyEnginePersistenceTests.swift in Sources */,
@@ -842,6 +849,7 @@
 				F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */,
 				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,
 				B6CAC1814763C6C420BA5980 /* CancellationState.swift in Sources */,
+				C0D41E90912EE8216FC9D01F /* CardSeal.swift in Sources */,
 				BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */,
 				2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */,
 				CC9CDD4A5E70CB6B2BDA8920 /* ConflictScanner.swift in Sources */,
