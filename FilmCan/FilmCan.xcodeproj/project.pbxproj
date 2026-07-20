@@ -61,6 +61,7 @@
 		57BA4BC4B86BCAE146F33A32 /* DestinationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1EF3014920FF86C66BBDA1F /* DestinationListView.swift */; };
 		57FC2EE06C74789FE4CD31E3 /* PerfSignpost.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0317734201A6D2FEBC7A76F /* PerfSignpost.swift */; };
 		58B0C02F251AA3212196E62C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3536A61B485A79461038B1C /* Constants.swift */; };
+		5A069207716694B04A3D9825 /* CardSealService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2291CD94DD3226526CCBBD /* CardSealService.swift */; };
 		60328CEF84C73456E58A6D6C /* OrphanCleanerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */; };
 		631FB4F10F8D72E1F5C5DA4A /* RereadProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DD344286EE0B943C0F5733 /* RereadProgressTests.swift */; };
 		63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A206C11337F2DF884AF7C3C /* StreamingHasher.swift */; };
@@ -175,6 +176,7 @@
 		F2E0833957D8398B94F490D7 /* DriveSpeedClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C99BAF59C858C9B554B612E /* DriveSpeedClassifierTests.swift */; };
 		F815188F2A0AC030BBEF3C0D /* DestProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25CADDC1BE66072D93ADFD6 /* DestProgress.swift */; };
 		F932C00CDF31D137B4D98E5C /* SiblingDestSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF50D74C080DB0D6C4A8A93C /* SiblingDestSource.swift */; };
+		F94154DA8195DD313511F508 /* CardSealServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B57D995B2944E5D5E619D88 /* CardSealServiceTests.swift */; };
 		F95E3FE9B1896E8B4B908381 /* HashListStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0286B22138243BCD956CDCFF /* HashListStyle.swift */; };
 		FA5BA2A86E85CD12D7EFE614 /* UIStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB457DCE07BC5C884750E430 /* UIStrings.swift */; };
 		FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */; };
@@ -284,6 +286,8 @@
 		8978606748B7E273D703E81B /* SourceMediaKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceMediaKind.swift; sourceTree = "<group>"; };
 		8AF95B7C89A071A16B63AAA0 /* ConflictScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictScanner.swift; sourceTree = "<group>"; };
 		8B24A04D94C538092C852CA0 /* NetflixValidationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetflixValidationSheet.swift; sourceTree = "<group>"; };
+		8B57D995B2944E5D5E619D88 /* CardSealServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSealServiceTests.swift; sourceTree = "<group>"; };
+		8C2291CD94DD3226526CCBBD /* CardSealService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSealService.swift; sourceTree = "<group>"; };
 		8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListNamer.swift; sourceTree = "<group>"; };
 		9001459881AA68F2CACD3AC2 /* DriveInfoCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveInfoCacheTests.swift; sourceTree = "<group>"; };
 		9206A217BBA196D61CF9854B /* InlineFanOutETALabelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineFanOutETALabelTests.swift; sourceTree = "<group>"; };
@@ -410,6 +414,7 @@
 				DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */,
 				13273CE3DB6E17D073212DFE /* BoundedChannel.swift */,
 				BAFAD6C66A15CFFEE76EF71F /* CancellationState.swift */,
+				8C2291CD94DD3226526CCBBD /* CardSealService.swift */,
 				64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */,
 				8AF95B7C89A071A16B63AAA0 /* ConflictScanner.swift */,
 				FEAB41177986B7BBED498656 /* CustomCopierService.swift */,
@@ -477,6 +482,7 @@
 				DA33115E34C847104B67968D /* BackupLogWriterTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
 				03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */,
+				8B57D995B2944E5D5E619D88 /* CardSealServiceTests.swift */,
 				CE4BBB2D2E9534130CB6CF3F /* CardSealTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
 				73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */,
@@ -789,6 +795,7 @@
 				C46ED6D795647E028D695967 /* BackupLogWriterTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
 				84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */,
+				F94154DA8195DD313511F508 /* CardSealServiceTests.swift in Sources */,
 				DEFA2C0E9571C5B04DF70788 /* CardSealTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
 				3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */,
@@ -850,6 +857,7 @@
 				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,
 				B6CAC1814763C6C420BA5980 /* CancellationState.swift in Sources */,
 				C0D41E90912EE8216FC9D01F /* CardSeal.swift in Sources */,
+				5A069207716694B04A3D9825 /* CardSealService.swift in Sources */,
 				BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */,
 				2749411B9A32EC62839394EE /* ConfigurationStorage.swift in Sources */,
 				CC9CDD4A5E70CB6B2BDA8920 /* ConflictScanner.swift in Sources */,
