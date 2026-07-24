@@ -85,6 +85,7 @@
 		818A3B2F83A72582CF1CB60D /* FlowLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD11CFCCF27B1DEB5D65053 /* FlowLinkView.swift */; };
 		81EE59B6D31B1EBE7E309659 /* BasicOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F725B4EA67B79A41B4614F3 /* BasicOptionsView.swift */; };
 		84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */; };
+		85B89550BA97C96DCC304796 /* SpotlightIndexingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC812F2EC72F2A09FD510F13 /* SpotlightIndexingTests.swift */; };
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
 		8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209A0A98482A692929BD2180 /* FastVerifyTests.swift */; };
 		8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */; };
@@ -106,6 +107,7 @@
 		9DEFC9EE9D15FE8DB37EBCBF /* FileOrdering.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E6C2BF26C154734D9112D1 /* FileOrdering.swift */; };
 		A130CD37D34920402619C20C /* TransferHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4C9259A7AF9ACBC20B9852 /* TransferHistoryView.swift */; };
 		A21DBD43D194DFEB77A0DC78 /* TransferViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13D3F43F96E0A035C1266F8F /* TransferViewModel.swift */; };
+		A281599D9F647313852A0B32 /* SpotlightIndexing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7D1C85C0145852D123513D /* SpotlightIndexing.swift */; };
 		A29FDCB8A2EE46E85F197C4E /* DriveEjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76A38CE57BBBB5588E7A674 /* DriveEjector.swift */; };
 		A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6DAECC7717B5F2550472F23 /* MainView.swift */; };
 		A630CD6871F678915F92AC17 /* DriveSpeedClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205AE7D857C27274A358FB77 /* DriveSpeedClassifier.swift */; };
@@ -302,6 +304,7 @@
 		9C6FC1873384FD0889894E2C /* CardSeal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSeal.swift; sourceTree = "<group>"; };
 		9C7E8936CFBE0F758236B71B /* FilmCanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmCanApp.swift; sourceTree = "<group>"; };
 		9DC45AE48AB7E0431686A6DB /* BackupEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEditorViewModel.swift; sourceTree = "<group>"; };
+		9E7D1C85C0145852D123513D /* SpotlightIndexing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndexing.swift; sourceTree = "<group>"; };
 		A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyBackedUpSheet.swift; sourceTree = "<group>"; };
 		A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierServiceE2ETests.swift; sourceTree = "<group>"; };
 		A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDispatcher.swift; sourceTree = "<group>"; };
@@ -357,6 +360,7 @@
 		EA53CF49EB871FCF6D6CBE16 /* RetryRepairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryRepairSheet.swift; sourceTree = "<group>"; };
 		EA563679AEE01B0FF5D12CB7 /* TransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferService.swift; sourceTree = "<group>"; };
 		EB457DCE07BC5C884750E430 /* UIStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIStrings.swift; sourceTree = "<group>"; };
+		EC812F2EC72F2A09FD510F13 /* SpotlightIndexingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndexingTests.swift; sourceTree = "<group>"; };
 		EE1226492995F5E55F0C261F /* LogItemizeParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogItemizeParser.swift; sourceTree = "<group>"; };
 		EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyCleanupTests.swift; sourceTree = "<group>"; };
 		EF371D249BB433DDD658E2F5 /* OrganizationEditorModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationEditorModelTests.swift; sourceTree = "<group>"; };
@@ -398,6 +402,7 @@
 				78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */,
 				C0317734201A6D2FEBC7A76F /* PerfSignpost.swift */,
 				9A872C6782B426B22FE8EEDC /* SourceFilterMatching.swift */,
+				9E7D1C85C0145852D123513D /* SpotlightIndexing.swift */,
 				5A206C11337F2DF884AF7C3C /* StreamingHasher.swift */,
 				EB457DCE07BC5C884750E430 /* UIStrings.swift */,
 				1C05BF20EEBC1E7CC7DB8795 /* XXHash.swift */,
@@ -517,6 +522,7 @@
 				DBDF7051DA56C935FDB1E25A /* SecretsNetworkTests.swift */,
 				93B221BAE2102BEB26E8FFE7 /* SourceFilterMatchingTests.swift */,
 				5C4300AAEA574C2EA24D846C /* SpaceAndDefaultsRegressionTests.swift */,
+				EC812F2EC72F2A09FD510F13 /* SpotlightIndexingTests.swift */,
 				F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */,
 				5F292B5657EF98C29383419C /* XXHashCanonicalTests.swift */,
 			);
@@ -829,6 +835,7 @@
 				8DF8D007DFC3E0509BAAACCB /* SecretsNetworkTests.swift in Sources */,
 				72ADFBC154DB1F6E8A40FE00 /* SourceFilterMatchingTests.swift in Sources */,
 				C07E2057A9173CB6E455E864 /* SpaceAndDefaultsRegressionTests.swift in Sources */,
+				85B89550BA97C96DCC304796 /* SpotlightIndexingTests.swift in Sources */,
 				6A1495C244606EC2E72C29E9 /* TransferProgressTests.swift in Sources */,
 				CBDBF34DD06EFFB8992142C3 /* XXHashCanonicalTests.swift in Sources */,
 			);
@@ -947,6 +954,7 @@
 				7191245AD630701955CB29ED /* SourceListView.swift in Sources */,
 				8E0F3EB7D7BCA27B339F1418 /* SourceMediaKind.swift in Sources */,
 				D9CFB01FF5A83E377CAAECAB /* SourceOptionsView.swift in Sources */,
+				A281599D9F647313852A0B32 /* SpotlightIndexing.swift in Sources */,
 				63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */,
 				ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */,
 				E3646B0FD3D8713EE6949BCF /* TokenFlowLayout.swift in Sources */,
