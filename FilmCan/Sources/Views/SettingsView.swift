@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var webhookHeaders: String = ""
     @State private var webhookSecret: String = ""
     @AppStorage("historyRetentionLimit") private var historyRetentionLimit: Int = 200
+    @AppStorage("disableSpotlightIndexing") private var disableSpotlightIndexing: Bool = true
     @AppStorage("appearanceAccentHex") private var appearanceAccentHex: String = AppearanceDefaults.accentHex
     @AppStorage("appearanceAccentMode") private var appearanceAccentMode: String = AppearanceDefaults.accentMode
     @AppStorage("appearanceSuccessHex") private var appearanceSuccessHex: String = AppearanceDefaults.successHex
@@ -69,6 +70,13 @@ struct SettingsView: View {
             )
             .tabItem {
                 Label("History", systemImage: "clock")
+            }
+
+            DriveSettingsView(
+                disableSpotlightIndexing: $disableSpotlightIndexing
+            )
+            .tabItem {
+                Label("Drives", systemImage: "externaldrive")
             }
 
             HotkeysSettingsView()
