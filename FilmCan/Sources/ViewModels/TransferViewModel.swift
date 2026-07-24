@@ -159,6 +159,14 @@ class TransferViewModel: ObservableObject {
         let organizationPreset = resolveOrganizationPreset(for: activeConfig)
         let sources = activeConfig.sourcePaths
 
+        // Stop Spotlight from thrashing the card and backup drives during the
+        // run. Opt-out via Settings › Drives. Best-effort; never blocks a backup.
+        if SpotlightIndexing.shouldDisable() {
+            for path in sources + destinations {
+                SpotlightIndexing.disableIndexing(forVolumeContaining: path)
+            }
+        }
+
         do {
             currentSources = sources
 
