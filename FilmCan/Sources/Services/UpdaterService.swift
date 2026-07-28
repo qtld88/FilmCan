@@ -4,7 +4,7 @@ import Sparkle
 final class UpdaterService: NSObject {
     static let shared = UpdaterService()
 
-    private lazy var controller = SPUStandardUpdaterController(
+    private let controller = SPUStandardUpdaterController(
         startingUpdater: true,
         updaterDelegate: nil,
         userDriverDelegate: nil
