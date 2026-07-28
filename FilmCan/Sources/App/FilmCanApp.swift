@@ -51,7 +51,13 @@ struct FilmCanApp: App {
                 }
                 .keyboardShortcut("r", modifiers: .command)
             }
-            
+
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    UpdaterService.shared.checkForUpdates()
+                }
+            }
+
             CommandGroup(replacing: .help) {
                 Button("FilmCan Help") {
                     if let url = URL(string: "https://www.filmcan.eu/docs") {
@@ -85,9 +91,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Initialize notification service
         let notificationService = NotificationService.shared
-        
+
         // Request authorization
         notificationService.ensureAuthorized()
+
+        // Starts Sparkle's background update scheduler
+        _ = UpdaterService.shared
 
         #if DEBUG
         // Skip under XCTest — the background timer firing into the test host's
