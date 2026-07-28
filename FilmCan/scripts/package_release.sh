@@ -85,6 +85,18 @@ emit_version_json() {
   echo "Updated: ${out} (version=${version}, dmg=${versioned_dmg})"
 }
 
+sign_dmg_for_sparkle() {
+  local dmg_path="$1"
+  local sign_update_bin="${SPARKLE_SIGN_UPDATE_BIN:-$HOME/.sparkle-tools/bin/sign_update}"
+  if [ ! -x "$sign_update_bin" ]; then
+    echo "error: sign_update not found at ${sign_update_bin}." >&2
+    echo "       Run the Sparkle keypair setup (see docs/superpowers/specs/2026-07-28-sparkle-auto-update-design.md, Task 2)" >&2
+    echo "       or set SPARKLE_SIGN_UPDATE_BIN to its location." >&2
+    exit 1
+  fi
+  "$sign_update_bin" "$dmg_path"
+}
+
 ensure_not_open() {
   local file="$1"
   if [ -e "$file" ] && lsof "$file" >/dev/null 2>&1; then
