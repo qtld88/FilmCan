@@ -70,6 +70,7 @@
 		69106EFEF4CEB1062A82E122 /* TransferResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C4305DE01CFC043DF8C21A /* TransferResult.swift */; };
 		695913F9928C23E38743D1B2 /* DataIntegrityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A6DC9FACD5035B47A5E3C96 /* DataIntegrityTests.swift */; };
 		6A1495C244606EC2E72C29E9 /* TransferProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */; };
+		6E67359DE3EF3C1D07E0E7CB /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA403948401A20FE881D3511 /* UpdaterService.swift */; };
 		6F63821DF88A41F7D5728BD6 /* BackupEditorView+Overview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5633209606F4327D6FE158AA /* BackupEditorView+Overview.swift */; };
 		6F6ACE7EEFBE0D09F20D8C17 /* SourceFilterMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A872C6782B426B22FE8EEDC /* SourceFilterMatching.swift */; };
 		712C89C119B957716D4B9AEB /* PreviewCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40F951445F8238F0B740353 /* PreviewCalculator.swift */; };
@@ -359,6 +360,7 @@
 		F7BE5C204AB2FB815099B2D4 /* RollIdentitySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollIdentitySheet.swift; sourceTree = "<group>"; };
 		F9CD815B95993DF28EC8FE0A /* MainThreadWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainThreadWatchdog.swift; sourceTree = "<group>"; };
 		F9D99A9948745B469ACD3E0F /* TransferProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferProgressTests.swift; sourceTree = "<group>"; };
+		FA403948401A20FE881D3511 /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterService.swift; sourceTree = "<group>"; };
 		FA912365575B6BB6724929CD /* NetflixPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetflixPresetTests.swift; sourceTree = "<group>"; };
 		FB8B45E6010E1222A7826DC8 /* WindowTitleSetter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleSetter.swift; sourceTree = "<group>"; };
 		FEAB41177986B7BBED498656 /* CustomCopierService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierService.swift; sourceTree = "<group>"; };
@@ -440,6 +442,7 @@
 				7AB60E31AC734912F2B72ACB /* SimpleMHLWriter.swift */,
 				3C3502BD9707954651E53BAE /* SourceCollisionValidator.swift */,
 				EA563679AEE01B0FF5D12CB7 /* TransferService.swift */,
+				FA403948401A20FE881D3511 /* UpdaterService.swift */,
 				61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */,
 			);
 			path = Services;
@@ -962,6 +965,7 @@
 				A21DBD43D194DFEB77A0DC78 /* TransferViewModel.swift in Sources */,
 				FA5BA2A86E85CD12D7EFE614 /* UIStrings.swift in Sources */,
 				CA4825B83DBA48B44DE72C58 /* UnreadableFilesSheet.swift in Sources */,
+				6E67359DE3EF3C1D07E0E7CB /* UpdaterService.swift in Sources */,
 				1E5E93C12E83641D2E9FA332 /* VerifyMode.swift in Sources */,
 				1777544B7D467D923D430A7F /* WebhookService.swift in Sources */,
 				0A072FA0A742F50215424112 /* WindowTitleSetter.swift in Sources */,
