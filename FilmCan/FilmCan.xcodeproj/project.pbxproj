@@ -42,6 +42,7 @@
 		33E2A4274E6A38C89E43992A /* HashListVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */; };
 		35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01775FD7053AF831126757D6 /* C4Hash.swift */; };
 		36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640924E857BB35194B737188 /* CombinedSpeedETATests.swift */; };
+		37D1480E7C528F989C9C7E45 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 3220B1F83E0BD07F2D8AE43B /* Sparkle */; };
 		392EFFD780CF6346123B3FA7 /* DryRunReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A2A61C6C44FA754A8D3ED5 /* DryRunReport.swift */; };
 		3BC6AFF1943D2F6B23601E95 /* ConstantsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */; };
 		3D35F63A0736E54799B7FC99 /* ExplodeFanOutResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244ADA509455AE3EBC04AC4D /* ExplodeFanOutResultTests.swift */; };
@@ -365,6 +366,17 @@
 		FFA8427B4A1254A14DCE35B2 /* TransferResultSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferResultSummary.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		61B7CA196864B5F6FA76584D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				37D1480E7C528F989C9C7E45 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
 		1A3AE896260F508D68713690 /* Utilities */ = {
 			isa = PBXGroup;
@@ -686,6 +698,7 @@
 				49626612294C12A5179B09DA /* Embed rsync */,
 				B172D70E1C995905FCAF10ED /* Sources */,
 				D934B3D2821C3BD995395AEB /* Resources */,
+				61B7CA196864B5F6FA76584D /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -693,6 +706,7 @@
 			);
 			name = FilmCan;
 			packageProductDependencies = (
+				3220B1F83E0BD07F2D8AE43B /* Sparkle */,
 			);
 			productName = FilmCan;
 			productReference = 083A2D2BAD99B47EB86C5386 /* FilmCan.app */;
@@ -725,6 +739,9 @@
 			);
 			mainGroup = 3E892F890C4DE93ED91D099A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E75DC63EAA7CA6589ACAC16B /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
@@ -1194,6 +1211,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E75DC63EAA7CA6589ACAC16B /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.6.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3220B1F83E0BD07F2D8AE43B /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E75DC63EAA7CA6589ACAC16B /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6B4985DF85DB4767DFBF0845 /* Project object */;
 }
