@@ -95,8 +95,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         // Request authorization
         notificationService.ensureAuthorized()
 
-        // Starts Sparkle's background update scheduler
-        _ = UpdaterService.shared
+        // Starts Sparkle's background update scheduler (skipped under XCTest —
+        // the test host launches the real app, and tests shouldn't depend on
+        // network reachability to the production update feed)
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            _ = UpdaterService.shared
+        }
 
         #if DEBUG
         // Skip under XCTest — the background timer firing into the test host's
