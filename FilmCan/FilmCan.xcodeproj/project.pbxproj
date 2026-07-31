@@ -119,6 +119,7 @@
 		AB7A8CF9DC4FAA379BE7064B /* DestStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C58BD6BBAE45AB2BED7FDAA /* DestStatus.swift */; };
 		AC0D7BA40F0814AB5305A2ED /* EngineOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24D110CD2578FC0A7854302 /* EngineOptions.swift */; };
 		ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE87AE92E6D0FD2C5F1566BA /* TitlebarAccessory.swift */; };
+		ACC26B4EE93658AA4877B554 /* IOPerfProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EBACAD4FF12342BB0D8F56 /* IOPerfProbeTests.swift */; };
 		ADD84C805512EEC84CD93FFA /* RepairFailedDestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F772B2D53DF92EE1BA0929C9 /* RepairFailedDestTests.swift */; };
 		ADE31DDEE0B65D6199D89613 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EB91D5AC324DFAEC3E376F /* SettingsView.swift */; };
 		AF683945DDE046A3AB1C236F /* LogsOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6794CD2A43286C823FE41E30 /* LogsOptionsView.swift */; };
@@ -168,6 +169,7 @@
 		E3646B0FD3D8713EE6949BCF /* TokenFlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9B0ACA5EC9329FFCD201A6 /* TokenFlowLayout.swift */; };
 		E4E204AA8BDCC68C5C1EC35A /* FilmCanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C7E8936CFBE0F758236B71B /* FilmCanApp.swift */; };
 		E653B071F3866510799DDB86 /* TransferResultSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA8427B4A1254A14DCE35B2 /* TransferResultSummary.swift */; };
+		E6D7D7DBEE8D8113DCAAD03D /* IOPerfProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F60B4F314EB312BB4E580F /* IOPerfProbe.swift */; };
 		E7739A75BD7483BE6EBF5601 /* BackupEditorView+Options.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B7A7EDDA19A0713A93A6DA4 /* BackupEditorView+Options.swift */; };
 		E899FC2861C89B39CCA30A36 /* DefaultExcludes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC7B2B17992A10576B84599 /* DefaultExcludes.swift */; };
 		E913256E07143EBE91685672 /* NetflixPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA912365575B6BB6724929CD /* NetflixPresetTests.swift */; };
@@ -232,6 +234,7 @@
 		2F67DC91E4B3EC90EB8F6AFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3066C90EFA131CD742855EB5 /* FanOutCopierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierTests.swift; sourceTree = "<group>"; };
 		31E297808A920BE36CE33E0B /* ASCMHLConformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLConformanceTests.swift; sourceTree = "<group>"; };
+		35F60B4F314EB312BB4E580F /* IOPerfProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOPerfProbe.swift; sourceTree = "<group>"; };
 		3622B8C4F47A914F473D8798 /* LogFolderNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogFolderNamer.swift; sourceTree = "<group>"; };
 		383ACFF923DEBEC571A967AB /* NotificationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettings.swift; sourceTree = "<group>"; };
 		3C3502BD9707954651E53BAE /* SourceCollisionValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceCollisionValidator.swift; sourceTree = "<group>"; };
@@ -312,6 +315,7 @@
 		A010A934559300C76E021129 /* CustomCopierServiceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierServiceE2ETests.swift; sourceTree = "<group>"; };
 		A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDispatcher.swift; sourceTree = "<group>"; };
 		A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierSafetyTests.swift; sourceTree = "<group>"; };
+		A5EBACAD4FF12342BB0D8F56 /* IOPerfProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOPerfProbeTests.swift; sourceTree = "<group>"; };
 		AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupLogWriter.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
 		AB0DE00B31C198D55826941B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
@@ -398,6 +402,7 @@
 				8DBCBAAD1A5249AA2E5D417F /* HashListNamer.swift */,
 				9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */,
 				493E9CCA8A02D3E16ADEB97C /* HashListWriter.swift */,
+				35F60B4F314EB312BB4E580F /* IOPerfProbe.swift */,
 				AB4BE7FDB8F045263D4E2883 /* LogFileNamer.swift */,
 				3622B8C4F47A914F473D8798 /* LogFolderNamer.swift */,
 				EE1226492995F5E55F0C261F /* LogItemizeParser.swift */,
@@ -508,6 +513,7 @@
 				209A0A98482A692929BD2180 /* FastVerifyTests.swift */,
 				E47CF7DDB3A7E4B996579E0F /* Info.plist */,
 				9206A217BBA196D61CF9854B /* InlineFanOutETALabelTests.swift */,
+				A5EBACAD4FF12342BB0D8F56 /* IOPerfProbeTests.swift */,
 				EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */,
 				E6B27306257A56E2C8B8AF2B /* LogItemizeParserTests.swift */,
 				461775DA159F8BCD137BF26C /* MainThreadWatchdogTests.swift */,
@@ -821,6 +827,7 @@
 				99F49C12806796F55D999CEE /* FanOutCopierSafetyTests.swift in Sources */,
 				A6588DD8301CC2D89C181486 /* FanOutCopierTests.swift in Sources */,
 				8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */,
+				ACC26B4EE93658AA4877B554 /* IOPerfProbeTests.swift in Sources */,
 				DF00E721769C210498AACBED /* InlineFanOutETALabelTests.swift in Sources */,
 				138FE41894080BDF18228786 /* LegacyCleanupTests.swift in Sources */,
 				DA54C6EDDF200DBCBDCE5DC8 /* LogItemizeParserTests.swift in Sources */,
@@ -920,6 +927,7 @@
 				CF26D25B0D58A7227FCA5275 /* HashListWriter.swift in Sources */,
 				1FDBC1FC2134CD17CA9D1995 /* Hashing.swift in Sources */,
 				713B1681CADD11A2A09EDA86 /* HistoryRecorder.swift in Sources */,
+				E6D7D7DBEE8D8113DCAAD03D /* IOPerfProbe.swift in Sources */,
 				1D4332EE017A572123B64D50 /* InfoPopover.swift in Sources */,
 				1E64C22B5381774E5D73BA7C /* InlineFanOutProgress.swift in Sources */,
 				D4D1CA5AB6031337836735E1 /* KeychainStore.swift in Sources */,
