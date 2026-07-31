@@ -38,6 +38,28 @@ enum Constants {
     /// memory pressure. Plain fsync (not F_FULLFSYNC) keeps this cheap.
     static let writeFlushEveryBytes: Int64 = 256 * 1024 * 1024
 
+    /// How many finished files the copy lane may run ahead of the verify lane.
+    ///
+    /// The verify lane re-reads each destination from disk while the copy lane is still
+    /// writing the next files. On one spindle both streams share a head, and run #2 of
+    /// the HDD perf investigation measured 813 s of destination work inside a 555 s wall
+    /// — proof they overlap, with both lanes losing ~45 % of their uncontended
+    /// throughput. Lowering this bounds that overlap.
+    ///
+    /// Whether bounding it actually helps is **not yet measured**: phase separation and
+    /// per-file alternation predict opposite results, and alternation may win because
+    /// the head is already parked on the bytes just written. Default stays at the
+    /// historical 64 (effectively unbounded) so shipped behaviour is unchanged; override
+    /// with `FILMCAN_VERIFY_RUNAHEAD` to A/B it. See `docs/perf-hdd-fast-mode.md`.
+    static func verifyRunAheadFiles(
+        env: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Int {
+        guard let raw = env["FILMCAN_VERIFY_RUNAHEAD"], let n = Int(raw), n >= 1 else {
+            return 64
+        }
+        return n
+    }
+
     static func chunkBytes(forSlowestDest dest: SlowestDestClass) -> Int {
         switch dest {
         case .nvmeLocal: return 16 * 1024 * 1024

@@ -523,7 +523,7 @@ Revised after runs #1 and #2. Savings are quoted against run #2 (555.1 s wall,
 |---|--------|-----------|-------------------|-----------|
 | 1 | **Background destination verification** — copy completes, read-back continues behind, status goes copied → verified | **unchanged** | **−49 %, ~1.00×** | OffShoot's background destination reads |
 | 2 | **Standalone verify from an existing ASC MHL chain** — verify a drive later, at the office | **unchanged** | n/a (moves it off set entirely) | OffShoot 24.3 Standalone Verification; Silverstack "Separate (per Job)" |
-| 3 | 1a serialize the verify lane behind the copy on rotational dests | unchanged | −13 %, 1.69× | — |
+| 3 | 1a bound how far the copy lane runs ahead of the verify lane | unchanged | **−13 % modeled, not measured** | knob shipped, see below |
 | 4 | Per-destination verification level (full on archive, size-only on shuttle) | reduced, per-dest, explicit | varies | Silverstack Cascading Copy |
 | 5 | Overlap Paranoid's source re-read instead of serializing it behind the settle sleep | unchanged | Paranoid only | Silverstack, which charges nothing for source verification |
 | 6 | 4 bigger HDD chunks | unchanged | unmeasured, plausibly part of item 3's 13 % | — |
@@ -589,3 +589,33 @@ time is going somewhere not yet instrumented — say so rather than guessing.
 **A/B protocol.** Same roll, same drive, freshly formatted, three runs each:
 Finder copy, FilmCan Fast, FilmCan Fast with verification off (isolates the
 verify cost from everything else). Record the bucket table for each FilmCan run.
+
+## Pending experiment — verify run-ahead depth
+
+`BoundedChannel.send` blocks only once `buffer.count >= capacity`, and `receive()`
+dequeues when the verifier *starts* a file, not when it finishes. At the historical
+capacity of 64 the copy lane therefore never waits, which is why run #2 overlapped so
+heavily. `Constants.verifyRunAheadFiles()` now exposes that depth, overridable with
+`FILMCAN_VERIFY_RUNAHEAD`. **The default is unchanged at 64**, so shipped behaviour is
+identical until the experiment settles the question.
+
+The question is genuinely open, because two regimes predict opposite results:
+
+- **Phase separation** (copy everything, then verify everything) is what the −13 %
+  estimate models. It assumes each lane regains its uncontended throughput.
+- **Per-file alternation** (write file N, immediately read file N back) may beat it
+  outright: the head is already parked on the bytes just written, so the read is a short
+  seek rather than a long one. The −13 % model does not account for this at all.
+
+Lowering the capacity moves toward alternation, not toward phase separation. Run:
+
+```bash
+FILMCAN_VERIFY_RUNAHEAD=1 FILMCAN_IO_PERF=1 "$(ls -dt ~/Library/Developer/Xcode/DerivedData/FilmCan-*/Build/Products/Debug/FilmCan.app/Contents/MacOS/FilmCan 2>/dev/null | head -1)"
+```
+
+Run #2 (555.1 s, 24 977 MB, 5 mixed clips) is already the capacity-64 baseline for that
+workload, so only depths 1 and 4 still need measuring. The number to watch is
+`dest write` + `verify re-read` against the wall: at 64 it was 813.19 s inside 555.1 s
+(overlap factor 1.47). If bounding the depth helps, that sum should fall toward the wall
+and both lanes should recover throughput. **If it does not, this lever is dead and the
+1.70× floor stands** — say so and stop, rather than building the heavier explicit gate.

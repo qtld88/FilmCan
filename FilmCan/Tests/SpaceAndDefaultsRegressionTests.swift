@@ -44,4 +44,23 @@ final class SpaceAndDefaultsRegressionTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(optimistic + slack, importantUsage)
         }
     }
+    // MARK: - verify run-ahead knob
+
+    func test_verifyRunAhead_defaultsToHistoricalValue() {
+        XCTAssertEqual(Constants.verifyRunAheadFiles(env: [:]), 64)
+    }
+
+    func test_verifyRunAhead_honoursEnvOverride() {
+        XCTAssertEqual(Constants.verifyRunAheadFiles(env: ["FILMCAN_VERIFY_RUNAHEAD": "1"]), 1)
+        XCTAssertEqual(Constants.verifyRunAheadFiles(env: ["FILMCAN_VERIFY_RUNAHEAD": "8"]), 8)
+    }
+
+    func test_verifyRunAhead_rejectsGarbageAndSubOneValues() {
+        // A bad value must not silently stall the pipeline at zero.
+        for bad in ["0", "-3", "", "abc", "2.5"] {
+            XCTAssertEqual(Constants.verifyRunAheadFiles(env: ["FILMCAN_VERIFY_RUNAHEAD": bad]), 64,
+                           "env value \(bad) should fall back to the default")
+        }
+    }
+
 }
