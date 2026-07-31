@@ -83,6 +83,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         // Activate the app (bring to front)
         NSApp.activate(ignoringOtherApps: true)
         
+        // Before anything reads a secret: rescue any left in UserDefaults by a build
+        // older than the Keychain switch, and erase the plaintext copy.
+        SecretsMigration.run()
+
         // Initialize notification service
         let notificationService = NotificationService.shared
         

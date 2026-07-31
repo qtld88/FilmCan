@@ -309,6 +309,28 @@ struct PushSettingsView: View {
     @Binding var webhookIncludeFullPaths: Bool
     @Binding var legacyWebhookSecret: String
 
+    @State private var ntfyTesting = false
+    @State private var ntfyTestResult: NtfyOutcome?
+
+    /// Exercises the real ntfy path with what is currently in the fields, so a bad
+    /// token or topic surfaces here instead of silently failing after a backup.
+    private func sendNtfyTest() {
+        ntfyTesting = true
+        ntfyTestResult = nil
+        WebhookService.sendNtfy(
+            urlString: ntfyURL,
+            bearerToken: ntfyBearerToken,
+            title: "FilmCan test",
+            message: "If you can read this, ntfy push is configured correctly.",
+            fields: [:]
+        ) { outcome in
+            DispatchQueue.main.async {
+                ntfyTesting = false
+                ntfyTestResult = outcome
+            }
+        }
+    }
+
     var body: some View {
         Form {
             Section("NTFY") {
@@ -325,6 +347,31 @@ struct PushSettingsView: View {
                 SecureField("Bearer token :", text: $ntfyBearerToken)
                     .textFieldStyle(.roundedBorder)
                     .disabled(!ntfyEnabled)
+
+                // The field is secure, so a bad paste is invisible. Say so.
+                if !WebhookService.looksLikeNtfyToken(ntfyBearerToken) {
+                    Label(
+                        "This does not look like an ntfy access token. They start with "
+                        + "tk_ and contain no spaces.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(FilmCanFont.body(11))
+                    .foregroundColor(.orange)
+                }
+
+                HStack(spacing: 10) {
+                    Button(ntfyTesting ? "Sending…" : "Send test push") { sendNtfyTest() }
+                        .disabled(!ntfyEnabled || ntfyTesting || ntfyURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if let outcome = ntfyTestResult {
+                        Label(
+                            outcome.userMessage,
+                            systemImage: outcome.isSuccess ? "checkmark.circle.fill" : "xmark.octagon.fill"
+                        )
+                        .font(FilmCanFont.body(11))
+                        .foregroundColor(outcome.isSuccess ? .green : .red)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Custom notification title")
                         .font(FilmCanFont.body(12))
