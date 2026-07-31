@@ -247,8 +247,48 @@ sentence in the docs; not a code change recommendation.
 | 5 | 1b optional stream-verify tier (off by default, honest label) | **reduced** — no on-platter read-back | up to 45 % | small |
 | 6 | 6 mkdir caching | unchanged | small-file rolls only | trivial |
 
-**Measure first.** Before implementing, add signpost timings for the three
-buckets (copy-write wall, verify-read wall, fsync total) and A/B one real 5400 rpm
-USB HDD against Finder with the same roll — the ratios above are modeled, and the
-per-drive `F_FULLFSYNC` latency in particular varies wildly by enclosure. Any
-change here goes through the real-app smoke gate before release.
+**The numbers above are modeled, not measured.** Do not implement from them
+directly — per-drive `F_FULLFSYNC` latency in particular varies wildly by
+enclosure, and it decides whether Finding 2 is worth doing at all. Any change
+here goes through the real-app smoke gate before release.
+
+## How to measure (IOPerfProbe)
+
+`IOPerfProbe` ([IOPerfProbe.swift](../FilmCan/Sources/Utilities/IOPerfProbe.swift))
+attributes a run's wall time to per-destination I/O buckets. It is inert unless
+`FILMCAN_IO_PERF=1` is set, so it ships harmlessly.
+
+Run a Debug build from a terminal so the summary prints to stdout:
+
+```bash
+FILMCAN_IO_PERF=1 "$(ls -d ~/Library/Developer/Xcode/DerivedData/FilmCan-*/Build/Products/Debug/FilmCan.app | head -1)/Contents/MacOS/FilmCan"
+```
+
+For a release/staged build, read it from the unified log instead:
+
+```bash
+log stream --predicate 'category == "FilmCan"' --info
+```
+
+The summary is emitted once per `FanOutCopier.run()`, via a `defer`, so it prints
+on cancel and on error too. Each row is one bucket at one destination:
+
+```
+=== FilmCan I/O perf — wall 1840.2s ===
+[LaCie-HDD]
+  dest write      612.40s  n=31200  mean=  19.628ms  max=   210.44ms     214.1 MB/s
+  cache flush     186.02s  n=500    mean= 372.040ms  max=  1180.30ms
+  verify re-read  735.10s  n=31200  mean=  23.561ms  max=   295.10ms     178.3 MB/s
+```
+
+**Reading it.** `cache flush` mean is the number that decides Finding 2 — anything
+over ~50 ms per call means batching wins big; the `max` column tells you whether
+the drive is a bimodal flusher (a mean of 40 ms with a max of 900 ms still hurts).
+Comparing `dest write` MB/s against `verify re-read` MB/s **during the same run**
+quantifies Finding 1's thrash: if both sit far below the drive's sequential
+figure, the two streams are fighting for the head. `sum(buckets) ≪ wall` means
+time is going somewhere not yet instrumented — say so rather than guessing.
+
+**A/B protocol.** Same roll, same drive, freshly formatted, three runs each:
+Finder copy, FilmCan Fast, FilmCan Fast with verification off (isolates the
+verify cost from everything else). Record the bucket table for each FilmCan run.
