@@ -30,10 +30,11 @@ None of the fixes below removes checksum verification, ASC MHL manifests, or
 durability flushing. Findings 1a, 2, 3, 4, 5, 6 preserve current guarantees
 outright; 1b is an explicit, gated trade-off.
 
-> **Superseded in part.** The findings below were modeled from code, not measured.
-> The first real A/B ran on 2026-07-31 and is recorded in the next section. It
-> **confirms Finding 1's cost**, **refutes Finding 1's mechanism**, and **kills
-> Findings 1a and 3**. Read the measured section before acting on any ranking here.
+> **Superseded.** The findings below were modeled from code, not measured. Two real
+> A/Bs ran on 2026-07-31 and are recorded in the next two sections. Net result:
+> Finding 1's cost is confirmed and quantified, Finding 3 is dead, Findings 2, 5 and
+> 6 are retired as negligible, and Finding 1a is confirmed but worth ~13 %, not the
+> 15-40 % modeled here. Read the measured sections before acting on any ranking below.
 
 ---
 
@@ -108,19 +109,101 @@ Micro-optimizing anything else cannot recover more than ~2 % of wall time.
 
 ### What this run could not test
 
-The workload was 8 files. Every per-file cost is therefore invisible, and those are
-exactly where Findings 2, 5 and 6 live. Extrapolating the measured per-call costs to
-a realistic 500-clip card at the same byte count:
+The workload was 8 files, so every per-file cost is invisible. Findings 2, 5 and 6
+live there. See run #2 below, which settles them.
 
-| Per-file cost | Measured (8 files) | Extrapolated (500 files) |
-|---|---|---|
-| `F_FULLFSYNC` (Finding 2) | 1.31 s | ~82 s |
-| `temp create` + `rename` | 0.10 s | ~7 s |
-| MHL re-render (Finding 5, O(N²)) | 0.04 s | tens of seconds |
+---
 
-That total is the same order as the 101 s verify pass, possibly larger. **Run #2 must
-use a real camera card with hundreds of files before Findings 2, 5 and 6 are ranked
-or dismissed.**
+## Measured run #2 — 2026-07-31, 5 mixed-size clips, same USB HDD
+
+Workload: 5 clips of deliberately mixed sizes, 24 977 MB total, same source and same
+destination as run #1, Fast mode. 6 247 chunks at 4.00 MB average.
+
+| Bucket | Time | n | Throughput | vs run #1 |
+|---|---|---|---|---|
+| dest write | 439.01 s | 6247 | 56.9 MB/s | **−41 %** |
+| verify re-read | 374.18 s | 6247 | 66.7 MB/s | **−48 %** |
+| source read | 285.45 s | 6247 | 87.5 MB/s | −2.7 % |
+| dest hash | 8.50 s | 6247 | 2 938 MB/s | |
+| source hash | 6.65 s | 6247 | 3 755 MB/s | |
+| verify hash | 4.88 s | 6247 | 5 113 MB/s | |
+| cache flush | 0.90 s | 5 | 180.0 ms/call | |
+| rename | 0.28 s | 5 | 55.1 ms/call | |
+| temp create | 0.18 s | 10 | 17.9 ms/call | |
+| mhl render | 0.04 s | 2 | 20.4 ms/call | |
+
+Wall 555.1 s. Finder 285 s. Ratio **1.95×**.
+
+### The governing model (fits both runs exactly)
+
+FilmCan pushes **twice** the bytes through the destination that Finder does: it writes
+each byte once, then reads it back to verify. Finder writes once and never reads.
+So the destination head, not the source, sets the wall time:
+
+```
+wall  =  2 × bytes  ÷  destination aggregate throughput
+```
+
+| | bytes | dest aggregate | predicted | measured |
+|---|---|---|---|---|
+| run #1 | 2 × 12 846 MB | 103.6 MB/s | 248 s | 247.9 s |
+| run #2 | 2 × 24 977 MB | 90.0 MB/s | 555 s | 555.1 s |
+
+Finder is **source**-bound in both runs, at 88.0 and 87.6 MB/s — and FilmCan's own
+`source read` bucket independently measures that same source at 89.9 and 87.5 MB/s.
+The ratio therefore falls out as `2 × source_speed ÷ dest_aggregate`:
+2 × 88.0 ÷ 103.6 = **1.70** (run #1), 2 × 87.6 ÷ 90.0 = **1.95** (run #2). Both match.
+
+The user's own summary — "copy time ×2 for checksum" — is literally correct. It is
+2× the destination I/O.
+
+### Interleaving costs ~13 %, so Finding 1a is back
+
+Run #2's destination lanes overlap: `dest write 439.01 + verify re-read 374.18 =
+813.19 s` of destination work inside a **555.1 s** wall. Exceeding the wall is
+arithmetic proof that the head served both streams at once. The copy group and the
+verify lane run concurrently by construction — `drainVerifies` is launched with
+`async let` behind a 64-deep channel
+([FanOutCopier.swift:1017-1022](../FilmCan/Sources/Services/FanOutCopier.swift#L1017-L1022)),
+so the copy side can run up to 64 files ahead and never waits for the verifier.
+
+The contention is destination-only: both destination lanes lost ~45 % of their run #1
+throughput while `source read` lost 2.7 %. The source is a different device and was
+never contended. Per-call maxima confirm it — `dest write` max went 222.65 → 811.74 ms
+and `verify re-read` max 519.10 → 802.11 ms.
+
+Serializing the verify behind the copy on a rotational destination predicts:
+copy phase 24 977 ÷ 87.5 = 285.5 s (source-bound, i.e. Finder speed) + verify
+24 977 ÷ 127.1 = 196.5 s at run #1's uncontended read speed = **482 s**, saving 73 s
+(**13 %**) and moving the ratio 1.95 → 1.69.
+
+**This retracts the run #1 verdict that Finding 1a was dead.** Run #1's totals
+(233.03 s of destination work in a 247.9 s wall) were *consistent* with serial
+execution but did not prove it; run #2's exceed the wall and do prove concurrency.
+Uniform 1.6 GB files kept the pipeline in near-lockstep; mixed clip sizes let one long
+verify straddle several copies. Real cards have mixed clip sizes, so **run #2 is the
+representative case**.
+
+Finding 3 stays dead: even under contention the verify re-read (66.7 MB/s) is faster
+than the concurrent write (56.9 MB/s). It is not being QoS-throttled.
+
+### Findings 2, 5 and 6 are retired
+
+Per-file costs totalled **1.40 s = 0.25 % of wall**. The run #1 extrapolation assumed a
+500-clip card, which is not the real shape of the workload: a camera card is typically
+**under 100 clips**, a few MB to a few tens of GB each. At 100 files the whole per-file
+group is ~30 s worst case on a ~9-minute run — 3-5 %, behind everything else. Neither
+`F_FULLFSYNC` batching (Finding 2), MHL checkpoint cadence (Finding 5), nor mkdir
+caching (Finding 6) is worth doing for throughput. Finding 2 may still be worth it for
+the *jitter* it causes, not the total.
+
+### Two side observations, not perf findings
+
+- `MainThreadWatchdog` logged repeated 103-228 ms janks with `region='idle'` throughout
+  run #2. The main thread stalls during copy. Separate UI issue.
+- Hash per-call maxima are implausible for xxh128 on 4 MB (99.73, 125.46, 160.89 ms
+  against sub-millisecond means). That is thread starvation, not hashing cost. Hash
+  totals remain 3.6 % of wall.
 
 ---
 
@@ -330,22 +413,24 @@ sentence in the docs; not a code change recommendation.
 
 ## Recommended order of attack
 
-Revised after measured run #1. Modeled estimates are struck where the measurement
-contradicts them.
+Revised after runs #1 and #2. Savings are quoted against run #2 (555.1 s wall,
+1.95× Finder), the representative mixed-clip-size case.
 
-| # | Change | Integrity | Savings (HDD) | Status after run #1 |
-|---|--------|-----------|---------------|---------------------|
-| 1 | 1b optional stream-verify tier (off by default, honest label) | **reduced** — no on-platter read-back | **41 % of wall, measured** | the only lever that closes the Finder gap on large files |
-| 2 | 2 batch `F_FULLFSYNC` at MHL checkpoints (flush-before-render invariant) | unchanged (certified ⇒ flushed) | ~82 s / 500 files, extrapolated | **needs run #2** (many-file card) |
-| 3 | 5 coarser MHL checkpoint cadence | unchanged | tens of seconds, extrapolated | **needs run #2** |
-| 4 | 6 mkdir caching | unchanged | small-file rolls only | **needs run #2** |
-| 5 | 4 bigger HDD chunks | unchanged | ~~5–15 %~~ likely <2 % | 4 MB read takes 44.4 ms with max 54.7 ms — that is media time, not syscall overhead. One-line A/B at 16 MB to confirm, then drop |
-| — | ~~1a serialize copy/verify per rotational dest~~ | — | ~~15–40 %~~ **~0 %** | **dead** — measured time is already additive |
-| — | ~~3 fix verify QoS~~ | — | ~~included above~~ **0 %** | **dead** — verify re-read is the fastest stream in the run |
+| # | Change | Integrity | Savings | Ratio after |
+|---|--------|-----------|---------|-------------|
+| 1 | 1b optional stream-verify tier (off by default, honest label) | **reduced** — no on-platter read-back | **−270 s (49 %)** | **1.00×** — halves destination I/O, so the run becomes source-bound like Finder |
+| 2 | 1a serialize the verify lane behind the copy on rotational dests | unchanged | −73 s (13 %) | 1.69× |
+| 3 | 4 bigger HDD chunks | unchanged | unmeasured, plausibly part of the 13 % | — |
+| — | ~~2 batch `F_FULLFSYNC`~~ / ~~5 MHL cadence~~ / ~~6 mkdir caching~~ | — | **0.25 % measured** | **retired** — cards are <100 clips, so per-file cost never dominates |
+| — | ~~3 fix verify QoS~~ | — | **0 %** | **dead** — verify re-reads faster than the concurrent write |
 
-Findings 2, 5 and 6 are per-file costs and run #1 had only 8 files, so their
-extrapolations remain modeled. **Run #2 on a real card decides them.** Any change
-here goes through the real-app smoke gate before release.
+Items 1 and 2 stack: serializing first and then gating the read-back off gives the
+same 1.00× as item 1 alone, since item 1 removes the contention item 2 mitigates.
+**Item 1 is the only change that reaches Finder parity, and it is the only one that
+touches an integrity guarantee.** That makes the decision a product call — what
+"verified" is allowed to mean — not an engineering one.
+
+Any change here goes through the real-app smoke gate before release.
 
 ## How to measure (IOPerfProbe)
 
