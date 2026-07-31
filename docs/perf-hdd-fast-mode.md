@@ -467,6 +467,27 @@ That implies the traditional in-line tier costs ~2.5× Finder. **FilmCan measure
 thorough tier.** The gap the user perceives is not slowness — it is that FilmCan ships
 only the thorough tier and puts all of it on the critical path.
 
+### Head-to-head on the run #2 workload (measured 2026-07-31)
+
+| Tool | Wall | vs Finder |
+|---|---|---|
+| Finder (no verification) | 285 s | 1.00× |
+| **FilmCan, Fast** | **555.1 s** | **1.95×** |
+| Hedge 21.3.2 | 565 s | 1.98× |
+
+**FilmCan is 2 % faster than Hedge on identical work.** Hedge reported the job finished
+with an estimated 20-30 % of verification still outstanding, then kept reading in the
+background — which is the background-verification model working exactly as documented.
+Its *displayed* time is shorter; its *actual* time is slightly longer than FilmCan's.
+
+This closes the original question. FilmCan was never the slow one. It reports honestly
+and the competition reports early.
+
+**Product decision, 2026-07-31: background verification is rejected.** The user prefers
+the completion signal to mean the work is actually done. Items 1 and 4 below are
+therefore parked, and item 3 (serialising the verify lane on rotational destinations,
+−13 %, integrity untouched) becomes the top remaining lever.
+
 ### What this changes about the recommendation
 
 1. **The cheap tier competitors actually ship is "destination file size only"** — not a
