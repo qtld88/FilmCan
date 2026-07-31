@@ -411,24 +411,114 @@ sentence in the docs; not a code change recommendation.
   [FanOutCopier.swift:1511–1517](../FilmCan/Sources/Services/FanOutCopier.swift)).
   Don't remove it — Findings 1a/3/4 work *with* it.
 
+## How the industry solves this (researched 2026-07-31)
+
+Short version: **nobody avoids the 2× destination I/O. They schedule it differently.**
+
+### OffShoot (ex-Hedge) — three modes, renamed in 24.3
+
+| Mode (pre-24.3 name) | Source | Destination | Cost |
+|---|---|---|---|
+| **Transfer** (Checkpoint OFF) | read once + checksum | **file size only** | 1× |
+| **Source** (Checkpoint ON, Backup) | *"contents are independently read twice"* | **file size only** | 2× source, 1× dest |
+| **Source & Destination** (Checkpoint ON, Archive) | checksum | **full read-back**, three checksums total | *"twice as long as Transfer Verification"* |
+
+Two scheduling features FilmCan lacks:
+
+- **Background destination reads.** The 2019 Newsshooter benchmark notes Hedge
+  *"completes its initial verification while continuing background destination reads"*,
+  and warns the completion tick therefore *"means something different than ticks from
+  other software."* The job reports done; the destination read-back keeps running.
+- **Standalone Verification** (24.3): double-click an MHL file and OffShoot re-locates
+  every referenced file and checksums it against the stored values — verification fully
+  decoupled from the copy, run whenever.
+
+OffShoot explicitly warns that Transfer mode *"should not be used if you plan to delete
+source files."* That is the honest framing of the trade-off.
+
+### Silverstack (Pomfort)
+
+Source verification is **overlapped** with destination verification, so per Pomfort it
+*"usually comes at no performance cost… the duration of the copy process is not
+extended by copying with source verification."* Scheduling is user-selectable:
+**Included in Copy Job** (default), **Separate (per Job)** — verification can be
+suspended and resumed later, e.g. after transcoding — and **Cascading Copy**, which
+allows *different security levels per destination*.
+
+### ShotPut Pro
+
+Nine checksum algorithms (XXHash-64/3-64/128, MD5, SHA-1/256/512, C4, CRC-32, file-size
+comparison), but conventional in-line verification with no deferral mechanism. It was
+the **slowest** tool in the Newsshooter test.
+
+### Benchmark, 212 GB to 3 destinations (Newsshooter, 2019 — no Finder baseline)
+
+| Tool | Time | vs Hedge |
+|---|---|---|
+| Hedge | 22:16 | 1.00× |
+| YoYotta | 25:46 | 1.16× |
+| Silverstack | 26:11 | 1.18× |
+| ShotPut Pro | 30:31 | 1.37× |
+
+Hedge's own marketing claims Fast Lane is *"at least a factor of 2.5"* over traditional
+checksum transfer, reaching *"as fast as a standard non-verified Finder copy/paste."*
+That implies the traditional in-line tier costs ~2.5× Finder. **FilmCan measures
+1.70-1.95×, so FilmCan's thorough tier is already at or better than the industry's
+thorough tier.** The gap the user perceives is not slowness — it is that FilmCan ships
+only the thorough tier and puts all of it on the critical path.
+
+### What this changes about the recommendation
+
+1. **The cheap tier competitors actually ship is "destination file size only"** — not a
+   hash of the write buffer. That distinction matters: file-size checking is weak but
+   *honest and non-zero*. Re-hashing the in-memory buffer, which is what FilmCan did
+   before `ceed823`, is not a weaker check — it is **no check at all**, since both
+   hashes come from the same bytes and can never disagree. Do not resurrect it.
+2. **Nobody ships sampled/percentage read-back.** The idea floated earlier in this
+   investigation has no industry precedent; the simpler size-only tier occupies that
+   slot.
+3. **The winning move is scheduling, and FilmCan already owns the prerequisite.** It
+   writes ASC MHL chains, which is exactly the asset OffShoot's Standalone Verification
+   consumes. Deferred and background verification are scheduling features on top of
+   existing manifests, not new cryptography, and they cost **nothing** in integrity.
+4. **Paranoid mode has a separate, free win.** Silverstack overlaps the source re-read
+   with destination verification and charges nothing for it. FilmCan serializes it
+   behind a 1 s settle sleep ([FanOutCopier.swift:1668-1681](../FilmCan/Sources/Services/FanOutCopier.swift#L1668-L1681)).
+
+Sources: [OffShoot verification docs](https://docs.hedge.video/offshoot/features/verification),
+[OffShoot 24.3 release notes](https://hedge.co/blog/offshoot-24-3),
+[Newsshooter offload benchmark](https://www.newsshooter.com/2019/10/28/what-is-the-fastest-offload-software/),
+[CineD on Hedge Fast Lane](https://www.cined.com/hedge-for-mac-1-3-checksum-file-transfer/),
+[Pomfort verification behaviors](https://pomfort.com/article/backup-shooting-data-verification-behavior/),
+[Pomfort on source verification](https://pomfort.com/article/how-source-verification-helps-identify-underlying-problems-in-your-copy-process/),
+[ShotPut Pro verification options](https://imagineproducts.freshdesk.com/support/solutions/articles/35000203787-what-are-the-differences-between-the-verification-options-available-on-shotput-pro-).
+
 ## Recommended order of attack
 
 Revised after runs #1 and #2. Savings are quoted against run #2 (555.1 s wall,
 1.95× Finder), the representative mixed-clip-size case.
 
-| # | Change | Integrity | Savings | Ratio after |
-|---|--------|-----------|---------|-------------|
-| 1 | 1b optional stream-verify tier (off by default, honest label) | **reduced** — no on-platter read-back | **−270 s (49 %)** | **1.00×** — halves destination I/O, so the run becomes source-bound like Finder |
-| 2 | 1a serialize the verify lane behind the copy on rotational dests | unchanged | −73 s (13 %) | 1.69× |
-| 3 | 4 bigger HDD chunks | unchanged | unmeasured, plausibly part of the 13 % | — |
+| # | Change | Integrity | Time to card-pull | Precedent |
+|---|--------|-----------|-------------------|-----------|
+| 1 | **Background destination verification** — copy completes, read-back continues behind, status goes copied → verified | **unchanged** | **−49 %, ~1.00×** | OffShoot's background destination reads |
+| 2 | **Standalone verify from an existing ASC MHL chain** — verify a drive later, at the office | **unchanged** | n/a (moves it off set entirely) | OffShoot 24.3 Standalone Verification; Silverstack "Separate (per Job)" |
+| 3 | 1a serialize the verify lane behind the copy on rotational dests | unchanged | −13 %, 1.69× | — |
+| 4 | Per-destination verification level (full on archive, size-only on shuttle) | reduced, per-dest, explicit | varies | Silverstack Cascading Copy |
+| 5 | Overlap Paranoid's source re-read instead of serializing it behind the settle sleep | unchanged | Paranoid only | Silverstack, which charges nothing for source verification |
+| 6 | 4 bigger HDD chunks | unchanged | unmeasured, plausibly part of item 3's 13 % | — |
 | — | ~~2 batch `F_FULLFSYNC`~~ / ~~5 MHL cadence~~ / ~~6 mkdir caching~~ | — | **0.25 % measured** | **retired** — cards are <100 clips, so per-file cost never dominates |
 | — | ~~3 fix verify QoS~~ | — | **0 %** | **dead** — verify re-reads faster than the concurrent write |
+| — | ~~1b trust the streamed dest hash~~ | **none** | — | **forbidden** — identical to the `ceed823` C-1 bug; both hashes come from the same buffer and can never disagree |
 
-Items 1 and 2 stack: serializing first and then gating the read-back off gives the
-same 1.00× as item 1 alone, since item 1 removes the contention item 2 mitigates.
-**Item 1 is the only change that reaches Finder parity, and it is the only one that
-touches an integrity guarantee.** That makes the decision a product call — what
-"verified" is allowed to mean — not an engineering one.
+**Items 1 and 2 are the answer.** They cost nothing in integrity, they are what the
+market leader actually does, and FilmCan already writes the ASC MHL chains they depend
+on. The earlier framing of this document — that closing the gap requires trading away
+verification — was wrong. The total I/O does not shrink; it comes off the critical path.
+
+The one real design constraint: if the destination read-back is deferred, the UI must
+not let the user eject, wipe or reformat the card until verification has actually
+finished. OffShoot states the same rule for its Transfer mode — *"should not be used if
+you plan to delete source files."*
 
 Any change here goes through the real-app smoke gate before release.
 
