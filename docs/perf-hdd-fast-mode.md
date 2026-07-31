@@ -30,6 +30,98 @@ None of the fixes below removes checksum verification, ASC MHL manifests, or
 durability flushing. Findings 1a, 2, 3, 4, 5, 6 preserve current guarantees
 outright; 1b is an explicit, gated trade-off.
 
+> **Superseded in part.** The findings below were modeled from code, not measured.
+> The first real A/B ran on 2026-07-31 and is recorded in the next section. It
+> **confirms Finding 1's cost**, **refutes Finding 1's mechanism**, and **kills
+> Findings 1a and 3**. Read the measured section before acting on any ranking here.
+
+---
+
+## Measured run #1 — 2026-07-31, 8 large files, USB HDD
+
+Workload: 8 files, 12 846 MB total (~1.6 GB each), one source → one destination
+(`/Volumes/TLF 4/TESTS`), Fast mode, `FILMCAN_IO_PERF=1`. Chunk size 3.99 MB
+average over 3 218 chunks, which confirms the 4 MB HDD class at
+[Constants.swift:46](../FilmCan/Sources/Models/Constants.swift#L46).
+
+| Bucket | Time | n | Throughput |
+|---|---|---|---|
+| source read | 142.95 s | 3218 | 89.9 MB/s |
+| dest write | 131.97 s | 3218 | 97.3 MB/s |
+| verify re-read | 101.06 s | 3218 | 127.1 MB/s |
+| dest hash | 1.81 s | 3218 | 7 099 MB/s |
+| verify hash | 1.38 s | 3218 | 9 337 MB/s |
+| source hash | 1.12 s | 3218 | 11 432 MB/s |
+| cache flush | 1.31 s | 8 | 163.1 ms/call (max 288.9) |
+| rename | 0.05 s | 8 | 6.3 ms/call |
+| temp create | 0.05 s | 16 | 3.4 ms/call |
+| mhl render | 0.04 s | 2 | 21.9 ms/call |
+
+Wall 247.9 s. Bucket sum 381.7 s, so the overlap factor is 1.54×.
+`settle sleep` is absent because it is paranoid-only
+([FanOutCopier.swift:1672-1681](../FilmCan/Sources/Services/FanOutCopier.swift#L1672-L1681)).
+
+### The gap is the verify pass, and nothing else
+
+```
+source read 142.95 s  +  verify re-read 101.06 s  =  244.01 s   (98.4 % of wall)
+```
+
+Finder moved the same set in 146 s = **88.0 MB/s**. FilmCan's copy phase ran at
+**89.9 MB/s**. The copy phase is **at parity with Finder**. The measured gap is
+247.9 − 146 = **101.9 s**, and the verify re-read is **101.06 s**. That accounts
+for 99.2 % of the difference. Overall ratio: **1.70× Finder**.
+
+### What this refutes
+
+- **Finding 1's mechanism is wrong.** The report claimed head thrash between the
+  verify read of file N and the write of file N+1 degrades the copy. It does not:
+  the copy runs at Finder speed. The verify is simply an extra full read pass that
+  Finder never performs. The cost is real, the explanation was not.
+- **Finding 1a (serialize copy and verify per rotational dest) is dead.** Measured
+  time is already additive (244.0 s of stream work in 247.9 s of wall), so the
+  existing overlap at [FanOutCopier.swift:1009-1014](../FilmCan/Sources/Services/FanOutCopier.swift#L1009-L1014)
+  is already yielding ~0 on one spindle. Serializing it deliberately would also
+  yield ~0. It would only remove the 519 ms `verify re-read` outlier (16× the
+  31.4 ms mean), which is a jitter fix, not a throughput fix.
+- **Finding 3 (`.utility` QoS throttling) is dead.** The verify re-read is the
+  *fastest* stream in the run at 127.1 MB/s, well above the 89.9 MB/s copy. It is
+  not being throttled.
+- **Hashing is not a target, ever.** All three hash buckets total 4.31 s = 1.7 %
+  of wall. xxh128 runs at 7–11 GB/s, three orders of magnitude above the disks.
+
+### What this reveals that the report missed
+
+- **The copy phase is source-bound, not destination-bound.** Source reads at
+  89.9 MB/s; the destination accepts 97.3 MB/s. The report assumed the destination
+  HDD was the constraint. Any destination-side write optimization is capped at
+  roughly 8 % during the copy phase.
+- **A read-back verify has a hard floor.** 12 846 MB ÷ 127.1 MB/s = 101 s. On one
+  spindle you cannot make an on-platter read-back cheaper than the time to read the
+  platter. The destination head is already ~92 % busy during the copy
+  (131.97 s of blocking writes inside a 142.95 s phase), so there is no idle
+  capacity to hide the verify in.
+
+**Therefore: on large-file workloads the only lever that closes the Finder gap is
+not reading the destination back** — Finding 1b, the explicit gated trade-off.
+Micro-optimizing anything else cannot recover more than ~2 % of wall time.
+
+### What this run could not test
+
+The workload was 8 files. Every per-file cost is therefore invisible, and those are
+exactly where Findings 2, 5 and 6 live. Extrapolating the measured per-call costs to
+a realistic 500-clip card at the same byte count:
+
+| Per-file cost | Measured (8 files) | Extrapolated (500 files) |
+|---|---|---|
+| `F_FULLFSYNC` (Finding 2) | 1.31 s | ~82 s |
+| `temp create` + `rename` | 0.10 s | ~7 s |
+| MHL re-render (Finding 5, O(N²)) | 0.04 s | tens of seconds |
+
+That total is the same order as the 101 s verify pass, possibly larger. **Run #2 must
+use a real camera card with hundreds of files before Findings 2, 5 and 6 are ranked
+or dismissed.**
+
 ---
 
 ## Finding 1 — Fast mode re-reads every destination byte, interleaved with the next file's writes
@@ -238,18 +330,21 @@ sentence in the docs; not a code change recommendation.
 
 ## Recommended order of attack
 
-| # | Change | Integrity | Savings (HDD) | Cost |
-|---|--------|-----------|---------------|------|
-| 1 | 1a serialize copy/verify per rotational dest + 3 fix verify QoS | unchanged | 15–40 % | moderate |
-| 2 | 2 batch `F_FULLFSYNC` at MHL checkpoints (flush-before-render invariant) | unchanged (certified ⇒ flushed) | 1–4 min / 500 files | small–moderate |
-| 3 | 4 bigger HDD chunks + ring scaling | unchanged | 5–15 % | trivial |
-| 4 | 5 coarser MHL checkpoint cadence | unchanged | seconds–1 min | trivial |
-| 5 | 1b optional stream-verify tier (off by default, honest label) | **reduced** — no on-platter read-back | up to 45 % | small |
-| 6 | 6 mkdir caching | unchanged | small-file rolls only | trivial |
+Revised after measured run #1. Modeled estimates are struck where the measurement
+contradicts them.
 
-**The numbers above are modeled, not measured.** Do not implement from them
-directly — per-drive `F_FULLFSYNC` latency in particular varies wildly by
-enclosure, and it decides whether Finding 2 is worth doing at all. Any change
+| # | Change | Integrity | Savings (HDD) | Status after run #1 |
+|---|--------|-----------|---------------|---------------------|
+| 1 | 1b optional stream-verify tier (off by default, honest label) | **reduced** — no on-platter read-back | **41 % of wall, measured** | the only lever that closes the Finder gap on large files |
+| 2 | 2 batch `F_FULLFSYNC` at MHL checkpoints (flush-before-render invariant) | unchanged (certified ⇒ flushed) | ~82 s / 500 files, extrapolated | **needs run #2** (many-file card) |
+| 3 | 5 coarser MHL checkpoint cadence | unchanged | tens of seconds, extrapolated | **needs run #2** |
+| 4 | 6 mkdir caching | unchanged | small-file rolls only | **needs run #2** |
+| 5 | 4 bigger HDD chunks | unchanged | ~~5–15 %~~ likely <2 % | 4 MB read takes 44.4 ms with max 54.7 ms — that is media time, not syscall overhead. One-line A/B at 16 MB to confirm, then drop |
+| — | ~~1a serialize copy/verify per rotational dest~~ | — | ~~15–40 %~~ **~0 %** | **dead** — measured time is already additive |
+| — | ~~3 fix verify QoS~~ | — | ~~included above~~ **0 %** | **dead** — verify re-read is the fastest stream in the run |
+
+Findings 2, 5 and 6 are per-file costs and run #1 had only 8 files, so their
+extrapolations remain modeled. **Run #2 on a real card decides them.** Any change
 here goes through the real-app smoke gate before release.
 
 ## How to measure (IOPerfProbe)
@@ -261,8 +356,14 @@ attributes a run's wall time to per-destination I/O buckets. It is inert unless
 Run a Debug build from a terminal so the summary prints to stdout:
 
 ```bash
-FILMCAN_IO_PERF=1 "$(ls -d ~/Library/Developer/Xcode/DerivedData/FilmCan-*/Build/Products/Debug/FilmCan.app | head -1)/Contents/MacOS/FilmCan"
+FILMCAN_IO_PERF=1 "$(ls -dt ~/Library/Developer/Xcode/DerivedData/FilmCan-*/Build/Products/Debug/FilmCan.app/Contents/MacOS/FilmCan 2>/dev/null | head -1)"
 ```
+
+The glob targets the **binary**, not the `.app`, and sorts newest-first with `-t`.
+Both matter: several `DerivedData/FilmCan-*` directories usually exist, an
+interrupted build leaves an `.app` bundle with no executable inside it, and that
+empty bundle often has the newest directory mtime. Globbing the `.app` alphabetically
+(or even by mtime) picks it and fails with `no such file or directory`.
 
 For a release/staged build, read it from the unified log instead:
 
