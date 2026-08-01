@@ -411,6 +411,60 @@ sentence in the docs; not a code change recommendation.
   [FanOutCopier.swift:1511–1517](../FilmCan/Sources/Services/FanOutCopier.swift)).
   Don't remove it — Findings 1a/3/4 work *with* it.
 
+## Measured runs #3 and #4 — 2026-08-01, 10 mixed clips, run-ahead A/B
+
+Same source and destination, 25 043 MB, 10 files, 6 265 chunks. Finder on this set:
+**285 s** (87.9 MB/s), measured directly this time rather than extrapolated.
+
+| | #3 (`RUNAHEAD=64`) | #4 (`RUNAHEAD=4`) |
+|---|---|---|
+| Wall | 584.1 s | **560.8 s** |
+| Ratio vs Finder | 2.05× | **1.97×** |
+| dest write | 406.24 s @ 61.6 MB/s | 447.93 s @ 55.9 MB/s |
+| verify re-read | 291.03 s @ 86.0 MB/s | 392.36 s @ 63.8 MB/s |
+| source read | 294.40 s @ 85.1 MB/s | 279.61 s @ 89.6 MB/s |
+| Destination aggregate | 85.75 MB/s | 89.31 MB/s |
+| Destination lane overlap | 697.27 s / 584.1 s = 1.19 | 840.29 s / 560.8 s = **1.50** |
+| Hash total | 33.28 s (5.7 % of wall) | 12.95 s (2.3 %) |
+| Hash throughput | 2127 / 2019 / 2750 MB/s | 4268 / 6307 / 8063 MB/s |
+
+The governing model still holds exactly: 2 × 87.9 ÷ 89.31 = **1.97**, the measured ratio.
+
+### Run #3 is contaminated — do not use it as a baseline
+
+Its hash throughput is the worst of all four runs, roughly a third of run #1's
+7099/9337/11432 MB/s, with per-call maxima of 135-233 ms on a 4 MB xxh128 whose clean
+figure is single-digit milliseconds. Hashing is pure CPU at multi-GB/s, so that is a
+descheduled thread, not disk. Something else was loading the machine, and every I/O
+timing in the same run inherits the distortion.
+
+**Hash throughput is therefore the run-validity check.** Read it first. If the three
+hash buckets are far below a few GB/s, discard the run rather than reasoning from it.
+(Deliberately left as a documented check rather than an automatic warning in the probe:
+four runs is not enough data to pick a threshold that would not cry wolf.)
+
+### The knob shows no effect, and depth 4 did not even test it
+
+Comparing #4 to #3 suggests −4 %, but that difference is run #3's contamination, not the
+knob. Against the clean depth-64 aggregate — run #2's 90.0 MB/s — run #4's 89.31 MB/s
+is **the same number**.
+
+Worse, depth 4 never bound. Its lane overlap is 1.50, identical to run #2's 1.47 at
+depth 64. With 10 files a 4-file buffer still lets the copy lane run far ahead, so the
+channel never blocked. Run #3's *lower* 1.19 overlap was itself an artifact: a
+CPU-starved verify lane stalls, which reduces overlap without improving anything.
+
+**Depth 1 is still the only real test.** The prize if it works, using run #1's
+uncontended destination speeds: copy stays source-bound at 25 043 ÷ 89.6 = 279.5 s, and
+a serial verify at 127.1 MB/s adds 197.0 s, for ≈ 476.5 s — **−15 %, ratio 1.67×**. If
+depth 1 lands near 560 s, the channel-capacity approach is dead, and only an explicit
+completion gate could serialize the lanes at all.
+
+### Power assertions verified live
+
+`pmset -g assertions` during run #4 showed both, owned by the FilmCan process:
+`PreventUserIdleSystemSleep` and `PreventDiskIdle`, named "FilmCan backup in progress".
+
 ## How the industry solves this (researched 2026-07-31)
 
 Short version: **nobody avoids the 2× destination I/O. They schedule it differently.**
