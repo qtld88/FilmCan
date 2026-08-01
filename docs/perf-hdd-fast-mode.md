@@ -586,6 +586,13 @@ quantifies Finding 1's thrash: if both sit far below the drive's sequential
 figure, the two streams are fighting for the head. `sum(buckets) ≪ wall` means
 time is going somewhere not yet instrumented — say so rather than guessing.
 
+**Sleep invalidates a measurement.** Until 2026-08-01 the app held no power assertion,
+so an unattended run could be suspended and its drives spun down mid-copy — one run
+went from a 3-minute ETA to 40+ minutes across a sleep/wake. `PowerAssertion` now holds
+`idleSystemSleepDisabled` plus an IOKit `PreventDiskIdle` for the whole run. Verify it
+is live during a backup with `pmset -g assertions`. Discard any timing collected from a
+build without it.
+
 **A/B protocol.** Same roll, same drive, freshly formatted, three runs each:
 Finder copy, FilmCan Fast, FilmCan Fast with verification off (isolates the
 verify cost from everything else). Record the bucket table for each FilmCan run.

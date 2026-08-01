@@ -647,6 +647,12 @@ actor FanOutCopier {
         IOPerfProbe.shared.begin()
         defer { IOPerfProbe.shared.logSummary() }
 
+        // Held for the whole run, including the verify tail. `defer` so a cancel, a
+        // throw, or an early return cannot strand the assertion and leave the Mac
+        // permanently awake.
+        PowerAssertion.shared.acquire()
+        defer { PowerAssertion.shared.release() }
+
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
 
         let destInfos = config.destinations.map { DriveSpeedClassifier.info(for: $0.destPath) }

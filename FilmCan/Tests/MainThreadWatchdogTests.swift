@@ -26,4 +26,30 @@ final class MainThreadWatchdogTests: XCTestCase {
     func test_evaluate_debounce_errorAlreadyReported() {
         XCTAssertNil(MainThreadWatchdog.evaluate(elapsedMs: 2000, lastReportedTier: .error))
     }
+    // MARK: - PowerAssertion
+
+    func test_powerAssertion_refCountsAndReleasesFully() {
+        let a = PowerAssertion.shared
+        XCTAssertFalse(a.isHeld)
+        a.acquire(reason: "unit test")
+        XCTAssertTrue(a.isHeld)
+        a.acquire(reason: "unit test nested")   // concurrent job
+        XCTAssertTrue(a.isHeld)
+        a.release()
+        XCTAssertTrue(a.isHeld, "still held while a second job runs")
+        a.release()
+        XCTAssertFalse(a.isHeld, "last one out must release")
+    }
+
+    func test_powerAssertion_extraReleaseIsHarmless() {
+        let a = PowerAssertion.shared
+        XCTAssertFalse(a.isHeld)
+        a.release()                              // unbalanced; must not underflow
+        XCTAssertFalse(a.isHeld)
+        a.acquire(reason: "unit test")
+        XCTAssertTrue(a.isHeld)
+        a.release()
+        XCTAssertFalse(a.isHeld)
+    }
+
 }

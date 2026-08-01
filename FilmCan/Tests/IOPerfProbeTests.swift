@@ -43,4 +43,21 @@ final class IOPerfProbeTests: XCTestCase {
             stats: ["HDD": [.flush: IOPerfProbe.Stat()]], wallSeconds: 1)
         XCTAssertFalse(text.contains("cache flush"))
     }
+    // MARK: - env gate
+
+    func test_probeGate_acceptsAnyOnSpelling() {
+        for on in ["1", "true", "TRUE", "yes", "on", "4", " 1 "] {
+            XCTAssertTrue(IOPerfProbe.enabledFromEnv(["FILMCAN_IO_PERF": on]),
+                          "\(on) should enable the probe")
+        }
+    }
+
+    func test_probeGate_rejectsOffSpellingsAndAbsence() {
+        for off in ["0", "false", "NO", "off", "", "   "] {
+            XCTAssertFalse(IOPerfProbe.enabledFromEnv(["FILMCAN_IO_PERF": off]),
+                           "\(off) should not enable the probe")
+        }
+        XCTAssertFalse(IOPerfProbe.enabledFromEnv([:]))
+    }
+
 }

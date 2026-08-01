@@ -47,7 +47,17 @@ final class IOPerfProbe: @unchecked Sendable {
     private var stats: [String: [Bucket: Stat]] = [:]
     private var runStart: DispatchTime?
 
-    init(enabled: Bool = ProcessInfo.processInfo.environment["FILMCAN_IO_PERF"] == "1") {
+    /// Any plausible "on" spelling enables the probe. A strict `== "1"` silently
+    /// disabled a whole measurement run on 2026-08-01 when the value was mistyped, and
+    /// a probe that quietly does nothing is worse than one that is slightly permissive.
+    static func enabledFromEnv(_ env: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        guard let raw = env["FILMCAN_IO_PERF"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !raw.isEmpty else { return false }
+        return !["0", "false", "no", "off"].contains(raw)
+    }
+
+    init(enabled: Bool = IOPerfProbe.enabledFromEnv()) {
         self.isEnabled = enabled
     }
 
