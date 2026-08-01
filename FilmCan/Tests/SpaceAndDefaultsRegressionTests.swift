@@ -44,22 +44,43 @@ final class SpaceAndDefaultsRegressionTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(optimistic + slack, importantUsage)
         }
     }
-    // MARK: - verify run-ahead knob
+    // MARK: - verify run-ahead depth
 
-    func test_verifyRunAhead_defaultsToHistoricalValue() {
-        XCTAssertEqual(Constants.verifyRunAheadFiles(env: [:]), 64)
+    func test_verifyRunAhead_rotationalClassesSerialiseByDefault() {
+        // Measured -8.5% on HDD (runs #4 vs #5). Unknown is grouped with rotational,
+        // matching chunkBytes: an unidentified enclosure is assumed slow.
+        for dest in [Constants.SlowestDestClass.hdd, .exfat, .unknown] {
+            XCTAssertEqual(Constants.verifyRunAheadFiles(forSlowestDest: dest, env: [:]), 1,
+                           "\(dest) should bound the verify run-ahead")
+        }
     }
 
-    func test_verifyRunAhead_honoursEnvOverride() {
-        XCTAssertEqual(Constants.verifyRunAheadFiles(env: ["FILMCAN_VERIFY_RUNAHEAD": "1"]), 1)
-        XCTAssertEqual(Constants.verifyRunAheadFiles(env: ["FILMCAN_VERIFY_RUNAHEAD": "8"]), 8)
+    func test_verifyRunAhead_fastClassesKeepHistoricalDepth() {
+        // Never measured on flash; serialising there could only cost overlap.
+        for dest in [Constants.SlowestDestClass.ssdLocal, .nvmeLocal, .network] {
+            XCTAssertEqual(Constants.verifyRunAheadFiles(forSlowestDest: dest, env: [:]), 64,
+                           "\(dest) should keep the unbounded depth")
+        }
     }
 
-    func test_verifyRunAhead_rejectsGarbageAndSubOneValues() {
-        // A bad value must not silently stall the pipeline at zero.
+    func test_verifyRunAhead_envOverridesEveryClass() {
+        let all: [Constants.SlowestDestClass] = [.hdd, .exfat, .unknown, .ssdLocal, .nvmeLocal, .network]
+        for dest in all {
+            XCTAssertEqual(
+                Constants.verifyRunAheadFiles(
+                    forSlowestDest: dest, env: ["FILMCAN_VERIFY_RUNAHEAD": "8"]), 8)
+        }
+    }
+
+    func test_verifyRunAhead_garbageEnvFallsBackToTheClassDefault() {
         for bad in ["0", "-3", "", "abc", "2.5"] {
-            XCTAssertEqual(Constants.verifyRunAheadFiles(env: ["FILMCAN_VERIFY_RUNAHEAD": bad]), 64,
-                           "env value \(bad) should fall back to the default")
+            XCTAssertEqual(
+                Constants.verifyRunAheadFiles(
+                    forSlowestDest: .hdd, env: ["FILMCAN_VERIFY_RUNAHEAD": bad]), 1,
+                "env value \(bad) must not stall the pipeline")
+            XCTAssertEqual(
+                Constants.verifyRunAheadFiles(
+                    forSlowestDest: .ssdLocal, env: ["FILMCAN_VERIFY_RUNAHEAD": bad]), 64)
         }
     }
 

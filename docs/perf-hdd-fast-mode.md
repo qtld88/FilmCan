@@ -30,11 +30,22 @@ None of the fixes below removes checksum verification, ASC MHL manifests, or
 durability flushing. Findings 1a, 2, 3, 4, 5, 6 preserve current guarantees
 outright; 1b is an explicit, gated trade-off.
 
-> **Superseded.** The findings below were modeled from code, not measured. Two real
-> A/Bs ran on 2026-07-31 and are recorded in the next two sections. Net result:
-> Finding 1's cost is confirmed and quantified, Finding 3 is dead, Findings 2, 5 and
-> 6 are retired as negligible, and Finding 1a is confirmed but worth ~13 %, not the
-> 15-40 % modeled here. Read the measured sections before acting on any ranking below.
+> **Superseded — read the measured sections, not this one.** Everything above and in
+> the numbered findings below was modeled from code. Five real runs (2026-07-31 and
+> 2026-08-01) settled it:
+>
+> - The governing law is `wall = 2 × bytes ÷ destination aggregate throughput`. FilmCan
+>   pushes twice the bytes through the destination that Finder does, because it reads
+>   back what it wrote. It fits every run to within 0.1 %.
+> - **FilmCan was never the slow one.** On identical work: Finder 285 s, FilmCan 555 s,
+>   Hedge 21.3.2 565 s. Hedge only *reports* done sooner, then keeps verifying in the
+>   background.
+> - Finding 3 is dead. Findings 2, 5 and 6 are retired as negligible (0.25 % measured).
+> - Finding 1a is confirmed and **shipped**: bounding the verify run-ahead to 1 on
+>   rotational destinations is worth **−8.5 %** (1.97× → 1.80× Finder), not the 13-40 %
+>   modeled.
+> - Finding 1b — trusting the streamed hash — is **forbidden**, not merely weaker. It is
+>   the `ceed823` C-1 bug: both hashes derive from the same buffer and can never disagree.
 
 ---
 
@@ -443,22 +454,45 @@ hash buckets are far below a few GB/s, discard the run rather than reasoning fro
 (Deliberately left as a documented check rather than an automatic warning in the probe:
 four runs is not enough data to pick a threshold that would not cry wolf.)
 
-### The knob shows no effect, and depth 4 did not even test it
+### Run #5 settles it — depth 1 is a real 8.5 % win
 
-Comparing #4 to #3 suggests −4 %, but that difference is run #3's contamination, not the
-knob. Against the clean depth-64 aggregate — run #2's 90.0 MB/s — run #4's 89.31 MB/s
-is **the same number**.
+Depth 4 never bound: its lane overlap was 1.50, the same as run #2's 1.47 at depth 64.
+With 10 files a 4-file buffer still lets the copy lane run far ahead. Depth 1 does bind.
 
-Worse, depth 4 never bound. Its lane overlap is 1.50, identical to run #2's 1.47 at
-depth 64. With 10 files a 4-file buffer still lets the copy lane run far ahead, so the
-channel never blocked. Run #3's *lower* 1.19 overlap was itself an artifact: a
-CPU-starved verify lane stalls, which reduces overlap without improving anything.
+| | #4 (`RUNAHEAD=4`) | #5 (`RUNAHEAD=1`) |
+|---|---|---|
+| Wall | 560.8 s | **513.1 s** |
+| Ratio vs Finder (285 s) | 1.97× | **1.80×** |
+| dest write | 447.93 s @ 55.9 MB/s | 351.92 s @ **71.2 MB/s** |
+| verify re-read | 392.36 s @ 63.8 MB/s | 296.35 s @ **84.5 MB/s** |
+| source read | 279.61 s @ 89.6 MB/s | 279.07 s @ 89.7 MB/s |
+| Destination lane overlap | 1.50 | **1.26** |
+| Destination aggregate | 89.31 MB/s | **97.63 MB/s** |
+| Hash throughput | 4268/6307/8063 MB/s | 7068/11643/9612 MB/s |
 
-**Depth 1 is still the only real test.** The prize if it works, using run #1's
-uncontended destination speeds: copy stays source-bound at 25 043 ÷ 89.6 = 279.5 s, and
-a serial verify at 127.1 MB/s adds 197.0 s, for ≈ 476.5 s — **−15 %, ratio 1.67×**. If
-depth 1 lands near 560 s, the channel-capacity approach is dead, and only an explicit
-completion gate could serialize the lanes at all.
+Run #5 has the cleanest hash figures of the whole series, so the timing is trustworthy.
+
+Both destination lanes gained about 30 % while `source read` moved 89.6 → 89.7 MB/s,
+i.e. not at all. That isolates the contention at the destination head rather than the
+bus, the source, or the CPU, and it is the first direct confirmation of the mechanism
+rather than an inference from totals. The model holds again: 2 × 87.9 ÷ 97.63 = **1.80**.
+
+**Shipped.** `Constants.verifyRunAheadFiles(forSlowestDest:)` returns 1 for `.hdd`,
+`.exfat` and `.unknown`, and keeps 64 for `.ssdLocal`, `.nvmeLocal` and `.network` —
+depth 1 has never been measured on flash, where there is no seek penalty to avoid and
+serialising could only cost overlap. `FILMCAN_VERIFY_RUNAHEAD` still overrides.
+
+### What is left, and why it is not obviously worth taking
+
+Depth 1 still leaves overlap at 1.26, and the verify re-read reached 84.5 MB/s against
+the 127.1 MB/s it managed uncontended in run #1. Full serialisation would need an
+explicit completion gate, because `BoundedChannel.receive()` dequeues when the verifier
+*starts* a file, so even depth 1 permits one file of overlap.
+
+Estimated ceiling: a source-bound copy of 25 043 ÷ 89.7 = 279.2 s plus a serial verify
+of 25 043 ÷ 127.1 = 197.0 s ≈ **476 s, ratio 1.67×**. That is a further −7 % for a much
+more invasive change, against the −8.5 % already banked for a one-line default. Judgment:
+stop here unless someone asks for that last 7 %.
 
 ### Power assertions verified live
 

@@ -46,18 +46,34 @@ enum Constants {
     /// — proof they overlap, with both lanes losing ~45 % of their uncontended
     /// throughput. Lowering this bounds that overlap.
     ///
-    /// Whether bounding it actually helps is **not yet measured**: phase separation and
-    /// per-file alternation predict opposite results, and alternation may win because
-    /// the head is already parked on the bytes just written. Default stays at the
-    /// historical 64 (effectively unbounded) so shipped behaviour is unchanged; override
-    /// with `FILMCAN_VERIFY_RUNAHEAD` to A/B it. See `docs/perf-hdd-fast-mode.md`.
+    /// Measured on a USB HDD, 25 043 MB over 10 mixed-size clips, same drive and source
+    /// throughout (runs #4 and #5, 2026-08-01):
+    ///
+    /// | depth | wall | dest write | verify re-read | dest aggregate |
+    /// |---|---|---|---|---|
+    /// | 4 | 560.8 s | 55.9 MB/s | 63.8 MB/s | 89.31 MB/s |
+    /// | 1 | **513.1 s** | **71.2 MB/s** | **84.5 MB/s** | **97.63 MB/s** |
+    ///
+    /// Both destination lanes gained ~30 % while `source read` stayed flat at 89.6 →
+    /// 89.7 MB/s, which locates the contention at the destination head rather than the
+    /// bus or the source. Net −8.5 % wall, 1.97× → 1.80× versus Finder.
+    ///
+    /// Only the rotational classes get the low depth. A depth of 1 has **not** been
+    /// measured on SSD or NVMe, where there is no seek penalty to avoid and serialising
+    /// could only cost overlap, so those keep the historical 64. `.unknown` is grouped
+    /// with the rotational classes for the same reason `chunkBytes` does it: an
+    /// unidentified enclosure is assumed slow.
+    ///
+    /// `FILMCAN_VERIFY_RUNAHEAD` still overrides everything, for further A/Bs.
     static func verifyRunAheadFiles(
+        forSlowestDest dest: SlowestDestClass,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> Int {
-        guard let raw = env["FILMCAN_VERIFY_RUNAHEAD"], let n = Int(raw), n >= 1 else {
-            return 64
+        if let raw = env["FILMCAN_VERIFY_RUNAHEAD"], let n = Int(raw), n >= 1 { return n }
+        switch dest {
+        case .hdd, .exfat, .unknown: return 1
+        case .ssdLocal, .nvmeLocal, .network: return 64
         }
-        return n
     }
 
     static func chunkBytes(forSlowestDest dest: SlowestDestClass) -> Int {

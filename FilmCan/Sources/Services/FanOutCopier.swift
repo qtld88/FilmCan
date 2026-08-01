@@ -1020,7 +1020,8 @@ actor FanOutCopier {
         // lane (drainVerifies) consumes them, so file N is verified while file
         // N+1 is still copying. The lane is serial → the verify bar stays
         // monotonic.
-        let verifyChannel = BoundedChannel<CopyResult>(capacity: Constants.verifyRunAheadFiles())
+        let verifyChannel = BoundedChannel<CopyResult>(
+            capacity: Constants.verifyRunAheadFiles(forSlowestDest: slowest))
         async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(verifyChannel, sharedMHLsByDest: sharedMHLsByDest)
 
         var copyError: (any Swift.Error)?
