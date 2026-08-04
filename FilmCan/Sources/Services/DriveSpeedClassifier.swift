@@ -65,13 +65,6 @@ enum DriveSpeedClassifier {
         return .unknown
     }
 
-    /// Per-destination classes, in the order given. `slowestDestClass` collapses these
-    /// to one worst case; callers that must reason about *every* destination (the
-    /// copy/verify gate, which only engages when none of them is fast) need them all.
-    static func destClasses(_ infos: [DriveInfo]) -> [Constants.SlowestDestClass] {
-        infos.map { classify($0) }
-    }
-
     private static func classify(_ info: DriveInfo) -> Constants.SlowestDestClass {
         if info.isExFAT { return .exfat }
         if info.isNetwork { return .network }

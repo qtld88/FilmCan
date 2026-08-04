@@ -179,11 +179,6 @@ actor FanOutCopier {
         #if DEBUG
         var _testForceDestReadHashNil: Bool = false
         var _testForceMHLAppendFailure: Bool = false
-        /// Force the copy/verify completion gate on or off, bypassing the drive-class
-        /// decision. Tests run against temp dirs on the internal SSD, which classify as
-        /// `.nvmeLocal` and would never engage the gate — so the gated path, where a
-        /// missed token deadlocks the copy lane, would otherwise go unexercised.
-        var _testForceVerifyGate: Bool? = nil
         #endif
     }
 
@@ -662,11 +657,6 @@ actor FanOutCopier {
 
         let destInfos = config.destinations.map { DriveSpeedClassifier.info(for: $0.destPath) }
         let slowest = DriveSpeedClassifier.slowestDestClass(destInfos)
-        var gateCopyOnVerify = Constants.gateCopyOnVerify(
-            destClasses: DriveSpeedClassifier.destClasses(destInfos))
-        #if DEBUG
-        if let forced = config._testForceVerifyGate { gateCopyOnVerify = forced }
-        #endif
         let chunkSz = Constants.chunkBytes(forSlowestDest: slowest)
         let ringCapBytes = Constants.ringCapBytesPerDest()
         let channelCapacity = max(2, ringCapBytes / max(1, chunkSz))
@@ -1032,13 +1022,7 @@ actor FanOutCopier {
         // monotonic.
         let verifyChannel = BoundedChannel<CopyResult>(
             capacity: Constants.verifyRunAheadFiles(forSlowestDest: slowest))
-        // All-rotational jobs additionally wait for each verify to *finish* before
-        // the next file starts copying — see `Constants.gateCopyOnVerify`. The lane
-        // emits exactly one token per file it takes off `verifyChannel`, so the copy
-        // loop below can only block on a token that is guaranteed to arrive.
-        let verifyAck = gateCopyOnVerify ? BoundedChannel<Void>(capacity: 1) : nil
-        async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(
-            verifyChannel, ack: verifyAck, sharedMHLsByDest: sharedMHLsByDest)
+        async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(verifyChannel, sharedMHLsByDest: sharedMHLsByDest)
 
         var copyError: (any Swift.Error)?
         do {
@@ -1113,13 +1097,7 @@ actor FanOutCopier {
                             DebugLog.warn("FanOutCopier: destination fatally failed, skipping remaining files: \(w.destPath)")
                         }
                     }
-                    // Wait for the token only if the file actually entered the lane.
-                    // The lane emits exactly one token per file it dequeues, so a
-                    // failed send (channel already finished) must not block here.
-                    let handedOff: Void? = try? await verifyChannel.send(copyResult)
-                    if let verifyAck, handedOff != nil {
-                        _ = try? await verifyAck.receive()
-                    }
+                    try? await verifyChannel.send(copyResult)
                     _ = enqueueNext()
                 }
             }
@@ -1190,62 +1168,53 @@ actor FanOutCopier {
     /// running concurrently with the copy of later files.
     private func drainVerifies(
         _ channel: BoundedChannel<CopyResult>,
-        ack: BoundedChannel<Void>?,
         sharedMHLsByDest: [String: [String: any MHLWriting]]
     ) async -> [PerSourceOutcome] {
         var out: [PerSourceOutcome] = []
         var it = channel.makeAsyncIterator()
         while let c = try? await it.next() {
-            // One token per dequeued file, on every path. `verifyOne` is factored out
-            // precisely so no early exit can skip this line and strand a gated copy
-            // lane — a `defer` cannot be used here because it may not await.
-            out.append(await verifyOne(c, sharedMHLsByDest: sharedMHLsByDest))
-            if let ack { try? await ack.send(()) }
-        }
-        return out
-    }
-
-    /// Verify one copied file and append its MHL entries. Always returns; never throws.
-    private func verifyOne(
-        _ c: CopyResult,
-        sharedMHLsByDest: [String: [String: any MHLWriting]]
-    ) async -> PerSourceOutcome {
-        let outcome = await verifySource(c)
-        // Append MHL ONLY after verify passes — never before. If the file was
-        // deleted (nil hash, hash mismatch, source corruption) no entry is written.
-        guard !outcome.sourceCorrupted else { return outcome }
-        var appendFailed = outcome.verifyFailedDestPaths
-        for r in c.writerResults where r.success && r.filesTransferred > 0 && !appendFailed.contains(r.destPath) {
-            #if DEBUG
-            if config._testForceMHLAppendFailure {
-                appendFailed.insert(r.destPath)
-                continue
-            }
-            #endif
-            if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
-                do {
-                    // No per-file flush: `append` already renders a checkpoint
-                    // every `Constants.mhlFlushEveryFiles` files and `seal()`
-                    // writes the complete manifest at the end. Flushing every
-                    // file rewrote the entire growing manifest N times — O(N²)
-                    // disk writes on rolls with thousands of clips. A crash now
-                    // costs at most a few already-copied files being re-copied
-                    // on resume (safe), not data loss.
-                    try await writer.append(
-                        relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
-                        hash: r.destHashFromStream ?? c.verifiedSourceHash,
-                        mtime: c.srcMtime)
-                } catch {
-                    appendFailed.insert(r.destPath)
+            let outcome = await verifySource(c)
+            // Append MHL ONLY after verify passes — never before. If the file was
+            // deleted (nil hash, hash mismatch, source corruption) no entry is written.
+            if !outcome.sourceCorrupted {
+                var appendFailed = outcome.verifyFailedDestPaths
+                for r in c.writerResults where r.success && r.filesTransferred > 0 && !appendFailed.contains(r.destPath) {
+                    #if DEBUG
+                    if config._testForceMHLAppendFailure {
+                        appendFailed.insert(r.destPath)
+                        continue
+                    }
+                    #endif
+                    if let writer = sharedMHLsByDest[r.destPath]?[c.rootName] {
+                        do {
+                            // No per-file flush: `append` already renders a checkpoint
+                            // every `Constants.mhlFlushEveryFiles` files and `seal()`
+                            // writes the complete manifest at the end. Flushing every
+                            // file rewrote the entire growing manifest N times — O(N²)
+                            // disk writes on rolls with thousands of clips. A crash now
+                            // costs at most a few already-copied files being re-copied
+                            // on resume (safe), not data loss.
+                            try await writer.append(
+                                relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
+                                hash: r.destHashFromStream ?? c.verifiedSourceHash,
+                                mtime: c.srcMtime)
+                        } catch {
+                            appendFailed.insert(r.destPath)
+                        }
+                    }
+                }
+                if appendFailed != outcome.verifyFailedDestPaths {
+                    out.append(PerSourceOutcome(
+                        sourcePath: outcome.sourcePath,
+                        writerResults: outcome.writerResults,
+                        verifyFailedDestPaths: appendFailed,
+                        sourceCorrupted: outcome.sourceCorrupted))
+                    continue
                 }
             }
+            out.append(outcome)
         }
-        guard appendFailed != outcome.verifyFailedDestPaths else { return outcome }
-        return PerSourceOutcome(
-            sourcePath: outcome.sourcePath,
-            writerResults: outcome.writerResults,
-            verifyFailedDestPaths: appendFailed,
-            sourceCorrupted: outcome.sourceCorrupted)
+        return out
     }
 
     /// Source concurrency: one worker per distinct source drive, capped at sources.count.

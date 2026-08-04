@@ -64,58 +64,41 @@ enum Constants {
     /// with the rotational classes for the same reason `chunkBytes` does it: an
     /// unidentified enclosure is assumed slow.
     ///
+    /// **Do not try to reach zero overlap.** `BoundedChannel.receive` frees the sender's
+    /// slot when the verify lane *dequeues* a file rather than when it finishes one, so
+    /// a depth of 1 still leaves exactly one file of interleaving. Closing that last file
+    /// with an explicit completion token was built and measured (run #6, 2026-08-01) and
+    /// is **59 % slower** — 815.8 s against 513.1 s on the same drive and source:
+    ///
+    /// | | run #5 (depth 1) | run #6 (gated) | uncontended ceiling |
+    /// |---|---|---|---|
+    /// | wall | **513.1 s** | 815.8 s | — |
+    /// | dest write | 71.2 MB/s | 98.1 MB/s | 97.3 |
+    /// | verify re-read | 84.5 MB/s | 128.6 MB/s | 123.4 |
+    /// | source read | 89.7 MB/s | **43.1 MB/s** | ~90 |
+    ///
+    /// The gate did exactly what it was designed to do: both destination lanes hit their
+    /// uncontended ceilings and 255 + 195 = 450 s of destination work matched the 460 s
+    /// prediction. It lost anyway because it treats the source as free. Stalling the copy
+    /// lane for a ~40 s verify leaves the source drive idle that long, losing its
+    /// readahead and giving a USB enclosure time to spin down — one source read took
+    /// 5047 ms against a 92.8 ms mean. `PowerAssertion` stops the Mac sleeping, not an
+    /// enclosure's own firmware.
+    ///
+    /// So the copy/verify overlap is load-bearing: it is what keeps the source streaming.
+    /// Depth 1 is the empirical optimum between head thrash and source starvation, and
+    /// the reverted implementation is commit `9d6a6ce`.
+    ///
     /// `FILMCAN_VERIFY_RUNAHEAD` still overrides everything, for further A/Bs.
     static func verifyRunAheadFiles(
         forSlowestDest dest: SlowestDestClass,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> Int {
         if let raw = env["FILMCAN_VERIFY_RUNAHEAD"], let n = Int(raw), n >= 1 { return n }
-        return isRotational(dest) ? 1 : 64
-    }
-
-    /// A destination whose read and write streams share one mechanical head, so
-    /// interleaving them costs seeks. `.unknown` is grouped in for the same reason
-    /// `chunkBytes` does it: an unidentified enclosure is assumed slow. `.network`
-    /// is not — a NAS has no head to thrash, and serialising it would only add
-    /// round-trip latency.
-    static func isRotational(_ dest: SlowestDestClass) -> Bool {
         switch dest {
-        case .hdd, .exfat, .unknown: return true
-        case .ssdLocal, .nvmeLocal, .network: return false
+        case .hdd, .exfat, .unknown: return 1
+        case .ssdLocal, .nvmeLocal, .network: return 64
         }
-    }
-
-    /// Whether the copy lane must wait for file N's verify to *finish* before
-    /// starting file N+1.
-    ///
-    /// `verifyRunAheadFiles` alone cannot reach zero overlap: `BoundedChannel.receive`
-    /// frees the sender's slot when the verifier *dequeues* a file, not when it
-    /// finishes one, so even a capacity of 1 leaves exactly one file of copy/verify
-    /// interleaving. This gate closes that last file.
-    ///
-    /// Measured on the same USB HDD as `verifyRunAheadFiles`, 25 043 MB, 2026-08-01:
-    /// a bare sequential read-back of the copied files with nothing else touching the
-    /// drive ran at **123.4 MB/s**, against **84.5 MB/s** for the verify lane at
-    /// run-ahead 1. That 32 % shortfall is the overlap this gate removes. Combined
-    /// with the uncontended write figure (97.3 MB/s), full serialisation predicts
-    /// 25043/97.3 + 25043/123.4 = 460 s against a measured 513.1 s.
-    ///
-    /// **Only engaged when every destination is rotational.** The source is read once
-    /// and broadcast to all destinations, so stalling the copy lane for a slow HDD's
-    /// verify would equally stall an SSD sharing the same fan-out. With nothing fast
-    /// in the job there is nothing to penalise.
-    ///
-    /// `FILMCAN_VERIFY_GATE` overrides in either direction, for A/Bs.
-    static func gateCopyOnVerify(
-        destClasses: [SlowestDestClass],
-        env: [String: String] = ProcessInfo.processInfo.environment
-    ) -> Bool {
-        if let raw = env["FILMCAN_VERIFY_GATE"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty {
-            return !["0", "false", "no", "off"].contains(raw)
-        }
-        guard !destClasses.isEmpty else { return false }
-        return destClasses.allSatisfy(isRotational)
     }
 
     static func chunkBytes(forSlowestDest dest: SlowestDestClass) -> Int {

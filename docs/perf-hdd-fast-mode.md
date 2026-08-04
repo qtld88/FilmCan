@@ -46,6 +46,11 @@ outright; 1b is an explicit, gated trade-off.
 >   modeled.
 > - Finding 1b — trusting the streamed hash — is **forbidden**, not merely weaker. It is
 >   the `ceed823` C-1 bug: both hashes derive from the same buffer and can never disagree.
+> - Going *further* than depth 1 is a loss. Run #6 gated the copy lane on verify
+>   completion, eliminated destination head contention entirely — both lanes hit their
+>   uncontended ceilings — and was **59 % slower** (815.8 s vs 513.1 s), because a
+>   stalled copy lane starves the source drive and lets its enclosure spin down. Built,
+>   measured, reverted (`9d6a6ce`). **The copy/verify overlap is load-bearing.**
 
 ---
 
@@ -482,17 +487,55 @@ rather than an inference from totals. The model holds again: 2 × 87.9 ÷ 97.63 
 depth 1 has never been measured on flash, where there is no seek penalty to avoid and
 serialising could only cost overlap. `FILMCAN_VERIFY_RUNAHEAD` still overrides.
 
-### What is left, and why it is not obviously worth taking
+### Run #6 — the completion gate, built, measured, and reverted
 
-Depth 1 still leaves overlap at 1.26, and the verify re-read reached 84.5 MB/s against
-the 127.1 MB/s it managed uncontended in run #1. Full serialisation would need an
-explicit completion gate, because `BoundedChannel.receive()` dequeues when the verifier
-*starts* a file, so even depth 1 permits one file of overlap.
+Depth 1 still left overlap at 1.26, and the verify re-read reached 84.5 MB/s against the
+127.1 MB/s it managed uncontended in run #1. `BoundedChannel.receive()` dequeues when
+the verifier *starts* a file, so even depth 1 permits one file of overlap; closing it
+needs an explicit completion token from the verify lane back to the copy lane.
 
-Estimated ceiling: a source-bound copy of 25 043 ÷ 89.7 = 279.2 s plus a serial verify
-of 25 043 ÷ 127.1 = 197.0 s ≈ **476 s, ratio 1.67×**. That is a further −7 % for a much
-more invasive change, against the −8.5 % already banked for a one-line default. Judgment:
-stop here unless someone asks for that last 7 %.
+Before writing any code, the remaining prize was bounded by measuring the destination's
+uncontended sequential read directly — `find … -exec cat {} + > /dev/null` over the
+copied 25 043 MB with nothing else touching the drive:
+
+```
+0.13s user 7.64s system 3% cpu 3:22.99 total   →  25043 MB / 203.0 s = 123.4 MB/s
+```
+
+That agrees with run #1's 127.1 MB/s through `F_NOCACHE`, so page cache did not distort
+it. Two independent methods, same answer. Predicted full serialisation:
+25 043 ÷ 97.3 + 25 043 ÷ 123.4 = **460 s**, i.e. −10 % and 1.62×. Green light.
+
+The gate was built (commit `9d6a6ce`) and measured. **It is 59 % slower.**
+
+| | run #5 (depth 1) | run #6 (gated) | uncontended ceiling |
+|---|---|---|---|
+| Wall | **513.1 s** | 815.8 s | — |
+| `dest write` | 71.2 MB/s | **98.1 MB/s** | 97.3 |
+| `verify re-read` | 84.5 MB/s | **128.6 MB/s** | 123.4 |
+| `source read` | 89.7 MB/s | **43.1 MB/s** | ~90 |
+| Hash throughput | 7068/11643/9612 | 12528/7482/10680 | — |
+
+Hash figures are the cleanest of the series, so the run is valid — this is not run #3's
+thread starvation.
+
+**The gate did exactly what it was designed to do.** Both destination lanes reached their
+uncontended ceilings; head contention was eliminated, not reduced. Destination work of
+255.15 + 194.81 = 450 s matched the 460 s prediction to within 2 %.
+
+It lost anyway, because the model treated the source as free. Stalling the copy lane for
+a ~40 s verify leaves the source drive idle for that whole time. It loses its readahead
+window, and a USB enclosure has time to spin itself down: one source read took
+**5047 ms** against a 92.8 ms mean. `PowerAssertion` prevents the *Mac* from sleeping; it
+has no authority over an enclosure's own firmware.
+
+The new governing law for a gated run is `wall ≈ source read + verify`, i.e.
+581.5 + 194.8 = 776 s against 815.8 s measured.
+
+**The lesson: the copy/verify overlap is load-bearing.** It is not waste being trimmed —
+it is what keeps the source streaming while the destination verifies. Depth 1 is the
+empirical optimum between destination head thrash and source starvation, and it was
+found by measurement, not by the model. Reverted; do not rebuild this.
 
 ### Power assertions verified live
 
