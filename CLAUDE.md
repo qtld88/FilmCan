@@ -90,5 +90,6 @@ Progress is mounted **inside each destination card** in `DestinationListView` �
 - SwiftUI with MVVM — views stay thin, logic in ViewModels/Services
 - No generated code beyond XcodeGen's project file
 - Privacy-sensitive APIs (camera, removable storage) — entitlements in `FilmCan.entitlements`
-- Release script (`scripts/package_release.sh`) creates a universal DMG (arm64 + x86_64), **ad-hoc codesigned only — NOT notarized** (no Apple creds or network needed; downloaders must right-click→Open past Gatekeeper)
+- Release script (`scripts/package_release.sh`) creates a universal DMG (arm64 + x86_64), **still NOT notarized** (no Apple creds or network needed; downloaders must right-click→Open past Gatekeeper). It signs with a **self-signed `FilmCan Release` certificate**, resolved by name, falling back to ad-hoc with a warning when absent, and fails the build if the designated requirement comes back cdhash-based. `project.yml` keeps `CODE_SIGN_IDENTITY: "-"` on purpose — the script's final `codesign --force --deep` replaces Xcode's signature anyway.
+- **The saved ntfy token still disappears on update, and the certificate does NOT fix it.** The gate is the keychain **partition list**, pinned to `cdhash:` because a self-signed root is not Apple-anchored; normally-signed apps get a stable `teamid:`. Seven approaches were measured and all failed — read `docs/release.md` before touching signing, and do not re-derive a fix from the designated-requirement string.
 - Docs are in `docs/` — `architecture.md`, `technical-debt.md`, `qa.md`, `contributing.md`

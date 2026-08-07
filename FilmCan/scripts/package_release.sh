@@ -11,6 +11,42 @@ if [ "$REGEN_PROJECT" = "1" ]; then
   xcodegen generate
 fi
 
+# Code-signing identity.
+#
+# Ad-hoc signing ("-") emits a cdhash-based designated requirement, new on every build.
+# Signing with a certificate emits `certificate root = H"<cert sha1>"` instead, identical
+# across builds — verified 2026-08-07 by signing two binaries with different cdhashes and
+# diffing `codesign -d -r-`.
+#
+# What this does NOT do: it does not fix the saved ntfy token disappearing on update, and
+# it does not get past Gatekeeper (the DMG is still un-notarized, still right-click ->
+# Open). The token is guarded by the keychain *partition list*, which macOS pins to
+# `cdhash:` unless the signing chain is Apple-anchored with a team OU — a self-signed root
+# is not, so the partition stays cdhash-keyed and a new build is still refused. Measured,
+# not assumed: see docs/release.md. Do not re-derive that fix from the requirement string.
+#
+# Resolved by name so no machine-specific hash lives in the repo. A checkout without the
+# certificate falls back to ad-hoc and still builds. Set FILMCAN_SIGN_IDENTITY to force a
+# specific identity, or to "-" to force ad-hoc.
+SIGN_IDENTITY_NAME="${FILMCAN_SIGN_IDENTITY_NAME:-FilmCan Release}"
+if [ -n "${FILMCAN_SIGN_IDENTITY:-}" ]; then
+  SIGN_IDENTITY="$FILMCAN_SIGN_IDENTITY"
+else
+  # `find-identity -v` hides it: a self-signed root reports CSSMERR_TP_NOT_TRUSTED and so
+  # is never "valid". codesign accepts it anyway, so match against the unfiltered list.
+  SIGN_IDENTITY="$(security find-identity -p codesigning 2>/dev/null \
+    | awk -v n="\"${SIGN_IDENTITY_NAME}\"" '$0 ~ n {print $2; exit}')"
+  SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+fi
+
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  echo "warning: no '${SIGN_IDENTITY_NAME}' code-signing certificate found; signing ad-hoc." >&2
+  echo "warning: the designated requirement will be cdhash-based and change every build." >&2
+  echo "warning: See docs/release.md." >&2
+else
+  echo "Signing identity: ${SIGN_IDENTITY_NAME} (${SIGN_IDENTITY})"
+fi
+
 build_for_arch() {
   local arch="$1"
   local dd_path="${DERIVED_DATA_DIR}-${arch}"
@@ -243,11 +279,32 @@ lipo -create \
 RSYNC_DIR="$STAGE_DIR/FilmCan.app/Contents/Resources/rsync"
 if [ -d "$RSYNC_DIR" ]; then
   find "$RSYNC_DIR" -type f \( -name "rsync*" -o -name "*.dylib" \) -print0 \
-    | xargs -0 -I{} codesign --force --sign - "{}"
+    | xargs -0 -I{} codesign --force --sign "$SIGN_IDENTITY" "{}"
 fi
 
-codesign --force --deep --sign - "$STAGE_DIR/FilmCan.app"
+codesign --force --deep --sign "$SIGN_IDENTITY" "$STAGE_DIR/FilmCan.app"
 codesign --verify --deep --strict --verbose=2 "$STAGE_DIR/FilmCan.app"
+
+# Assert the requirement is identity-based, not cdhash-based, so a signing change cannot
+# silently revert to ad-hoc unnoticed.
+if [ "$SIGN_IDENTITY" != "-" ]; then
+  # codesign prints "# designated => X" when the requirement is implicit and a bare
+  # "designated => X" when the signature carries an explicit one. Accept both.
+  DR="$(codesign -d -r- "$STAGE_DIR/FilmCan.app" 2>&1 | sed -n 's/^#* *designated => //p')"
+  echo "Designated requirement: ${DR}"
+  case "$DR" in
+    *cdhash*)
+      echo "error: designated requirement is cdhash-based despite signing with" >&2
+      echo "error: '${SIGN_IDENTITY_NAME}'. Saved tokens would be lost on update." >&2
+      exit 1
+      ;;
+    *certificate*) ;;
+    *)
+      echo "error: unexpected designated requirement: ${DR}" >&2
+      exit 1
+      ;;
+  esac
+fi
 
 rm -f "$DMG_PATH"
 if [ "$CUSTOMIZE_DMG" -eq 0 ]; then
