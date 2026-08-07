@@ -77,18 +77,36 @@ Worth remembering, because it cost two attempts: in `SecAccessCreate` a nil
 trusted-application list means *the creating application only*, while in
 `SecACLSetContents` nil means *any application*.
 
-### What might fix it, untested
+### Decision: the prompt stays. Do not reopen this.
 
-A **free Apple Development certificate** (free Apple ID, no paid membership) is
-Apple-anchored and carries the Team ID in its OU, so it should produce a `teamid:`
-partition — stable across builds and across annual certificate renewal, because the Team
-ID belongs to the account rather than the certificate. That is a hypothesis with a
-mechanism, not a result. Run the A/B probe above before believing it.
+An **Apple Development certificate** (free with any Apple ID, no paid membership) is
+Apple-anchored and carries the Team ID in its OU, so it plausibly yields the `teamid:`
+partition. It was **rejected on privacy grounds, not technical ones.** Apple issues the
+certificate with the account holder's identity in the subject:
 
-The alternatives that need no signing at all both downgrade the token to "any process
-running as this user can read it", which for an ntfy bearer token may be an acceptable and
-explicit trade: a `0600` file in Application Support, or simply keeping today's behaviour
-of one approval click per update.
+```
+CN = Apple Development: <account email>
+O  = <account holder's legal name>
+OU = <Team ID>
+```
+
+Signing a publicly downloadable DMG with it publishes the maintainer's legal name and
+email inside every copy of the app, extractable with one `codesign` command. For a
+solo-maintained free project that is a worse trade than one keychain prompt per update,
+and a separate Apple ID does not avoid it — Apple puts the account holder's name in the
+certificate either way. **The prompt is the accepted cost.**
+
+(The path was never completed: the machine had only the expired G1 WWDR intermediate, so
+signing failed with `errSecInternalComponent` and the A/B probe never actually ran with an
+Apple-issued identity. The `teamid:` hypothesis therefore remains untested — if anyone
+revisits this, that is where it stopped, and the privacy objection above still applies
+regardless of the outcome.)
+
+The alternatives that need no signing at all downgrade the token to "any process running
+as this user can read it": a `0600` file in Application Support. Not taken either — the
+symptom is one approval click per update, not data loss, so weakening the storage buys
+very little. `docs/features/push-notifications.md` documents the prompt for users in all
+four languages so it reads as expected behaviour rather than a bug.
 
 ### What the certificate does buy
 

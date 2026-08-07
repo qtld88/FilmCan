@@ -75,6 +75,19 @@ The **title** and **message** use the same templates as ntfy. Use custom headers
 **ntfy not working**  
 Check topic URL and internet connection
 
+**"FilmCan wants to access your confidential information" after an update**  
+This is expected, and it is about your **ntfy bearer token**. The token is stored in your
+macOS keychain, and the keychain ties access to the exact copy of the app that saved it.
+A new version is a different copy, so macOS asks you to confirm once. Click **Always
+Allow** and the token works again until the next update. Your token is not lost.
+
+If you clicked **Deny**, or if the dialog never appeared, FilmCan sees no token and the
+field in Settings looks empty — paste the token again and it will be saved normally.
+
+Removing the prompt entirely would require signing FilmCan with a paid Apple certificate,
+which would publish the developer's legal name and email inside the app. That trade is
+deliberately not made.
+
 **Webhook not working**  
 Check URL, SSL/TLS, and your endpoint logs
 
@@ -160,6 +173,21 @@ Le **title** et le **message** utilisent les mêmes modèles que ntfy. Utilisez 
 
 **ntfy ne fonctionne pas**  
 Vérifiez l'URL du sujet et la connexion Internet
+
+**« FilmCan souhaite accéder à vos informations confidentielles » après une mise à jour**  
+C'est normal, et cela concerne votre **jeton ntfy**. Le jeton est conservé dans le
+trousseau macOS, qui lie l'accès à la copie exacte de l'application qui l'a enregistré.
+Une nouvelle version est une copie différente : macOS demande donc une confirmation, une
+seule fois. Cliquez sur **Toujours autoriser** et le jeton refonctionne jusqu'à la
+prochaine mise à jour. Votre jeton n'est pas perdu.
+
+Si vous avez cliqué sur **Refuser**, ou si la fenêtre ne s'est jamais affichée, FilmCan ne
+voit aucun jeton et le champ des réglages paraît vide : recollez le jeton, il sera
+enregistré normalement.
+
+Supprimer complètement cette fenêtre exigerait de signer FilmCan avec un certificat Apple
+payant, ce qui publierait le nom légal et l'adresse e-mail du développeur à l'intérieur de
+l'application. Ce compromis n'est volontairement pas fait.
 
 **Webhook ne fonctionne pas**  
 Vérifiez l'URL, SSL/TLS et les journaux de votre endpoint
@@ -247,6 +275,21 @@ Der **title** und die **message** verwenden dieselben Vorlagen wie ntfy. Verwend
 **ntfy funktioniert nicht**  
 Überprüfen Sie Thema-URL und Internetverbindung
 
+**„FilmCan möchte auf Ihre vertraulichen Informationen zugreifen" nach einem Update**  
+Das ist normal und betrifft Ihren **ntfy-Token**. Der Token liegt im macOS-Schlüsselbund,
+und der Schlüsselbund bindet den Zugriff an genau die Kopie der App, die ihn gespeichert
+hat. Eine neue Version ist eine andere Kopie, deshalb fragt macOS einmal nach. Klicken Sie
+auf **Immer erlauben**, dann funktioniert der Token bis zum nächsten Update. Ihr Token
+geht nicht verloren.
+
+Wenn Sie **Ablehnen** geklickt haben oder der Dialog nie erschien, sieht FilmCan keinen
+Token und das Feld in den Einstellungen wirkt leer: Fügen Sie den Token erneut ein, er
+wird normal gespeichert.
+
+Den Dialog ganz zu entfernen würde ein kostenpflichtiges Apple-Zertifikat erfordern,
+wodurch der bürgerliche Name und die E-Mail-Adresse des Entwicklers in der App
+veröffentlicht würden. Dieser Kompromiss wird bewusst nicht eingegangen.
+
 **Webhook funktioniert nicht**  
 Überprüfen Sie URL, SSL/TLS und Ihre Endpoint-Protokolle
 
@@ -332,6 +375,20 @@ El **title** y el **message** utilizan las mismas plantillas que ntfy. Utilice e
 
 ¿ntfy no funciona?  
 Verifique la URL del tema y la conexión a Internet
+
+«FilmCan quiere acceder a su información confidencial» tras una actualización  
+Es normal y se refiere a su **token de ntfy**. El token se guarda en el llavero de macOS,
+que vincula el acceso a la copia exacta de la aplicación que lo guardó. Una versión nueva
+es una copia distinta, así que macOS pide confirmación una sola vez. Pulse **Permitir
+siempre** y el token vuelve a funcionar hasta la próxima actualización. Su token no se ha
+perdido.
+
+Si pulsó **Denegar**, o si la ventana nunca apareció, FilmCan no ve ningún token y el
+campo de los ajustes parece vacío: vuelva a pegar el token y se guardará con normalidad.
+
+Eliminar por completo esa ventana exigiría firmar FilmCan con un certificado de Apple de
+pago, lo que publicaría el nombre legal y el correo del desarrollador dentro de la
+aplicación. Ese intercambio no se hace de forma deliberada.
 
 ¿Webhook no funciona?  
 Verifique la URL, SSL/TLS y sus registros de endpoint
