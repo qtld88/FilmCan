@@ -82,7 +82,7 @@ A new version is a different copy, so macOS asks you to confirm once. Click **Al
 Allow** and the token works again until the next update. Your token is not lost.
 
 If you clicked **Deny**, or if the dialog never appeared, FilmCan sees no token and the
-field in Settings looks empty — paste the token again and it will be saved normally.
+field in Settings looks empty: paste the token again and it will be saved normally.
 
 Removing the prompt entirely would require signing FilmCan with a paid Apple certificate,
 which would publish the developer's legal name and email inside the app. That trade is
