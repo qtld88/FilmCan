@@ -33,6 +33,19 @@ Manual test procedure for FilmCan. This validates core flows and checks for doc/
 7. **Live failure:** unplug one destination mid-copy. Expected: that destination's card turns **red** immediately (the others keep going); the run finishes with that destination marked failed.
 8. Turn **Force re-copy** ON and run. Expected: every file is re-copied to every destination; no skip.
 
+### Verify data — real file count (regression, 1.4.2)
+
+Before 1.4.2 `Verify data` checked nothing and always sealed green. Re-run this whenever the
+manifest format or its location changes:
+
+1. Back up a card, then run the same backup again to get the **Already backed up** popup.
+2. Press **Verify data**. Expected: the real file count, never `0 checked`. A backup with no
+   readable hash list must read *"No hash list found for this backup"*, not a green seal.
+3. Delete one file at the destination and verify again. Expected: it is reported as **missing**.
+
+Passed 2026-08-09 on 1.4.2: files copied correctly, and files deleted by hand at the destination
+were reported missing.
+
 ---
 
 ## Duplicate Handling
