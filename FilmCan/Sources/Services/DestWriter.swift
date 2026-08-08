@@ -77,14 +77,19 @@ actor DestWriter {
         // OrphanCleaner can never see this temp un-registered and delete it
         // mid-write (TOCTOU). Unregister on the create-failure path.
         await OrphanCleaner.shared.registerActive(tempName)
-        guard fm.createFile(atPath: tempURL.path, contents: nil) else {
+        let created = IOPerfProbe.shared.measure(.tempCreate, key: displayName) {
+            fm.createFile(atPath: tempURL.path, contents: nil)
+        }
+        guard created else {
             await OrphanCleaner.shared.unregisterActive(tempName)
             throw WriterError.createFailed(tempURL.path)
         }
         tempFileURL = tempURL
         self.tempName = tempName
 
-        let handle = try FileHandle(forWritingTo: tempURL)
+        let handle = try IOPerfProbe.shared.measure(.tempCreate, key: displayName) {
+            try FileHandle(forWritingTo: tempURL)
+        }
         // F_NOCACHE: backup writes are write-once and not re-read on this path
         // (the paranoid verify opens its own handle). Without it, writing a
         // multi-hundred-GB destination fills the unified buffer cache and, with
@@ -100,7 +105,9 @@ actor DestWriter {
         guard let handle = writeHandle else {
             throw WriterError.writeFailed("No write handle (already finalized?)")
         }
-        try handle.write(contentsOf: data)
+        try IOPerfProbe.shared.measure(.destWrite, key: displayName, bytes: Int64(data.count)) {
+            try handle.write(contentsOf: data)
+        }
     }
 
     /// Flush, fsync, close, then atomically rename temp → final destination.
@@ -135,30 +142,34 @@ actor DestWriter {
 
         finalized = true
 
-        if requiresFullFsync {
-            let fd = handle.fileDescriptor
-            if fcntl(fd, F_FULLFSYNC) == -1 {
-                os_log(
-                    "F_FULLFSYNC not honored on %{public}@ (errno=%d), falling back to fsync — drive cache flush not guaranteed",
-                    log: OSLog(subsystem: "com.filmcan.app", category: "DestWriter"),
-                    type: .error,
-                    destPath,
-                    errno
-                )
-                fsync(fd)
+        try IOPerfProbe.shared.measure(.flush, key: displayName) {
+            if requiresFullFsync {
+                let fd = handle.fileDescriptor
+                if fcntl(fd, F_FULLFSYNC) == -1 {
+                    os_log(
+                        "F_FULLFSYNC not honored on %{public}@ (errno=%d), falling back to fsync — drive cache flush not guaranteed",
+                        log: OSLog(subsystem: "com.filmcan.app", category: "DestWriter"),
+                        type: .error,
+                        destPath,
+                        errno
+                    )
+                    fsync(fd)
+                }
+            } else {
+                try handle.synchronize()
             }
-        } else {
-            try handle.synchronize()
         }
 
         try handle.close()
         writeHandle = nil
 
         // POSIX rename(2) — atomic within the same volume
-        let ok = tempURL.withUnsafeFileSystemRepresentation { tRep in
-            effectiveDestURL.withUnsafeFileSystemRepresentation { dRep in
-                guard let t = tRep, let d = dRep else { return false }
-                return Darwin.rename(t, d) == 0
+        let ok = IOPerfProbe.shared.measure(.rename, key: displayName) {
+            tempURL.withUnsafeFileSystemRepresentation { tRep in
+                effectiveDestURL.withUnsafeFileSystemRepresentation { dRep in
+                    guard let t = tRep, let d = dRep else { return false }
+                    return Darwin.rename(t, d) == 0
+                }
             }
         }
 

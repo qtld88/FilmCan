@@ -51,3 +51,6 @@ website/index.html
 website/fr/
 website/de/
 website/es/
+
+# Git worktrees (superpowers:using-git-worktrees)
+.worktrees/

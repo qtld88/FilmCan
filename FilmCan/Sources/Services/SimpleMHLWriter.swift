@@ -59,14 +59,18 @@ actor SimpleMHLWriter: MHLWriting {
     }
 
     private func render() throws {
-        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
-        var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n<hashlist>\n"
-        for e in entries {
-            let mt = e.mtime.map { " mtime=\"\($0)\"" } ?? ""
-            xml += "<file name=\"\(Self.esc(e.relPath))\"\(mt)><hash>\(e.hash)</hash></file>\n"
+        try IOPerfProbe.shared.measure(
+            .mhlRender, key: (manifestPath as NSString).lastPathComponent
+        ) {
+            try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+            var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n<hashlist>\n"
+            for e in entries {
+                let mt = e.mtime.map { " mtime=\"\($0)\"" } ?? ""
+                xml += "<file name=\"\(Self.esc(e.relPath))\"\(mt)><hash>\(e.hash)</hash></file>\n"
+            }
+            xml += "</hashlist>\n"
+            try xml.write(to: fileURL, atomically: true, encoding: .utf8)
         }
-        xml += "</hashlist>\n"
-        try xml.write(to: fileURL, atomically: true, encoding: .utf8)
     }
 
     private static func esc(_ s: String) -> String {

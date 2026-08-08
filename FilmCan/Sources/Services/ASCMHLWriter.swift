@@ -80,34 +80,36 @@ actor ASCMHLWriter: MHLWriting {
     // MARK: - Rendering
 
     private func render(partialReason: String? = nil) throws {
-        // Create the ascmhl/ folder lazily, only when there is something to write.
-        try FileManager.default.createDirectory(at: ascmhlDir, withIntermediateDirectories: true)
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0"
-        let host = Host.current().localizedName ?? "unknown"
-        var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
-        xml += #"<hashlist version="2.0" xmlns="urn:ASC:MHL:v2.0">"# + "\n"
-        xml += "  <creatorinfo>\n"
-        xml += "    <creationdate>\(creationDate)</creationdate>\n"
-        xml += "    <hostname>\(Self.esc(host))</hostname>\n"
-        xml += "    <tool version=\"\(Self.esc(appVersion))\">FilmCan</tool>\n"
-        xml += "  </creatorinfo>\n"
-        xml += "  <processinfo>\n"
-        xml += "    <process>in-place</process>\n"
-        if let reason = partialReason {
-            xml += "    <!-- filmcan:partial reason=\"\(Self.esc(reason))\" -->\n"
+        try IOPerfProbe.shared.measure(.mhlRender, key: rollName) {
+            // Create the ascmhl/ folder lazily, only when there is something to write.
+            try FileManager.default.createDirectory(at: ascmhlDir, withIntermediateDirectories: true)
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0"
+            let host = Host.current().localizedName ?? "unknown"
+            var xml = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
+            xml += #"<hashlist version="2.0" xmlns="urn:ASC:MHL:v2.0">"# + "\n"
+            xml += "  <creatorinfo>\n"
+            xml += "    <creationdate>\(creationDate)</creationdate>\n"
+            xml += "    <hostname>\(Self.esc(host))</hostname>\n"
+            xml += "    <tool version=\"\(Self.esc(appVersion))\">FilmCan</tool>\n"
+            xml += "  </creatorinfo>\n"
+            xml += "  <processinfo>\n"
+            xml += "    <process>in-place</process>\n"
+            if let reason = partialReason {
+                xml += "    <!-- filmcan:partial reason=\"\(Self.esc(reason))\" -->\n"
+            }
+            xml += "    <ignore>\n      <pattern>.DS_Store</pattern>\n      <pattern>ascmhl</pattern>\n    </ignore>\n"
+            xml += "  </processinfo>\n"
+            xml += "  <hashes>\n"
+            for e in entries {
+                xml += "    <hash>\n"
+                xml += "      <path size=\"\(e.size)\"" + (e.mtime.map { " lastmodificationdate=\"\($0)\"" } ?? "") + ">\(Self.esc(e.relPath))</path>\n"
+                xml += "      <xxh128 action=\"original\" hashdate=\"\(creationDate)\">\(e.hash)</xxh128>\n"
+                xml += "    </hash>\n"
+            }
+            xml += "  </hashes>\n"
+            xml += "</hashlist>\n"
+            try xml.write(to: manifestURL, atomically: true, encoding: .utf8)
         }
-        xml += "    <ignore>\n      <pattern>.DS_Store</pattern>\n      <pattern>ascmhl</pattern>\n    </ignore>\n"
-        xml += "  </processinfo>\n"
-        xml += "  <hashes>\n"
-        for e in entries {
-            xml += "    <hash>\n"
-            xml += "      <path size=\"\(e.size)\"" + (e.mtime.map { " lastmodificationdate=\"\($0)\"" } ?? "") + ">\(Self.esc(e.relPath))</path>\n"
-            xml += "      <xxh128 action=\"original\" hashdate=\"\(creationDate)\">\(e.hash)</xxh128>\n"
-            xml += "    </hash>\n"
-        }
-        xml += "  </hashes>\n"
-        xml += "</hashlist>\n"
-        try xml.write(to: manifestURL, atomically: true, encoding: .utf8)
     }
 
     private static func esc(_ s: String) -> String {

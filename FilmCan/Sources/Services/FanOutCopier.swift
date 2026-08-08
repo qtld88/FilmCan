@@ -644,6 +644,15 @@ actor FanOutCopier {
         etaEmitByDest.removeAll()
         etaSmoothedThroughputByDest.removeAll()
 
+        IOPerfProbe.shared.begin()
+        defer { IOPerfProbe.shared.logSummary() }
+
+        // Held for the whole run, including the verify tail. `defer` so a cancel, a
+        // throw, or an early return cannot strand the assertion and leave the Mac
+        // permanently awake.
+        PowerAssertion.shared.acquire()
+        defer { PowerAssertion.shared.release() }
+
         let destURLs = config.destinations.map { URL(fileURLWithPath: $0.destPath) }
 
         let destInfos = config.destinations.map { DriveSpeedClassifier.info(for: $0.destPath) }
@@ -775,7 +784,8 @@ actor FanOutCopier {
             var sourceHashForReverify: String?
             if config.reVerifyExistingOnResume {
                 sourceHashForReverify = await Self.rereadHashDetached(
-                    url: URL(fileURLWithPath: f.absPath), chunkSz: 8 * 1024 * 1024)
+                    url: URL(fileURLWithPath: f.absPath), chunkSz: 8 * 1024 * 1024,
+                    perfKey: "resume re-verify")
             }
             return config.destinations.filter { dest in
                 guard let recorded = existingMHLByDest[dest.destPath]?[f.rootName]?
@@ -1010,7 +1020,8 @@ actor FanOutCopier {
         // lane (drainVerifies) consumes them, so file N is verified while file
         // N+1 is still copying. The lane is serial → the verify bar stays
         // monotonic.
-        let verifyChannel = BoundedChannel<CopyResult>(capacity: 64)
+        let verifyChannel = BoundedChannel<CopyResult>(
+            capacity: Constants.verifyRunAheadFiles(forSlowestDest: slowest))
         async let verifyOutcomes: [PerSourceOutcome] = drainVerifies(verifyChannel, sharedMHLsByDest: sharedMHLsByDest)
 
         var copyError: (any Swift.Error)?
@@ -1342,7 +1353,12 @@ actor FanOutCopier {
                         if writeFailed == nil {
                             do {
                                 try await writer.write(data: chunk.data)
-                                destHasher.update(data: chunk.data)
+                                IOPerfProbe.shared.measure(
+                                    .destHash, key: destCfg.displayName,
+                                    bytes: Int64(chunk.data.count)
+                                ) {
+                                    destHasher.update(data: chunk.data)
+                                }
                                 totalBytes += Int64(chunk.data.count)
 
                                 let now = Date()
@@ -1525,6 +1541,7 @@ actor FanOutCopier {
                 // User cancel: stop reading; channels are finished below so the
                 // writer tasks drain and abort before finalizing (no partial file).
                 if config.shouldCancel?() == true { break }
+                let readStart = DispatchTime.now()
                 let chunkData: Data
                 if #available(macOS 10.15.4, *) {
                     guard let data = try sourceHandle.read(upToCount: chunkSz), !data.isEmpty
@@ -1535,7 +1552,15 @@ actor FanOutCopier {
                     if data.isEmpty { break }
                     chunkData = data
                 }
-                sourceHasher.update(data: chunkData)
+                IOPerfProbe.shared.record(
+                    .sourceRead, key: "source",
+                    nanos: DispatchTime.now().uptimeNanoseconds &- readStart.uptimeNanoseconds,
+                    bytes: Int64(chunkData.count))
+                IOPerfProbe.shared.measure(
+                    .sourceHash, key: "source", bytes: Int64(chunkData.count)
+                ) {
+                    sourceHasher.update(data: chunkData)
+                }
 
                 let chunk = Chunk(data: chunkData)
                 for (destPath, channel) in channels where !deadDests.contains(destPath) {
@@ -1657,7 +1682,9 @@ actor FanOutCopier {
             // return stale data and produce a false hash mismatch.
             let hasFullFsyncDest = config.destinations.contains { $0.requiresFullFsync }
             if hasFullFsyncDest {
-                try? await Task.sleep(for: .seconds(1))
+                await IOPerfProbe.shared.measureAsync(.settleSleep, key: "verify") {
+                    try? await Task.sleep(for: .seconds(1))
+                }
             }
 
             // Cancel can land during the settle delay.
@@ -1691,7 +1718,7 @@ actor FanOutCopier {
                 config.progressHandler?(prog)
             }
 
-            let sourceHashFromDisk = await rereadHash(url: c.sourceURL, chunkSz: c.chunkSz)
+            let sourceHashFromDisk = await rereadHash(url: c.sourceURL, chunkSz: c.chunkSz, perfKey: "source re-read")
             if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
                 corrupted = true
                 for r in c.writerResults where r.success {
@@ -1735,6 +1762,7 @@ actor FanOutCopier {
                         let filesTotal = c.filesTotalByDest[destPath] ?? c.totalSources
                         let hash = await Self.rereadHashDetached(
                             url: destFileURL, chunkSz: c.chunkSz,
+                            perfKey: (destPath as NSString).lastPathComponent,
                             onProgress: { read in
                                 let combined = await self.recordVerifyInFlight(
                                     destPath: destPath, bytesThisFile: read)
@@ -1942,9 +1970,10 @@ actor FanOutCopier {
 
     nonisolated private func rereadHash(
         url: URL, chunkSz: Int,
+        perfKey: String = "verify",
         onProgress: (@Sendable (Int64) async -> Void)? = nil
     ) async -> String? {
-        await Self.rereadHashDetached(url: url, chunkSz: chunkSz, onProgress: onProgress)
+        await Self.rereadHashDetached(url: url, chunkSz: chunkSz, perfKey: perfKey, onProgress: onProgress)
     }
 
     /// Re-reads `url` with caching disabled and returns its xxh128 hex hash.
@@ -1955,6 +1984,7 @@ actor FanOutCopier {
     nonisolated static func rereadHashDetached(
         url: URL, chunkSz: Int,
         reportEveryBytes: Int64 = 16 * 1024 * 1024,
+        perfKey: String = "verify",
         onProgress: (@Sendable (Int64) async -> Void)? = nil
     ) async -> String? {
         await Task.detached(priority: .utility) {
@@ -1971,14 +2001,27 @@ actor FanOutCopier {
             // ~= 3x a multi-GB clip = >15 GB). Drain per chunk.
             while true {
                 let chunkLen = autoreleasepool { () -> Int in
+                    let readStart = DispatchTime.now()
                     if #available(macOS 10.15.4, *) {
                         guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { return 0 }
-                        hasher.update(data: data)
+                        IOPerfProbe.shared.record(
+                            .verifyRead, key: perfKey,
+                            nanos: DispatchTime.now().uptimeNanoseconds &- readStart.uptimeNanoseconds,
+                            bytes: Int64(data.count))
+                        IOPerfProbe.shared.measure(.verifyHash, key: perfKey, bytes: Int64(data.count)) {
+                            hasher.update(data: data)
+                        }
                         return data.count
                     } else {
                         let data = handle.readData(ofLength: chunkSz)
                         if data.isEmpty { return 0 }
-                        hasher.update(data: data)
+                        IOPerfProbe.shared.record(
+                            .verifyRead, key: perfKey,
+                            nanos: DispatchTime.now().uptimeNanoseconds &- readStart.uptimeNanoseconds,
+                            bytes: Int64(data.count))
+                        IOPerfProbe.shared.measure(.verifyHash, key: perfKey, bytes: Int64(data.count)) {
+                            hasher.update(data: data)
+                        }
                         return data.count
                     }
                 }
