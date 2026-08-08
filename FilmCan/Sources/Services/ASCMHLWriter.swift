@@ -15,6 +15,7 @@ actor ASCMHLWriter: MHLWriting {
     nonisolated let manifestPath: String
     private let manifestURL: URL
     private var entries: [MHLEntry] = []
+    private var indexByRelPath: [String: Int] = [:]
     private var finalized = false
     private let creationDate: String
 
@@ -37,13 +38,20 @@ actor ASCMHLWriter: MHLWriting {
 
     func seed(_ existing: [MHLEntry]) {
         guard !finalized, !existing.isEmpty else { return }
-        let known = Set(entries.map { $0.relPath })
-        entries = existing.filter { !known.contains($0.relPath) } + entries
+        let fresh = existing.filter { indexByRelPath[$0.relPath] == nil }
+        entries = fresh + entries
+        indexByRelPath = Dictionary(uniqueKeysWithValues: entries.enumerated().map { ($1.relPath, $0) })
     }
 
     func append(relPath: String, size: Int64, hash: String, mtime: Int64?) async throws {
         guard !finalized else { return }
-        entries.append(MHLEntry(relPath: relPath, size: size, hash: hash, mtime: mtime))
+        let entry = MHLEntry(relPath: relPath, size: size, hash: hash, mtime: mtime)
+        if let i = indexByRelPath[relPath] {
+            entries[i] = entry            // re-copied this run: the fresh hash replaces the seeded one
+        } else {
+            indexByRelPath[relPath] = entries.count
+            entries.append(entry)
+        }
         if entries.count % Constants.mhlFlushEveryFiles == 0 { try render() }
     }
 

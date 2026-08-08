@@ -747,6 +747,12 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let r = try await FanOutCopier(config: resumeConfig(card: card, dest: dest, forceRecopy: true)).run()
         XCTAssertEqual(r.first?.filesTransferred, 2, "force re-copy ignores the hash list")
         XCTAssertEqual(r.first?.filesSkipped, 0)
+
+        // The forced re-copy must not duplicate the entries it seeded from the
+        // previous generation.
+        let entries = try readLatestASCMHL(ascmhlDir: dest.appendingPathComponent("CARD4/ascmhl"))
+        XCTAssertEqual(entries.count, 2, "force re-copy must not duplicate manifest entries")
+        XCTAssertEqual(Set(entries.map { $0.relPath }), ["a.bin", "b.bin"])
     }
 
     func test_resume_skipsAlreadyBackedUpFiles() async throws {
