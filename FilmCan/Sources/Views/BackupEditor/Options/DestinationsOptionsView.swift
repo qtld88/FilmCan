@@ -157,33 +157,6 @@ struct DestinationsOptionsView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
-
-                        DisclosureGroup(isExpanded: $showRenameOnlyPatterns) {
-                            PatternEditor(
-                                title: "",
-                                placeholder: "*.mp4",
-                                patterns: presetBinding.renameOnlyPatterns,
-                                showsTitle: false
-                            )
-                        } label: {
-                            HStack {
-                                Text("Rename only patterns (optional)")
-                                InfoPopoverButton(
-                                    content: InfoPopoverContent(
-                                        title: "Rename only patterns",
-                                        description: "Only rename files that match these patterns.",
-                                        notes: [
-                                            "Example: `*.mp4` to rename only proxies.",
-                                            "ARRI filename example: `A001C001_240101_0010.MOV`."
-                                        ]
-                                    )
-                                )
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture { showRenameOnlyPatterns.toggle() }
-                        }
-                        .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
                     }
 
                     HStack(spacing: OptionsLayout.spacing) {
@@ -193,12 +166,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("File name template")
+                                Text("File Rename Template")
                                     .font(FilmCanFont.label(13))
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "File name template",
+                                        title: "File Rename Template",
                                         description: "Renames each copied item before it is placed in the destination.",
                                         notes: [
                                             "Use tokens like `{filename}` and `{counter}`.",
@@ -237,6 +210,33 @@ struct DestinationsOptionsView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
+
+                        DisclosureGroup(isExpanded: $showRenameOnlyPatterns) {
+                            PatternEditor(
+                                title: "",
+                                placeholder: "*.mp4",
+                                patterns: presetBinding.renameOnlyPatterns,
+                                showsTitle: false
+                            )
+                        } label: {
+                            HStack {
+                                Text("Rename only patterns (optional)")
+                                InfoPopoverButton(
+                                    content: InfoPopoverContent(
+                                        title: "Rename only patterns",
+                                        description: "Only rename files that match these patterns.",
+                                        notes: [
+                                            "Example: `*.mp4` to rename only proxies.",
+                                            "ARRI filename example: `A001C001_240101_0010.MOV`."
+                                        ]
+                                    )
+                                )
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture { showRenameOnlyPatterns.toggle() }
+                        }
                         .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
                     }
 
