@@ -1071,4 +1071,34 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let etas = await emits.values
         XCTAssertTrue(etas.allSatisfy { $0 > 0 }, "no non-positive ETA, got: \(etas)")
     }
+
+    func test_resume_acceptsLegacyAllocatedSizeInManifest() async throws {
+        // Copy once (manifest now holds logical sizes), then rewrite the manifest's
+        // size attribute to the allocated size as a pre-upgrade manifest would have,
+        // and confirm the next run still skips instead of re-copying.
+        let fm = FileManager.default
+        let card = tmpDir.appendingPathComponent("LEGACYCARD")
+        try fm.createDirectory(at: card, withIntermediateDirectories: true)
+        try Data([0x41]).write(to: card.appendingPathComponent("tiny.txt"))
+        let dest = tmpDir.appendingPathComponent("legacydest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        // First run: creates manifest with logical size (1 byte)
+        let first = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(first.first?.filesTransferred, 1)
+
+        // Patch the manifest to have the allocated size (typically 4096) instead of logical (1)
+        let ascDir = dest.appendingPathComponent("LEGACYCARD/ascmhl")
+        let manifestName = try XCTUnwrap(ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir))
+        let manifestPath = ascDir.appendingPathComponent(manifestName).path
+        var content = try String(contentsOfFile: manifestPath, encoding: .utf8)
+        // Replace size="1" with size="4096" (or whatever the allocated size is)
+        content = content.replacingOccurrences(of: "size=\"1\"", with: "size=\"4096\"")
+        try content.write(toFile: manifestPath, atomically: true, encoding: .utf8)
+
+        // Second run: should still skip because destsNeeding accepts either size
+        let second = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
+        XCTAssertEqual(second.first?.filesTransferred, 0, "a legacy-size manifest must still resume")
+        XCTAssertGreaterThan(second.first?.filesSkipped ?? 0, 0)
+    }
 }

@@ -93,18 +93,8 @@ enum CardSealService {
     // MARK: - Helpers
 
     private static func enumerate(source: URL, preset: OrganizationPreset?) async -> [CardSeal.Entry] {
-        // FileEnumerator only emits regular files, but its `size` is the
-        // allocated size (rounded to the filesystem block), which hides
-        // sub-block content changes. The seal is about content, so re-read the
-        // logical byte size per entry (`.fileSizeKey`), falling back to the
-        // enumerator's size if the stat fails.
         let result = await FileEnumerator.enumerateFiles(sources: [source.path], preset: preset)
-        return result.entries.map { entry in
-            let logical = (try? URL(fileURLWithPath: entry.sourcePath)
-                .resourceValues(forKeys: [.fileSizeKey]))?.fileSize
-            return CardSeal.Entry(relPath: entry.relativePath,
-                                  size: logical.map(Int64.init) ?? entry.size)
-        }
+        return result.entries.map { CardSeal.Entry(relPath: $0.relativePath, size: $0.logicalSize) }
     }
 
     private static func volumeUUID(for url: URL) -> String? {

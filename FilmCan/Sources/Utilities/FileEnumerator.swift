@@ -4,7 +4,10 @@ struct SourceFileEntry {
     let sourcePath: String
     let sourceRoot: String
     let relativePath: String
-    let size: Int64
+    /// The file's byte count — what goes in the manifest and the card seal.
+    let logicalSize: Int64
+    /// max(logical, allocated) — what the progress bars and the space preflight need.
+    let allocatedSize: Int64
     let sourceIsDirectory: Bool
 }
 
@@ -94,13 +97,13 @@ enum FileEnumerator {
                             ) {
                                 let logicalSize = Int64(values?.fileSize ?? 0)
                                 let allocatedSize = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
-                                let size = max(logicalSize, allocatedSize)
                                 entries.append(
                                     SourceFileEntry(
                                         sourcePath: path,
                                         sourceRoot: source,
                                         relativePath: relative,
-                                        size: size,
+                                        logicalSize: logicalSize,
+                                        allocatedSize: max(logicalSize, allocatedSize),
                                         sourceIsDirectory: true
                                     )
                                 )
@@ -120,13 +123,13 @@ enum FileEnumerator {
                         let values = try? fileURL.resourceValues(forKeys: keys)
                         let logicalSize = Int64(values?.fileSize ?? 0)
                         let allocatedSize = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
-                        let size = max(logicalSize, allocatedSize)
                         entries.append(
                             SourceFileEntry(
                                 sourcePath: source,
                                 sourceRoot: source,
                                 relativePath: relative,
-                                size: size,
+                                logicalSize: logicalSize,
+                                allocatedSize: max(logicalSize, allocatedSize),
                                 sourceIsDirectory: false
                             )
                         )

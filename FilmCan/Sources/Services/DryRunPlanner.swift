@@ -28,7 +28,7 @@ actor DryRunPlanner {
         for path in enumResult.unreadable {
             warnings.append("Could not read: \(path)")
         }
-        totalBytes = entries.reduce(Int64(0)) { $0 + $1.size }
+        totalBytes = entries.reduce(Int64(0)) { $0 + $1.allocatedSize }
         totalFiles = entries.count
         let plannedRelPaths = entries.map { $0.relativePath }
 

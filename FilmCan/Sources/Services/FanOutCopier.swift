@@ -119,6 +119,7 @@ struct CopyResult: Sendable {
     let verifiedSourceHash: String
     let cumulativeBytesBeforeSource: Int64
     let sourceSize: Int64
+    let sourceLogicalSize: Int64
     let sourceIndex: Int
     let totalSources: Int
     let totalBytesAllSources: Int64
@@ -234,7 +235,10 @@ actor FanOutCopier {
         let rootId: String
         let absPath: String
         let relPath: String
+        /// Allocated size — progress totals, space preflight, resume comparison.
         let size: Int64
+        /// Byte count — the value recorded in the manifest.
+        let logicalSize: Int64
     }
 
     /// Resolved duplicate policy (after optional pre-flight `.ask` prompt).
@@ -691,7 +695,8 @@ actor FanOutCopier {
                 rootId: (entry.sourceRoot as NSString).standardizingPath,
                 absPath: entry.sourcePath,
                 relPath: entry.sourceIsDirectory ? entry.relativePath : "",
-                size: entry.size
+                size: entry.allocatedSize,
+                logicalSize: entry.logicalSize
             )
         }
 
@@ -775,10 +780,9 @@ actor FanOutCopier {
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
                     metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath))
                 guard FileManager.default.fileExists(atPath: path) else { return true }  // missing → copy
-                // Compare planned size (max(logical, allocated)) — the same value stored by
-                // FileEnumerator and therefore in the MHL. recorded.size == 0 means legacy
-                // MHL format which carried no size; skip the check in that case.
-                if recorded.size != 0, recorded.size != f.size { return true }
+                // A manifest written before FilmCan recorded logical sizes holds the ALLOCATED
+                // size. Accept either so an upgrade does not trigger a full re-copy.
+                if recorded.size != 0, recorded.size != f.logicalSize, recorded.size != f.size { return true }
                 if config.reVerifyExistingOnResume {
                     return sourceHashForReverify?.lowercased() != recorded.hash.lowercased()
                 }
@@ -1039,6 +1043,7 @@ actor FanOutCopier {
                             sourceURL: absURL,
                             sourceName: file.relPath.isEmpty ? (file.absPath as NSString).lastPathComponent : file.relPath,
                             sourceSize: file.size,
+                            sourceLogicalSize: file.logicalSize,
                             cumulativeBytesBeforeSource: cumBefore,
                             totalBytesAllSources: totalBytesAllSources,
                             sourceIndex: index,
@@ -1173,7 +1178,7 @@ actor FanOutCopier {
                             // costs at most a few already-copied files being re-copied
                             // on resume (safe), not data loss.
                             try await writer.append(
-                                relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceSize,
+                                relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceLogicalSize,
                                 hash: r.destHashFromStream ?? c.verifiedSourceHash,
                                 mtime: c.srcMtime)
                         } catch {
@@ -1225,6 +1230,7 @@ actor FanOutCopier {
         sourceURL: URL,
         sourceName: String,
         sourceSize: Int64,
+        sourceLogicalSize: Int64,
         cumulativeBytesBeforeSource: Int64,
         totalBytesAllSources: Int64,
         sourceIndex: Int,
@@ -1579,6 +1585,7 @@ actor FanOutCopier {
             verifiedSourceHash: verifiedSourceHash,
             cumulativeBytesBeforeSource: cumulativeBytesBeforeSource,
             sourceSize: sourceSize,
+            sourceLogicalSize: sourceLogicalSize,
             sourceIndex: sourceIndex,
             totalSources: totalSources,
             totalBytesAllSources: totalBytesAllSources,
