@@ -20,6 +20,7 @@
 		0C6E8C035A09C8748B2BE1B0 /* TotalTransfersEditMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F583D01B5F61457BFBA712E /* TotalTransfersEditMode.swift */; };
 		0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93FFA7594374B35EFD1117A /* DonationPromptView.swift */; };
 		0E5C6DCD8EF03EDC8D4A1CC8 /* FanOutCopierIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B96018630A1BE87D3AE467 /* FanOutCopierIntegrationTests.swift */; };
+		1226CA18550EFC0D1A73B78A /* StorageErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ACBAAD91D37D9498AEBBEC2 /* StorageErrorBanner.swift */; };
 		138FE41894080BDF18228786 /* LegacyCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */; };
 		16BBD578A2200A6CFF0C0C0D /* DestinationsOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFCE6A38FFA62F38F063BF7 /* DestinationsOptionsView.swift */; };
 		170A04CEAB4882CBFA7D184A /* NetflixValidationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B24A04D94C538092C852CA0 /* NetflixValidationSheet.swift */; };
@@ -321,6 +322,7 @@
 		97D862BDFCB070BBF317B5C2 /* QuickTourView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTourView.swift; sourceTree = "<group>"; };
 		9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListVerifier.swift; sourceTree = "<group>"; };
 		9A872C6782B426B22FE8EEDC /* SourceFilterMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterMatching.swift; sourceTree = "<group>"; };
+		9ACBAAD91D37D9498AEBBEC2 /* StorageErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageErrorBanner.swift; sourceTree = "<group>"; };
 		9B7A7EDDA19A0713A93A6DA4 /* BackupEditorView+Options.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackupEditorView+Options.swift"; sourceTree = "<group>"; };
 		9C1983264D0443559124CDB6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C6FC1873384FD0889894E2C /* CardSeal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSeal.swift; sourceTree = "<group>"; };
@@ -587,6 +589,7 @@
 				C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */,
 				DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */,
 				F7BE5C204AB2FB815099B2D4 /* RollIdentitySheet.swift */,
+				9ACBAAD91D37D9498AEBBEC2 /* StorageErrorBanner.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -1022,6 +1025,7 @@
 				8E0F3EB7D7BCA27B339F1418 /* SourceMediaKind.swift in Sources */,
 				D9CFB01FF5A83E377CAAECAB /* SourceOptionsView.swift in Sources */,
 				A281599D9F647313852A0B32 /* SpotlightIndexing.swift in Sources */,
+				1226CA18550EFC0D1A73B78A /* StorageErrorBanner.swift in Sources */,
 				63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */,
 				ACAA5129EDAA2E48E2EDC84F /* TitlebarAccessory.swift in Sources */,
 				E3646B0FD3D8713EE6949BCF /* TokenFlowLayout.swift in Sources */,

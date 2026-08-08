@@ -102,7 +102,13 @@ struct MainView: View {
 
     private var insetContent: some View {
         baseContent.safeAreaInset(edge: .top, spacing: 0) {
-            topBar
+            VStack(spacing: 0) {
+                topBar
+                StorageErrorBanner(
+                    loadError: storage.lastLoadError,
+                    saveError: storage.lastSaveError
+                )
+            }
         }
     }
 
