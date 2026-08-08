@@ -608,6 +608,28 @@ actor FanOutCopier {
         self.config = config
     }
 
+    /// Pure space check: sums each volume's demand across the destinations that
+    /// share it, then compares to that volume's available bytes. Returns the first
+    /// shortfall, or nil when every volume fits.
+    nonisolated static func spaceShortfall(
+        neededByDest: [String: Int64],
+        volumeKeyByDest: [String: String],
+        availableByDest: [String: Int64]
+    ) -> (destPath: String, available: Int64, required: Int64)? {
+        var neededByVolume: [String: Int64] = [:]
+        for (dest, need) in neededByDest where need > 0 {
+            neededByVolume[volumeKeyByDest[dest] ?? dest, default: 0] += need
+        }
+        for dest in neededByDest.keys.sorted() {
+            guard (neededByDest[dest] ?? 0) > 0 else { continue }
+            let key = volumeKeyByDest[dest] ?? dest
+            guard let required = neededByVolume[key] else { continue }
+            let available = availableByDest[dest] ?? 0
+            if available < required { return (dest, available, required) }
+        }
+        return nil
+    }
+
     /// Run the fan-out copy. Sources from distinct drives are processed
     /// concurrently (one worker per source drive); sources from the same
     /// drive are processed sequentially within their drive's worker.
@@ -901,16 +923,27 @@ actor FanOutCopier {
         // handling) rather than churning. The editor surfaces a softer,
         // overridable "purgeable space" warning before the run.
         let mb = { (b: Int64) in b / (1024 * 1024) }
+        var volumeKeyByDest: [String: String] = [:]
+        var availableByDest: [String: Int64] = [:]
         for dest in config.destinations {
             let need = neededBytesByDest[dest.destPath] ?? 0
             guard need > 0 else { continue }
             let writableNow = DriveUtilities.immediatelyWritableBytes(for: dest.destPath) ?? 0
             let available = DriveUtilities.liveAvailableBytes(for: dest.destPath) ?? writableNow
+            availableByDest[dest.destPath] = available
+            // Destinations sharing a volume share its free space — key by volume UUID so
+            // their demands are summed, falling back to the path when no UUID is exposed.
+            volumeKeyByDest[dest.destPath] = DriveSpeedClassifier.info(for: dest.destPath).volumeUUID
+                ?? DriveUtilities.volumeRootPath(for: dest.destPath)
+                ?? dest.destPath
             DebugLog.info("FanOutCopier preflight \(dest.destPath): need \(mb(need)) MB, immediately-writable \(mb(writableNow)) MB, Finder/optimistic \(mb(available)) MB")
-            if available < need {
-                throw Error.insufficientSpace(
-                    destPath: dest.destPath, available: available, required: need)
-            }
+        }
+        if let short = Self.spaceShortfall(
+            neededByDest: neededBytesByDest,
+            volumeKeyByDest: volumeKeyByDest,
+            availableByDest: availableByDest) {
+            throw Error.insufficientSpace(
+                destPath: short.destPath, available: short.available, required: short.required)
         }
 
         // Pre-compute cumulative bytes before each planned file.
