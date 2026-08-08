@@ -6,6 +6,11 @@ options:
   xcodeVersion: "15.0"
   generateEmptyDirectories: true
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.6.4
+
 settings:
   base:
     ARCHS: "arm64 x86_64"
@@ -24,6 +29,8 @@ targets:
     platform: macOS
     sources:
       - Sources
+    dependencies:
+      - package: Sparkle
     preBuildScripts:
       - name: Embed rsync
         script: |

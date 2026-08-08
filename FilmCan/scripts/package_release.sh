@@ -121,6 +121,61 @@ emit_version_json() {
   echo "Updated: ${out} (version=${version}, dmg=${versioned_dmg})"
 }
 
+sign_dmg_for_sparkle() {
+  local dmg_path="$1"
+  local sign_update_bin="${SPARKLE_SIGN_UPDATE_BIN:-$HOME/.sparkle-tools/bin/sign_update}"
+  if [ ! -x "$sign_update_bin" ]; then
+    echo "error: sign_update not found at ${sign_update_bin}." >&2
+    echo "       Run the Sparkle keypair setup (see docs/superpowers/specs/2026-07-28-sparkle-auto-update-design.md, Task 2)" >&2
+    echo "       or set SPARKLE_SIGN_UPDATE_BIN to its location." >&2
+    exit 1
+  fi
+  "$sign_update_bin" "$dmg_path"
+}
+
+emit_appcast_entry() {
+  local app_plist="${APP_ARM64}/Contents/Info.plist"
+  local short_version build_number
+  short_version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$app_plist" 2>/dev/null)"
+  build_number="$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$app_plist" 2>/dev/null)"
+  if [ -z "$short_version" ] || [ -z "$build_number" ]; then
+    echo "warning: could not read version from ${app_plist} — appcast.xml not updated" >&2
+    return
+  fi
+  if [ -z "$REPO_ROOT" ]; then
+    echo "warning: REPO_ROOT is empty (not a git repo?) — appcast.xml not updated" >&2
+    return
+  fi
+
+  local versioned_dmg="FilmCan-${short_version}-universal.dmg"
+  local tag="Release_${short_version}"
+  local dmg_url="https://github.com/qtld88/FilmCan/releases/download/${tag}/${versioned_dmg}"
+  local appcast_path="${REPO_ROOT}/website/appcast.xml"
+
+  local sign_output
+  sign_output="$(sign_dmg_for_sparkle "${DIST_DIR}/${versioned_dmg}")"
+  local ed_signature length
+  ed_signature="$(echo "$sign_output" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')"
+  length="$(echo "$sign_output" | sed -n 's/.*length="\([^"]*\)".*/\1/p')"
+  if [ -z "$ed_signature" ] || [ -z "$length" ]; then
+    echo "error: could not parse sign_update output: ${sign_output}" >&2
+    exit 1
+  fi
+
+  local notes
+  notes="$(git -C "$REPO_ROOT" tag -l --format='%(contents)' "$tag")"
+  if [ -z "$notes" ]; then
+    notes="Release ${short_version}."
+  fi
+
+  local pub_date
+  pub_date="$(date -u "+%a, %d %b %Y %H:%M:%S +0000")"
+
+  "${ROOT_DIR}/scripts/append_appcast_entry.py" "$appcast_path" \
+    "$build_number" "$short_version" "$dmg_url" "$ed_signature" "$length" "$pub_date" "$notes"
+  echo "Updated: ${appcast_path} (version=${short_version}, build=${build_number})"
+}
+
 ensure_not_open() {
   local file="$1"
   if [ -e "$file" ] && lsof "$file" >/dev/null 2>&1; then
@@ -311,6 +366,7 @@ if [ "$CUSTOMIZE_DMG" -eq 0 ]; then
   create_udzo "$DMG_PATH"
   echo "Created: ${DMG_PATH}"
   emit_version_json
+  emit_appcast_entry
   exit 0
 fi
 
@@ -380,6 +436,7 @@ if [ "$CUSTOMIZE_DMG" -eq 0 ]; then
   create_udzo "$DMG_PATH"
   echo "Created: ${DMG_PATH}"
   emit_version_json
+  emit_appcast_entry
   exit 0
 fi
 
@@ -437,6 +494,7 @@ if [ "$CONVERT_OK" -ne 1 ]; then
   create_udzo "$DMG_PATH"
   echo "Created: ${DMG_PATH}"
   emit_version_json
+  emit_appcast_entry
   exit 0
 fi
 
@@ -444,3 +502,4 @@ rm -f "$DMG_TEMP"
 
 echo "Created: ${DMG_PATH}"
 emit_version_json
+emit_appcast_entry
