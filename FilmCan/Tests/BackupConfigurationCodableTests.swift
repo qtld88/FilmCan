@@ -23,4 +23,10 @@ final class BackupConfigurationCodableTests: XCTestCase {
         XCTAssertEqual(back.unit, "MU")
         XCTAssertEqual(back.cameraFormat, "ARRI")
     }
+
+    func testPayloadWithoutSchemaVersionDecodesTo1() throws {
+        let json = #"{"id":"\#(UUID().uuidString)","name":"Old"}"#.data(using: .utf8)!
+        let cfg = try JSONDecoder().decode(BackupConfiguration.self, from: json)
+        XCTAssertEqual(cfg.schemaVersion, 1, "payload without schemaVersion must default to 1")
+    }
 }

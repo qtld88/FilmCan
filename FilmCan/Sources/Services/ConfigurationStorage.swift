@@ -10,6 +10,10 @@ class ConfigurationStorage: ObservableObject {
     @Published var organizationPresets: [OrganizationPreset] = []
     @Published var transferHistory: [TransferHistoryEntry] = []
     @Published private(set) var lastSaveError: String?
+    @Published private(set) var lastLoadError: String?
+    /// Set when a file existed but could not be decoded. Blocks `save()` so a
+    /// recoverable file is never overwritten with an empty set behind the user's back.
+    private var saveIsBlocked = false
     
     private let fileManager = FileManager.default
     private let configFileURL: URL
@@ -165,6 +169,10 @@ class ConfigurationStorage: ObservableObject {
     
     @discardableResult
     func save() -> Bool {
+        guard !saveIsBlocked else {
+            DebugLog.error("ConfigurationStorage: save suppressed — a quarantined file is unresolved")
+            return false
+        }
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -181,9 +189,7 @@ class ConfigurationStorage: ObservableObject {
             return true
         } catch {
             lastSaveError = error.localizedDescription
-            #if DEBUG
-            DebugLog.warn("Failed to save configurations: \(error)")
-            #endif
+            DebugLog.error("Failed to save configurations: \(error)")
             return false
         }
     }
@@ -207,13 +213,14 @@ class ConfigurationStorage: ObservableObject {
             decoder: decoder
         ) {
             configurations = loadedConfigs
+        } else if fileManager.fileExists(atPath: configFileURL.path) {
+            quarantine(configFileURL)
+            noteLoadFailure("configs.json")
+            configurations = []
         } else {
-            #if DEBUG
-            DebugLog.warn("Failed to load configurations from primary and backup files.")
-            #endif
             configurations = []
         }
-        
+
         if fileManager.fileExists(atPath: presetsFileURL.path) || fileManager.fileExists(atPath: presetsBackupFileURL.path) {
             if let loadedPresets: [OrganizationPreset] = decodeWithFallback(
                 type: [OrganizationPreset].self,
@@ -222,10 +229,11 @@ class ConfigurationStorage: ObservableObject {
                 decoder: decoder
             ) {
                 organizationPresets = loadedPresets
+            } else if fileManager.fileExists(atPath: presetsFileURL.path) {
+                quarantine(presetsFileURL)
+                noteLoadFailure("presets.json")
+                organizationPresets = []
             } else {
-                #if DEBUG
-                DebugLog.warn("Failed to load presets from primary and backup files.")
-                #endif
                 organizationPresets = []
             }
         } else {
@@ -240,17 +248,18 @@ class ConfigurationStorage: ObservableObject {
                 decoder: decoder
             ) {
                 transferHistory = loadedHistory
+            } else if fileManager.fileExists(atPath: historyFileURL.path) {
+                quarantine(historyFileURL)
+                noteLoadFailure("history.json")
+                transferHistory = []
             } else {
-                #if DEBUG
-                DebugLog.warn("Failed to load history from primary and backup files.")
-                #endif
                 transferHistory = []
             }
         } else {
             transferHistory = []
         }
         seedTotalTransferCountIfNeeded()
-        
+
         // Load last used
         if let lastUsedIdString = userDefaults.string(forKey: lastUsedKey),
            let lastUsedId = UUID(uuidString: lastUsedIdString) {
@@ -284,7 +293,29 @@ class ConfigurationStorage: ObservableObject {
         }
         return nil
     }
-    
+
+    /// Move an undecodable file aside rather than letting the next save overwrite it.
+    private func quarantine(_ url: URL) {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let dead = url.appendingPathExtension("corrupt-\(stamp)")
+        try? fileManager.moveItem(at: url, to: dead)
+        // The .bak is a copy of the same generation — quarantine it too, or the
+        // next load silently "recovers" from an equally broken file.
+        let bak = url.appendingPathExtension("bak")
+        if fileManager.fileExists(atPath: bak.path) {
+            try? fileManager.moveItem(at: bak, to: bak.appendingPathExtension("corrupt-\(stamp)"))
+        }
+    }
+
+    private func noteLoadFailure(_ name: String) {
+        saveIsBlocked = true
+        let message = "\(name) could not be read and was set aside. Nothing was deleted — "
+            + "quit FilmCan and check ~/Library/Application Support/FilmCan before continuing."
+        lastLoadError = [lastLoadError, message].compactMap { $0 }.joined(separator: "\n")
+        DebugLog.error("ConfigurationStorage: \(name) failed to decode; quarantined")
+    }
+
     func markAsUsed(_ config: BackupConfiguration) {
         lastUsedConfigId = config.id
         userDefaults.set(config.id.uuidString, forKey: lastUsedKey)

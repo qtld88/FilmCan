@@ -64,6 +64,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var createdAt: Date = Date()
     var lastUsedAt: Date?
     var webhookTemplateFormatVersion: Int = 1
+    /// Bumped when the on-disk shape changes in a way a reader must know about.
+    var schemaVersion: Int = 1
 
     enum LogLocation: String, Codable, CaseIterable {
         case sameAsDestination = "same"
@@ -129,6 +131,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         createdAt    = try c.decodeIfPresent(Date.self,   forKey: .createdAt)    ?? Date()
         lastUsedAt   = try c.decodeIfPresent(Date.self,   forKey: .lastUsedAt)
         webhookTemplateFormatVersion = try c.decodeIfPresent(Int.self, forKey: .webhookTemplateFormatVersion) ?? 1
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
         sourcePaths = try c.decodeIfPresent([String].self, forKey: .sourcePaths) ?? []
     }
     
@@ -192,12 +195,13 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(createdAt,        forKey: .createdAt)
         try c.encodeIfPresent(lastUsedAt, forKey: .lastUsedAt)
         try c.encode(webhookTemplateFormatVersion, forKey: .webhookTemplateFormatVersion)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
     }
 
     private enum CodingKeys: String, CodingKey {
         case episode, day, unit, cameraFormat, hashListStyle
         case id, name, sourcePaths, destinationPaths, engineOptions
-        case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion
+        case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion, schemaVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
         case cameraFolderTemplate, soundFolderTemplate
