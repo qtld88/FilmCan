@@ -219,7 +219,8 @@ class TransferViewModel: ObservableObject {
                 alreadyBackedUp = AlreadyBackedUpInfo(
                     sources: sources,
                     destinations: perDestResults.map { $0.destination },
-                    fileCount: perDestResults.map { $0.filesSkipped }.max() ?? 0
+                    fileCount: perDestResults.map { $0.filesSkipped }.max() ?? 0,
+                    date: transferStartTime ?? Date()
                 )
             } else {
                 BackupLogWriter.writeFanOutLogs(
@@ -651,15 +652,27 @@ class TransferViewModel: ObservableObject {
     /// Re-verify an already-backed-up config against its hash lists (the same
     /// check as "Check data" in History). Runs off the main thread.
     func verifyAlreadyBackedUp(_ info: AlreadyBackedUpInfo) async -> (total: Int, missing: Int, mismatched: Int) {
-        let rootNames = info.sources.map { ($0 as NSString).lastPathComponent }
         let sources = info.sources
         let dests = info.destinations
+        let preset = config.map { resolveOrganizationPreset(for: $0) } ?? nil
+        let copyContents = config?.copyFolderContents ?? false
+        let metadata = ShootMetadata(episode: config?.episode ?? "", day: config?.day ?? "",
+                                     unit: config?.unit ?? "", cameraFormat: config?.cameraFormat ?? "")
+        let kinds = config.map { effectiveSourceMediaKinds(for: $0, sources: sources) } ?? [:]
+
         return await Task.detached(priority: .utility) {
             var total = 0, missing = 0, mismatched = 0
             for dest in dests {
-                for root in rootNames {
-                    let mhl = (dest as NSString).appendingPathComponent(".filmcan/hashlists/\(root).mhl")
-                    if let r = HashListVerifier.verify(hashListPath: mhl, rootsFallback: sources) {
+                for src in sources {
+                    let rollFolder = FanOutCopier.resolveRollFolder(
+                        destRoot: dest, rootName: (src as NSString).lastPathComponent, rootPath: src,
+                        isDirectoryRoot: true, preset: preset, copyFolderContents: copyContents,
+                        date: info.date, metadata: metadata, mediaKind: kinds[src] ?? .camera)
+                    let ascDir = FanOutCopier.ascMHLDir(rollFolder: rollFolder)
+                    guard let name = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir) else { continue }
+                    if let r = HashListVerifier.verify(
+                        hashListPath: ascDir.appendingPathComponent(name).path,
+                        rootsFallback: [rollFolder]) {
                         total += r.total; missing += r.missing; mismatched += r.mismatched
                     }
                 }

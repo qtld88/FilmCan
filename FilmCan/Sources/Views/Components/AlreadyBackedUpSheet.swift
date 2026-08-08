@@ -8,6 +8,9 @@ struct AlreadyBackedUpInfo: Identifiable {
     let sources: [String]
     let destinations: [String]
     let fileCount: Int
+    /// The date the original backup run started — needed to resolve dated folder
+    /// templates to the same roll folder the engine wrote.
+    let date: Date
 }
 
 struct AlreadyBackedUpSheet: View {
@@ -38,12 +41,15 @@ struct AlreadyBackedUpSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let r = result {
-                let ok = r.missing == 0 && r.mismatched == 0
+                let ok = r.total > 0 && r.missing == 0 && r.mismatched == 0
                 HStack(spacing: 8) {
                     Image(systemName: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundColor(ok ? FilmCanTheme.brandGreen : FilmCanTheme.brandRed)
                     if ok {
                         Text("Verified \(r.total) file\(r.total == 1 ? "" : "s") — all match.")
+                    } else if r.total == 0 {
+                        Text("No hash list found for this backup — nothing could be checked.")
+                            .foregroundColor(FilmCanTheme.brandRed)
                     } else {
                         Text("\(r.total) checked · \(r.missing) missing · \(r.mismatched) mismatched.")
                             .foregroundColor(FilmCanTheme.brandRed)
