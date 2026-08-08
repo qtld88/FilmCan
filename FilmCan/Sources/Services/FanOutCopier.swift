@@ -542,32 +542,10 @@ actor FanOutCopier {
             .appendingPathComponent(".filmcan").appendingPathComponent("hashlists")
             .appendingPathComponent("\(rootName).mhl")
         if FileManager.default.fileExists(atPath: legacy.path),
-           let data = try? Data(contentsOf: legacy) {
-            return Self.parseLegacyMHL(data)
+           let entries = try? SimpleMHLReader.read(url: legacy) {
+            return entries.map { (fileName: $0.relPath, hash: $0.hash, size: $0.size, mtime: $0.mtime) }
         }
         return []
-    }
-
-    /// Minimal parser for the old <file name=".."><hash>..</hash></file> format.
-    /// (The legacy format carried no size or mtime, so both are reported as 0/nil.)
-    nonisolated private static func parseLegacyMHL(_ data: Data) -> [(fileName: String, hash: String, size: Int64, mtime: Int64?)] {
-        guard let xml = String(data: data, encoding: .utf8) else { return [] }
-        var out: [(String, String, Int64, Int64?)] = []
-        let ns = xml as NSString
-        let pattern = #"<file name=\"(.*?)\"><hash>(.*?)</hash></file>"#
-        guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else { return [] }
-        re.enumerateMatches(in: xml, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
-            guard let m, m.numberOfRanges == 3 else { return }
-            let name = ns.substring(with: m.range(at: 1))
-                .replacingOccurrences(of: "&amp;", with: "&")
-                .replacingOccurrences(of: "&lt;", with: "<")
-                .replacingOccurrences(of: "&gt;", with: ">")
-                .replacingOccurrences(of: "&quot;", with: "\"")
-                .replacingOccurrences(of: "&apos;", with: "'")
-            let hash = ns.substring(with: m.range(at: 2))
-            out.append((name, hash, 0, nil))
-        }
-        return out
     }
 
     private func buildSharedMHLs(
