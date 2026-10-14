@@ -59,7 +59,7 @@
   "dl.main_button": "⬇ Herunterladen (.dmg)",
   "dl.all_releases": "Alle Versionen / ältere Versionen",
   "dl.meta": "Benötigt macOS 13 Ventura oder später",
-  "dl.note": "Beim ersten Start: Wenn macOS sagt, dass die App nicht sicher zu öffnen ist, gehe zu Systemeinstellungen › Datenschutz und Sicherheit und klicke auf <strong>Trotzdem öffnen</strong>.",
+  "dl.note": "Beim ersten Start: Wenn macOS sagt, dass die App nicht sicher zu öffnen ist, gehe zu Systemeinstellungen › Datenschutz und Sicherheit und klicke auf <strong>Dennoch öffnen</strong> (macOS 15 und neuer). Unter macOS 13 und 14 klicke mit der rechten Maustaste auf die App und wähle <strong>Öffnen</strong>.",
 
   "faq.eyebrow": "Fragen und Antworten",
   "faq.h2": "Häufig gestellt",

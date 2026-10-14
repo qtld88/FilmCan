@@ -59,7 +59,7 @@
   "dl.main_button": "⬇ Descargar (.dmg)",
   "dl.all_releases": "Todas las versiones, versiones anteriores",
   "dl.meta": "Requiere macOS 13 Ventura o posterior",
-  "dl.note": "Primer lanzamiento: si macOS dice que la aplicación no es segura de abrir, ve a Configuración del Sistema, Privacidad y seguridad y haz clic en <strong>Abrir de todos modos</strong>.",
+  "dl.note": "Primer lanzamiento: si macOS dice que la aplicación no es segura de abrir, ve a Configuración del Sistema › Privacidad y seguridad y haz clic en <strong>Abrir igualmente</strong> (macOS 15 y posteriores). En macOS 13 y 14, haz clic derecho en la aplicación y elige <strong>Abrir</strong>.",
 
   "faq.eyebrow": "Preguntas y respuestas",
   "faq.h2": "Preguntas frecuentes",

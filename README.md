@@ -50,7 +50,9 @@ Done. FilmCan copies, verifies, and saves the checksums.
 
 1. Download the **DMG** from [GitHub Releases](https://github.com/qtld88/FilmCan/releases) (recommended)
 2. Open the DMG and drag `FilmCan.app` to **Applications**
-3. Open FilmCan (macOS may block the first launch; go to **System Settings → Privacy & Security → Open Anyway**)
+3. Open FilmCan. The app is not notarized, so macOS blocks the first launch:
+    - **macOS 15 and later:** open FilmCan once and dismiss the warning, then go to **System Settings → Privacy & Security** and click **Open Anyway**
+    - **macOS 13 and 14:** right-click `FilmCan.app` and choose **Open**
 4. Grant permissions when prompted
 
 [Full install guide →](docs/installation.md)

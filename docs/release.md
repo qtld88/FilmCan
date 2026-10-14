@@ -13,8 +13,10 @@ because it builds Release twice, once per architecture.
 ## Code signing
 
 FilmCan is **not notarized** and has no paid Developer ID. Anyone downloading the DMG has
-to right-click → Open the first time to get past Gatekeeper. That is unchanged and is not
-what the signing certificate below is for.
+to get past Gatekeeper the first time: **System Settings → Privacy & Security → Open
+Anyway** on macOS 15 and later, right-click → Open on macOS 13 and 14 (right-click no
+longer bypasses Gatekeeper from macOS 15). That is unchanged and is not what the signing
+certificate below is for.
 
 ### The saved ntfy token disappears on update — root cause
 

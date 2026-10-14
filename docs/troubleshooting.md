@@ -9,8 +9,8 @@ For detailed error codes, see [Transfer Errors Reference](./reference/transfer-e
 
 ## App Won’t Launch
 
-- Right-click > Open (bypass Gatekeeper)
-- Check **System Settings** > **Privacy & Security**
+- macOS 15 and later: **System Settings** > **Privacy & Security** > **Open Anyway** (bypass Gatekeeper)
+- macOS 13 and 14: right-click > Open (bypass Gatekeeper)
 - Re-download the DMG
 - Restart your Mac
 
@@ -110,8 +110,8 @@ Pour les codes d’erreur détaillés, voir [Référence des erreurs de transfer
 
 ## L’application ne démarre pas
 
-- Clic droit > Ouvrir (contourner Gatekeeper)
-- Vérifiez **System Settings** > **Privacy & Security**
+- macOS 15 et versions ultérieures : **System Settings** > **Privacy & Security** > **Open Anyway** (contourner Gatekeeper)
+- macOS 13 et 14 : clic droit > Ouvrir (contourner Gatekeeper)
 - Retéléchargez le DMG
 - Redémarrez votre Mac
 
@@ -211,8 +211,8 @@ Detaillierte Fehlercodes finden Sie unter [Übertragungsfehler-Referenz](./refer
 
 ## App startet nicht
 
-- Rechtsklick > Öffnen (Gatekeeper umgehen)
-- Überprüfen Sie **System Settings** > **Privacy & Security**
+- macOS 15 und neuer: **System Settings** > **Privacy & Security** > **Open Anyway** (Gatekeeper umgehen)
+- macOS 13 und 14: Rechtsklick > Öffnen (Gatekeeper umgehen)
 - DMG erneut herunterladen
 - Mac neu starten
 
@@ -312,8 +312,8 @@ Para códigos de error detallados, consulte [Referencia de errores de transferen
 
 ## La aplicación no se inicia
 
-- Clic derecho > Abrir (omitir Gatekeeper)
-- Compruebe **System Settings** > **Privacy & Security**
+- macOS 15 y posteriores: **System Settings** > **Privacy & Security** > **Open Anyway** (omitir Gatekeeper)
+- macOS 13 y 14: clic derecho > Abrir (omitir Gatekeeper)
 - Descargue nuevamente el DMG
 - Reinicie su Mac
 

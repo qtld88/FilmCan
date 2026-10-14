@@ -19,8 +19,9 @@ fi
 # diffing `codesign -d -r-`.
 #
 # What this does NOT do: it does not fix the saved ntfy token disappearing on update, and
-# it does not get past Gatekeeper (the DMG is still un-notarized, still right-click ->
-# Open). The token is guarded by the keychain *partition list*, which macOS pins to
+# it does not get past Gatekeeper (the DMG is still un-notarized: Privacy & Security ->
+# Open Anyway on macOS 15+, right-click -> Open on macOS 13 and 14). The token is guarded
+# by the keychain *partition list*, which macOS pins to
 # `cdhash:` unless the signing chain is Apple-anchored with a team OU — a self-signed root
 # is not, so the partition stays cdhash-keyed and a new build is still refused. Measured,
 # not assumed: see docs/release.md. Do not re-derive that fix from the requirement string.

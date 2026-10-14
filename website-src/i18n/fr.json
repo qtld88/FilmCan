@@ -53,7 +53,7 @@
   "dl.main_button": "⬇ Télécharger (.dmg)",
   "dl.all_releases": "Toutes les versions / versions antérieures",
   "dl.meta": "Nécessite macOS 13 Ventura ou plus récent",
-  "dl.note": "Premier lancement : si macOS dit que l'app n'est pas sûre à ouvrir, allez dans Paramètres système › Confidentialité et sécurité et cliquez sur <strong>Ouvrir quand même</strong>.",
+  "dl.note": "Premier lancement : si macOS dit que l'app n'est pas sûre à ouvrir, allez dans Réglages Système › Confidentialité et sécurité et cliquez sur <strong>Ouvrir quand même</strong> (macOS 15 et versions ultérieures). Sur macOS 13 et 14, faites un clic droit sur l'app et choisissez <strong>Ouvrir</strong>.",
   "faq.eyebrow": "Q&A",
   "faq.h2": "Questions fréquentes",
   "faq.q1": "Est-ce gratuit ?",

@@ -59,7 +59,7 @@
   "dl.main_button": "⬇ Download (.dmg)",
   "dl.all_releases": "All releases / older versions",
   "dl.meta": "Requires macOS 13 Ventura or later",
-  "dl.note": "First launch: if macOS says the app is not safe to open, go to System Settings › Privacy &amp; Security and click <strong>Open Anyway</strong>.",
+  "dl.note": "First launch: if macOS says the app is not safe to open, go to System Settings › Privacy &amp; Security and click <strong>Open Anyway</strong> (macOS 15 and later). On macOS 13 and 14, right-click the app and choose <strong>Open</strong>.",
 
   "faq.eyebrow": "Q&amp;A",
   "faq.h2": "Frequently asked",

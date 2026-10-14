@@ -13,7 +13,9 @@
 
 1. Download the DMG from [GitHub Releases](https://github.com/qtld88/FilmCan/releases)
 2. Drag `FilmCan.app` to **Applications**
-3. Open FilmCan (right-click > Open on first launch)
+3. Open FilmCan. The app is not notarized, so macOS blocks the first launch:
+    - **macOS 15 and later:** open FilmCan once and dismiss the warning, then go to **System Settings** > **Privacy & Security** and click **Open Anyway**
+    - **macOS 13 and 14:** right-click `FilmCan.app` and choose **Open**
 
 ---
 
@@ -65,20 +67,22 @@ See [Troubleshooting](./troubleshooting.md) if something goes wrong.
 
 1. Téléchargez le DMG à partir de [GitHub Releases](https://github.com/qtld88/FilmCan/releases)
 2. Glissez `FilmCan.app` dans **Applications**
-3. Ouvrez FilmCan (clic droit > Ouvrir au premier lancement)
+3. Ouvrez FilmCan. L'app n'est pas notarisée, macOS bloque donc le premier lancement :
+    - **macOS 15 et versions ultérieures :** ouvrez FilmCan une fois et fermez l'avertissement, puis allez dans **Réglages Système** > **Confidentialité et sécurité** et cliquez sur **Ouvrir quand même**
+    - **macOS 13 et 14 :** faites un clic droit sur `FilmCan.app` et choisissez **Ouvrir**
 
 ---
 
 ## Permissions
 
-Accordez ces permissions dans Paramètres Système :
+Accordez ces permissions dans Réglages Système :
 
 - **Notifications** : recevoir des alertes quand les transferts sont terminés
 - **Accès disque complet** : lire les cartes et écrire sur les disques
 
 Chemins :
-- **Paramètres Système** > **Confidentialité et sécurité** > **Accès disque complet**
-- **Paramètres Système** > **Notifications** > FilmCan
+- **Réglages Système** > **Confidentialité et sécurité** > **Accès disque complet**
+- **Réglages Système** > **Notifications** > FilmCan
 
 ---
 
@@ -117,7 +121,9 @@ Consultez [Dépannage](./troubleshooting.md) si quelque chose s'est mal passé.
 
 1. Laden Sie die DMG von [GitHub Releases](https://github.com/qtld88/FilmCan/releases) herunter
 2. Ziehen Sie `FilmCan.app` in **Programme**
-3. Öffnen Sie FilmCan (Rechtsklick > Öffnen beim ersten Start)
+3. Öffnen Sie FilmCan. Die App ist nicht notarisiert, daher blockiert macOS den ersten Start:
+    - **macOS 15 und neuer:** Öffnen Sie FilmCan einmal und schließen Sie die Warnung. Gehen Sie dann zu **Systemeinstellungen** > **Datenschutz & Sicherheit** und klicken Sie auf **Dennoch öffnen**
+    - **macOS 13 und 14:** Klicken Sie mit der rechten Maustaste auf `FilmCan.app` und wählen Sie **Öffnen**
 
 ---
 
@@ -169,7 +175,9 @@ Siehe [Fehlerbehebung](./troubleshooting.md), falls etwas schief geht.
 
 1. Descargue el DMG desde [GitHub Releases](https://github.com/qtld88/FilmCan/releases)
 2. Arrastre `FilmCan.app` a **Aplicaciones**
-3. Abra FilmCan (clic derecho > Abrir al primer inicio)
+3. Abra FilmCan. La app no está notarizada, por lo que macOS bloquea el primer inicio:
+    - **macOS 15 y posteriores:** abra FilmCan una vez y cierre el aviso. Luego vaya a **Configuración del Sistema** > **Privacidad y seguridad** y haga clic en **Abrir igualmente**
+    - **macOS 13 y 14:** haga clic derecho en `FilmCan.app` y elija **Abrir**
 
 ---
 
