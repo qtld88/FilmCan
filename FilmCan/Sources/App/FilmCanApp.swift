@@ -85,7 +85,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         // the entry appears without a logout.
         NSApp.servicesProvider = QuickCopyServiceProvider.shared
         NSUpdateDynamicServices()
-        _ = QuickCopyCoordinator.shared   // starts the "launched for quick copy" clock
+        _ = QuickCopyCoordinator.shared   // instantiate early so its window-key observer is registered
     }
 
     /// Dock-icon drop of files/folders.
@@ -94,11 +94,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { QuickCopyCoordinator.shared.showMainWindow() }
+        if !flag, QuickCopyCoordinator.shared.revealHiddenMainWindowIfNeeded() { return false }
         return true
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = QuickCopyServiceProvider.shared
         // Ensure app is properly registered as a regular app (in dock)
         NSApp.setActivationPolicy(.regular)
         
@@ -191,9 +192,16 @@ private struct InitialWindowSizer: ViewModifier {
             }
     }
 
+    /// Quick Copy windows can be key on a service launch; never size or track them.
+    private static func mainWindow() -> NSWindow? {
+        func isQuickCopy(_ w: NSWindow) -> Bool { w.delegate is QuickCopyCoordinator }
+        if let key = NSApp.keyWindow, !isQuickCopy(key) { return key }
+        return NSApp.windows.first { $0.isVisible && !isQuickCopy($0) }
+    }
+
     private func applyInitialSize() {
         guard !didApply else { return }
-        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
+        guard let window = Self.mainWindow() else { return }
         window.tabbingMode = .disallowed
         if !savedFrame.isEmpty {
             let restored = NSRectFromString(savedFrame).standardized
@@ -218,7 +226,7 @@ private struct InitialWindowSizer: ViewModifier {
 
     private func registerWindowObservers() {
         guard observers.isEmpty else { return }
-        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
+        guard let window = Self.mainWindow() else { return }
         let center = NotificationCenter.default
         let save: (Notification) -> Void = { _ in
             savedFrame = NSStringFromRect(window.frame)

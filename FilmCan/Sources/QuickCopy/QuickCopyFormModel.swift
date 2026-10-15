@@ -190,6 +190,7 @@ extension QuickCopyFormModel {
             c.customLogPath = p.customLogPath
             c.logFileNameTemplate = p.logFileNameTemplate
             c.duplicateCounterTemplate = p.duplicateCounterTemplate
+            c.runInParallel = p.runInParallel
         }
         c.selectedOrganizationPresetId = selectedPresetId
         return c
@@ -201,6 +202,7 @@ extension QuickCopyFormModel {
         case noDestination
         case missingDestination(String)
         case missingProject
+        case invalidRollName(String)
         case multipleFiles
 
         var message: String {
@@ -210,6 +212,9 @@ extension QuickCopyFormModel {
             case .missingDestination(let p):
                 return "Destination not found: \((p as NSString).lastPathComponent)."
             case .missingProject: return "Enter a project name."
+            case .invalidRollName(let name):
+                let chars = String(Array(Set(name.filter { NetflixNameValidator.prohibited.contains($0) })))
+                return "\u{201C}\(name)\u{201D} contains characters Netflix prohibits (\(chars)). Rename the folder first."
             case .multipleFiles:
                 return "Several loose files can't be copied together yet — select a folder, or copy the files one at a time."
             }
@@ -220,8 +225,11 @@ extension QuickCopyFormModel {
         if items.isEmpty { return .noSources }
         if destinations.isEmpty { return .noDestination }
         if let gone = destinations.first(where: { !pathExists($0) }) { return .missingDestination(gone) }
-        if selectedPreset == nil, organization == .projectAndDay, sanitizedProject.isEmpty {
-            return .missingProject
+        if showsProjectField, sanitizedProject.isEmpty { return .missingProject }
+        if selectedPreset?.name == OrganizationPreset.netflixIngestName {
+            for issue in NetflixNameValidator.validate(rollNames: items.map(\.name)) {
+                if case .prohibitedChars(let name, _) = issue { return .invalidRollName(name) }
+            }
         }
         if items.filter({ !$0.isDirectory }).count > 1 { return .multipleFiles }
         return nil

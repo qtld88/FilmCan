@@ -15,7 +15,7 @@ enum MediaKindGuesser {
         if !isDir.boolValue { return isAudio(path) ? .sound : .camera }
 
         guard let enumerator = fileManager.enumerator(
-            at: URL(fileURLWithPath: path),
+            at: URL(fileURLWithPath: path).resolvingSymlinksInPath(),
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return .camera }

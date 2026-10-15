@@ -49,6 +49,14 @@ final class MediaKindGuesserTests: XCTestCase {
         XCTAssertEqual(MediaKindGuesser.guess(path: tmp.appendingPathComponent("S").path), .sound)
     }
 
+    func test_symlinkedFolder_isFollowed() throws {
+        for n in ["a.wav", "b.wav", "c.bwf"] { try touch("REAL/\(n)") }
+        let link = tmp.appendingPathComponent("LINK")
+        try FileManager.default.createSymbolicLink(
+            at: link, withDestinationURL: tmp.appendingPathComponent("REAL"))
+        XCTAssertEqual(MediaKindGuesser.guess(path: link.path), .sound)
+    }
+
     func test_emptyAndMissing_areCamera() throws {
         try FileManager.default.createDirectory(
             at: tmp.appendingPathComponent("EMPTY"), withIntermediateDirectories: true)

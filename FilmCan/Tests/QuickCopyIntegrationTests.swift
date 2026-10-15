@@ -149,6 +149,7 @@ final class QuickCopyIntegrationTests: XCTestCase {
         let second = try await runEngine(config: config, preset: nil)
         XCTAssertTrue(second.destinationResults.allSatisfy { $0.success })
         XCTAssertEqual(second.destinationResults.map(\.filesTransferred), [0])
+        XCTAssertEqual(second.destinationResults.map(\.filesSkipped), [1])
     }
 
     /// Observed engine behaviour for copyFolderContents = true + .dateOnly (a record, not a spec):

@@ -163,6 +163,20 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
         }
     }
 
+    /// A window THIS coordinator hid at launch is still waiting: bring it back.
+    /// Returns false (and does nothing) when it hid none, so the caller keeps the
+    /// system's normal reopen behaviour.
+    func revealHiddenMainWindowIfNeeded() -> Bool {
+        guard let window = NSApp.windows.first(where: {
+            hiddenWindows.contains(ObjectIdentifier($0)) && !$0.isVisible
+        }) else { return false }
+        hiddenWindows.remove(ObjectIdentifier(window))
+        launchedForQuickCopy = false
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        return true
+    }
+
     private func isMainAppWindow(_ window: NSWindow) -> Bool {
         guard window.styleMask.contains(.titled), !(window is NSPanel),
               window.delegate !== self, !isQuickCopyWindow(window) else { return false }

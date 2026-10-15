@@ -160,11 +160,13 @@ final class QuickCopyFormModelTests: XCTestCase {
         p.duplicatePolicy = .increment
         p.copyFolderContents = true
         p.hashListStyle = .simpleHidden
+        p.runInParallel = true
         form.savedPresets = [p]
         form.selectedPresetId = p.id
         form.destinations = ["/Volumes/SSD"]
         form.verification = .paranoid   // ignored: preset wins
         let c = form.makeConfiguration()
+        XCTAssertTrue(c.runInParallel)
         XCTAssertEqual(c.selectedOrganizationPresetId, p.id)
         XCTAssertEqual(c.engineOptions.verificationMode, .off)
         XCTAssertEqual(c.duplicatePolicy, .increment)
@@ -203,6 +205,46 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertNil(form.blocker)                 // one loose file + a folder
         form.items = [f1, f2]
         XCTAssertEqual(form.blocker, .multipleFiles)
+    }
+
+    func test_blocker_presetWithEpisodeToken_needsProject() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        let p = netflixLike()          // {episode} in template, empty projectName
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        form.destinations = ["/Volumes/SSD"]
+        form.pathExists = { _ in true }
+        XCTAssertEqual(form.blocker, .missingProject)
+        form.project = "Docu"
+        XCTAssertNil(form.blocker)
+
+        let named = netflixLike(projectName: "Show")
+        form.savedPresets = [named]
+        form.selectedPresetId = named.id
+        form.project = ""
+        XCTAssertNil(form.blocker)     // preset supplies the project name
+    }
+
+    func test_blocker_prohibitedRollName_onlyUnderNetflixPreset() {
+        let bad = QuickCopyFormModel.Item(path: "/Volumes/CARD/A@001", isDirectory: true, kind: .camera)
+        var form = QuickCopyFormModel(items: [bad])
+        form.destinations = ["/Volumes/SSD"]
+        form.pathExists = { _ in true }
+        XCTAssertNil(form.blocker)     // Preset = None: no Netflix rules
+
+        var p = netflixLike(projectName: "Show")
+        p.name = OrganizationPreset.netflixIngestName
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        XCTAssertEqual(form.blocker, .invalidRollName("A@001"))
+        XCTAssertTrue(form.blocker?.message.contains("A@001") == true)
+        XCTAssertTrue(form.blocker?.message.contains("@") == true)
+
+        var other = p
+        other.name = "Something else"
+        form.savedPresets = [other]
+        form.selectedPresetId = other.id
+        XCTAssertNil(form.blocker)
     }
 
     // MARK: Save as preset
