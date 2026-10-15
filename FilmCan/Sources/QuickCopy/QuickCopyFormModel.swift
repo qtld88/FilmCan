@@ -270,3 +270,68 @@ extension QuickCopyFormModel {
             + "\(copy) · \(effectiveHashListStyle.shortName)"
     }
 }
+
+// MARK: - Folder tree preview
+
+extension QuickCopyFormModel {
+
+    struct TreeLine: Equatable {
+        let depth: Int
+        let name: String
+        let isNew: Bool
+    }
+
+    /// Path of each item under `destination`, relative to it, resolved with the
+    /// SAME function the engine uses (`FanOutCopier.resolveDestFilePath`) so the
+    /// preview cannot drift from what is written.
+    func relativePaths(for destination: String) -> [String] {
+        let preset = runPreset()
+        let metadata = ShootMetadata(episode: sanitizedProject, day: sanitizedDay)
+        let prefix = destination.hasSuffix("/") ? destination : destination + "/"
+        return items.map { item in
+            let full = FanOutCopier.resolveDestFilePath(
+                destRoot: destination, rootName: item.name, rootPath: item.path, relPath: "",
+                preset: preset, copyFolderContents: false,
+                date: today, metadata: metadata, mediaKind: item.kind)
+            return full.hasPrefix(prefix) ? String(full.dropFirst(prefix.count)) : item.name
+        }
+    }
+
+    /// What will be created under `destination`; `isNew` = does not exist yet.
+    func treePreview(for destination: String) -> [TreeLine] {
+        var lines: [TreeLine] = []
+        var seen = Set<String>()
+        for (item, rel) in zip(items, relativePaths(for: destination)) {
+            var components = rel.split(separator: "/").map(String.init)
+            var contentsLabel: String?
+            if effectiveCopyFolderContents && item.isDirectory {
+                // Contents land flat in the parent: the roll folder is not created.
+                components.removeLast()
+                contentsLabel = "contents of \(item.name)"
+            }
+            var cumulative = destination
+            for (depth, component) in components.enumerated() {
+                cumulative = (cumulative as NSString).appendingPathComponent(component)
+                if seen.insert(cumulative).inserted {
+                    lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative)))
+                }
+            }
+            if let contentsLabel {
+                lines.append(TreeLine(depth: components.count, name: contentsLabel, isNew: true))
+            }
+        }
+        return lines
+    }
+
+    /// Folder to reveal in Finder after the copy: the top folder the run created
+    /// under `destination` (or the destination itself when nothing nests below it).
+    func revealPath(for destination: String) -> String {
+        guard let rel = relativePaths(for: destination).first else { return destination }
+        let parts = rel.split(separator: "/")
+        if effectiveCopyFolderContents, items.first?.isDirectory == true, parts.count == 1 {
+            return destination
+        }
+        guard let top = parts.first else { return destination }
+        return (destination as NSString).appendingPathComponent(String(top))
+    }
+}

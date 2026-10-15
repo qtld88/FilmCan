@@ -262,4 +262,55 @@ final class QuickCopyFormModelTests: XCTestCase {
         form.selectedPresetId = nil
         XCTAssertNil(form.presetSummary)
     }
+
+    // MARK: Folder tree preview
+    private func previewForm() -> QuickCopyFormModel {
+        var form = QuickCopyFormModel(items: [dir("A001"), dir("ZOOM_F8", .sound)])
+        form.organization = .projectAndDay
+        form.project = "Docu Truc"
+        form.day = "itw"
+        form.today = date(2026, 10, 14)
+        form.pathExists = { _ in false }
+        return form
+    }
+
+    func test_treePreview_projectAndDay() {
+        let lines = previewForm().treePreview(for: "/Volumes/SSD")
+        XCTAssertEqual(lines.map(\.name), [
+            "20261014_Docu_Truc_itw", "Camera_Media", "A001", "Sound_Media", "ZOOM_F8"])
+        XCTAssertEqual(lines.map(\.depth), [0, 1, 2, 1, 2])
+        XCTAssertTrue(lines.allSatisfy(\.isNew))
+    }
+
+    func test_treePreview_marksExistingFolderNotNew() {
+        var form = previewForm()
+        form.pathExists = { $0 == "/Volumes/SSD/20261014_Docu_Truc_itw" }
+        let lines = form.treePreview(for: "/Volumes/SSD")
+        XCTAssertFalse(lines[0].isNew)
+        XCTAssertTrue(lines[1].isNew)
+    }
+
+    func test_treePreview_noOrganization_isJustTheRoll() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.pathExists = { _ in false }
+        let lines = form.treePreview(for: "/Volumes/SSD")
+        XCTAssertEqual(lines.map(\.name), ["A001"])
+    }
+
+    func test_treePreview_copyContents_dropsRollFolder() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.copyFolderContents = true
+        form.organization = .dateOnly
+        form.today = date(2026, 10, 14)
+        form.pathExists = { _ in false }
+        let lines = form.treePreview(for: "/Volumes/SSD")
+        XCTAssertEqual(lines.map(\.name), ["20261014", "Camera_Media", "contents of A001"])
+    }
+
+    func test_revealPath_isTopCreatedFolder() {
+        XCTAssertEqual(previewForm().revealPath(for: "/Volumes/SSD"),
+                       "/Volumes/SSD/20261014_Docu_Truc_itw")
+        let plain = QuickCopyFormModel(items: [dir("A001")])
+        XCTAssertEqual(plain.revealPath(for: "/Volumes/SSD"), "/Volumes/SSD/A001")
+    }
 }
