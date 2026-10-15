@@ -379,9 +379,3 @@ struct QuickCopyProgressView: View {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: target)])
     }
 }
-
-// TEMP — removed in Task 9
-@MainActor final class QuickCopyCoordinator {
-    static let shared = QuickCopyCoordinator()
-    func showMainWindow() {}
-}
