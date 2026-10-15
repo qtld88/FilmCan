@@ -307,11 +307,11 @@ extension QuickCopyFormModel {
         var seen = Set<String>()
         for (item, rel) in zip(items, relativePaths(for: destination)) {
             var components = rel.split(separator: "/").map(String.init)
-            var contentsLabel: String?
+            var rollName: String?
             if effectiveCopyFolderContents && item.isDirectory {
-                // Contents land flat in the parent: the roll folder is not created.
-                components = Array(components.dropLast())
-                contentsLabel = "contents of \(item.name)"
+                // Contents land flat in the parent; the roll folder is still created
+                // beside them, holding only the hash list (`ascmhl/`, `.filmcan/`).
+                rollName = components.popLast()
             }
             var cumulative = destination
             for (depth, component) in components.enumerated() {
@@ -320,8 +320,11 @@ extension QuickCopyFormModel {
                     lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative)))
                 }
             }
-            if let contentsLabel {
-                lines.append(TreeLine(depth: components.count, name: contentsLabel, isNew: true))
+            if let rollName {
+                let rollPath = (cumulative as NSString).appendingPathComponent(rollName)
+                lines.append(TreeLine(depth: components.count, name: "contents of \(item.name)", isNew: true))
+                lines.append(TreeLine(depth: components.count, name: "\(rollName) (hash list only)",
+                                      isNew: !pathExists(rollPath)))
             }
         }
         return lines

@@ -297,14 +297,22 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(lines.map(\.name), ["A001"])
     }
 
-    func test_treePreview_copyContents_dropsRollFolder() {
+    func test_treePreview_copyContents_showsFlatContentsAndHashListFolder() {
         var form = QuickCopyFormModel(items: [dir("A001")])
         form.copyFolderContents = true
         form.organization = .dateOnly
         form.today = date(2026, 10, 14)
         form.pathExists = { _ in false }
         let lines = form.treePreview(for: "/Volumes/SSD")
-        XCTAssertEqual(lines.map(\.name), ["20261014", "Camera_Media", "contents of A001"])
+        XCTAssertEqual(lines.map(\.name), [
+            "20261014", "Camera_Media", "contents of A001", "A001 (hash list only)"])
+        XCTAssertEqual(lines.map(\.depth), [0, 1, 2, 2])
+        XCTAssertTrue(lines.allSatisfy(\.isNew))
+
+        form.pathExists = { $0 == "/Volumes/SSD/20261014/Camera_Media/A001" }
+        let existing = form.treePreview(for: "/Volumes/SSD")
+        XCTAssertTrue(existing[2].isNew)
+        XCTAssertFalse(existing[3].isNew)
     }
 
     func test_revealPath_isTopCreatedFolder() {
