@@ -14,6 +14,7 @@ struct FilmCanApp: App {
                 .environmentObject(appState)
                 .environmentObject(appState.storage)
         }
+        .handlesExternalEvents(matching: [])
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(replacing: .appTermination) {
@@ -79,6 +80,24 @@ struct FilmCanApp: App {
 }
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Finder → Services → FilmCan Copy. Refresh the registry at every launch so
+        // the entry appears without a logout.
+        NSApp.servicesProvider = QuickCopyServiceProvider.shared
+        NSUpdateDynamicServices()
+        _ = QuickCopyCoordinator.shared   // starts the "launched for quick copy" clock
+    }
+
+    /// Dock-icon drop of files/folders.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        QuickCopyCoordinator.shared.open(paths: urls.filter(\.isFileURL).map(\.path))
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { QuickCopyCoordinator.shared.showMainWindow() }
+        return true
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure app is properly registered as a regular app (in dock)
         NSApp.setActivationPolicy(.regular)
@@ -125,8 +144,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let transferViewModel = TransferViewModel.shared
+        let quickCopy = QuickCopyCoordinator.shared
         let progress = transferViewModel.progress
         let isBusy = transferViewModel.hasActiveTransfers()
+            || quickCopy.hasRunningQuickCopy
             || progress.isRunning
             || progress.verificationPhase == .verifying
             || progress.verificationPhase == .generatingHashList
@@ -144,6 +165,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let response = alert.runModal()
         if response == .alertSecondButtonReturn {
             transferViewModel.cancelAll()
+            quickCopy.cancelAllRunning()
             return .terminateNow
         }
         return .terminateCancel
