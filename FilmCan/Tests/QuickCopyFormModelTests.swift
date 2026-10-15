@@ -126,4 +126,140 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertTrue(run.useCustomDate)
         XCTAssertFalse(form.savedPresets[0].useCustomDate)
     }
+
+    // MARK: temporary configuration
+    func test_makeConfiguration_noPreset() {
+        var form = QuickCopyFormModel(items: [dir("A001"), dir("ZOOM", .sound)])
+        form.destinations = ["/Volumes/SSD1", "/Volumes/SSD2"]
+        form.verification = .paranoid
+        form.duplicatePolicy = .overwrite
+        form.copyFolderContents = true
+        form.organization = .projectAndDay
+        form.project = "Docu Truc"
+        form.day = "itw/1"
+        let c = form.makeConfiguration()
+        XCTAssertEqual(c.name, "Quick Copy — A001")
+        XCTAssertEqual(c.sourcePaths, ["/Volumes/CARD/A001", "/Volumes/CARD/ZOOM"])
+        XCTAssertEqual(c.destinationPaths, ["/Volumes/SSD1", "/Volumes/SSD2"])
+        XCTAssertEqual(c.sourceMediaKinds["/Volumes/CARD/ZOOM"], .sound)
+        XCTAssertEqual(c.sourceMediaKinds["/Volumes/CARD/A001"], .camera)
+        XCTAssertEqual(c.episode, "Docu_Truc")
+        XCTAssertEqual(c.day, "itw_1")
+        XCTAssertEqual(c.engineOptions.verificationMode, .paranoid)
+        XCTAssertEqual(c.duplicatePolicy, .overwrite)
+        XCTAssertTrue(c.copyFolderContents)
+        XCTAssertTrue(c.logEnabled)
+        XCTAssertEqual(c.hashListStyle, .ascMHL)
+        XCTAssertNil(c.selectedOrganizationPresetId)
+    }
+
+    func test_makeConfiguration_withPreset_usesPresetValues() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var p = netflixLike(projectName: "Show")
+        p.engineOptions.verificationMode = .off
+        p.duplicatePolicy = .increment
+        p.copyFolderContents = true
+        p.hashListStyle = .simpleHidden
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        form.destinations = ["/Volumes/SSD"]
+        form.verification = .paranoid   // ignored: preset wins
+        let c = form.makeConfiguration()
+        XCTAssertEqual(c.selectedOrganizationPresetId, p.id)
+        XCTAssertEqual(c.engineOptions.verificationMode, .off)
+        XCTAssertEqual(c.duplicatePolicy, .increment)
+        XCTAssertTrue(c.copyFolderContents)
+        XCTAssertEqual(c.hashListStyle, .simpleHidden)
+        XCTAssertEqual(c.episode, "Show")
+    }
+
+    // MARK: Run blockers
+    func test_blockers() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.pathExists = { _ in true }
+        XCTAssertEqual(form.blocker, .noDestination)
+        XCTAssertFalse(form.canRun)
+
+        form.destinations = ["/Volumes/SSD"]
+        XCTAssertNil(form.blocker)
+        XCTAssertTrue(form.canRun)
+
+        form.pathExists = { $0 != "/Volumes/SSD" }
+        XCTAssertEqual(form.blocker, .missingDestination("/Volumes/SSD"))
+
+        form.pathExists = { _ in true }
+        form.organization = .projectAndDay
+        XCTAssertEqual(form.blocker, .missingProject)
+        form.project = "Docu"
+        XCTAssertNil(form.blocker)
+    }
+
+    func test_blocker_twoLooseFiles_butFoldersAreFine() {
+        let f1 = QuickCopyFormModel.Item(path: "/x/a.mov", isDirectory: false, kind: .camera)
+        let f2 = QuickCopyFormModel.Item(path: "/x/b.mov", isDirectory: false, kind: .camera)
+        var form = QuickCopyFormModel(items: [f1, dir("A001")])
+        form.destinations = ["/Volumes/SSD"]
+        form.pathExists = { _ in true }
+        XCTAssertNil(form.blocker)                 // one loose file + a folder
+        form.items = [f1, f2]
+        XCTAssertEqual(form.blocker, .multipleFiles)
+    }
+
+    // MARK: Save as preset
+    func test_makeSavedPreset_contents_noDateStored() throws {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.organization = .projectAndDay
+        form.project = "Docu Truc"
+        form.verification = .paranoid
+        form.duplicatePolicy = .verify
+        form.copyFolderContents = true
+        form.pickedDate = date(2026, 3, 2)
+        form.savePresetName = "  Docu  "
+        let p = try XCTUnwrap(form.makeSavedPreset())
+        XCTAssertEqual(p.name, "Docu")
+        XCTAssertEqual(p.engineOptions.verificationMode, .paranoid)
+        XCTAssertEqual(p.duplicatePolicy, .verify)
+        XCTAssertTrue(p.copyFolderContents)
+        XCTAssertTrue(p.logEnabled)
+        XCTAssertEqual(p.hashListStyle, .ascMHL)
+        XCTAssertEqual(p.projectName, "Docu_Truc")
+        XCTAssertTrue(p.useFolderTemplate)
+        XCTAssertEqual(p.folderTemplate, QuickCopyFormModel.projectCameraTemplate)
+        XCTAssertEqual(p.soundFolderTemplate, QuickCopyFormModel.projectSoundTemplate)
+        XCTAssertFalse(p.useCustomDate)
+    }
+
+    func test_makeSavedPreset_nilWhenNameEmptyOrPresetSelected() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        XCTAssertNil(form.makeSavedPreset())
+        form.savePresetName = "X"
+        let p = netflixLike()
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        XCTAssertNil(form.makeSavedPreset())
+    }
+
+    func test_makeSavedPreset_noOrganization_hasNoTemplate() throws {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.savePresetName = "Plain"
+        let p = try XCTUnwrap(form.makeSavedPreset())
+        XCTAssertFalse(p.useFolderTemplate)
+        XCTAssertEqual(p.folderTemplate, "")
+        XCTAssertEqual(p.projectName, "")
+    }
+
+    // MARK: Summary line
+    func test_presetSummary_mentionsMappedAsk() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var p = netflixLike()
+        p.duplicatePolicy = .ask
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        let summary = form.presetSummary ?? ""
+        XCTAssertTrue(summary.contains("Fast"), summary)
+        XCTAssertTrue(summary.contains("Skip"), summary)
+        XCTAssertTrue(summary.contains("Ask each time"), summary)
+        form.selectedPresetId = nil
+        XCTAssertNil(form.presetSummary)
+    }
 }

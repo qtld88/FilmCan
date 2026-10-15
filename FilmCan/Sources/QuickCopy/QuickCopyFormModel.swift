@@ -156,3 +156,117 @@ struct QuickCopyFormModel {
         return preset
     }
 }
+
+// MARK: - Temporary configuration, validation, saved preset
+
+extension QuickCopyFormModel {
+
+    /// Never written to `configs.json`. Engine options are read from the CONFIG by
+    /// `TransferViewModel.runFanOut`, so preset values are copied in here; the
+    /// organization preset itself travels separately (`runPreset()`).
+    func makeConfiguration() -> BackupConfiguration {
+        var c = BackupConfiguration()
+        c.name = "Quick Copy — \(items.first?.name ?? "")"
+        c.sourcePaths = items.map(\.path)
+        c.destinationPaths = destinations
+        c.sourceMediaKinds = Dictionary(uniqueKeysWithValues: items.map { ($0.path, $0.kind) })
+        c.episode = sanitizedProject
+        c.day = sanitizedDay
+
+        var options = selectedPreset?.engineOptions ?? EngineOptions()
+        options.verificationMode = effectiveVerification
+        c.engineOptions = options
+
+        c.hashListStyle = effectiveHashListStyle
+        c.duplicatePolicy = effectiveDuplicatePolicy
+        c.copyFolderContents = effectiveCopyFolderContents
+        c.logEnabled = selectedPreset?.logEnabled ?? true
+        if let p = selectedPreset {
+            c.logLocation = p.logLocation
+            c.customLogPath = p.customLogPath
+            c.logFileNameTemplate = p.logFileNameTemplate
+            c.duplicateCounterTemplate = p.duplicateCounterTemplate
+        }
+        c.selectedOrganizationPresetId = selectedPresetId
+        return c
+    }
+
+    // MARK: Run blockers
+    enum Blocker: Equatable {
+        case noSources
+        case noDestination
+        case missingDestination(String)
+        case missingProject
+        case multipleFiles
+
+        var message: String {
+            switch self {
+            case .noSources: return "Nothing to copy."
+            case .noDestination: return "Add a destination to continue."
+            case .missingDestination(let p):
+                return "Destination not found: \((p as NSString).lastPathComponent)."
+            case .missingProject: return "Enter a project name."
+            case .multipleFiles:
+                return "Several loose files can't be copied together yet — select a folder, or copy the files one at a time."
+            }
+        }
+    }
+
+    var blocker: Blocker? {
+        if items.isEmpty { return .noSources }
+        if destinations.isEmpty { return .noDestination }
+        if let gone = destinations.first(where: { !pathExists($0) }) { return .missingDestination(gone) }
+        if selectedPreset == nil, organization == .projectAndDay, sanitizedProject.isEmpty {
+            return .missingProject
+        }
+        if items.filter({ !$0.isDirectory }).count > 1 { return .multipleFiles }
+        return nil
+    }
+
+    var canRun: Bool { blocker == nil }
+
+    // MARK: Save as preset
+    /// Only with Preset = None and a non-empty name. A date is never stored.
+    func makeSavedPreset() -> OrganizationPreset? {
+        guard selectedPresetId == nil else { return nil }
+        let name = savePresetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+
+        var p = OrganizationPreset()
+        p.name = name
+        var options = EngineOptions()
+        options.verificationMode = verification
+        p.engineOptions = options
+        p.duplicatePolicy = duplicatePolicy == .ask ? .skip : duplicatePolicy
+        p.copyFolderContents = copyFolderContents
+        p.logEnabled = true
+        p.hashListStyle = .ascMHL
+        p.useCustomDate = false
+        switch organization {
+        case .none:
+            break
+        case .dateOnly:
+            p.useFolderTemplate = true
+            p.folderTemplate = Self.dateCameraTemplate
+            p.soundFolderTemplate = Self.dateSoundTemplate
+        case .projectAndDay:
+            p.useFolderTemplate = true
+            p.folderTemplate = Self.projectCameraTemplate
+            p.soundFolderTemplate = Self.projectSoundTemplate
+            p.projectName = sanitizedProject
+        }
+        return p
+    }
+
+    // MARK: Summary
+    /// One-line description of the chosen preset's options (nil with Preset = None).
+    var presetSummary: String? {
+        guard let p = selectedPreset else { return nil }
+        let policy = duplicatePolicyWasMapped
+            ? "Skip (preset says Ask each time)"
+            : p.duplicatePolicy.displayName
+        let copy = p.copyFolderContents ? "contents only" : "whole folder"
+        return "\(effectiveVerification.displayName) verification · If exists: \(policy) · "
+            + "\(copy) · \(effectiveHashListStyle.shortName)"
+    }
+}
