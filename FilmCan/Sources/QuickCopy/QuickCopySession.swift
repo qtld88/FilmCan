@@ -1,0 +1,125 @@
+import AppKit
+import Combine
+import Foundation
+
+/// State of ONE Quick Copy window: the form, the background worker and the
+/// setup → running → finished lifecycle.
+@MainActor
+final class QuickCopySession: ObservableObject, Identifiable {
+
+    enum Phase { case setup, running, finished }
+
+    static let lastPresetKey = "quickCopy.lastPresetId"
+    static let lastDestinationsKey = "quickCopy.lastDestinations"
+
+    let id = UUID()
+    @Published var form: QuickCopyFormModel
+    @Published private(set) var phase: Phase = .setup
+    /// Total bytes per selected item, filled in off the main thread.
+    @Published private(set) var sizes: [String: Int64] = [:]
+
+    let worker = TransferViewModel(isBackgroundWorker: true)
+    weak var window: NSWindow?
+    var windowClosed = false
+    /// Called on the main actor when the run ends (success, failure or stop).
+    var onFinished: (() -> Void)?
+
+    private let storage: ConfigurationStorage
+    private let defaults: UserDefaults
+    private var workerObserver: AnyCancellable?
+
+    init(paths: [String],
+         storage: ConfigurationStorage? = nil,
+         defaults: UserDefaults = .standard) {
+        let storage = storage ?? ConfigurationStorage.shared
+        self.storage = storage
+        self.defaults = defaults
+
+        var form = QuickCopyFormModel(items: QuickCopyFormModel.items(for: paths))
+        form.savedPresets = storage.organizationPresets
+        // Quick Copy keeps its own "last used" keys — never the main app's lastUsedConfigId.
+        if let raw = defaults.string(forKey: Self.lastPresetKey),
+           let presetId = UUID(uuidString: raw),
+           form.savedPresets.contains(where: { $0.id == presetId }) {
+            form.selectedPresetId = presetId
+        }
+        form.destinations = (defaults.stringArray(forKey: Self.lastDestinationsKey) ?? [])
+            .filter { FileManager.default.fileExists(atPath: $0) }
+        self.form = form
+
+        workerObserver = worker.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        loadSizes()
+    }
+
+    var isRunning: Bool { phase == .running }
+
+    // MARK: Setup actions
+
+    func addDestinationViaPanel() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls where !form.destinations.contains(url.path) {
+            form.destinations.append(url.path)
+        }
+    }
+
+    func removeDestination(_ path: String) {
+        form.destinations.removeAll { $0 == path }
+    }
+
+    // MARK: Run / stop
+
+    func run() {
+        guard phase == .setup, form.canRun else { return }
+
+        if let preset = form.makeSavedPreset() {
+            storage.addPreset(preset)
+            form.savedPresets = storage.organizationPresets
+            form.selectedPresetId = preset.id
+        }
+        defaults.set(form.selectedPresetId?.uuidString, forKey: Self.lastPresetKey)
+        defaults.set(form.destinations, forKey: Self.lastDestinationsKey)
+
+        let config = form.makeConfiguration()
+        let preset = form.runPreset()
+        phase = .running
+
+        Task { [weak self, worker] in
+            await worker.startTransfer(config: config, organizationPresetOverride: preset)
+            self?.finish()
+        }
+    }
+
+    /// Stops the copy. Deletes nothing; re-running the Quick Copy resumes from the
+    /// on-disk manifest and copies only what is missing.
+    func stop() {
+        guard phase == .running else { return }
+        worker.cancelAll()
+    }
+
+    private func finish() {
+        phase = .finished
+        onFinished?()
+    }
+
+    // MARK: Sizes
+
+    private func loadSizes() {
+        for item in form.items {
+            let path = item.path
+            Task { @MainActor [weak self] in
+                let bytes = await Task.detached(priority: .utility) {
+                    PreviewCalculator.calculateTotalsAndSizes(for: [path]).0
+                }.value
+                self?.sizes[path] = bytes
+            }
+        }
+    }
+}
