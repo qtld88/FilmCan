@@ -69,8 +69,11 @@ struct QuickCopyFormModel {
     }
 
     var sanitizedProject: String {
-        let typed = Self.sanitizeName(project)
-        if !typed.isEmpty { return typed }
+        // A hidden field's leftover text must not override the preset's project name.
+        if selectedPreset == nil || showsProjectField {
+            let typed = Self.sanitizeName(project)
+            if !typed.isEmpty { return typed }
+        }
         return Self.sanitizeName(selectedPreset?.projectName ?? "")
     }
 
@@ -149,9 +152,10 @@ struct QuickCopyFormModel {
             preset.name = "Quick Copy"
             preset.useFolderTemplate = true
         }
-        if let picked = pickedDate, organizationActive {
-            preset.useCustomDate = true
-            preset.customDate = picked
+        if organizationActive {
+            // No picked date means "Today", whatever the stored preset says.
+            preset.useCustomDate = pickedDate != nil
+            if let picked = pickedDate { preset.customDate = picked }
         }
         return preset
     }
@@ -169,7 +173,7 @@ extension QuickCopyFormModel {
         c.name = "Quick Copy — \(items.first?.name ?? "")"
         c.sourcePaths = items.map(\.path)
         c.destinationPaths = destinations
-        c.sourceMediaKinds = Dictionary(uniqueKeysWithValues: items.map { ($0.path, $0.kind) })
+        c.sourceMediaKinds = Dictionary(items.map { ($0.path, $0.kind) }, uniquingKeysWith: { first, _ in first })
         c.episode = sanitizedProject
         c.day = sanitizedDay
 
@@ -306,7 +310,7 @@ extension QuickCopyFormModel {
             var contentsLabel: String?
             if effectiveCopyFolderContents && item.isDirectory {
                 // Contents land flat in the parent: the roll folder is not created.
-                components.removeLast()
+                components = Array(components.dropLast())
                 contentsLabel = "contents of \(item.name)"
             }
             var cumulative = destination

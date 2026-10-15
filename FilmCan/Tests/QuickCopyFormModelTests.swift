@@ -313,4 +313,72 @@ final class QuickCopyFormModelTests: XCTestCase {
         let plain = QuickCopyFormModel(items: [dir("A001")])
         XCTAssertEqual(plain.revealPath(for: "/Volumes/SSD"), "/Volumes/SSD/A001")
     }
+
+    // MARK: Review fixes
+    func test_sanitizedProject_hiddenFieldIgnoresStaleTypedValue() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.project = "Foo"
+        XCTAssertEqual(form.sanitizedProject, "Foo")
+        let named = netflixLike(projectName: "Show")
+        form.savedPresets = [named]
+        form.selectedPresetId = named.id
+        XCTAssertFalse(form.showsProjectField)
+        XCTAssertEqual(form.sanitizedProject, "Show")
+    }
+
+    func test_sanitizedProject_visibleFieldUsesTypedValue() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        let unnamed = netflixLike()
+        form.savedPresets = [unnamed]
+        form.selectedPresetId = unnamed.id
+        form.project = "Foo"
+        XCTAssertTrue(form.showsProjectField)
+        XCTAssertEqual(form.sanitizedProject, "Foo")
+    }
+
+    func test_runPreset_storedUseCustomDateIgnoredWithoutPickedDate() throws {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var p = netflixLike()
+        p.useCustomDate = true
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        let run = try XCTUnwrap(form.runPreset())
+        XCTAssertFalse(run.useCustomDate)
+        XCTAssertTrue(form.savedPresets[0].useCustomDate)
+    }
+
+    func test_blocker_noSources() {
+        var form = QuickCopyFormModel(items: [])
+        form.destinations = ["/Volumes/SSD"]
+        form.pathExists = { _ in true }
+        XCTAssertEqual(form.blocker, .noSources)
+    }
+
+    func test_revealPath_contentsMode_noOrganization_isDestination() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.copyFolderContents = true
+        XCTAssertEqual(form.revealPath(for: "/Volumes/SSD"), "/Volumes/SSD")
+    }
+
+    func test_showsDayField_falseWhenTemplatesHaveNoDayToken() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var p = netflixLike()
+        p.folderTemplate = "{date}/Camera_Media"
+        p.soundFolderTemplate = "{date}/Sound_Media"
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        XCTAssertTrue(form.organizationActive)
+        XCTAssertFalse(form.showsDayField)
+    }
+
+    func test_makeSavedPreset_dateOnly() throws {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.savePresetName = "By date"
+        form.organization = .dateOnly
+        let p = try XCTUnwrap(form.makeSavedPreset())
+        XCTAssertTrue(p.useFolderTemplate)
+        XCTAssertEqual(p.folderTemplate, "{date}/Camera_Media")
+        XCTAssertEqual(p.soundFolderTemplate, "{date}/Sound_Media")
+        XCTAssertEqual(p.projectName, "")
+    }
 }
