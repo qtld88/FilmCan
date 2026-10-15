@@ -26,6 +26,21 @@ structurally cannot catch these. The smoke run is the only thing that can.
 
 If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 
+### Quick Copy gate (run when Quick Copy / Services code changed)
+
+| # | Check (real .app, installed once) | Expected | Pass? |
+|---|-----------------------------------|----------|-------|
+| Q1 | Quit FilmCan. Finder: right-click a **folder** → Services → **FilmCan Copy**. | Quick Copy window opens; no main window (≤ 1 s flash tolerated); Dock icon visible. | ☐ |
+| Q2 | Same with a **single file**, then with a **mounted card**. | Window opens; Camera/Sound pre-filled sensibly; Run works. | ☐ |
+| Q3 | Quit FilmCan. Drop a folder on the **Dock icon**. | Same window; no second main window. | ☐ |
+| Q4 | Two destinations, Project + day, Camera + Sound items, Run. | `YYYYMMDD_Project_Day/Camera_Media/<roll>` and `/Sound_Media/<roll>` on both, `ascmhl/` per roll, copy+verify bars move, both cards ✓. | ☐ |
+| Q5 | **Show in Finder**, then **Close**. | Finder reveals the day folder; FilmCan quits (launched for quick copy). | ☐ |
+| Q6 | With the main app open and a normal backup running, start a quick copy. | Both run; closing the quick copy does NOT quit FilmCan. | ☐ |
+| Q7 | Start a quick copy, **Stop**, run it again to the same destination. | Second run resumes and copies only what is missing. (Stop, not Pause — Pause does not exist in Quick Copy) | ☐ |
+| Q8 | During a quick copy press ⌘Q; and close the window. | Quit alert / "Stop the copy?" alert; Continue keeps copying. | ☐ |
+| Q9 | After a completed quick copy. | macOS notification (and ntfy if configured) received; entry present in `history.json`. | ☐ |
+| Q10 | Preset = a saved preset with `Ask each time`. | Summary line says it runs as Skip; no prompt appears. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
