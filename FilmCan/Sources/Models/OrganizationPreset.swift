@@ -46,7 +46,13 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
     var logFileNameTemplate: String = "transfer_{datetime}"
     var useCustomDate: Bool = false
     var customDate: Date = Date()
-    
+    /// Quick Copy: default project name for the `{episode}` token. Empty ⇒ the
+    /// Quick Copy window asks for it when the folder template uses `{episode}`.
+    var projectName: String = ""
+    /// Quick Copy only: hash-list format for runs started from the Quick Copy
+    /// window. Main-app backups keep using `BackupConfiguration.hashListStyle`.
+    var hashListStyle: HashListStyle = .ascMHL
+
     private enum CodingKeys: String, CodingKey {
         case id, name, folderTemplate, soundFolderTemplate, renameTemplate
         case useFolderTemplate, useRenameTemplate, renameOnlyPatterns
@@ -55,6 +61,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         case copyFolderContents, runInParallel, engineOptions
         case logEnabled, logLocation, customLogPath, logFileNameTemplate
         case useCustomDate, customDate
+        case projectName, hashListStyle
     }
     
     init() {}
@@ -84,6 +91,8 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         logFileNameTemplate = try c.decodeIfPresent(String.self, forKey: .logFileNameTemplate) ?? "transfer_{datetime}"
         useCustomDate = try c.decodeIfPresent(Bool.self, forKey: .useCustomDate) ?? false
         customDate = try c.decodeIfPresent(Date.self, forKey: .customDate) ?? Date()
+        projectName = try c.decodeIfPresent(String.self, forKey: .projectName) ?? ""
+        hashListStyle = try c.decodeIfPresent(HashListStyle.self, forKey: .hashListStyle) ?? .ascMHL
         
         duplicateCounterTemplate = try c.decodeIfPresent(String.self, forKey: .duplicateCounterTemplate) ?? "_001"
     }
@@ -112,6 +121,8 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         try c.encode(logFileNameTemplate, forKey: .logFileNameTemplate)
         try c.encode(useCustomDate, forKey: .useCustomDate)
         try c.encode(customDate, forKey: .customDate)
+        try c.encode(projectName, forKey: .projectName)
+        try c.encode(hashListStyle, forKey: .hashListStyle)
     }
 }
 
