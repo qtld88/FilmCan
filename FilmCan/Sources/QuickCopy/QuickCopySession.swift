@@ -15,6 +15,8 @@ final class QuickCopySession: ObservableObject, Identifiable {
     let id = UUID()
     @Published var form: QuickCopyFormModel
     @Published private(set) var phase: Phase = .setup
+    /// Set when the user asked to stop; drives the "Stopping…" button state.
+    @Published private(set) var stopRequested = false
     /// Total bytes per selected item, filled in off the main thread.
     @Published private(set) var sizes: [String: Int64] = [:]
 
@@ -111,6 +113,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
     /// on-disk manifest and copies only what is missing.
     func stop() {
         guard isRunning else { return }
+        stopRequested = true
         worker.cancelAll()
         unblockPendingPrompts()
         guard stopTask == nil else { return }

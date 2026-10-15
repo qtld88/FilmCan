@@ -273,7 +273,9 @@ struct QuickCopyProgressView: View {
     @ObservedObject var worker: TransferViewModel
 
     private var destinations: [String] { session.form.destinations }
+    /// Results are on screen (the run's tail may still be writing history etc.).
     private var finished: Bool { session.resultsComplete }
+    private var fullyFinished: Bool { session.phase == .finished }
 
     private func result(for destination: String) -> TransferResult? {
         worker.results.last { $0.destination == destination }
@@ -331,7 +333,14 @@ struct QuickCopyProgressView: View {
 
     private var header: some View {
         HStack {
-            Text(finished ? "Finished" : "Copying…").font(FilmCanFont.title(18))
+            if finished && !fullyFinished {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Finalizing…").font(FilmCanFont.title(18))
+                }
+            } else {
+                Text(fullyFinished ? "Finished" : "Copying…").font(FilmCanFont.title(18))
+            }
             Spacer()
             Text("\(session.form.items.count) item\(session.form.items.count == 1 ? "" : "s") → "
                  + "\(destinations.count) destination\(destinations.count == 1 ? "" : "s")")
@@ -391,9 +400,11 @@ struct QuickCopyProgressView: View {
                 Spacer()
                 Button("Close") { session.window?.performClose(nil) }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!fullyFinished)
             } else {
                 Spacer()
-                Button("Stop") { session.stop() }
+                Button(session.stopRequested ? "Stopping…" : "Stop") { session.stop() }
+                    .disabled(session.stopRequested)
             }
         }
         .padding(12)

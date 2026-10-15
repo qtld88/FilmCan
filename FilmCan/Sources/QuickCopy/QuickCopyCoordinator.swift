@@ -11,8 +11,6 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
     /// launched BY the quick copy (Services/Dock), not opened by the user.
     private static let launchWindow: TimeInterval = 10
 
-    /// Fallback only; the real launch date comes from `NSRunningApplication`.
-    private let processStart = Date()
     private var sessions: [UUID: QuickCopySession] = [:]
     /// Main-app windows this coordinator ordered out; when one becomes key the
     /// user has taken the app over, so auto-quit is cancelled.
@@ -51,8 +49,10 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
         let existing = paths.filter { FileManager.default.fileExists(atPath: $0) }
         guard !existing.isEmpty else { return }
 
+        // No launch date → never treat the request as launch-triggered (never auto-quit).
         if sessions.isEmpty, !launchedForQuickCopy,
-           Date().timeIntervalSince(NSRunningApplication.current.launchDate ?? processStart) < Self.launchWindow {
+           let launchDate = NSRunningApplication.current.launchDate,
+           Date().timeIntervalSince(launchDate) < Self.launchWindow {
             launchedForQuickCopy = true
         }
         if launchedForQuickCopy { scheduleMainWindowHiding() }
