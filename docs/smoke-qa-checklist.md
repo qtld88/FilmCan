@@ -40,6 +40,10 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q8 | During a quick copy press ⌘Q; and close the window. | Quit alert / "Stop the copy?" alert; Continue keeps copying. | ☐ |
 | Q9 | After a completed quick copy. | macOS notification (and ntfy if configured) received; entry present in `history.json`. | ☐ |
 | Q10 | Preset = a saved preset with `Ask each time`. | Summary line says it runs as Skip; no prompt appears. | ☐ |
+| Q11 | After a Services-launched quick copy, quit, then open FilmCan normally. | Main window opens at its usual size/position (not the Quick Copy window's frame); no Quick Copy window. | ☐ |
+| Q12 | Close the main window, click the Dock icon (no quick copy involved). | Exactly one main window reopens, as before this feature. | ☐ |
+| Q13 | Quick Copy window → "Edit in FilmCan…" with the main window closed/hidden. | Main window appears; closing the quick copy afterwards does NOT quit FilmCan. | ☐ |
+| Q14 | Netflix Ingest preset, source folder named with a prohibited character (e.g. `A001 (copy)`). | Run disabled with a message naming the characters. | ☐ |
 
 ## Setup
 
