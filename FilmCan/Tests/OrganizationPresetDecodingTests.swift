@@ -12,6 +12,13 @@ final class OrganizationPresetDecodingTests: XCTestCase {
         XCTAssertTrue(p.useFolderTemplate)
     }
 
+    func test_literalJSONWithNewKeys_decodesStoredKeyNames() throws {
+        let json = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","name":"Quick","projectName":"Docu_Truc","hashListStyle":"simpleHidden"}"#
+        let p = try JSONDecoder().decode(OrganizationPreset.self, from: Data(json.utf8))
+        XCTAssertEqual(p.projectName, "Docu_Truc")
+        XCTAssertEqual(p.hashListStyle, .simpleHidden)
+    }
+
     func test_newFields_roundTrip() throws {
         var p = OrganizationPreset()
         p.projectName = "Docu_Truc"
