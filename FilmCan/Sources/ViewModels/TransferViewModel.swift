@@ -93,7 +93,10 @@ class TransferViewModel: ObservableObject {
         duplicatesObserver = duplicates.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
     
-    func startTransfer(config: BackupConfiguration) async {
+    /// `organizationPresetOverride`: a fully-built preset for this run (Quick Copy).
+    /// When nil the preset is resolved from the config + stored presets as usual.
+    func startTransfer(config: BackupConfiguration,
+                       organizationPresetOverride: OrganizationPreset? = nil) async {
         if !isBackgroundWorker, isTransferring, activeConfigId != config.id {
             startConcurrentTransfer(config: config)
             return
@@ -152,11 +155,15 @@ class TransferViewModel: ObservableObject {
             }
         }
 
-        // Mark as used
-        AppState.shared.storage.markAsUsed(activeConfig)
+        // Mark as used — only configs that live in storage. A temporary config
+        // (Quick Copy) would point the main app's last-used tab at an id that
+        // does not exist.
+        if AppState.shared.storage.configurations.contains(where: { $0.id == activeConfig.id }) {
+            AppState.shared.storage.markAsUsed(activeConfig)
+        }
         
         let destinations = activeConfig.destinationPaths
-        let organizationPreset = resolveOrganizationPreset(for: activeConfig)
+        let organizationPreset = organizationPresetOverride ?? resolveOrganizationPreset(for: activeConfig)
         let sources = activeConfig.sourcePaths
 
         // Stop Spotlight from thrashing the card and backup drives during the
