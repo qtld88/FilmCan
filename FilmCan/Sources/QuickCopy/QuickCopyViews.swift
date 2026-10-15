@@ -249,8 +249,9 @@ struct QuickCopySetupView: View {
 
     // Footer
     private var footer: some View {
-        HStack {
-            if let message = session.form.blocker?.message {
+        let blocker = session.form.blocker
+        return HStack {
+            if let message = blocker?.message {
                 Text(message).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.brandRed)
                     .lineLimit(2)
             }
@@ -259,7 +260,7 @@ struct QuickCopySetupView: View {
                 .keyboardShortcut(.cancelAction)
             Button("Run") { session.run() }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!session.form.canRun)
+                .disabled(blocker != nil)
         }
         .padding(12)
     }
@@ -272,7 +273,7 @@ struct QuickCopyProgressView: View {
     @ObservedObject var worker: TransferViewModel
 
     private var destinations: [String] { session.form.destinations }
-    private var finished: Bool { session.phase == .finished }
+    private var finished: Bool { session.resultsComplete }
 
     private func result(for destination: String) -> TransferResult? {
         worker.results.last { $0.destination == destination }
@@ -285,10 +286,6 @@ struct QuickCopyProgressView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     header
-                    if worker.alreadyBackedUp != nil {
-                        Label("Already backed up — nothing to copy.", systemImage: "checkmark.circle.fill")
-                            .foregroundColor(FilmCanTheme.brandGreen)
-                    }
                     ForEach(destinations, id: \.self) { destination in
                         destinationCard(destination)
                     }
@@ -298,10 +295,37 @@ struct QuickCopyProgressView: View {
             Divider()
             footer
         }
+        .sheet(item: $worker.activeDuplicatePrompt) { prompt in
+            DuplicatePromptSheet(
+                prompt: prompt,
+                onDecision: { action, applyToAll, counterTemplate in
+                    worker.submitDuplicateResolution(
+                        action: action,
+                        applyToAll: applyToAll,
+                        counterTemplate: counterTemplate
+                    )
+                },
+                onCancel: {
+                    worker.cancelRunFromDuplicatePrompt()
+                }
+            )
+            .interactiveDismissDisabled()
+        }
         .sheet(item: $worker.activeRollIdentityPrompt) { prompt in
             RollIdentitySheet(prompt: prompt) { isResume in
                 worker.submitRollIdentity(isResume: isResume)
             }
+            .interactiveDismissDisabled()
+        }
+        .sheet(isPresented: Binding(
+            get: { !worker.pendingUnreadableFiles.isEmpty },
+            set: { if !$0 { worker.resolveUnreadable(proceed: false) } }
+        )) {
+            UnreadableFilesSheet(
+                paths: worker.pendingUnreadableFiles,
+                onContinue: { worker.resolveUnreadable(proceed: true) },
+                onCancel: { worker.resolveUnreadable(proceed: false) }
+            )
         }
     }
 
@@ -319,7 +343,10 @@ struct QuickCopyProgressView: View {
     private func destinationCard(_ destination: String) -> some View {
         let name = (destination as NSString).lastPathComponent
         QCPanel(title: name.uppercased(), trailing: destination) {
-            if let result = result(for: destination) {
+            if worker.alreadyBackedUp != nil {
+                Label("Already backed up — nothing to copy", systemImage: "checkmark.circle.fill")
+                    .foregroundColor(FilmCanTheme.brandGreen)
+            } else if let result = result(for: destination) {
                 resultRow(result)
             } else if finished {
                 let fallback = worker.results.first(where: { !$0.success })?.errorMessage
@@ -360,7 +387,7 @@ struct QuickCopyProgressView: View {
         HStack {
             if finished {
                 Button("Show in Finder") { revealInFinder() }
-                    .disabled(!anySuccess)
+                    .disabled(!(anySuccess || worker.alreadyBackedUp != nil))
                 Spacer()
                 Button("Close") { session.window?.performClose(nil) }
                     .keyboardShortcut(.defaultAction)
@@ -373,9 +400,16 @@ struct QuickCopyProgressView: View {
     }
 
     private func revealInFinder() {
-        guard let ok = worker.results.first(where: { $0.success }) else { return }
-        let path = session.form.revealPath(for: ok.destination)
-        let target = FileManager.default.fileExists(atPath: path) ? path : ok.destination
+        let destination: String
+        if worker.alreadyBackedUp != nil {
+            guard let first = destinations.first else { return }
+            destination = first
+        } else {
+            guard let ok = worker.results.first(where: { $0.success }) else { return }
+            destination = ok.destination
+        }
+        let path = session.form.revealPath(for: destination)
+        let target = FileManager.default.fileExists(atPath: path) ? path : destination
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: target)])
     }
 }

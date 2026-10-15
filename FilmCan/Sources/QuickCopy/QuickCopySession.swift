@@ -27,6 +27,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
     private let storage: ConfigurationStorage
     private let defaults: UserDefaults
     private var workerObserver: AnyCancellable?
+    private var stopTask: Task<Void, Never>?
 
     init(paths: [String],
          storage: ConfigurationStorage? = nil,
@@ -53,7 +54,16 @@ final class QuickCopySession: ObservableObject, Identifiable {
         loadSizes()
     }
 
-    var isRunning: Bool { phase == .running }
+    /// True as soon as every destination has its result (or the run was already
+    /// backed up) — before `startTransfer` has finished history/notifications.
+    var resultsComplete: Bool {
+        phase == .finished
+            || worker.alreadyBackedUp != nil
+            || (!form.destinations.isEmpty
+                && form.destinations.allSatisfy { d in worker.results.contains { $0.destination == d } })
+    }
+
+    var isRunning: Bool { phase == .running && !resultsComplete }
 
     // MARK: Setup actions
 
@@ -100,11 +110,45 @@ final class QuickCopySession: ObservableObject, Identifiable {
     /// Stops the copy. Deletes nothing; re-running the Quick Copy resumes from the
     /// on-disk manifest and copies only what is missing.
     func stop() {
-        guard phase == .running else { return }
+        guard isRunning else { return }
         worker.cancelAll()
+        unblockPendingPrompts()
+        guard stopTask == nil else { return }
+        // `startTransfer` resets the cancel flag and the engine service may not exist
+        // yet, so a single cancel can be lost: re-assert until the run ends.
+        stopTask = Task { [weak self] in
+            while self?.reassertStop() == true {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
+    }
+
+    private func reassertStop() -> Bool {
+        guard phase == .running, !Task.isCancelled else { return false }
+        if isRunning {
+            worker.cancelAll()
+            unblockPendingPrompts()
+        }
+        return true
+    }
+
+    /// A pending prompt holds a continuation inside the engine: answer it so the
+    /// cancel cannot hang.
+    private func unblockPendingPrompts() {
+        if worker.activeRollIdentityPrompt != nil {
+            worker.submitRollIdentity(isResume: true)
+        }
+        if !worker.pendingUnreadableFiles.isEmpty {
+            worker.resolveUnreadable(proceed: false)
+        }
+        if worker.activeDuplicatePrompt != nil {
+            worker.submitDuplicateResolution(action: .skip, applyToAll: true)
+        }
     }
 
     private func finish() {
+        stopTask?.cancel()
+        stopTask = nil
         phase = .finished
         onFinished?()
     }

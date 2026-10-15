@@ -11,8 +11,29 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
     /// launched BY the quick copy (Services/Dock), not opened by the user.
     private static let launchWindow: TimeInterval = 10
 
+    /// Fallback only; the real launch date comes from `NSRunningApplication`.
     private let processStart = Date()
     private var sessions: [UUID: QuickCopySession] = [:]
+    /// Main-app windows this coordinator ordered out; when one becomes key the
+    /// user has taken the app over, so auto-quit is cancelled.
+    private var hiddenWindows: Set<ObjectIdentifier> = []
+    private var nextCascadePoint: NSPoint?
+
+    private override init() {
+        super.init()
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let window = note.object as AnyObject? else { return }
+            let id = ObjectIdentifier(window)
+            Task { @MainActor [weak self] in self?.hiddenWindowBecameKey(id) }
+        }
+    }
+
+    private func hiddenWindowBecameKey(_ id: ObjectIdentifier) {
+        guard hiddenWindows.remove(id) != nil else { return }
+        launchedForQuickCopy = false
+    }
 
     /// True when FilmCan was started for a quick copy → auto-quit at the end.
     private(set) var launchedForQuickCopy = false
@@ -31,7 +52,7 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
         guard !existing.isEmpty else { return }
 
         if sessions.isEmpty, !launchedForQuickCopy,
-           Date().timeIntervalSince(processStart) < Self.launchWindow {
+           Date().timeIntervalSince(NSRunningApplication.current.launchDate ?? processStart) < Self.launchWindow {
             launchedForQuickCopy = true
         }
         if launchedForQuickCopy { scheduleMainWindowHiding() }
@@ -51,11 +72,18 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
             backing: .buffered, defer: false)
         window.title = "FilmCan Copy"
         window.isReleasedWhenClosed = false
+        window.isRestorable = false
         window.appearance = NSAppearance(named: .darkAqua)
         window.minSize = NSSize(width: 520, height: 480)
         window.delegate = self
         window.contentView = NSHostingView(rootView: QuickCopyWindowView(session: session))
-        window.center()
+        if let point = nextCascadePoint, sessions.count > 1 {
+            nextCascadePoint = window.cascadeTopLeft(from: point)
+        } else {
+            window.center()
+            nextCascadePoint = window.cascadeTopLeft(
+                from: NSPoint(x: window.frame.minX, y: window.frame.maxY))
+        }
         session.window = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -98,7 +126,9 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
     /// Forget sessions whose window is gone AND whose run has ended, then quit if
     /// FilmCan only exists for the quick copy and nothing else runs.
     private func reap() {
-        for (id, session) in sessions where session.windowClosed && !session.isRunning {
+        // `phase`, not `isRunning`: results can be on screen while history and
+        // notifications are still being written; quitting then would lose them.
+        for (id, session) in sessions where session.windowClosed && session.phase != .running {
             sessions.removeValue(forKey: id)
         }
         quitIfIdle()
@@ -128,8 +158,18 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
         for window in NSApp.windows
         where window.isVisible && window.styleMask.contains(.titled)
             && !(window is NSPanel) && !isQuickCopyWindow(window) {
+            hiddenWindows.insert(ObjectIdentifier(window))
             window.orderOut(nil)
         }
+    }
+
+    private func isMainAppWindow(_ window: NSWindow) -> Bool {
+        guard window.styleMask.contains(.titled), !(window is NSPanel),
+              window.delegate !== self, !isQuickCopyWindow(window) else { return false }
+        let settingsMarker = "settings"
+        let identifier = window.identifier?.rawValue.lowercased() ?? ""
+        return !identifier.contains(settingsMarker)
+            && !window.title.lowercased().contains(settingsMarker)
     }
 
     /// The user wants the real app (Dock click with no window, "Edit in FilmCan…"):
@@ -137,8 +177,7 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
     func showMainWindow() {
         launchedForQuickCopy = false
         NSApp.activate(ignoringOtherApps: true)
-        if let hidden = NSApp.windows.first(where: { !isQuickCopyWindow($0) && $0.styleMask.contains(.titled)
-                                                      && !($0 is NSPanel) }) {
+        if let hidden = NSApp.windows.first(where: isMainAppWindow) {
             hidden.makeKeyAndOrderFront(nil)
         } else {
             NSApp.sendAction(#selector(NSResponder.newWindowForTab(_:)), to: nil, from: nil)
