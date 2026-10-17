@@ -198,18 +198,18 @@ struct QuickCopySetupView: View {
     private var organizationPanel: some View {
         QCPanel(title: "ORGANIZATION") {
             QCSettingRow(label: "Date") {
-                HStack {
-                    Toggle("Pick a date", isOn: Binding(
-                        get: { session.form.pickedDate != nil },
-                        set: { session.form.pickedDate = $0 ? Date() : nil }))
-                        .toggleStyle(.checkbox)
-                    if session.form.pickedDate != nil {
-                        DatePicker("", selection: Binding(
-                            get: { session.form.pickedDate ?? Date() },
-                            set: { session.form.pickedDate = $0 }), displayedComponents: .date)
-                    } else {
-                        Text("Today").foregroundColor(FilmCanTheme.textSecondary)
-                    }
+                Picker("", selection: Binding(
+                    get: { session.form.pickedDate != nil },
+                    set: { session.form.pickedDate = $0 ? Date() : nil })) {
+                    Text("Today").tag(false)
+                    Text("Pick a date…").tag(true)
+                }
+            }
+            if let picked = session.form.pickedDate {
+                QCSettingRow(label: "Folder date") {
+                    DatePicker("", selection: Binding(
+                        get: { session.form.pickedDate ?? picked },
+                        set: { session.form.pickedDate = $0 }), displayedComponents: .date)
                 }
             }
             if session.form.showsProjectField {
