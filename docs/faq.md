@@ -14,6 +14,9 @@ Yes. GPL-3.0 licensed.
 **Supported macOS?**  
 13.0 (Ventura) and later.
 
+**Can I copy from the Finder without opening FilmCan?**  
+Yes. Select files or folders, right-click, then **Services → FilmCan Copy** (or drop them on the Dock icon). See [Quick Copy](./features/quick-copy.md).
+
 ---
 
 ## Compatibility
@@ -103,6 +106,9 @@ Oui. Sous licence GPL-3.0.
 
 **macOS pris en charge?**  
 13.0 (Ventura) et versions ultérieures.
+
+**Puis-je copier depuis le Finder sans ouvrir FilmCan?**  
+Oui. Sélectionnez des fichiers ou des dossiers, clic droit, puis **Services → FilmCan Copy** (ou déposez-les sur l'icône du Dock). Voir [Quick Copy](./features/quick-copy.md).
 
 ---
 
@@ -194,6 +200,9 @@ Ja. Unter GPL-3.0 lizenziert.
 **Unterstütztes macOS?**  
 13.0 (Ventura) und später.
 
+**Kann ich aus dem Finder kopieren, ohne FilmCan zu öffnen?**  
+Ja. Wählen Sie Dateien oder Ordner aus, Rechtsklick, dann **Dienste → FilmCan Copy** (oder ziehen Sie sie auf das Dock-Symbol). Siehe [Quick Copy](./features/quick-copy.md).
+
 ---
 
 ## Kompatibilität
@@ -283,6 +292,9 @@ Sí. Licencia GPL-3.0.
 
 ¿macOS compatible?
 13.0 (Ventura) y posterior.
+
+¿Puedo copiar desde el Finder sin abrir FilmCan?
+Sí. Seleccione archivos o carpetas, clic derecho y luego Servicios → FilmCan Copy (o suéltelos en el icono del Dock). Consulte [Quick Copy](./features/quick-copy.md).
 
 ---
 

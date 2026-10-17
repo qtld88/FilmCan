@@ -22,6 +22,7 @@ FilmCan/Sources/
 ├── Services/        # CustomCopierService, NotificationService, WebhookService, etc.
 ├── Models/          # DriveInfo, TaskResult, Preset, HistoryEntry, etc.
 ├── Utilities/       # Logger, HashListGenerator, DiskArbitration helpers
+├── QuickCopy/       # Finder Services / Dock-drop copy window (see "Quick Copy" below)
 └── Resources/       # Assets, entitlements
 ```
 
@@ -41,11 +42,11 @@ Local data lives in `~/Application Support`.
 
 ## Architecture Notes
 
-- **Single copy engine**: `CustomCopierService` (the FilmCan Engine — Swift-only, no external deps), driving the `FanOutCopier` actor. Supports pause/resume and duplicate detection. The rsync engine (`RsyncService`) was fully removed in 1.2.x — nothing shells out to rsync at runtime. **Build-time**, Homebrew rsync ≥ 3.4.0 is still required: the "Embed rsync" phase in `project.yml` harvests the binary + dylibs (incl. `libxxhash.0.dylib`) into `Resources/rsync/`.
+- **Single copy engine**: `CustomCopierService` (the FilmCan Engine — Swift-only, no external deps), driving the `FanOutCopier` actor. Stop is clean and a re-run resumes from the on-disk manifest; duplicate detection supported. `pause()` only sets flags — the fan-out engine never reads them, so there is no real Pause (Quick Copy deliberately has Stop only). The rsync engine (`RsyncService`) was fully removed in 1.2.x — nothing shells out to rsync at runtime. **Build-time**, Homebrew rsync ≥ 3.4.0 is still required: the "Embed rsync" phase in `project.yml` harvests the binary + dylibs (incl. `libxxhash.0.dylib`) into `Resources/rsync/`.
 - **Fan-out engine**: `FanOutCopier` (Swift actor) handles N-sources → M-destinations in one pass. One `BoundedChannel<Chunk>` per destination; source is read once and broadcast. Paranoid verify re-reads both source and dest from disk with `F_NOCACHE`. See `docs/architecture.md`.
 - **Entry point**: `FilmCanApp.swift` — creates `MainView` window and `SettingsView`. No storyboards.
 - **No CI, no linter, no formatter, no pre-commit hooks** — bare Xcode project.
-- **Automated tests**: `FilmCan/Tests/` (~100 tests, real temp-dir disk I/O, no mocks) — `FanOutCopierIntegrationTests` (progress monotonicity, per-dest resume, sound routing, cancel/partial), `FanOutCopierSafetyTests` (cancel/unwritable), `ASCMHLWriter/Reader/Chain/Conformance` (validated against the reference `ascmhl` CLI), `C4HashTests`, `OrganizationTemplateTokenTests`.
+- **Automated tests**: `FilmCan/Tests/` (~100 tests, real temp-dir disk I/O, no mocks) — `FanOutCopierIntegrationTests` (progress monotonicity, per-dest resume, sound routing, cancel/partial), `FanOutCopierSafetyTests` (cancel/unwritable), `ASCMHLWriter/Reader/Chain/Conformance` (validated against the reference `ascmhl` CLI), `C4HashTests`, `OrganizationTemplateTokenTests`, and the Quick Copy suites (`QuickCopyFormModelTests`, `QuickCopyIntegrationTests`, `MediaKindGuesserTests`, `QuickCopyServiceProviderTests`, `OrganizationPresetDecodingTests`). ~320 tests total.
 - **State pattern**: `@StateObject` in views, `@Published` in ObservableObjects. `TransferViewModel` is the single source of truth for backup runs.
 
 ## Fan-Out Engine — Key Details
@@ -69,6 +70,18 @@ Local data lives in `~/Application Support`.
 - **Editable templates**: `config.cameraFolderTemplate` / `config.soundFolderTemplate` override the Netflix preset's paths (applied in `TransferViewModel.resolveOrganizationPreset`, gated to the Netflix preset). Edited in **Options › Destinations › Folder templates**.
 - **Sound auto-detect**: `config.soundAutoDetectEnabled` + `soundAutoDetectPatterns`. `BackupEditorViewModel.refreshAutoDetectedSoundSources()` mirrors the camera detector — adds matching drives to sources AND tags them Sound, live on pattern/enable/drive-refresh.
 - **ASC MHL**: `ASCMHLWriter` (generation-aware, lazy dir creation, skips empty generations) + `ASCMHLChain` (C4-hashed `ascmhl_chain.xml`) + `ASCMHLReader`. `MHLWriting` protocol abstracts ASC MHL vs `SimpleMHLWriter` (hidden `.filmcan/hashlists/<roll>.mhl`), chosen by `config.hashListStyle`. `NetflixNameValidator` enforces prohibited chars + unique roll names. See `docs/features/netflix-ingest.md` and `docs/reference/netflix-asc-mhl-requirements.md`.
+
+## Quick Copy (Finder)
+
+Finder right-click → Services → "FilmCan Copy" (or a Dock-icon drop) opens a small window, copies with the same fan-out engine, and never shows the main window. User doc: `docs/features/quick-copy.md`. Spec: `docs/superpowers/specs/2026-10-15-quick-copy-design.md` (gitignored, local).
+
+- **Units** (`Sources/QuickCopy/`): `QuickCopyFormModel` (pure struct: form → temporary `BackupConfiguration` + run `OrganizationPreset`, blockers, folder-tree preview), `MediaKindGuesser` (Camera/Sound from content), `QuickCopySession` (one window's state + its own `TransferViewModel(isBackgroundWorker: true)`), `QuickCopyViews`, `QuickCopyCoordinator` (`@MainActor` singleton: one `NSWindow` + `NSHostingView` per request, launch flag, auto-quit, hides the SwiftUI main window), `QuickCopyServiceProvider` (`NSServices` handler).
+- **Hooks in existing code**: `TransferViewModel.startTransfer(config:organizationPresetOverride:)` (the run preset travels outside the config because the `offOrganization*` fallback drops `soundFolderTemplate`) and `markAsUsed` only for configs that exist in storage. `FilmCanApp` registers the services provider, handles `application(_:open:)` and Dock reopen, and counts running quick copies in the quit guard. `Info.plist` declares `NSServices` + `CFBundleDocumentTypes` (rank Alternate).
+- **Temporary config**: never written to `configs.json`. Presets: `OrganizationPreset.projectName` / `hashListStyle` are read only by Quick Copy.
+- **Launched-for-quick-copy** = request within 10 s of `NSRunningApplication.current.launchDate`; then the main window is hidden and FilmCan quits when the last Quick Copy window closes and nothing else runs.
+- **Known limits**: Stop only (no Pause). Two or more loose files in one selection are blocked: each gets its own `ASCMHLWriter` on the same `<parent>/ascmhl/` and `ASCMHLChain.append` replaces by sequence (proved by `test_twoLooseFiles_shareAscmhlFolder_chainKeepsOneGeneration`). Quick Copy history entries are saved but the History tab only lists the selected backup's. `RunContext` / `verifyAlreadyBackedUp` / `repairFromSource` do not know the override preset (the Quick Copy UI never calls them).
+- **Manual gate**: `docs/smoke-qa-checklist.md` → "Quick Copy gate" (Q1–Q14). Unit tests cannot cover Services registration, window hiding or auto-quit.
+- To run a branch build without touching `/Applications`: `xcodebuild build -project FilmCan/FilmCan.xcodeproj -scheme FilmCan -configuration Debug -destination platform=macOS -derivedDataPath FilmCan/build/qc`, then `open FilmCan/build/qc/Build/Products/Debug/FilmCan.app`. Quit other FilmCan copies first (same bundle id).
 
 ## Fan-Out UI Components
 

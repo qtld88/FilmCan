@@ -12,6 +12,7 @@
 
 - [Features Overview](./features/index.md)
 - [Copy Engine](./features/copy-engines.md)
+- [Quick Copy (Finder)](./features/quick-copy.md)
 - [Netflix Ingest](./features/netflix-ingest.md)
 - [Destination Presets](./features/destination-presets.md)
 - [Transfer History](./features/transfer-history.md)
@@ -52,6 +53,7 @@
 
 - [Aperçu des fonctionnalités](./features/index.md)
 - [Moteur de copie](./features/copy-engines.md)
+- [Quick Copy (Finder)](./features/quick-copy.md)
 - [Netflix Ingest](./features/netflix-ingest.md)
 - [Présets de destination](./features/destination-presets.md)
 - [Historique des transferts](./features/transfer-history.md)
@@ -92,6 +94,7 @@
 
 - [Funktionsübersicht](./features/index.md)
 - [Kopiertool](./features/copy-engines.md)
+- [Quick Copy (Finder)](./features/quick-copy.md)
 - [Netflix Ingest](./features/netflix-ingest.md)
 - [Zieleinstellungen](./features/destination-presets.md)
 - [Übertragungsverlauf](./features/transfer-history.md)
@@ -132,6 +135,7 @@
 
 - [Descripción general de funciones](./features/index.md)
 - [Motor de copia](./features/copy-engines.md)
+- [Quick Copy (Finder)](./features/quick-copy.md)
 - [Netflix Ingest](./features/netflix-ingest.md)
 - [Ajustes de destino](./features/destination-presets.md)
 - [Historial de transferencias](./features/transfer-history.md)

@@ -29,6 +29,7 @@ FilmCan backs up camera cards, rushes, folders, or files to multiple destination
 - Live per-destination progress, "DO NOT UNPLUG" banner on slow-flush drives
 - One-click **Retry from sibling**: a failed drive rebuilds from a verified neighbor's MHL, no need to re-mount the card
 - Organizes files with custom folder presets (or a simple hidden hash list for non-delivery use)
+- **Quick Copy** from the Finder: right-click files or folders, choose **Services → FilmCan Copy** (or drop them on the Dock icon), and copy with the same engine, no main window
 - Aggregated webhooks and ntfy push notifications
 
 ---
@@ -43,6 +44,8 @@ FilmCan backs up camera cards, rushes, folders, or files to multiple destination
 Done. FilmCan copies, verifies, and saves the checksums.
 
 [More details →](docs/quickstart.md)
+
+**Or from the Finder:** select files or folders, right-click, **Services → FilmCan Copy**. [Quick Copy →](docs/features/quick-copy.md)
 
 ---
 
