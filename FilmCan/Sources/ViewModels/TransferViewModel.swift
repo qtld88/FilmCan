@@ -101,8 +101,11 @@ class TransferViewModel: ObservableObject {
         if !isBackgroundWorker, concurrentWorkers[config.id] != nil {
             return
         }
-        let activeConfig = AppState.shared.storage.configurations
+        let storedConfig = AppState.shared.storage.configurations
             .first(where: { $0.id == config.id }) ?? config
+        // Roll numbers and the shoot day are fixed before anything else reads the config,
+        // and saved before the copy starts, so a cancelled run resumes into the same roll.
+        let activeConfig = applyRollNumberingAndDay(to: storedConfig)
         self.config = activeConfig
         activeConfigId = activeConfig.id
         if !isBackgroundWorker {
@@ -573,6 +576,53 @@ class TransferViewModel: ObservableObject {
         return preset
     }
 
+    /// Apply automatic roll numbering and the shoot-day counter to this run's copy of the
+    /// config. State lives in `RollNumberingStore` (not the config) so a stale editor save
+    /// can never overwrite it.
+    private func applyRollNumberingAndDay(to stored: BackupConfiguration) -> BackupConfiguration {
+        guard stored.dayAutoAdvance || stored.rollNumbering.enabled else { return stored }
+        var config = stored
+        let store = RollNumberingStore.shared
+        var state = store.state(for: config.id)
+        let now = Date()
+
+        if config.dayAutoAdvance {
+            let day = ShootDayCounter.advance(
+                day: state.currentDay ?? config.day, lastRun: state.lastRunDate,
+                now: now, calendar: .current)
+            config.day = day
+            state.currentDay = day
+            state.lastRunDate = now
+        }
+
+        if config.rollNumbering.enabled {
+            let kinds = effectiveSourceMediaKinds(for: config, sources: config.sourcePaths)
+            let fm = FileManager.default
+            let result = RollNumberer.assign(
+                sources: config.sourcePaths,
+                isDirectory: { path in
+                    var isDir: ObjCBool = false
+                    return fm.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+                },
+                kinds: kinds,
+                settings: config.rollNumbering,
+                existing: state.assignments,
+                keyFor: { path in
+                    let volumeRoot = (try? URL(fileURLWithPath: path)
+                        .resourceValues(forKeys: [.volumeURLKey]))?.volume?.path ?? "/"
+                    return RollNumberer.cardKey(
+                        volumeUUID: FanOutCopier.sourceVolumeUUID(path),
+                        sourcePath: path, volumeRoot: volumeRoot)
+                },
+                signatureFor: { CameraCardDetector.detect(rootPath: $0) })
+            config.runRollNames = result.names
+            state.assignments = result.assignments
+        }
+
+        store.update(state, for: config.id)
+        return config
+    }
+
     /// Per-source Camera/Sound tags for the run: explicit tags from the config,
     /// plus any source whose volume/folder name matches a Sound auto-detect pattern.
     private func effectiveSourceMediaKinds(
@@ -792,6 +842,7 @@ class TransferViewModel: ObservableObject {
                 shootMetadata: ShootMetadata(episode: config.episode, day: config.day,
                                              unit: config.unit, cameraFormat: config.cameraFormat),
                 sourceMediaKinds: effectiveSourceMediaKinds(for: config, sources: sources),
+                rollNames: config.runRollNames,
                 hashListStyle: config.hashListStyle,
                 reVerifyExistingOnResume: config.reVerifyExistingOnResume,
                 unreadableHandler: { [weak self] paths async -> Bool in
@@ -1038,7 +1089,8 @@ class TransferViewModel: ObservableObject {
                 copyFolderContents: repairCtx?.copyFolderContents ?? false,
                 duplicatePolicy: repairCtx?.duplicatePolicy ?? .ask,
                 sourceMediaKinds: repairCtx?.sourceMediaKinds ?? [:],
-                hashListStyle: repairCtx?.hashListStyle ?? .ascMHL
+                hashListStyle: repairCtx?.hashListStyle ?? .ascMHL,
+                rollNames: repairCtx?.rollNames ?? [:]
             )
             if outcome.allOK {
                 patchDestResultToSuccess(
