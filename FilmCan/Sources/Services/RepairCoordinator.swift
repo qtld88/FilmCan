@@ -102,7 +102,8 @@ enum RepairCoordinator {
         copyFolderContents: Bool,
         duplicatePolicy: OrganizationPreset.DuplicatePolicy,
         sourceMediaKinds: [String: SourceMediaKind],
-        hashListStyle: HashListStyle
+        hashListStyle: HashListStyle,
+        rollNames: [String: String] = [:]
     ) async -> SourceRepairOutcome {
         // Sanity check: every source path must still exist on disk before we attempt re-copy.
         let fm = FileManager.default
@@ -134,6 +135,7 @@ enum RepairCoordinator {
                 verifyMode: failed.verifyMode,
                 dryRun: false,
                 sourceMediaKinds: sourceMediaKinds,
+                rollNames: rollNames,
                 hashListStyle: hashListStyle,
                 progressHandler: nil
             )
