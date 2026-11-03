@@ -45,6 +45,8 @@ struct QuickCopyFormModel {
     var pickedDate: Date?
     /// Typed name for the top folder; nil ⇒ the name the templates resolve to.
     var rootFolderName: String?
+    /// Camera/Sound folder typed by the user when the preset has none.
+    var mediaFolderNames: [SourceMediaKind: String] = [:]
     var project = ""
     var day = ""
     var savePresetName = ""
@@ -96,10 +98,26 @@ struct QuickCopyFormModel {
         return organization != .none
     }
 
-    /// Camera/Sound dropdown only matters when the two kinds land in different folders.
-    var showsMediaKind: Bool {
-        guard organizationActive, let p = runPreset() else { return false }
-        return !Self.isBlank(p.soundFolderTemplate) && p.soundFolderTemplate != p.folderTemplate
+    var showsMediaKind: Bool { organizationActive }
+
+    /// The preset has no separate Camera/Sound folder: the user must name one per
+    /// kind in use, or both kinds would land in the same folder.
+    var lacksMediaFolder: Bool {
+        guard let p = organizedPreset() else { return false }
+        return Self.isBlank(p.soundFolderTemplate) || p.soundFolderTemplate == p.folderTemplate
+    }
+
+    /// Sanitized typed media folder name for `kind`; nil when empty.
+    func mediaFolder(for kind: SourceMediaKind) -> String? {
+        let name = Self.sanitizeName(mediaFolderNames[kind] ?? "").filter { $0 != "{" && $0 != "}" }
+        return name.isEmpty ? nil : name
+    }
+
+    var missingMediaFolderKind: SourceMediaKind? {
+        guard lacksMediaFolder else { return nil }
+        return SourceMediaKind.allCases.first { kind in
+            items.contains { $0.kind == kind } && mediaFolder(for: kind) == nil
+        }
     }
 
     /// Sanitized `rootFolderName`; nil when empty. Braces are dropped so typed text
@@ -161,6 +179,31 @@ struct QuickCopyFormModel {
     /// The preset the engine runs with (nil ⇒ no organization). A picked date lands
     /// on this copy only — never on a stored preset.
     func runPreset() -> OrganizationPreset? {
+        guard var preset = organizedPreset() else { return nil }
+        if organizationActive {
+            if lacksMediaFolder {
+                let base = preset.folderTemplate
+                preset.folderTemplate = Self.appending(mediaFolder(for: .camera), to: base)
+                preset.soundFolderTemplate = Self.appending(mediaFolder(for: .sound), to: base)
+            }
+            if let root = rootFolderOverride {
+                preset.folderTemplate = Self.replacingRoot(of: preset.folderTemplate, with: root)
+                if !Self.isBlank(preset.soundFolderTemplate) {
+                    preset.soundFolderTemplate = Self.replacingRoot(of: preset.soundFolderTemplate, with: root)
+                }
+            }
+        }
+        return preset
+    }
+
+    private static func appending(_ folder: String?, to template: String) -> String {
+        guard let folder else { return template }
+        return template.hasSuffix("/") ? template + folder : template + "/" + folder
+    }
+
+    /// Stored or basic-mode preset with the date and the derived sound template,
+    /// before the user's typed folder names.
+    private func organizedPreset() -> OrganizationPreset? {
         var preset: OrganizationPreset
         if let saved = selectedPreset {
             preset = saved
@@ -188,12 +231,6 @@ struct QuickCopyFormModel {
             if Self.isBlank(preset.soundFolderTemplate), preset.folderTemplate.contains("Camera_Media") {
                 preset.soundFolderTemplate = preset.folderTemplate
                     .replacingOccurrences(of: "Camera_Media", with: "Sound_Media")
-            }
-            if let root = rootFolderOverride {
-                preset.folderTemplate = Self.replacingRoot(of: preset.folderTemplate, with: root)
-                if !Self.isBlank(preset.soundFolderTemplate) {
-                    preset.soundFolderTemplate = Self.replacingRoot(of: preset.soundFolderTemplate, with: root)
-                }
             }
         }
         return preset
@@ -243,6 +280,7 @@ extension QuickCopyFormModel {
         case missingProject
         case invalidRollName(String)
         case multipleFiles
+        case missingMediaFolder(SourceMediaKind)
 
         var message: String {
             switch self {
@@ -254,6 +292,8 @@ extension QuickCopyFormModel {
             case .invalidRollName(let name):
                 let chars = String(Array(Set(name.filter { NetflixNameValidator.prohibited.contains($0) })))
                 return "\u{201C}\(name)\u{201D} contains characters Netflix prohibits (\(chars)). Rename the folder first."
+            case .missingMediaFolder(let kind):
+                return "Name the \(kind.displayName) folder in the preview below."
             case .multipleFiles:
                 return "Several loose files can't be copied together yet — select a folder, or copy the files one at a time."
             }
@@ -265,6 +305,7 @@ extension QuickCopyFormModel {
         if destinations.isEmpty { return .noDestination }
         if let gone = destinations.first(where: { !pathExists($0) }) { return .missingDestination(gone) }
         if showsProjectField, sanitizedProject.isEmpty, rootFolderOverride == nil { return .missingProject }
+        if let kind = missingMediaFolderKind { return .missingMediaFolder(kind) }
         if selectedPreset?.name == OrganizationPreset.netflixIngestName {
             for issue in NetflixNameValidator.validate(rollNames: items.map(\.name)) {
                 if case .prohibitedChars(let name, _) = issue { return .invalidRollName(name) }
@@ -330,6 +371,8 @@ extension QuickCopyFormModel {
         let depth: Int
         let name: String
         let isNew: Bool
+        /// Set on the user-named Camera/Sound folder line (name "" = still to name).
+        var mediaKind: SourceMediaKind? = nil
     }
 
     /// Path of each item under `destination`, relative to it, resolved with the
@@ -360,11 +403,29 @@ extension QuickCopyFormModel {
                 // beside them, holding only the hash list (`ascmhl/`, `.filmcan/`).
                 rollName = components.popLast()
             }
+            var mediaIndex: Int?
+            if lacksMediaFolder {
+                let end = rollName != nil ? components.count : components.count - 1
+                if mediaFolder(for: item.kind) == nil {
+                    components.insert("", at: max(end, 0))
+                    mediaIndex = max(end, 0)
+                } else {
+                    mediaIndex = end - 1
+                }
+            }
             var cumulative = destination
             for (depth, component) in components.enumerated() {
+                let isMedia = depth == mediaIndex
+                if component.isEmpty {
+                    if seen.insert(cumulative + "/\u{0}\(item.kind.rawValue)").inserted {
+                        lines.append(TreeLine(depth: depth, name: "", isNew: true, mediaKind: item.kind))
+                    }
+                    continue
+                }
                 cumulative = (cumulative as NSString).appendingPathComponent(component)
                 if seen.insert(cumulative).inserted {
-                    lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative)))
+                    lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative),
+                                          mediaKind: isMedia ? item.kind : nil))
                 }
             }
             if let rollName {

@@ -235,13 +235,30 @@ struct QuickCopySetupView: View {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     HStack(spacing: 6) {
                         Image(systemName: "folder").font(.system(size: 10))
-                        Text(line.name).font(.system(size: 11, design: .monospaced))
+                        if let kind = line.mediaKind {
+                            mediaFolderField(kind)
+                        } else {
+                            Text(line.name).font(.system(size: 11, design: .monospaced))
+                        }
                     }
                     .padding(.leading, CGFloat(line.depth) * 16)
                     .foregroundColor(line.isNew ? FilmCanTheme.brandYellow : FilmCanTheme.textSecondary)
                 }
             }
         }
+    }
+
+    private func mediaFolderField(_ kind: SourceMediaKind) -> some View {
+        let missing = session.form.mediaFolder(for: kind) == nil
+        return TextField("\(kind.displayName) folder name", text: Binding(
+            get: { session.form.mediaFolderNames[kind] ?? "" },
+            set: { session.form.mediaFolderNames[kind] = $0 }))
+            .font(.system(size: 11, design: .monospaced))
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 4).padding(.vertical, 1)
+            .frame(maxWidth: 220)
+            .overlay(RoundedRectangle(cornerRadius: 4)
+                .stroke(missing ? FilmCanTheme.brandRed : FilmCanTheme.cardStroke, lineWidth: 1))
     }
 
     // Save as preset

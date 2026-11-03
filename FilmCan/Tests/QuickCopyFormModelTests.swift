@@ -453,13 +453,29 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(form.savedPresets[0].soundFolderTemplate, "", "stored preset untouched")
     }
 
-    func test_presetWithoutCameraMarker_hidesMediaKind() {
-        var form = QuickCopyFormModel(items: [dir("A001")])
+    func test_presetWithoutMediaFolder_requiresTypedNamePerKind() {
+        var form = QuickCopyFormModel(items: [dir("A001"), dir("ZOOM", .sound)])
         var p = cameraOnlyPreset()
         p.folderTemplate = "{date}"
         form.savedPresets = [p]
         form.selectedPresetId = p.id
-        XCTAssertFalse(form.showsMediaKind)
+        form.destinations = ["/Volumes/SSD"]
+        form.pathExists = { $0 == "/Volumes/SSD" }
+        form.today = date(2026, 11, 3)
+        XCTAssertTrue(form.showsMediaKind)
+        XCTAssertTrue(form.lacksMediaFolder)
+        XCTAssertEqual(form.blocker, .missingMediaFolder(.camera))
+        let missing = form.treePreview(for: "/Volumes/SSD").filter { $0.mediaKind != nil }
+        XCTAssertEqual(missing.map(\.name), ["", ""])
+        form.mediaFolderNames[.camera] = "Cam"
+        XCTAssertEqual(form.blocker, .missingMediaFolder(.sound))
+        form.mediaFolderNames[.sound] = "Son Pro"
+        XCTAssertNil(form.blocker)
+        XCTAssertEqual(form.relativePaths(for: "/Volumes/SSD"),
+                       ["20261103/Cam/A001", "20261103/Son_Pro/ZOOM"])
+        let named = form.treePreview(for: "/Volumes/SSD").filter { $0.mediaKind != nil }
+        XCTAssertEqual(named.map(\.name), ["Cam", "Son_Pro"])
+        XCTAssertEqual(named.map(\.depth), [1, 1])
     }
 
     func test_rootFolderName_prefilledThenOverridesBothTemplates() {
