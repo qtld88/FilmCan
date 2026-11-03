@@ -14,6 +14,7 @@
 - [Options](./options.md), verification, copy mode, duplicates, force re-copy
 - [Hash Lists](./hash-lists.md), ASC MHL or simple hidden hash lists for later verification
 - [Transfer History](./transfer-history.md), review, resume, verify
+- [Catalog](./catalog.md), every roll and the drives that hold it, 2× ✓ coverage, offline clip search
 - [Stop & Resume](./stop.md), stop cleanly, resume without re-copying
 - [Safe Checks](./safe-checks.md), warnings before dangerous operations
 - [Push Notifications](./push-notifications.md), macOS + ntfy + webhook
