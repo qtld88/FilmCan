@@ -286,6 +286,45 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         }
     }
 
+    func test_fanOut_directorySource_reportsRollFolderPerDest() async throws {
+        let fm = FileManager.default
+        let cardRoot = tmpDir.appendingPathComponent("CARD")
+        try fm.createDirectory(at: cardRoot, withIntermediateDirectories: true)
+        for name in ["clip-001.bin", "clip-002.bin", "clip-003.bin"] {
+            try Data((0..<32 * 1024).map { _ in UInt8.random(in: 0...255) })
+                .write(to: cardRoot.appendingPathComponent(name))
+        }
+        let looseFile = tmpDir.appendingPathComponent("loose.bin")
+        try Data((0..<1024).map { _ in UInt8.random(in: 0...255) }).write(to: looseFile)
+
+        let dest1 = tmpDir.appendingPathComponent("roll-dest1")
+        let dest2 = tmpDir.appendingPathComponent("roll-dest2")
+        try fm.createDirectory(at: dest1, withIntermediateDirectories: true)
+        try fm.createDirectory(at: dest2, withIntermediateDirectories: true)
+
+        let config = FanOutCopier.Configuration(
+            sources: [cardRoot.path, looseFile.path],
+            destinations: [
+                DestWriter.Config(destPath: dest1.path, displayName: "D1",
+                                  verifyMode: .paranoid, requiresFullFsync: false, chunkSize: 32768),
+                DestWriter.Config(destPath: dest2.path, displayName: "D2",
+                                  verifyMode: .paranoid, requiresFullFsync: false, chunkSize: 32768)
+            ],
+            verifyMode: .paranoid,
+            mhlBasePath: nil,
+            dryRun: false,
+            progressHandler: nil
+        )
+
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertEqual(results.count, 2)
+        for result in results {
+            let dest = URL(fileURLWithPath: result.destinationPath)
+            XCTAssertEqual(result.rollFolders[cardRoot.path], dest.appendingPathComponent("CARD").path)
+            XCTAssertNil(result.rollFolders[looseFile.path], "A flat-file root owns no roll folder")
+        }
+    }
+
     func test_fanOut_mixedFlatAndDirectorySources() async throws {
         let fm = FileManager.default
 

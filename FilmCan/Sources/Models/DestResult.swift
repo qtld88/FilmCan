@@ -20,4 +20,7 @@ struct DestResult: Equatable {
     /// Manifest-relative names of files actually copied this run (truthful list,
     /// independent of the cumulative hash list).
     var transferredFileNames: [String] = []
+    /// Source root path → roll folder written at this destination this run. Roots whose
+    /// files were all skipped (resume) are absent.
+    var rollFolders: [String: String] = [:]
 }

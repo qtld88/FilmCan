@@ -25,6 +25,10 @@ struct DestWriterResult: Sendable {
     /// Used to build a truthful "transferred items" list independent of the
     /// (cumulative) hash list.
     var transferredRelPath: String? = nil
+    /// Source root and the roll folder it was written into. Directory roots only
+    /// (a flat-file root has no roll folder of its own).
+    var rootPath: String? = nil
+    var rollFolder: String? = nil
 }
 
 // MARK: - Accumulator across sources for one destination
@@ -45,8 +49,12 @@ struct DestResultBuilder {
     var manifestUnsealedReason: String? = nil
     /// Names of files actually copied this run (for a truthful transferred-items list).
     var transferredNames: [String] = []
+    var rollFolders: [String: String] = [:]
 
     mutating func incorporate(_ result: DestWriterResult) {
+        if result.success, let root = result.rootPath, let folder = result.rollFolder {
+            rollFolders[root] = folder
+        }
         totalBytes += result.bytesTransferred
         totalFiles += result.filesTransferred
         if !result.success {
@@ -94,7 +102,8 @@ struct DestResultBuilder {
             manifestUnsealedReason: manifestUnsealedReason,
             durationSec: totalDuration,
             verifyMode: verifyMode,
-            transferredFileNames: transferredNames
+            transferredFileNames: transferredNames,
+            rollFolders: rollFolders
         )
     }
 }
@@ -1530,7 +1539,9 @@ actor FanOutCopier {
                     failureReason: nil, verifyMode: destCfg.verifyMode,
                     destHashFromStream: destHash,
                     writtenFilePath: actualWrittenPath,
-                    transferredRelPath: writtenRelPath
+                    transferredRelPath: writtenRelPath,
+                    rootPath: rootPath,
+                    rollFolder: relPath.isEmpty ? nil : rollFolder
                 )
             }
             writerTasks.append(task)
