@@ -113,6 +113,8 @@ struct SourceOptionsView: View {
                 .padding(.top, 4)
             }
 
+            CardsAndRollsSection(viewModel: viewModel, availableWidth: availableWidth)
+
             let copyContentsInfo = InfoPopoverContent(
                 title: "Copy folder contents only",
                 description: "When on, FilmCan skips the top-level folder and copies only its contents into the destination.",
@@ -280,6 +282,126 @@ struct SourceOptionsView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { showExcludePatterns.toggle() }
             }
+        }
+    }
+}
+
+
+/// "Cards & rolls": camera/sound card recognition, automatic roll numbers, shoot-day counter.
+private struct CardsAndRollsSection: View {
+    @ObservedObject var viewModel: BackupEditorViewModel
+    let availableWidth: CGFloat
+    @State private var showResetAlert = false
+
+    private var indent: CGFloat { OptionsLayout.iconWidth + OptionsLayout.spacing }
+
+    private func prefixBinding(_ keyPath: WritableKeyPath<RollNumbering, String>) -> Binding<String> {
+        Binding(
+            get: { viewModel.rollNumbering[keyPath: keyPath] },
+            set: { newValue in
+                let letters = String(newValue.filter { $0.isLetter }.prefix(2)).uppercased()
+                guard !letters.isEmpty else { return }
+                viewModel.rollNumbering[keyPath: keyPath] = letters
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            optionsRow(
+                icon: "sdcard",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Detect camera and sound cards automatically",
+                subtitle: "",
+                isOn: $viewModel.cardAutoDetectEnabled,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: InfoPopoverContent(
+                    title: "Detect cards automatically",
+                    description: "Recognises a card from the folders the camera writes (ARRI, RED, Sony, Canon, Panasonic, Blackmagic, DJI, GoPro) or a sound card holding only WAV/BWF files, and adds it to the sources. Right-click a source to correct a wrong guess; FilmCan remembers it for that drive.",
+                    pros: ["No patterns to maintain", "Sound cards are tagged Sound"],
+                    cons: ["A card that is still empty is not recognised"]
+                ),
+                availableWidth: availableWidth
+            )
+
+            optionsRow(
+                icon: "number",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Number rolls automatically",
+                subtitle: "",
+                isOn: $viewModel.rollNumbering.enabled,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: InfoPopoverContent(
+                    title: "Number rolls automatically",
+                    description: "Roll folders use these names instead of the card name. The rename template no longer applies to roll folders.",
+                    pros: ["No more \"Untitled\" cards", "The same card always gets the same roll name"],
+                    cons: ["A reformatted card is a new roll"]
+                ),
+                availableWidth: availableWidth
+            )
+
+            if viewModel.rollNumbering.enabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 14) {
+                        labeled("Camera prefix") {
+                            TextField("A", text: prefixBinding(\.cameraPrefix)).frame(width: 44)
+                        }
+                        labeled("Sound prefix") {
+                            TextField("S", text: prefixBinding(\.soundPrefix)).frame(width: 44)
+                        }
+                        Stepper("Digits: \(viewModel.rollNumbering.digits)",
+                                value: $viewModel.rollNumbering.digits, in: 2...4)
+                    }
+                    HStack(spacing: 14) {
+                        Stepper("Camera start: \(viewModel.rollNumbering.cameraStart)",
+                                value: $viewModel.rollNumbering.cameraStart, in: 1...9999)
+                        Stepper("Sound start: \(viewModel.rollNumbering.soundStart)",
+                                value: $viewModel.rollNumbering.soundStart, in: 1...9999)
+                    }
+                    Toggle("ARRI and RED keep their reel name", isOn: $viewModel.rollNumbering.keepCameraReelNames)
+                    Text(viewModel.nextRollSummary)
+                        .font(FilmCanFont.body(11))
+                        .foregroundColor(FilmCanTheme.textSecondary)
+                    Button("Reset numbering…") { showResetAlert = true }
+                        .buttonStyle(.bordered)
+                }
+                .font(FilmCanFont.body(12))
+                .padding(.leading, indent)
+                .alert("Reset numbering?", isPresented: $showResetAlert) {
+                    Button("Reset", role: .destructive) { viewModel.resetRollNumbering() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Cards seen before will be numbered again from the start values. Backups already made keep their folder names.")
+                }
+            }
+
+            optionsRow(
+                icon: "calendar",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Advance the shoot day automatically",
+                subtitle: "",
+                isOn: $viewModel.dayAutoAdvance,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: InfoPopoverContent(
+                    title: "Advance the shoot day automatically",
+                    description: "On the first backup of each new day, {day} goes up by one (Day01 → Day02). The Day field is the starting value."
+                ),
+                availableWidth: availableWidth
+            )
+
+            if viewModel.dayAutoAdvance {
+                Text("Today: \(viewModel.shootDayToday.isEmpty ? "Day01" : viewModel.shootDayToday)")
+                    .font(FilmCanFont.body(11))
+                    .foregroundColor(FilmCanTheme.textSecondary)
+                    .padding(.leading, indent)
+            }
+        }
+    }
+
+    private func labeled<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 6) {
+            Text(title).foregroundColor(FilmCanTheme.textSecondary)
+            content()
         }
     }
 }

@@ -40,6 +40,22 @@ and sound folders (e.g. **Netflix Ingest**).
 
 ---
 
+## Card recognition
+
+Options › Sources › **Detect camera and sound cards automatically** (off by default).
+FilmCan recognises a card from the folders the camera writes: ARRI, RED, Sony, Canon,
+Panasonic, Blackmagic, DJI, GoPro. A drive holding only WAV/BWF files is a sound card and is
+tagged Sound. Recognised cards get a badge ("Sony card") on their source row and are added to
+the sources when they are plugged in. Destinations are never added.
+
+A wrong guess is corrected with a right-click on the source: **Camera card**, **Sound card**,
+**Not a camera card** or **Reset recognition**. The correction is remembered per drive
+(volume UUID).
+
+See [Roll numbering](./roll-numbering.md) for automatic roll names.
+
+---
+
 ## Include / Exclude Patterns
 
 **Include** (copy only these):

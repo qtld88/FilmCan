@@ -38,6 +38,15 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     /// the preset's built-in template.
     var cameraFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
     var soundFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Sound_Media"
+    /// Automatic roll names (A001/S001...). Off by default.
+    var rollNumbering: RollNumbering = RollNumbering()
+    /// Advance `day` by one on the first backup of each new calendar day.
+    var dayAutoAdvance: Bool = false
+    /// Recognise camera/sound cards from their folder layout and add them as sources.
+    var cardAutoDetectEnabled: Bool = false
+    /// Transient: source path -> roll name for the current run. Filled by
+    /// `TransferViewModel`; deliberately NOT in CodingKeys (never persisted).
+    var runRollNames: [String: String] = [:]
     var destinationAutoDetectEnabled: Bool = false
     var destinationAutoDetectPatterns: [String] = []
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .ask
@@ -104,6 +113,9 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         soundAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .soundAutoDetectPatterns) ?? []
         cameraFolderTemplate = try c.decodeIfPresent(String.self, forKey: .cameraFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
         soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Sound_Media"
+        rollNumbering = try c.decodeIfPresent(RollNumbering.self, forKey: .rollNumbering) ?? RollNumbering()
+        dayAutoAdvance = try c.decodeIfPresent(Bool.self, forKey: .dayAutoAdvance) ?? false
+        cardAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .cardAutoDetectEnabled) ?? false
         destinationAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .destinationAutoDetectEnabled) ?? false
         destinationAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .destinationAutoDetectPatterns) ?? []
         duplicatePolicy = try c.decodeIfPresent(OrganizationPreset.DuplicatePolicy.self, forKey: .duplicatePolicy) ?? .ask
@@ -171,6 +183,9 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(soundAutoDetectPatterns, forKey: .soundAutoDetectPatterns)
         try c.encode(cameraFolderTemplate, forKey: .cameraFolderTemplate)
         try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
+        try c.encode(rollNumbering, forKey: .rollNumbering)
+        try c.encode(dayAutoAdvance, forKey: .dayAutoAdvance)
+        try c.encode(cardAutoDetectEnabled, forKey: .cardAutoDetectEnabled)
         try c.encode(destinationAutoDetectEnabled, forKey: .destinationAutoDetectEnabled)
         try c.encode(destinationAutoDetectPatterns, forKey: .destinationAutoDetectPatterns)
         try c.encode(duplicatePolicy, forKey: .duplicatePolicy)
@@ -209,6 +224,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
         case cameraFolderTemplate, soundFolderTemplate
+        case rollNumbering, dayAutoAdvance, cardAutoDetectEnabled
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case logFileNameTemplate, reportEnabled
         case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy

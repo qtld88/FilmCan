@@ -163,6 +163,9 @@ actor FanOutCopier {
         /// Camera/Sound tag per source ROOT path; absent ⇒ camera. Routes a source
         /// under Camera_Media/ or Sound_Media/ (Netflix preset).
         var sourceMediaKinds: [String: SourceMediaKind] = [:]
+        /// Assigned roll name per directory source ROOT path (automatic roll numbering).
+        /// Replaces the folder basename as the roll folder name. Empty ⇒ unchanged behaviour.
+        var rollNames: [String: String] = [:]
         /// Which hash-list format to write. The Netflix Ingest preset always forces
         /// ASC MHL regardless of this value.
         var hashListStyle: HashListStyle = .ascMHL
@@ -335,11 +338,13 @@ actor FanOutCopier {
     /// same card always resolves to the same folder across runs (resume-safe). The
     /// suffix is collision-checked against names already taken, so a literal root
     /// named "DJI-2" never gets double-assigned.
-    nonisolated static func disambiguatedRootNames(sourceRoots: [String]) -> [String: String] {
+    nonisolated static func disambiguatedRootNames(
+        sourceRoots: [String], overrides: [String: String] = [:]
+    ) -> [String: String] {
         var result: [String: String] = [:]
         var used = Set<String>()
         for root in Array(Set(sourceRoots)).sorted() {
-            let base = (root as NSString).lastPathComponent
+            let base = overrides[root] ?? (root as NSString).lastPathComponent
             var name = base
             var n = 2
             while used.contains(name) {
@@ -389,7 +394,7 @@ actor FanOutCopier {
                 destRoot: dest.destPath, rootName: name, rootPath: src,
                 isDirectoryRoot: true, preset: config.organizationPreset,
                 copyFolderContents: config.copyFolderContents, date: date,
-                metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: src))
+                metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: src), rollNameIsAssigned: isAssignedRoll(src))
             if Self.rollFolderHasPriorBackup(rf) {
                 return (rf, RollIdentityStore.read(rollFolder: rf))
             }
@@ -409,7 +414,7 @@ actor FanOutCopier {
         var assigned: [String: String] = [:]
         var takenInRun = Set(inRunNames.values)
         for src in dirSourceRoots.sorted() {
-            let base = (src as NSString).lastPathComponent
+            let base = config.rollNames[src] ?? (src as NSString).lastPathComponent
             let curUUID = Self.sourceVolumeUUID(src)
             let curPath = (src as NSString).standardizingPath
             var candidate = inRunNames[src] ?? base
@@ -445,7 +450,8 @@ actor FanOutCopier {
     nonisolated static func resolveDestFilePath(
         destRoot: String, rootName: String, rootPath: String, relPath: String,
         preset: OrganizationPreset?, copyFolderContents: Bool, date: Date,
-        metadata: ShootMetadata = .empty, mediaKind: SourceMediaKind = .camera
+        metadata: ShootMetadata = .empty, mediaKind: SourceMediaKind = .camera,
+        rollNameIsAssigned: Bool = false
     ) -> String {
         // A directory root's basename was disambiguated when two cards shared a name
         // (e.g. two "DJI" → "DJI", "DJI-2"). `disambiguationSuffix` is the "-N" tail that
@@ -467,7 +473,10 @@ actor FanOutCopier {
             // rather than dropping the template for a bare "DJI-2". Not disambiguated ⇒
             // rename behavior unchanged.
             let rollSegment: String
-            if !isDisambiguated {
+            if rollNameIsAssigned {
+                // Automatic roll name: used verbatim, the rename template does not apply.
+                rollSegment = rootName
+            } else if !isDisambiguated {
                 rollSegment = resolved.renamedItem
             } else if !disambiguationSuffix.isEmpty {
                 rollSegment = resolved.renamedItem + disambiguationSuffix
@@ -476,7 +485,7 @@ actor FanOutCopier {
             }
             if relPath.isEmpty {
                 return (folderBase as NSString).appendingPathComponent(rollSegment)
-            } else if copyFolderContents && !isDisambiguated {
+            } else if copyFolderContents && !(isDisambiguated || rollNameIsAssigned) {
                 return (folderBase as NSString).appendingPathComponent(relPath)
             } else {
                 // copyFolderContents normally dumps contents flat (no roll folder), but a
@@ -487,7 +496,7 @@ actor FanOutCopier {
             }
         } else if relPath.isEmpty {
             return (destRoot as NSString).appendingPathComponent(rootName)
-        } else if copyFolderContents && !isDisambiguated {
+        } else if copyFolderContents && !(isDisambiguated || rollNameIsAssigned) {
             return (destRoot as NSString).appendingPathComponent(relPath)
         } else {
             let named = (destRoot as NSString).appendingPathComponent(rootName)
@@ -504,18 +513,24 @@ actor FanOutCopier {
         destRoot: String, rootName: String, rootPath: String,
         isDirectoryRoot: Bool, preset: OrganizationPreset?,
         copyFolderContents: Bool, date: Date, metadata: ShootMetadata = .empty,
-        mediaKind: SourceMediaKind = .camera
+        mediaKind: SourceMediaKind = .camera, rollNameIsAssigned: Bool = false
     ) -> String {
         let resolvedRoot = resolveDestFilePath(
             destRoot: destRoot, rootName: rootName, rootPath: rootPath,
             relPath: "", preset: preset, copyFolderContents: copyFolderContents,
-            date: date, metadata: metadata, mediaKind: mediaKind)
+            date: date, metadata: metadata, mediaKind: mediaKind,
+            rollNameIsAssigned: rollNameIsAssigned)
         return isDirectoryRoot ? resolvedRoot : (resolvedRoot as NSString).deletingLastPathComponent
     }
 
     /// Camera/Sound tag for a source root (defaults to camera).
     nonisolated func mediaKind(forRoot rootPath: String) -> SourceMediaKind {
         config.sourceMediaKinds[rootPath] ?? .camera
+    }
+
+    /// True when automatic roll numbering assigned this root's folder name.
+    nonisolated func isAssignedRoll(_ rootPath: String) -> Bool {
+        config.rollNames[rootPath] != nil
     }
 
     /// The roll's `ascmhl/` folder (holds the generation manifests + chain index).
@@ -580,7 +595,7 @@ actor FanOutCopier {
                     isDirectoryRoot: directoryRoots.contains(rootName),
                     preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: src))
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: src), rollNameIsAssigned: isAssignedRoll(src))
                 // Stamp the source volume identity so a later run can distinguish a
                 // same-card resume from a different card that shares this roll name.
                 // Only directory roots own a roll folder; a flat-file root's "rollFolder"
@@ -711,7 +726,7 @@ actor FanOutCopier {
         // root. Flat-file roots keep their basename — disambiguation is folder-only, so
         // file names are never mangled (same-named flat files are handled by dup detection).
         let dirSourceRoots = Array(Set(entries.filter { $0.sourceIsDirectory }.map { $0.sourceRoot }))
-        let inRunRollNames = Self.disambiguatedRootNames(sourceRoots: dirSourceRoots)
+        let inRunRollNames = Self.disambiguatedRootNames(sourceRoots: dirSourceRoots, overrides: config.rollNames)
         // Cross-run: when a same-named roll already exists at a destination from a prior
         // run, decide resume (same card) vs a fresh "-N" roll (different card) using the
         // source volume UUID, optionally confirmed by the rollIdentityHandler.
@@ -765,7 +780,7 @@ actor FanOutCopier {
                     isDirectoryRoot: directoryRoots.contains(root),
                     preset: config.organizationPreset, copyFolderContents: config.copyFolderContents,
                     date: jobStartTime, metadata: config.shootMetadata,
-                    mediaKind: mediaKind(forRoot: rootPath(for: root)))
+                    mediaKind: mediaKind(forRoot: rootPath(for: root)), rollNameIsAssigned: isAssignedRoll(rootPath(for: root)))
                 if directoryRoots.contains(root) {
                     recursiveRollFolders.insert(rf)
                 } else {
@@ -809,7 +824,7 @@ actor FanOutCopier {
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath))
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath), rollNameIsAssigned: isAssignedRoll(f.rootPath))
                 guard FileManager.default.fileExists(atPath: path) else { return true }  // missing → copy
                 // A manifest written before FilmCan recorded logical sizes holds the ALLOCATED
                 // size. Accept either so an upgrade does not trigger a full re-copy.
@@ -836,7 +851,7 @@ actor FanOutCopier {
                 preset: config.organizationPreset,
                 copyFolderContents: config.copyFolderContents,
                 date: jobStartTime, metadata: config.shootMetadata,
-                mediaKind: mediaKind(forRoot: src))
+                mediaKind: mediaKind(forRoot: src), rollNameIsAssigned: isAssignedRoll(src))
         }
         let nameCollisions = SourceCollisionValidator.collisions(resolvedRoots: resolvedRootsForCollision)
         if !nameCollisions.isEmpty { throw Error.duplicateSourceNames(nameCollisions) }
@@ -992,7 +1007,7 @@ actor FanOutCopier {
                         preset: config.organizationPreset,
                         copyFolderContents: config.copyFolderContents,
                         date: jobStartTime, metadata: config.shootMetadata,
-                        mediaKind: mediaKind(forRoot: rp))
+                        mediaKind: mediaKind(forRoot: rp), rollNameIsAssigned: isAssignedRoll(rp))
                     return FileManager.default.fileExists(atPath: destFile)
                 }
                 if !present.isEmpty {
@@ -1010,7 +1025,7 @@ actor FanOutCopier {
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath))
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath), rollNameIsAssigned: isAssignedRoll(f.rootPath))
                 return ConflictScanner.Target(
                     destPath: dest.destPath, rootName: f.rootName,
                     fileName: plannedSourceName(f), resolvedPath: resolved)
@@ -1304,7 +1319,7 @@ actor FanOutCopier {
                 destRoot: destCfg.destPath, rootName: rootName, rootPath: rootPath,
                 relPath: relPath, preset: config.organizationPreset,
                 copyFolderContents: config.copyFolderContents, date: jobStartTime,
-                metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: rootPath))
+                metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: rootPath), rollNameIsAssigned: isAssignedRoll(rootPath))
             let parent = (targetPath as NSString).deletingLastPathComponent
             try? FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
             let destFileURL = URL(fileURLWithPath: targetPath)
@@ -1527,7 +1542,7 @@ actor FanOutCopier {
                     preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents,
                     date: jobStartTime, metadata: config.shootMetadata,
-                    mediaKind: self.mediaKind(forRoot: rootPath))
+                    mediaKind: self.mediaKind(forRoot: rootPath), rollNameIsAssigned: self.isAssignedRoll(rootPath))
                 let writtenRelPath = actualWrittenPath.hasPrefix(rollFolder + "/")
                     ? String(actualWrittenPath.dropFirst(rollFolder.count + 1))
                     : sourceName

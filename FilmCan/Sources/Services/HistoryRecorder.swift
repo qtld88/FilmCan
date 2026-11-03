@@ -81,7 +81,8 @@ final class HistoryRecorder {
             copyFolderContents: config.copyFolderContents,
             sourceMediaKinds: config.sourceMediaKinds,
             duplicatePolicy: config.duplicatePolicy,
-            hashListStyle: config.hashListStyle
+            hashListStyle: config.hashListStyle,
+            rollNames: config.runRollNames
         )
         entry.runContext = ctx
         storage.appendHistory(entry, retentionLimit: retentionLimit)

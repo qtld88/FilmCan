@@ -88,6 +88,7 @@ struct BackupEditorView: View {
         DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
         viewModel.refreshAutoDetectedSources()
         viewModel.refreshAutoDetectedSoundSources()
+        viewModel.refreshAutoDetectedCards()
         viewModel.refreshAutoDetectedDestinations()
         viewModel.enforceCustomEngineDefaultsIfNeeded()
     }
@@ -198,6 +199,11 @@ struct BackupEditorView: View {
         .onChange(of: viewModel.soundAutoDetectPatterns) { _ in
             if viewModel.soundAutoDetectEnabled {
                 viewModel.refreshAutoDetectedSoundSources()
+            }
+        }
+        .onChange(of: viewModel.cardAutoDetectEnabled) { enabled in
+            if enabled {
+                viewModel.refreshAutoDetectedCards()
             }
         }
         .onChange(of: viewModel.destinationAutoDetectEnabled) { enabled in

@@ -250,6 +250,131 @@ class BackupEditorViewModel: ObservableObject {
         set { config.soundAutoDetectPatterns = newValue; save() }
     }
 
+    // MARK: - Card recognition and roll numbering
+
+    var rollNumbering: RollNumbering {
+        get { config.rollNumbering }
+        set { config.rollNumbering = newValue; save() }
+    }
+
+    var dayAutoAdvance: Bool {
+        get { config.dayAutoAdvance }
+        set { config.dayAutoAdvance = newValue; save() }
+    }
+
+    var cardAutoDetectEnabled: Bool {
+        get { config.cardAutoDetectEnabled }
+        set { config.cardAutoDetectEnabled = newValue; save() }
+    }
+
+    private var cardCache: [String: CardSignature?] = [:]
+
+    /// Detected camera/sound card for a source path (cached until the next drive refresh).
+    func detectedCard(for path: String) -> CardSignature? {
+        if let cached = cardCache[path] { return cached }
+        let signature = CameraCardDetector.detect(rootPath: path)
+        cardCache[path] = .some(signature)
+        return signature
+    }
+
+    func clearCardCache() {
+        cardCache.removeAll()
+        objectWillChange.send()
+    }
+
+    /// Roll name the next run would give this source; nil when numbering is off or the
+    /// source is not a folder. Does not save anything.
+    func rollNamePreview(for path: String) -> String? {
+        guard config.rollNumbering.enabled else { return nil }
+        let state = RollNumberingStore.shared.state(for: config.id)
+        let result = RollNumberer.assign(
+            sources: config.sourcePaths,
+            isDirectory: Self.isDirectory,
+            kinds: config.sourceMediaKinds,
+            settings: config.rollNumbering,
+            existing: state.assignments,
+            keyFor: { RollNumberer.cardKey(forPath: $0) },
+            signatureFor: { [weak self] in self?.detectedCard(for: $0) })
+        return result.names[path]
+    }
+
+    /// "Next camera roll: A004 · next sound roll: S002".
+    var nextRollSummary: String {
+        let state = RollNumberingStore.shared.state(for: config.id)
+        let assigned = Array(state.assignments.values)
+        let cam = RollNumberer.nextName(kind: .camera, settings: config.rollNumbering, assigned: assigned)
+        let snd = RollNumberer.nextName(kind: .sound, settings: config.rollNumbering, assigned: assigned)
+        return "Next camera roll: \(cam) · next sound roll: \(snd)"
+    }
+
+    /// Shoot day the next run will use when auto-advance is on.
+    var shootDayToday: String {
+        RollNumberingStore.shared.state(for: config.id).currentDay ?? config.day
+    }
+
+    func resetRollNumbering() {
+        RollNumberingStore.shared.resetNumbering(for: config.id)
+        objectWillChange.send()
+    }
+
+    private static func isDirectory(_ path: String) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    /// Volume UUID of the drive holding `path`, for the per-drive recognition override.
+    func volumeUUID(for path: String) -> String? {
+        FanOutCopier.sourceVolumeUUID(path)
+    }
+
+    /// Correct the detector for one drive and remember it (by volume UUID).
+    func setCardRole(_ role: CardRole?, for path: String) {
+        if let uuid = volumeUUID(for: path) {
+            CardRoleOverrides.set(role, forVolumeUUID: uuid)
+        }
+        if role == .sound { setMediaKind(.sound, for: path) }
+        else if role == .camera { setMediaKind(.camera, for: path) }
+        else if role == .notACard, let index = config.sourcePaths.firstIndex(of: path) {
+            removeSource(at: index)
+        }
+        clearCardCache()
+        refreshAutoDetectedCards()
+    }
+
+    /// Adds recognised camera/sound cards among the mounted external drives to the
+    /// sources (sound cards are tagged Sound). Drives the user marked "not a card" are
+    /// skipped; destinations are never added.
+    func refreshAutoDetectedCards() {
+        cardCache.removeAll()
+        guard config.cardAutoDetectEnabled else { return }
+        var sources = config.sourcePaths
+        var kinds = config.sourceMediaKinds
+        var changed = false
+        for volumeURL in mountedExternalVolumes() {
+            let path = volumeURL.path
+            if config.destinationPaths.contains(where: { $0 == path || $0.hasPrefix(path + "/") }) { continue }
+            if sources.contains(path) { continue }
+            let override = FanOutCopier.sourceVolumeUUID(path).flatMap { CardRoleOverrides.role(forVolumeUUID: $0) }
+            if override == .notACard { continue }
+            let role: CardRole
+            if let override {
+                role = override
+            } else if let signature = CameraCardDetector.detect(rootPath: path) {
+                role = signature.brand.isSound ? .sound : .camera
+            } else {
+                continue
+            }
+            sources.append(path)
+            if role == .sound { kinds[path] = .sound }
+            changed = true
+        }
+        if changed {
+            config.sourcePaths = sources
+            config.sourceMediaKinds = kinds
+            save()
+        }
+    }
+
     var destinationAutoDetectEnabled: Bool {
         get { config.destinationAutoDetectEnabled }
         set {
@@ -684,6 +809,9 @@ class BackupEditorViewModel: ObservableObject {
         }
         if config.soundAutoDetectEnabled {
             refreshAutoDetectedSoundSources()
+        }
+        if config.cardAutoDetectEnabled {
+            refreshAutoDetectedCards()
         }
         if config.sourcePaths.isEmpty {
             validationMessage = "Please add at least one source file or folder"

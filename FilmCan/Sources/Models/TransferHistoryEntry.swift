@@ -8,6 +8,27 @@ struct RunContext: Codable {
     var sourceMediaKinds: [String: SourceMediaKind]
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy
     var hashListStyle: HashListStyle
+    /// Source path → assigned roll name for this run (empty when numbering was off).
+    var rollNames: [String: String] = [:]
+}
+
+extension RunContext {
+    private enum CodingKeys: String, CodingKey {
+        case organizationPresetId, cameraFolderTemplate, soundFolderTemplate, copyFolderContents
+        case sourceMediaKinds, duplicatePolicy, hashListStyle, rollNames
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        organizationPresetId = try c.decodeIfPresent(UUID.self, forKey: .organizationPresetId)
+        cameraFolderTemplate = try c.decodeIfPresent(String.self, forKey: .cameraFolderTemplate)
+        soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate)
+        copyFolderContents = try c.decode(Bool.self, forKey: .copyFolderContents)
+        sourceMediaKinds = try c.decode([String: SourceMediaKind].self, forKey: .sourceMediaKinds)
+        duplicatePolicy = try c.decode(OrganizationPreset.DuplicatePolicy.self, forKey: .duplicatePolicy)
+        hashListStyle = try c.decode(HashListStyle.self, forKey: .hashListStyle)
+        rollNames = try c.decodeIfPresent([String: String].self, forKey: .rollNames) ?? [:]
+    }
 }
 
 struct TransferHistoryEntry: Codable, Identifiable {
