@@ -188,6 +188,7 @@
 		E98FDAFD30446A17E8D7EE5B /* ManifestDedupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776FCDE369C644189E0138A5 /* ManifestDedupTests.swift */; };
 		EB135DDE8A17EF04263A2AB2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D1A5B5BDD573D20E4EF6A03 /* AppState.swift */; };
 		EC5874CE48288D04FD140DD1 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8EAD261337C6BEE4032A23E /* DebugLog.swift */; };
+		EDF978CFE653628EAD27F3CE /* BackupReportWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FADA94D25E831A4B9D64AA9 /* BackupReportWriter.swift */; };
 		EF7CA3F082BDAD3652FC2D86 /* RollIdentitySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7BE5C204AB2FB815099B2D4 /* RollIdentitySheet.swift */; };
 		F04AD0B22FCB0313E2ABC4E9 /* SimpleMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB60E31AC734912F2B72ACB /* SimpleMHLWriter.swift */; };
 		F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13273CE3DB6E17D073212DFE /* BoundedChannel.swift */; };
@@ -257,6 +258,7 @@
 		3C3502BD9707954651E53BAE /* SourceCollisionValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceCollisionValidator.swift; sourceTree = "<group>"; };
 		3D2147830DD49FC39B828D61 /* HashListBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListBuilder.swift; sourceTree = "<group>"; };
 		3F8187C7774E66ED0782A908 /* OrganizationEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationEditorModel.swift; sourceTree = "<group>"; };
+		3FADA94D25E831A4B9D64AA9 /* BackupReportWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupReportWriter.swift; sourceTree = "<group>"; };
 		40E6C2BF26C154734D9112D1 /* FileOrdering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOrdering.swift; sourceTree = "<group>"; };
 		43A1BB108A96290E666D66D7 /* Hashing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hashing.swift; sourceTree = "<group>"; };
 		43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MHLWriting.swift; sourceTree = "<group>"; };
@@ -464,6 +466,7 @@
 				5F952967FCBF46F1C2D84927 /* ASCMHLChain.swift */,
 				9516D730EDD86DA944200527 /* ASCMHLReader.swift */,
 				DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */,
+				3FADA94D25E831A4B9D64AA9 /* BackupReportWriter.swift */,
 				13273CE3DB6E17D073212DFE /* BoundedChannel.swift */,
 				BAFAD6C66A15CFFEE76EF71F /* CancellationState.swift */,
 				8C2291CD94DD3226526CCBBD /* CardSealService.swift */,
@@ -932,6 +935,7 @@
 				939C56061F3AFD0E2CA6561A /* BackupListViewModel.swift in Sources */,
 				7E135086E0399B9B614CF679 /* BackupLogWriter.swift in Sources */,
 				DA45FF55210F8AB5FBBA3967 /* BackupReport.swift in Sources */,
+				EDF978CFE653628EAD27F3CE /* BackupReportWriter.swift in Sources */,
 				81EE59B6D31B1EBE7E309659 /* BasicOptionsView.swift in Sources */,
 				F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */,
 				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,

@@ -1,4 +1,5 @@
 import XCTest
+import PDFKit
 @testable import FilmCan
 
 @MainActor
@@ -63,5 +64,56 @@ final class BackupReportTests: XCTestCase {
             let sum = try XCTUnwrap(clip.checksum, "no checksum for \(clip.relPath)")
             XCTAssertNotNil(hex.firstMatch(in: sum, range: NSRange(sum.startIndex..., in: sum)))
         }
+    }
+
+    private func sampleReport(clipCount: Int) -> BackupReport {
+        let clips = (1...clipCount).map { i in
+            BackupReport.Clip(relPath: "clip-\(String(format: "%03d", i)).mov",
+                              absolutePath: "/nonexistent/clip-\(i).mov", size: Int64(i) * 1_000_000,
+                              checksum: String(repeating: "ab", count: 16), checksumAlgorithm: "xxh128",
+                              isVideo: true, isAudio: false)
+        }
+        return BackupReport(
+            projectName: "Sample Project", episode: "EP1", day: "Day2", unit: "MU",
+            destinationPath: "/Volumes/SSD", destinationVolumeName: "SSD",
+            startedAt: Date(), endedAt: Date().addingTimeInterval(120), success: true, verified: true,
+            warning: nil,
+            rolls: [BackupReport.Roll(name: "A001", folderPath: "/Volumes/SSD/A001",
+                                      mediaKind: .camera, clips: clips)],
+            appVersion: "1.0")
+    }
+
+    func test_render_producesReadablePDFWithClipNames() throws {
+        let url = tmpDir.appendingPathComponent("r.pdf")
+        try BackupReportWriter.render(sampleReport(clipCount: 3), thumbnails: [:], durations: [:], to: url)
+        let doc = try XCTUnwrap(PDFDocument(url: url))
+        XCTAssertGreaterThanOrEqual(doc.pageCount, 1)
+        let text = doc.string ?? ""
+        for n in ["clip-001.mov", "clip-002.mov", "clip-003.mov", "Sample Project"] {
+            XCTAssertTrue(text.contains(n), "missing \(n)")
+        }
+    }
+
+    func test_render_paginates() throws {
+        let url = tmpDir.appendingPathComponent("r.pdf")
+        try BackupReportWriter.render(sampleReport(clipCount: 40), thumbnails: [:], durations: [:], to: url)
+        let doc = try XCTUnwrap(PDFDocument(url: url))
+        XCTAssertGreaterThanOrEqual(doc.pageCount, 2)
+        XCTAssertTrue(doc.page(at: 1)?.string?.contains("(cont.)") ?? false)
+    }
+
+    func test_thumbnail_nonVideo_returnsIconQuickly() async throws {
+        let f = tmpDir.appendingPathComponent("x.xml")
+        try Data("<a/>".utf8).write(to: f)
+        let start = Date()
+        let img = await BackupReportWriter.thumbnail(for: f.path, isVideo: false, isAudio: false)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1)
+        XCTAssertGreaterThan(img.size.width, 0)
+    }
+
+    func test_generate_withoutLog_returnsNil() async {
+        let result = TransferResult(configurationName: "X", destination: tmpDir.path, startTime: Date())
+        let path = await BackupReportWriter.generate(result: result, config: BackupConfiguration())
+        XCTAssertNil(path)
     }
 }
