@@ -5,6 +5,7 @@ struct LogsOptionsView: View {
     let availableWidth: CGFloat
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
         LogSettingsView(
             logEnabled: Binding(
                 get: { viewModel.logEnabled },
@@ -26,5 +27,43 @@ struct LogsOptionsView: View {
             sampleDestination: viewModel.destinations.first ?? "Destination",
             showHeader: false
         )
+        reportRow
+        }
+    }
+
+    private var reportInfo: InfoPopoverContent {
+        InfoPopoverContent(
+            title: "PDF report",
+            description: "Writes a PDF next to each log with one thumbnail per clip, sizes, durations and checksums.",
+            cons: ["Takes extra time after the copy (runs in the background)"],
+            notes: ["ARRI, RED and BRAW clips show an icon unless a QuickLook plugin is installed."]
+        )
+    }
+
+    private var reportRow: some View {
+        HStack(spacing: 20) {
+            Image(systemName: "doc.richtext")
+                .font(.title3)
+                .foregroundColor(FilmCanTheme.textSecondary)
+                .frame(width: 32)
+            HStack(spacing: 6) {
+                Text("PDF report with thumbnails")
+                    .font(FilmCanFont.label(13))
+                    .foregroundColor(FilmCanTheme.textPrimary)
+                InfoPopoverButton(content: reportInfo)
+            }
+            .frame(width: 268, alignment: .leading)
+            Toggle("", isOn: Binding(
+                get: { viewModel.config.reportEnabled },
+                set: { viewModel.config.reportEnabled = $0; viewModel.save() }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .scaleEffect(0.8)
+            .tint(FilmCanTheme.toggleTint)
+        }
+        .disabled(!viewModel.logEnabled)
+        .help(viewModel.logEnabled ? "" : "Turn on “Create log file” first")
     }
 }

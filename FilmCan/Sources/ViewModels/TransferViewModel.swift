@@ -248,6 +248,15 @@ class TransferViewModel: ObservableObject {
                         )
                     }
                 )
+                if activeConfig.reportEnabled {
+                    let reportResults = perDestResults
+                    let reportConfig = activeConfig
+                    Task.detached(priority: .utility) {
+                        for result in reportResults where result.logFilePath != nil {
+                            _ = await BackupReportWriter.generate(result: result, config: reportConfig)
+                        }
+                    }
+                }
             }
         }
 

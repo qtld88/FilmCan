@@ -285,6 +285,7 @@ struct TransferHistoryView: View {
         .frame(width: 200, height: 200)
         .contextMenu {
             Button("Use it again") { recallSettings(from: entry) }
+            reportButtons(for: entry.results)
             if !entry.results.isEmpty {
                 Divider()
             }
@@ -552,6 +553,7 @@ struct TransferHistoryView: View {
         .frame(width: 200, height: 200)
         .contextMenu {
             Button("Use it again") { recallSettings(from: item.entry) }
+            reportButtons(for: [result])
             let destName = (result.destination as NSString).lastPathComponent
             let label = "Check data for \(destName)"
             let target = hashTarget(for: item.entry, result: result)
@@ -894,6 +896,21 @@ struct TransferHistoryView: View {
         let fileLabel = totalFiles == 1 ? "1 file" : "\(totalFiles) files"
         let bytesLabel = FilmCanFormatters.bytes(totalBytes, style: .decimal)
         return "\(fileLabel) · \(bytesLabel)"
+    }
+
+    @ViewBuilder
+    private func reportButtons(for results: [TransferResultRecord]) -> some View {
+        let reports: [(name: String, path: String)] = results.compactMap { r in
+            guard let log = r.logFilePath else { return nil }
+            let path = BackupReportWriter.reportPath(forLog: log)
+            guard FileManager.default.fileExists(atPath: path) else { return nil }
+            return ((r.destination as NSString).lastPathComponent, path)
+        }
+        ForEach(Array(reports.enumerated()), id: \.offset) { _, report in
+            Button(reports.count == 1 ? "Open report" : "Open report — \(report.name)") {
+                NSWorkspace.shared.open(URL(fileURLWithPath: report.path))
+            }
+        }
     }
 
     private func hashTarget(for entry: TransferHistoryEntry, result: TransferResultRecord) -> (path: String, roots: [String])? {
