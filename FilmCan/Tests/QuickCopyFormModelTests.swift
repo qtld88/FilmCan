@@ -431,4 +431,64 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(p.soundFolderTemplate, "{date}/Sound_Media")
         XCTAssertEqual(p.projectName, "")
     }
+
+    // MARK: gate feedback (2026-11-03)
+    private func cameraOnlyPreset() -> OrganizationPreset {
+        var p = OrganizationPreset()
+        p.name = "DCM"
+        p.useFolderTemplate = true
+        p.folderTemplate = "DCM_{day}_{date}/Camera_Media"
+        return p
+    }
+
+    func test_presetWithoutSoundTemplate_sendsSoundToSoundMedia() throws {
+        var form = QuickCopyFormModel(items: [dir("261103_", .sound)])
+        let p = cameraOnlyPreset()
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        form.today = date(2026, 11, 3)
+        form.day = "J07"
+        XCTAssertTrue(form.showsMediaKind)
+        XCTAssertEqual(form.relativePaths(for: "/Volumes/SSD"), ["DCM_J07_20261103/Sound_Media/261103_"])
+        XCTAssertEqual(form.savedPresets[0].soundFolderTemplate, "", "stored preset untouched")
+    }
+
+    func test_presetWithoutCameraMarker_hidesMediaKind() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var p = cameraOnlyPreset()
+        p.folderTemplate = "{date}"
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        XCTAssertFalse(form.showsMediaKind)
+    }
+
+    func test_rootFolderName_prefilledThenOverridesBothTemplates() {
+        var form = QuickCopyFormModel(items: [dir("A001"), dir("ZOOM", .sound)])
+        form.organization = .dateOnly
+        form.today = date(2026, 11, 3)
+        XCTAssertEqual(form.defaultRootFolderName, "20261103")
+        form.rootFolderName = "DCM J07 {x}"
+        XCTAssertEqual(form.relativePaths(for: "/Volumes/SSD"),
+                       ["DCM_J07_x/Camera_Media/A001", "DCM_J07_x/Sound_Media/ZOOM"])
+        XCTAssertEqual(form.defaultRootFolderName, "20261103")
+        XCTAssertEqual(form.copyFolders(for: "/Volumes/SSD"),
+                       ["/Volumes/SSD/DCM_J07_x/Camera_Media", "/Volumes/SSD/DCM_J07_x/Sound_Media"])
+    }
+
+    func test_rootFolderName_satisfiesMissingProject() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.destinations = ["/Volumes/SSD"]
+        form.pathExists = { _ in true }
+        form.organization = .projectAndDay
+        XCTAssertEqual(form.blocker, .missingProject)
+        form.rootFolderName = "Docu"
+        XCTAssertNil(form.blocker)
+        form.rootFolderName = "   "
+        XCTAssertEqual(form.blocker, .missingProject)
+    }
+
+    func test_copyFolders_noOrganization_isDestination() {
+        let form = QuickCopyFormModel(items: [dir("A001")])
+        XCTAssertEqual(form.copyFolders(for: "/Volumes/SSD"), ["/Volumes/SSD"])
+    }
 }

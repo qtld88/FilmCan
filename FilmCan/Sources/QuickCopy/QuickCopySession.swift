@@ -19,6 +19,10 @@ final class QuickCopySession: ObservableObject, Identifiable {
     @Published private(set) var stopRequested = false
     /// Total bytes per selected item, filled in off the main thread.
     @Published private(set) var sizes: [String: Int64] = [:]
+    /// Read on a timer, not on every redraw: free space includes purgeable space
+    /// that macOS reclaims at any moment, so per-redraw reads made the bars jump
+    /// whenever an unrelated control changed.
+    @Published private(set) var capacities: [String: (total: Int64?, available: Int64?)] = [:]
 
     let worker = TransferViewModel(isBackgroundWorker: true)
     weak var window: NSWindow?
@@ -54,6 +58,12 @@ final class QuickCopySession: ObservableObject, Identifiable {
             self?.objectWillChange.send()
         }
         loadSizes()
+        refreshCapacities()
+    }
+
+    func refreshCapacities() {
+        capacities = Dictionary(form.destinations.map { ($0, DriveUtilities.capacity(for: $0)) },
+                                uniquingKeysWith: { first, _ in first })
     }
 
     /// True as soon as every destination has its result (or the run was already
@@ -80,10 +90,22 @@ final class QuickCopySession: ObservableObject, Identifiable {
         for url in panel.urls where !form.destinations.contains(url.path) {
             form.destinations.append(url.path)
         }
+        refreshCapacities()
     }
 
     func removeDestination(_ path: String) {
         form.destinations.removeAll { $0 == path }
+    }
+
+    /// Same form, fresh results. A re-run resumes from the on-disk manifest.
+    func backToSetup() {
+        guard phase == .finished else { return }
+        worker.results = []
+        worker.alreadyBackedUp = nil
+        worker.progress.resetProgress()
+        stopRequested = false
+        phase = .setup
+        refreshCapacities()
     }
 
     // MARK: Run / stop
@@ -95,6 +117,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
             storage.addPreset(preset)
             form.savedPresets = storage.organizationPresets
             form.selectedPresetId = preset.id
+            form.savePresetName = ""
         }
         defaults.set(form.selectedPresetId?.uuidString, forKey: Self.lastPresetKey)
         defaults.set(form.destinations, forKey: Self.lastDestinationsKey)

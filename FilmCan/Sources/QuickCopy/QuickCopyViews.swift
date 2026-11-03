@@ -84,6 +84,9 @@ struct QuickCopySetupView: View {
             Divider()
             footer
         }
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
+            session.refreshCapacities()
+        }
     }
 
     // Copy From
@@ -124,7 +127,7 @@ struct QuickCopySetupView: View {
     private var destinationsPanel: some View {
         QCPanel(title: "COPY TO") {
             ForEach(session.form.destinations, id: \.self) { path in
-                let capacity = DriveUtilities.capacity(for: path)
+                let capacity = session.capacities[path] ?? (total: nil, available: nil)
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text((path as NSString).lastPathComponent).font(FilmCanFont.label(13)).lineLimit(1)
@@ -197,19 +200,21 @@ struct QuickCopySetupView: View {
     // Organization
     private var organizationPanel: some View {
         QCPanel(title: "ORGANIZATION") {
-            QCSettingRow(label: "Date") {
-                Picker("", selection: Binding(
-                    get: { session.form.pickedDate != nil },
-                    set: { session.form.pickedDate = $0 ? Date() : nil })) {
-                    Text("Today").tag(false)
-                    Text("Pick a date…").tag(true)
-                }
-            }
-            if let picked = session.form.pickedDate {
-                QCSettingRow(label: "Folder date") {
-                    DatePicker("", selection: Binding(
-                        get: { session.form.pickedDate ?? picked },
-                        set: { session.form.pickedDate = $0 }), displayedComponents: .date)
+            if let suggested = session.form.defaultRootFolderName {
+                QCSettingRow(label: "Folder name") {
+                    HStack(spacing: 6) {
+                        TextField(suggested, text: Binding(
+                            get: { session.form.rootFolderName ?? suggested },
+                            set: { session.form.rootFolderName = $0 == suggested ? nil : $0 }))
+                            .textFieldStyle(.roundedBorder)
+                        if session.form.rootFolderName != nil {
+                            Button { session.form.rootFolderName = nil } label: {
+                                Image(systemName: "arrow.uturn.backward")
+                            }
+                            .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
+                            .help("Back to the preset's name")
+                        }
+                    }
                 }
             }
             if session.form.showsProjectField {
@@ -351,7 +356,15 @@ struct QuickCopyProgressView: View {
     @ViewBuilder
     private func destinationCard(_ destination: String) -> some View {
         let name = (destination as NSString).lastPathComponent
-        QCPanel(title: name.uppercased(), trailing: destination) {
+        QCPanel(title: name.uppercased()) {
+            ForEach(session.form.copyFolders(for: destination), id: \.self) { folder in
+                Button { openInFinder(folder, under: destination) } label: {
+                    Label(folder, systemImage: "folder")
+                        .font(FilmCanFont.body(11)).lineLimit(1).truncationMode(.middle)
+                }
+                .buttonStyle(.link)
+                .help("Open in Finder")
+            }
             if worker.alreadyBackedUp != nil {
                 Label("Already backed up — nothing to copy", systemImage: "checkmark.circle.fill")
                     .foregroundColor(FilmCanTheme.brandGreen)
@@ -397,6 +410,8 @@ struct QuickCopyProgressView: View {
             if finished {
                 Button("Show in Finder") { revealInFinder() }
                     .disabled(!(anySuccess || worker.alreadyBackedUp != nil))
+                Button("Back to settings") { session.backToSetup() }
+                    .disabled(!fullyFinished)
                 Spacer()
                 Button("Close") { session.window?.performClose(nil) }
                     .keyboardShortcut(.defaultAction)
@@ -408,6 +423,16 @@ struct QuickCopyProgressView: View {
             }
         }
         .padding(12)
+    }
+
+    /// Before the copy creates it, the folder may not exist yet: open the nearest
+    /// existing parent, never above the destination.
+    private func openInFinder(_ folder: String, under destination: String) {
+        var path = folder
+        while !FileManager.default.fileExists(atPath: path), path.count > destination.count {
+            path = (path as NSString).deletingLastPathComponent
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
     private func revealInFinder() {

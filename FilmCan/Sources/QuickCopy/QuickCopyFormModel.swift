@@ -43,6 +43,8 @@ struct QuickCopyFormModel {
     var organization: OrganizationMode = .none
     /// nil ⇒ today.
     var pickedDate: Date?
+    /// Typed name for the top folder; nil ⇒ the name the templates resolve to.
+    var rootFolderName: String?
     var project = ""
     var day = ""
     var savePresetName = ""
@@ -94,8 +96,34 @@ struct QuickCopyFormModel {
         return organization != .none
     }
 
-    /// Camera/Sound dropdown only matters when folders are organized.
-    var showsMediaKind: Bool { organizationActive }
+    /// Camera/Sound dropdown only matters when the two kinds land in different folders.
+    var showsMediaKind: Bool {
+        guard organizationActive, let p = runPreset() else { return false }
+        return !Self.isBlank(p.soundFolderTemplate) && p.soundFolderTemplate != p.folderTemplate
+    }
+
+    /// Sanitized `rootFolderName`; nil when empty. Braces are dropped so typed text
+    /// is never read as a template token.
+    var rootFolderOverride: String? {
+        guard let raw = rootFolderName else { return nil }
+        let name = Self.sanitizeName(raw).filter { $0 != "{" && $0 != "}" }
+        return name.isEmpty ? nil : name
+    }
+
+    /// The top folder name the templates produce, used to pre-fill the field.
+    var defaultRootFolderName: String? {
+        guard organizationActive else { return nil }
+        var plain = self
+        plain.rootFolderName = nil
+        guard let rel = plain.relativePaths(for: "/").first else { return nil }
+        let parts = rel.split(separator: "/")
+        return parts.count > 1 ? String(parts[0]) : nil
+    }
+
+    static func replacingRoot(of template: String, with root: String) -> String {
+        guard let slash = template.firstIndex(of: "/") else { return root }
+        return root + template[slash...]
+    }
 
     var showsProjectField: Bool {
         if let p = selectedPreset {
@@ -156,6 +184,17 @@ struct QuickCopyFormModel {
             // No picked date means "Today", whatever the stored preset says.
             preset.useCustomDate = pickedDate != nil
             if let picked = pickedDate { preset.customDate = picked }
+            // A preset without a sound template would send Sound cards to Camera_Media.
+            if Self.isBlank(preset.soundFolderTemplate), preset.folderTemplate.contains("Camera_Media") {
+                preset.soundFolderTemplate = preset.folderTemplate
+                    .replacingOccurrences(of: "Camera_Media", with: "Sound_Media")
+            }
+            if let root = rootFolderOverride {
+                preset.folderTemplate = Self.replacingRoot(of: preset.folderTemplate, with: root)
+                if !Self.isBlank(preset.soundFolderTemplate) {
+                    preset.soundFolderTemplate = Self.replacingRoot(of: preset.soundFolderTemplate, with: root)
+                }
+            }
         }
         return preset
     }
@@ -225,7 +264,7 @@ extension QuickCopyFormModel {
         if items.isEmpty { return .noSources }
         if destinations.isEmpty { return .noDestination }
         if let gone = destinations.first(where: { !pathExists($0) }) { return .missingDestination(gone) }
-        if showsProjectField, sanitizedProject.isEmpty { return .missingProject }
+        if showsProjectField, sanitizedProject.isEmpty, rootFolderOverride == nil { return .missingProject }
         if selectedPreset?.name == OrganizationPreset.netflixIngestName {
             for issue in NetflixNameValidator.validate(rollNames: items.map(\.name)) {
                 if case .prohibitedChars(let name, _) = issue { return .invalidRollName(name) }
@@ -336,6 +375,17 @@ extension QuickCopyFormModel {
             }
         }
         return lines
+    }
+
+    func copyFolders(for destination: String) -> [String] {
+        var seen = Set<String>()
+        var folders: [String] = []
+        for rel in relativePaths(for: destination) {
+            let parent = (rel as NSString).deletingLastPathComponent
+            let full = parent.isEmpty ? destination : (destination as NSString).appendingPathComponent(parent)
+            if seen.insert(full).inserted { folders.append(full) }
+        }
+        return folders.isEmpty ? [destination] : folders
     }
 
     /// Folder to reveal in Finder after the copy: the top folder the run created

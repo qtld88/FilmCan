@@ -27,7 +27,7 @@ Each request opens its own window, so two selections run side by side.
   - **If file exists**: Skip (default), Overwrite, Add counter or Verify using hash list.
   - **Copy**: the folder (default) or its contents only.
   - **Organization**: None, Date only, or Project + day.
-- **Organization** section (when organized): **Date** is *Today* or a date you pick, then **Project** and **Day** (Day is optional). A live preview shows the folders that will be created on the first destination, with new ones highlighted.
+- **Organization** section (when organized): **Folder name** is pre-filled from the preset (date, project, day) and you can type over it; the arrow button restores the preset's name. Then **Project** and **Day** (Day is optional). A live preview shows the folders that will be created on the first destination, with new ones highlighted.
 - **Save as preset**: type a name to keep these settings as a preset. Leave it empty to skip. A picked date is never saved.
 
 Project and Day are cleaned before use: spaces and characters Netflix prohibits become `_`.
@@ -54,7 +54,9 @@ The setup window turns into the progress window. Each destination shows the copy
 
 - **Stop** stops the copy cleanly. Nothing is deleted. Run Quick Copy again on the same selection and destination: only what is missing is copied.
 - When it ends, each destination shows a green check (copied and verified) or a red message explaining the failure. One failing destination does not stop the others.
+- Each destination card lists the folders the copy writes to (for example `…/Camera_Media`). Click one to open it in Finder, during or after the copy.
 - **Show in Finder** opens the folder that was created.
+- **Back to settings** returns to the setup window with the same choices, to copy again or change something.
 - If everything was already present, the window says **Already backed up** and nothing is copied.
 
 Closing the window during a copy asks whether to stop it.
@@ -113,7 +115,7 @@ Chaque demande ouvre sa propre fenêtre : deux sélections tournent côte à cô
   - **If file exists** : Skip (par défaut), Overwrite, Add counter ou Verify using hash list.
   - **Copy** : le dossier (par défaut) ou son contenu seulement.
   - **Organization** : None, Date only ou Project + day.
-- Section **Organization** (si les dossiers sont organisés) : **Date** vaut *Today* ou une date choisie, puis **Project** et **Day** (Day est facultatif). Un aperçu en direct montre les dossiers qui seront créés sur la première destination, les nouveaux étant mis en évidence.
+- Section **Organization** (si les dossiers sont organisés) : **Folder name** est pré-rempli d'après le preset (date, projet, jour) et vous pouvez le remplacer ; la flèche rétablit le nom du preset. Puis **Project** et **Day** (Day est facultatif). Un aperçu en direct montre les dossiers qui seront créés sur la première destination, les nouveaux étant mis en évidence.
 - **Save as preset** : saisissez un nom pour garder ces réglages comme préset. Laissez vide pour ne rien enregistrer. Une date choisie n'est jamais enregistrée.
 
 Project et Day sont nettoyés avant usage : les espaces et les caractères interdits par Netflix deviennent `_`.
@@ -140,7 +142,9 @@ La fenêtre de réglage devient la fenêtre de progression. Chaque destination a
 
 - **Stop** arrête la copie proprement. Rien n'est supprimé. Relancez Quick Copy sur la même sélection et la même destination : seul ce qui manque est copié.
 - À la fin, chaque destination affiche une coche verte (copié et vérifié) ou un message rouge qui explique l'échec. Une destination en échec n'arrête pas les autres.
+- Chaque carte de destination liste les dossiers où la copie écrit (par exemple `…/Camera_Media`). Cliquez-en un pour l'ouvrir dans le Finder, pendant ou après la copie.
 - **Show in Finder** ouvre le dossier créé.
+- **Back to settings** revient à la fenêtre de réglage avec les mêmes choix, pour recopier ou modifier.
 - Si tout était déjà présent, la fenêtre indique **Already backed up** et rien n'est copié.
 
 Fermer la fenêtre pendant une copie demande s'il faut l'arrêter.
@@ -199,7 +203,7 @@ Jede Anfrage öffnet ein eigenes Fenster, zwei Auswahlen laufen also nebeneinand
   - **If file exists**: Skip (Standard), Overwrite, Add counter oder Verify using hash list.
   - **Copy**: der Ordner (Standard) oder nur sein Inhalt.
   - **Organization**: None, Date only oder Project + day.
-- Abschnitt **Organization** (bei organisierten Ordnern): **Date** ist *Today* oder ein gewähltes Datum, dann **Project** und **Day** (Day ist optional). Eine Live-Vorschau zeigt die Ordner, die auf dem ersten Ziel angelegt werden, neue hervorgehoben.
+- Abschnitt **Organization** (bei organisierten Ordnern): **Folder name** wird aus dem Preset (Datum, Projekt, Tag) vorausgefüllt und lässt sich überschreiben; der Pfeil stellt den Namen des Presets wieder her. Dann **Project** und **Day** (Day ist optional). Eine Live-Vorschau zeigt die Ordner, die auf dem ersten Ziel angelegt werden, neue hervorgehoben.
 - **Save as preset**: geben Sie einen Namen ein, um diese Einstellungen als Voreinstellung zu behalten. Leer lassen, um nichts zu speichern. Ein gewähltes Datum wird nie gespeichert.
 
 Project und Day werden vor der Verwendung bereinigt: Leerzeichen und von Netflix verbotene Zeichen werden zu `_`.
@@ -226,7 +230,9 @@ Das Einrichtungsfenster wird zum Fortschrittsfenster. Jedes Ziel zeigt den Kopie
 
 - **Stop** beendet das Kopieren sauber. Nichts wird gelöscht. Starten Sie Quick Copy erneut mit derselben Auswahl und demselben Ziel: Es wird nur kopiert, was fehlt.
 - Am Ende zeigt jedes Ziel ein grünes Häkchen (kopiert und verifiziert) oder eine rote Meldung mit dem Grund. Ein fehlgeschlagenes Ziel stoppt die anderen nicht.
+- Jede Zielkarte listet die Ordner, in die kopiert wird (zum Beispiel `…/Camera_Media`). Ein Klick öffnet ihn im Finder, während oder nach dem Kopieren.
 - **Show in Finder** öffnet den erstellten Ordner.
+- **Back to settings** kehrt mit denselben Einstellungen zum Einrichtungsfenster zurück, um erneut zu kopieren oder etwas zu ändern.
 - War alles bereits vorhanden, meldet das Fenster **Already backed up** und es wird nichts kopiert.
 
 Schließen Sie das Fenster während des Kopierens, wird gefragt, ob gestoppt werden soll.
@@ -285,7 +291,7 @@ Cada solicitud abre su propia ventana, así que dos selecciones se ejecutan en p
   - **If file exists**: Skip (por defecto), Overwrite, Add counter o Verify using hash list.
   - **Copy**: la carpeta (por defecto) o solo su contenido.
   - **Organization**: None, Date only o Project + day.
-- Sección **Organization** (cuando se organiza): **Date** es *Today* o una fecha elegida, luego **Project** y **Day** (Day es opcional). Una vista previa en directo muestra las carpetas que se crearán en el primer destino, con las nuevas resaltadas.
+- Sección **Organization** (cuando se organiza): **Folder name** se rellena a partir del preset (fecha, proyecto, día) y puede sobrescribirse; la flecha restaura el nombre del preset. Luego **Project** y **Day** (Day es opcional). Una vista previa en directo muestra las carpetas que se crearán en el primer destino, con las nuevas resaltadas.
 - **Save as preset**: escriba un nombre para guardar estos ajustes como preajuste. Déjelo vacío para no guardar. Una fecha elegida nunca se guarda.
 
 Project y Day se limpian antes de usarse: los espacios y los caracteres que Netflix prohíbe pasan a `_`.
@@ -312,7 +318,9 @@ La ventana de configuración se convierte en la ventana de progreso. Cada destin
 
 - **Stop** detiene la copia con limpieza. No se borra nada. Vuelva a ejecutar Quick Copy con la misma selección y el mismo destino: solo se copia lo que falta.
 - Al terminar, cada destino muestra una marca verde (copiado y verificado) o un mensaje rojo que explica el fallo. Un destino fallido no detiene a los demás.
+- Cada tarjeta de destino lista las carpetas donde se copia (por ejemplo `…/Camera_Media`). Haga clic en una para abrirla en el Finder, durante o después de la copia.
 - **Show in Finder** abre la carpeta creada.
+- **Back to settings** vuelve a la ventana de ajustes con las mismas opciones, para copiar de nuevo o cambiar algo.
 - Si todo ya estaba presente, la ventana indica **Already backed up** y no se copia nada.
 
 Cerrar la ventana durante una copia pregunta si desea detenerla.
