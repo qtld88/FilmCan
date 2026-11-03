@@ -200,23 +200,6 @@ struct QuickCopySetupView: View {
     // Organization
     private var organizationPanel: some View {
         QCPanel(title: "ORGANIZATION") {
-            if let suggested = session.form.defaultRootFolderName {
-                QCSettingRow(label: "Folder name") {
-                    HStack(spacing: 6) {
-                        TextField(suggested, text: Binding(
-                            get: { session.form.rootFolderName ?? suggested },
-                            set: { session.form.rootFolderName = $0 == suggested ? nil : $0 }))
-                            .textFieldStyle(.roundedBorder)
-                        if session.form.rootFolderName != nil {
-                            Button { session.form.rootFolderName = nil } label: {
-                                Image(systemName: "arrow.uturn.backward")
-                            }
-                            .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
-                            .help("Back to the preset's name")
-                        }
-                    }
-                }
-            }
             if session.form.showsProjectField {
                 QCSettingRow(label: "Project") {
                     TextField("Project", text: $session.form.project).textFieldStyle(.roundedBorder)
@@ -225,6 +208,11 @@ struct QuickCopySetupView: View {
             if session.form.showsDayField {
                 QCSettingRow(label: "Day (optional)") {
                     TextField("Day", text: $session.form.day).textFieldStyle(.roundedBorder)
+                }
+            }
+            if let suggested = session.form.defaultRootFolderName {
+                QCSettingRow(label: "Folder name") {
+                    QCFolderNameField(suggested: suggested, override: $session.form.rootFolderName)
                 }
             }
             if let first = session.form.destinations.first {
@@ -285,6 +273,29 @@ struct QuickCopySetupView: View {
                 .disabled(blocker != nil)
         }
         .padding(12)
+    }
+}
+
+/// Local state, not a computed binding: a focused macOS TextField commits its
+/// buffer on blur and would save a stale suggestion as a user override.
+private struct QCFolderNameField: View {
+    let suggested: String
+    @Binding var override: String?
+    @State private var text = ""
+
+    var body: some View {
+        HStack(spacing: 6) {
+            TextField(suggested, text: $text).textFieldStyle(.roundedBorder)
+            if override != nil {
+                Button { override = nil } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
+                    .help("Back to the preset's name")
+            }
+        }
+        .onAppear { text = override ?? suggested }
+        .onChange(of: suggested) { new in if override == nil { text = new } }
+        .onChange(of: override) { new in if new == nil { text = suggested } }
+        .onChange(of: text) { new in override = new == suggested ? nil : new }
     }
 }
 
