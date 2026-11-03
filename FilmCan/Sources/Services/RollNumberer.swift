@@ -12,6 +12,13 @@ enum RollNumberer {
         return "\(volumeUUID ?? "nouuid")|\(rel)"
     }
 
+    /// Card key for a real path: reads the volume UUID and volume root from disk.
+    static func cardKey(forPath path: String) -> String {
+        let volumeRoot = (try? URL(fileURLWithPath: path)
+            .resourceValues(forKeys: [.volumeURLKey]))?.volume?.path ?? "/"
+        return cardKey(volumeUUID: FanOutCopier.sourceVolumeUUID(path), sourcePath: path, volumeRoot: volumeRoot)
+    }
+
     /// Pure. For each DIRECTORY source (sorted for determinism): reuse an existing assignment
     /// for its card key; else keep an ARRI/RED reel name; else take the next free number.
     static func assign(sources: [String], isDirectory: (String) -> Bool,

@@ -41,7 +41,10 @@ extension BackupEditorView {
                 ),
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
-                setMediaKind: { viewModel.setMediaKind($1, for: $0) }
+                setMediaKind: { viewModel.setMediaKind($1, for: $0) },
+                cardSignature: { viewModel.detectedCard(for: $0) },
+                rollNamePreview: { viewModel.rollNamePreview(for: $0) },
+                setCardRole: { viewModel.setCardRole($1, for: $0) }
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("sourcePanel")
@@ -142,7 +145,10 @@ extension BackupEditorView {
                 ),
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
-                setMediaKind: { viewModel.setMediaKind($1, for: $0) }
+                setMediaKind: { viewModel.setMediaKind($1, for: $0) },
+                cardSignature: { viewModel.detectedCard(for: $0) },
+                rollNamePreview: { viewModel.rollNamePreview(for: $0) },
+                setCardRole: { viewModel.setCardRole($1, for: $0) }
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("sourcePanel")

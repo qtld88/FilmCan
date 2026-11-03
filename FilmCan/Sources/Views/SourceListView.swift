@@ -21,6 +21,10 @@ struct SourceListView: View {
     /// When provided, each source row shows a Camera/Sound toggle (Netflix routing).
     var mediaKind: ((String) -> SourceMediaKind)? = nil
     var setMediaKind: ((String, SourceMediaKind) -> Void)? = nil
+    /// Camera/sound card recognition badge, roll-name preview and per-drive correction.
+    var cardSignature: ((String) -> CardSignature?)? = nil
+    var rollNamePreview: ((String) -> String?)? = nil
+    var setCardRole: ((String, CardRole?) -> Void)? = nil
     
     var body: some View {
         let _ = refreshToken
@@ -226,6 +230,29 @@ struct SourceListView: View {
                        : "Sound source — click to switch to Camera (uses the Camera folder)")
     }
 
+    @ViewBuilder
+    private func cardBadgeRow(path: String, isDirectory: Bool) -> some View {
+        let signature = isDirectory ? cardSignature?(path) : nil
+        let preview = isDirectory ? rollNamePreview?(path) : nil
+        if signature != nil || preview != nil {
+            HStack(spacing: 6) {
+                if let signature {
+                    Text("\(signature.brand.displayName) card")
+                        .font(FilmCanFont.body(10))
+                        .foregroundColor(FilmCanTheme.textPrimary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(FilmCanTheme.cardStrokeStrong))
+                }
+                if let preview {
+                    Text("→ \(preview)")
+                        .font(FilmCanFont.body(11))
+                        .foregroundColor(FilmCanTheme.textSecondary)
+                }
+            }
+        }
+    }
+
     private func sourceRow(source: SourcePath, isExternal: Bool) -> some View {
         let metadata = getFileMetadata(source.path)
         let iconName = DriveUtilities.iconName(
@@ -247,7 +274,9 @@ struct SourceListView: View {
                     .font(FilmCanFont.label(12))
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .lineLimit(1)
-                
+
+                cardBadgeRow(path: source.path, isDirectory: metadata.isDirectory)
+
                 HStack(spacing: 8) {
                     if let size = metadata.formattedSize {
                         Text(size)
@@ -293,6 +322,13 @@ struct SourceListView: View {
         }
         .contentShape(Rectangle())
         .contextMenu {
+            if let setCardRole {
+                Button("Camera card") { setCardRole(source.path, .camera) }
+                Button("Sound card") { setCardRole(source.path, .sound) }
+                Button("Not a camera card") { setCardRole(source.path, .notACard) }
+                Button("Reset recognition") { setCardRole(source.path, nil) }
+                Divider()
+            }
             Button("Remove source from this backup") {
                 removeSource(source.path)
             }

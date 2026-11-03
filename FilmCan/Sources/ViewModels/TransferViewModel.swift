@@ -607,13 +607,7 @@ class TransferViewModel: ObservableObject {
                 kinds: kinds,
                 settings: config.rollNumbering,
                 existing: state.assignments,
-                keyFor: { path in
-                    let volumeRoot = (try? URL(fileURLWithPath: path)
-                        .resourceValues(forKeys: [.volumeURLKey]))?.volume?.path ?? "/"
-                    return RollNumberer.cardKey(
-                        volumeUUID: FanOutCopier.sourceVolumeUUID(path),
-                        sourcePath: path, volumeRoot: volumeRoot)
-                },
+                keyFor: { RollNumberer.cardKey(forPath: $0) },
                 signatureFor: { CameraCardDetector.detect(rootPath: $0) })
             config.runRollNames = result.names
             state.assignments = result.assignments
