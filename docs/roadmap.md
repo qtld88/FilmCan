@@ -22,7 +22,7 @@ Detect **video vs sound clips** by container/extension and route them automatica
 ### Corrupted-file detection
 Go beyond checksum-mismatch: flag clips that are **structurally broken** (truncated, unreadable headers) during or after copy, and surface them per destination.
 
-### PDF backup report (Foolcat-style)
+### PDF backup report (Foolcat-style) (in progress)
 Generate a **delivery-ready PDF** per backup, per-roll thumbnails, clip metadata, checksums, and copy summary, written into the shoot-day `Reports/` folder alongside the transfer log.
 
 ---
