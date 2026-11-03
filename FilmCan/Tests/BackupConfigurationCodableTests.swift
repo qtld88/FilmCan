@@ -29,4 +29,42 @@ final class BackupConfigurationCodableTests: XCTestCase {
         let cfg = try JSONDecoder().decode(BackupConfiguration.self, from: json)
         XCTAssertEqual(cfg.schemaVersion, 1, "payload without schemaVersion must default to 1")
     }
+
+    func testLegacyConfigWithoutRollFieldsDecodesToDefaults() throws {
+        let json = #"{"id":"\#(UUID().uuidString)","name":"Old"}"#.data(using: .utf8)!
+        let cfg = try JSONDecoder().decode(BackupConfiguration.self, from: json)
+        XCTAssertEqual(cfg.rollNumbering, RollNumbering())
+        XCTAssertFalse(cfg.rollNumbering.enabled)
+        XCTAssertFalse(cfg.dayAutoAdvance)
+        XCTAssertFalse(cfg.cardAutoDetectEnabled)
+        XCTAssertTrue(cfg.runRollNames.isEmpty)
+    }
+
+    func testRollFieldsRoundTrip_andRunRollNamesIsNotEncoded() throws {
+        var cfg = BackupConfiguration()
+        cfg.rollNumbering.enabled = true
+        cfg.rollNumbering.cameraStart = 45
+        cfg.dayAutoAdvance = true
+        cfg.cardAutoDetectEnabled = true
+        cfg.runRollNames = ["/Volumes/X": "A001"]
+        let data = try JSONEncoder().encode(cfg)
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("runRollNames"))
+        let back = try JSONDecoder().decode(BackupConfiguration.self, from: data)
+        XCTAssertTrue(back.rollNumbering.enabled)
+        XCTAssertEqual(back.rollNumbering.cameraStart, 45)
+        XCTAssertTrue(back.dayAutoAdvance)
+        XCTAssertTrue(back.cardAutoDetectEnabled)
+        XCTAssertTrue(back.runRollNames.isEmpty)
+    }
+
+    func testLegacyRunContextWithoutRollNamesDecodes() throws {
+        let json = #"{"copyFolderContents":false,"sourceMediaKinds":{},"duplicatePolicy":"ask","hashListStyle":"ascMHL"}"#.data(using: .utf8)!
+        let ctx = try JSONDecoder().decode(RunContext.self, from: json)
+        XCTAssertTrue(ctx.rollNames.isEmpty)
+        let back = try JSONDecoder().decode(RunContext.self, from: try JSONEncoder().encode(
+            RunContext(organizationPresetId: nil, cameraFolderTemplate: nil, soundFolderTemplate: nil,
+                       copyFolderContents: false, sourceMediaKinds: [:], duplicatePolicy: .ask,
+                       hashListStyle: .ascMHL, rollNames: ["/a": "A001"])))
+        XCTAssertEqual(back.rollNames, ["/a": "A001"])
+    }
 }
