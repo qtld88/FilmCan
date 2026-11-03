@@ -85,7 +85,7 @@ final class MediaCatalogStore: ObservableObject {
                     destVolumeUUID: info.uuid,
                     destVolumeName: info.name ?? dr.displayName,
                     rollFolderPath: rollFolder,
-                    verified: result.success && result.wasVerified,
+                    verified: result.success && dr.verifyMode != .off,
                     date: runDate
                 )
                 if copiesBySource[sourcePath] == nil { order.append(sourcePath) }
