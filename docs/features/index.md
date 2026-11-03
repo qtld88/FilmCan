@@ -13,6 +13,7 @@
 - [Netflix Ingest](./netflix-ingest.md), Footage-Ingest folder structure, ASC MHL per roll, Camera/Sound routing
 - [Options](./options.md), verification, copy mode, duplicates, force re-copy
 - [Hash Lists](./hash-lists.md), ASC MHL or simple hidden hash lists for later verification
+- [PDF Backup Report](./backup-report.md), PDF per destination with clip thumbnails, sizes, durations, checksums
 - [Transfer History](./transfer-history.md), review, resume, verify
 - [Catalog](./catalog.md), every roll and the drives that hold it, 2× ✓ coverage, offline clip search
 - [Stop & Resume](./stop.md), stop cleanly, resume without re-copying
