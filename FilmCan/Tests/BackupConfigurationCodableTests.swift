@@ -29,4 +29,14 @@ final class BackupConfigurationCodableTests: XCTestCase {
         let cfg = try JSONDecoder().decode(BackupConfiguration.self, from: json)
         XCTAssertEqual(cfg.schemaVersion, 1, "payload without schemaVersion must default to 1")
     }
+
+    func testReportEnabledDefaultsFalseAndRoundTrips() throws {
+        let json = #"{"id":"\#(UUID().uuidString)","name":"Old"}"#.data(using: .utf8)!
+        let legacy = try JSONDecoder().decode(BackupConfiguration.self, from: json)
+        XCTAssertFalse(legacy.reportEnabled)
+        var cfg = BackupConfiguration()
+        cfg.reportEnabled = true
+        let back = try JSONDecoder().decode(BackupConfiguration.self, from: JSONEncoder().encode(cfg))
+        XCTAssertTrue(back.reportEnabled)
+    }
 }

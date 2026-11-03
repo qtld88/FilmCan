@@ -7,6 +7,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var destinationPaths: [String] = []
     var engineOptions: EngineOptions = EngineOptions()
     var logEnabled: Bool = true
+    /// Write a PDF report (with clip thumbnails) next to each transfer log.
+    var reportEnabled: Bool = false
     var logLocation: LogLocation = .sameAsDestination
     var customLogPath: String = ""
     var logFileNameTemplate: String = "transfer_{datetime}"
@@ -80,6 +82,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         destinationPaths = try c.decodeIfPresent([String].self, forKey: .destinationPaths) ?? []
         engineOptions = try c.decodeIfPresent(EngineOptions.self, forKey: .engineOptions) ?? EngineOptions()
         logEnabled = try c.decodeIfPresent(Bool.self, forKey: .logEnabled) ?? true
+        reportEnabled = try c.decodeIfPresent(Bool.self, forKey: .reportEnabled) ?? false
         logLocation  = try c.decodeIfPresent(LogLocation.self, forKey: .logLocation) ?? .sameAsDestination
         customLogPath = try c.decodeIfPresent(String.self, forKey: .customLogPath) ?? ""
         logFileNameTemplate = try c.decodeIfPresent(String.self, forKey: .logFileNameTemplate) ?? "transfer_{datetime}"
@@ -146,6 +149,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(destinationPaths, forKey: .destinationPaths)
         try c.encode(engineOptions,    forKey: .engineOptions)
         try c.encode(logEnabled,       forKey: .logEnabled)
+        try c.encode(reportEnabled,    forKey: .reportEnabled)
         try c.encode(logLocation,      forKey: .logLocation)
         try c.encode(customLogPath,    forKey: .customLogPath)
         try c.encode(logFileNameTemplate, forKey: .logFileNameTemplate)
@@ -206,7 +210,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
         case cameraFolderTemplate, soundFolderTemplate
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
-        case logFileNameTemplate
+        case logFileNameTemplate, reportEnabled
         case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy
         case duplicatePolicy, duplicateCounterTemplate, reVerifyExistingOnResume
         case organizationFolderTemplate, organizationRenameTemplate
