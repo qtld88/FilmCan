@@ -6,6 +6,7 @@ struct MainView: View {
     @StateObject private var listViewModel = BackupListViewModel()
     @ObservedObject private var transferViewModel = TransferViewModel.shared
     @ObservedObject private var storage = ConfigurationStorage.shared
+    @ObservedObject private var catalogStore = MediaCatalogStore.shared
     @State private var showHistoryPanel: Bool = true
     @State private var showQuickTour: Bool = false
     @State private var quickTourIndex: Int = 0
@@ -171,6 +172,7 @@ struct MainView: View {
                 trailingInset: 0
             )
 
+            catalogButton
             historyButton
                 .padding(.trailing, 8)
         }
@@ -256,6 +258,23 @@ struct MainView: View {
         workspaceObservers.append(center.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main, using: postRefresh))
         workspaceObservers.append(center.addObserver(forName: NSWorkspace.didUnmountNotification, object: nil, queue: .main, using: postRefresh))
         workspaceObservers.append(center.addObserver(forName: NSWorkspace.didRenameVolumeNotification, object: nil, queue: .main, using: postRefresh))
+    }
+
+    private var catalogButton: some View {
+        Button(action: { CatalogWindowController.shared.show() }) {
+            Image(systemName: "books.vertical")
+                .foregroundColor(FilmCanTheme.textSecondary)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(6)
+        }
+        .frame(width: 28, height: 28)
+        .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            if !MediaCatalog.atRisk(catalogStore.rolls).isEmpty {
+                Circle().fill(FilmCanTheme.brandOrange).frame(width: 7, height: 7)
+            }
+        }
+        .help("Catalog — where every roll is")
     }
 
     private var historyButton: some View {

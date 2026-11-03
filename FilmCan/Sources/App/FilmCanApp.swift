@@ -52,6 +52,13 @@ struct FilmCanApp: App {
                 .keyboardShortcut("r", modifiers: .command)
             }
 
+            CommandGroup(after: .windowArrangement) {
+                Button("Catalog") {
+                    CatalogWindowController.shared.show()
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+            }
+
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
                     UpdaterService.shared.checkForUpdates()
