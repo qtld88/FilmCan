@@ -55,6 +55,7 @@
 		3EA59FA489C797309AAFBBE4 /* DuplicatePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EDF10844CC898228982672 /* DuplicatePrompt.swift */; };
 		3F41BCBD65ED74CD2F01C425 /* RollIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2339F276B8D91A5D4667E75 /* RollIdentity.swift */; };
 		40FA5D85515E21FADAFE1D60 /* QuickTourView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D862BDFCB070BBF317B5C2 /* QuickTourView.swift */; };
+		41A4C986B24441E326907DB6 /* CameraCardDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96BE2CC357E1C98C914025EC /* CameraCardDetectorTests.swift */; };
 		4536D8AE58C4A2678A9723B6 /* ASCMHLReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD9CF342642411C13186C2E1 /* ASCMHLReaderTests.swift */; };
 		46E99381B82C03828893F845 /* ASCMHLWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84612D3213C028ABF62D4FA7 /* ASCMHLWriterTests.swift */; };
 		4E3F4192B4F29DD714EC6682 /* DestWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2314F69E3FD8DCE91282F1FA /* DestWriter.swift */; };
@@ -67,6 +68,7 @@
 		57FC2EE06C74789FE4CD31E3 /* PerfSignpost.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0317734201A6D2FEBC7A76F /* PerfSignpost.swift */; };
 		58B0C02F251AA3212196E62C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3536A61B485A79461038B1C /* Constants.swift */; };
 		5A069207716694B04A3D9825 /* CardSealService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2291CD94DD3226526CCBBD /* CardSealService.swift */; };
+		5FA82063B157B9F41DD56925 /* CameraCardDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6245C9170960E6550C56889 /* CameraCardDetector.swift */; };
 		60328CEF84C73456E58A6D6C /* OrphanCleanerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */; };
 		631FB4F10F8D72E1F5C5DA4A /* RereadProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DD344286EE0B943C0F5733 /* RereadProgressTests.swift */; };
 		63E38C3BDB1BF4219250EFFF /* StreamingHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A206C11337F2DF884AF7C3C /* StreamingHasher.swift */; };
@@ -319,6 +321,7 @@
 		93B221BAE2102BEB26E8FFE7 /* SourceFilterMatchingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterMatchingTests.swift; sourceTree = "<group>"; };
 		93EB91D5AC324DFAEC3E376F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		9516D730EDD86DA944200527 /* ASCMHLReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLReader.swift; sourceTree = "<group>"; };
+		96BE2CC357E1C98C914025EC /* CameraCardDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCardDetectorTests.swift; sourceTree = "<group>"; };
 		97D862BDFCB070BBF317B5C2 /* QuickTourView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTourView.swift; sourceTree = "<group>"; };
 		9A05E04DE7CC4AF1995192BD /* HashListVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashListVerifier.swift; sourceTree = "<group>"; };
 		9A872C6782B426B22FE8EEDC /* SourceFilterMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterMatching.swift; sourceTree = "<group>"; };
@@ -334,6 +337,7 @@
 		A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDispatcher.swift; sourceTree = "<group>"; };
 		A4E744E0D40DFB989DCAE818 /* FanOutCopierSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierSafetyTests.swift; sourceTree = "<group>"; };
 		A5EBACAD4FF12342BB0D8F56 /* IOPerfProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOPerfProbeTests.swift; sourceTree = "<group>"; };
+		A6245C9170960E6550C56889 /* CameraCardDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCardDetector.swift; sourceTree = "<group>"; };
 		AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupLogWriter.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
 		AB0DE00B31C198D55826941B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
@@ -461,6 +465,7 @@
 				9516D730EDD86DA944200527 /* ASCMHLReader.swift */,
 				DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */,
 				13273CE3DB6E17D073212DFE /* BoundedChannel.swift */,
+				A6245C9170960E6550C56889 /* CameraCardDetector.swift */,
 				BAFAD6C66A15CFFEE76EF71F /* CancellationState.swift */,
 				8C2291CD94DD3226526CCBBD /* CardSealService.swift */,
 				64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */,
@@ -533,6 +538,7 @@
 				DA33115E34C847104B67968D /* BackupLogWriterTests.swift */,
 				1A78A284E0053C8E25D82BF2 /* BoundedChannelTests.swift */,
 				03CC9BE5FF7D4201A2C1E39C /* C4HashTests.swift */,
+				96BE2CC357E1C98C914025EC /* CameraCardDetectorTests.swift */,
 				8B57D995B2944E5D5E619D88 /* CardSealServiceTests.swift */,
 				CE4BBB2D2E9534130CB6CF3F /* CardSealTests.swift */,
 				640924E857BB35194B737188 /* CombinedSpeedETATests.swift */,
@@ -860,6 +866,7 @@
 				C46ED6D795647E028D695967 /* BackupLogWriterTests.swift in Sources */,
 				00C38AA7D2B23332766C72AA /* BoundedChannelTests.swift in Sources */,
 				84D61FEBEB259D68C6ECED19 /* C4HashTests.swift in Sources */,
+				41A4C986B24441E326907DB6 /* CameraCardDetectorTests.swift in Sources */,
 				F94154DA8195DD313511F508 /* CardSealServiceTests.swift in Sources */,
 				DEFA2C0E9571C5B04DF70788 /* CardSealTests.swift in Sources */,
 				36A1AA3258E80CBD9CE8B7B2 /* CombinedSpeedETATests.swift in Sources */,
@@ -927,6 +934,7 @@
 				81EE59B6D31B1EBE7E309659 /* BasicOptionsView.swift in Sources */,
 				F052C07DA6736F7CB6B81987 /* BoundedChannel.swift in Sources */,
 				35C2DD0BCD36E8EFA80B697E /* C4Hash.swift in Sources */,
+				5FA82063B157B9F41DD56925 /* CameraCardDetector.swift in Sources */,
 				B6CAC1814763C6C420BA5980 /* CancellationState.swift in Sources */,
 				C0D41E90912EE8216FC9D01F /* CardSeal.swift in Sources */,
 				5A069207716694B04A3D9825 /* CardSealService.swift in Sources */,
