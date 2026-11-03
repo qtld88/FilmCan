@@ -27,6 +27,7 @@
 		1777544B7D467D923D430A7F /* WebhookService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61177C3A7E8C07E8B3FB9112 /* WebhookService.swift */; };
 		178F4B6B36FD3B5548F3E219 /* OrganizationTemplateTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802D5EC223B6B2F4CB3CF764 /* OrganizationTemplateTokenTests.swift */; };
 		18135282F61724B8A532D032 /* TransferProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297A6705D2E34EA8E454FB3B /* TransferProgress.swift */; };
+		183EAFD8529B1DFD2826E4DF /* MediaCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDBF31AD1BEC359F39D311E3 /* MediaCatalogStore.swift */; };
 		1A27694F65DDE9D6A6EECCA8 /* DuplicatePromptCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86A607F0938B68118BC36B7 /* DuplicatePromptCoordinator.swift */; };
 		1AB7A04FDB21CBA5B2E08A68 /* FanOutProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */; };
 		1B52DDDFB277C55474E5E9C2 /* FileEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E84E2F5E2941DED39DB6EDD /* FileEnumerator.swift */; };
@@ -405,6 +406,7 @@
 		FA912365575B6BB6724929CD /* NetflixPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetflixPresetTests.swift; sourceTree = "<group>"; };
 		FB8B45E6010E1222A7826DC8 /* WindowTitleSetter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleSetter.swift; sourceTree = "<group>"; };
 		FCFC863B70589C3A7F58ED95 /* SecretsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretsMigration.swift; sourceTree = "<group>"; };
+		FDBF31AD1BEC359F39D311E3 /* MediaCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCatalogStore.swift; sourceTree = "<group>"; };
 		FEAB41177986B7BBED498656 /* CustomCopierService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCopierService.swift; sourceTree = "<group>"; };
 		FF50D74C080DB0D6C4A8A93C /* SiblingDestSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiblingDestSource.swift; sourceTree = "<group>"; };
 		FFA8427B4A1254A14DCE35B2 /* TransferResultSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferResultSummary.swift; sourceTree = "<group>"; };
@@ -477,6 +479,7 @@
 				B3F3E1E15AB98D6E20FE01A1 /* FanOutCopier.swift */,
 				2D21908EF19755E8DBB9B0C6 /* HistoryRecorder.swift */,
 				75DFBCD664B68D864309A2C9 /* KeychainStore.swift */,
+				FDBF31AD1BEC359F39D311E3 /* MediaCatalogStore.swift */,
 				43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */,
 				4882B2F12F61AB72895AD3A0 /* NetworkSpeedProbe.swift */,
 				A13571D2149AF730C60F05DA /* NotificationDispatcher.swift */,
@@ -999,6 +1002,7 @@
 				2A332D2274013BB431B0EF92 /* MainThreadWatchdog.swift in Sources */,
 				A310C44F21AC3D95EDBDA69F /* MainView.swift in Sources */,
 				9D947A7FA0D6C58F42B666D3 /* MediaCatalog.swift in Sources */,
+				183EAFD8529B1DFD2826E4DF /* MediaCatalogStore.swift in Sources */,
 				8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */,
 				170A04CEAB4882CBFA7D184A /* NetflixValidationSheet.swift in Sources */,
 				CE474008F03132B40E87A901 /* NetworkSpeedProbe.swift in Sources */,
