@@ -235,6 +235,9 @@ class TransferViewModel: ObservableObject {
                     results: perDestResults,
                     preset: organizationPreset
                 )
+                await MediaCatalogStore.shared.record(
+                    config: activeConfig, sources: sources,
+                    results: perDestResults, runDate: transferStartTime ?? Date())
                 await NotificationDispatcher.sendSource(
                     source: sources.first ?? "",
                     config: activeConfig,
