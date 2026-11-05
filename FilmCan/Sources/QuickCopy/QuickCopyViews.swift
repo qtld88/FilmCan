@@ -24,7 +24,7 @@ struct QuickCopyWindowView: View {
 
 private enum QCPanelStyle {
     /// Copy From / Save To: the data cards, headed loud.
-    case data(icon: String)
+    case data(icon: String? = nil)
     /// Settings: recessed, darker, dashed — reads as "how", not "what".
     case settings
 }
@@ -51,9 +51,11 @@ private struct QCPanel<Content: View>: View {
         switch style {
         case .data(let icon):
             HStack(spacing: 8) {
-                Image(systemName: icon)
+                if let icon {
+                    Image(systemName: icon)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(FilmCanTheme.brandYellow)
+                }
                 Text(title).font(FilmCanFont.title(16)).foregroundColor(FilmCanTheme.textPrimary)
                 Spacer()
                 if let trailing {
@@ -182,7 +184,7 @@ struct QuickCopySetupView: View {
         QCPanel(title: "COPY FROM",
                 trailing: "\(session.form.items.count) item\(session.form.items.count == 1 ? "" : "s")"
                     + (totalSize.isEmpty ? "" : " · \(totalSize)"),
-                style: .data(icon: "sdcard.fill")) {
+                style: .data()) {
             ForEach(Array(session.form.items.enumerated()), id: \.element.id) { index, item in
                 HStack(spacing: 10) {
                     Text("\(index + 1)")
@@ -191,7 +193,8 @@ struct QuickCopySetupView: View {
                         .frame(width: 20, height: 20)
                         .background(Circle().fill(FilmCanTheme.brandYellow))
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(item.name).font(FilmCanFont.label(13)).lineLimit(1)
+                        Label(item.name, systemImage: item.kind == .sound ? "waveform" : "sdcard.fill")
+                            .font(FilmCanFont.label(13)).lineLimit(1)
                         Text(item.path).font(FilmCanFont.body(10))
                             .foregroundColor(FilmCanTheme.textTertiary)
                             .lineLimit(1).truncationMode(.middle)
@@ -223,13 +226,14 @@ struct QuickCopySetupView: View {
 
     // Copy To
     private var destinationsPanel: some View {
-        QCPanel(title: "SAVE TO", style: .data(icon: "externaldrive.fill")) {
+        QCPanel(title: "SAVE TO", style: .data()) {
             ForEach(Array(session.form.destinations.enumerated()), id: \.element) { index, path in
                 let capacity = session.capacities[path] ?? (total: nil, available: nil)
                 if index > 0 { Divider().padding(.vertical, 2) }
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text((path as NSString).lastPathComponent).font(FilmCanFont.label(13)).lineLimit(1)
+                        Label((path as NSString).lastPathComponent, systemImage: "externaldrive.fill")
+                            .font(FilmCanFont.label(13)).lineLimit(1)
                         if let total = capacity.total, let free = capacity.available, total > 0 {
                             let info = DriveCapacityInfo(requiredBytes: totalBytes, available: free, total: total)
                             DriveCapacityBar(info: info, requiredBytes: totalBytes)
