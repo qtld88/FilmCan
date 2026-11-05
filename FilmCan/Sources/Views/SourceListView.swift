@@ -230,15 +230,15 @@ struct SourceListView: View {
     private func mediaKindToggle(path: String, kind: SourceMediaKind,
                                  set: @escaping (String, SourceMediaKind) -> Void) -> some View {
         HStack(spacing: 0) {
-            mediaKindSegment(.camera, icon: "video.fill", current: kind) { set(path, .camera) }
-            mediaKindSegment(.sound, icon: "speaker.wave.2.fill", current: kind) { set(path, .sound) }
+            mediaKindSegment(.camera, icon: "video.fill", current: kind) { set(path, kind == .camera ? .sound : .camera) }
+            mediaKindSegment(.sound, icon: "speaker.wave.2.fill", current: kind) { set(path, kind == .camera ? .sound : .camera) }
         }
         .padding(2)
         .background(Capsule().fill(FilmCanTheme.card))
         .overlay(Capsule().stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1))
         .animation(.easeInOut(duration: 0.12), value: kind)
-        .help(kind == .camera ? "Camera source — goes to the Camera folder. Click the speaker for Sound."
-                              : "Sound source — goes to the Sound folder. Click the camera for Camera.")
+        .help(kind == .camera ? "Camera source — goes to the Camera folder. Click to switch to Sound."
+                              : "Sound source — goes to the Sound folder. Click to switch to Camera.")
     }
 
     private func mediaKindSegment(_ segment: SourceMediaKind, icon: String, current: SourceMediaKind,
