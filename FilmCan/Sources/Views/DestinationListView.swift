@@ -671,7 +671,7 @@ struct DestinationListView: View {
         let backupText = info.backupPercent == 0 ? "<1%" : "\(info.backupPercent)%"
         let usedText = info.usedPercent == 0 ? "<1%" : "\(info.usedPercent)%"
         let backupLabel = backupStoredOnDrive ? "already there" : "backup"
-        return "\(freeText) free · \(backupText) \(backupLabel) · \(usedText) full"
+        return "\(freeText) free · \(usedText) occupied · \(backupText) \(backupLabel)"
     }
 
     private func capacityBarVisualization(info: CapacityInfo, requiredBytes: Int64) -> some View {
