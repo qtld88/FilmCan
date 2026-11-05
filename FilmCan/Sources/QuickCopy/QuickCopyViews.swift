@@ -22,27 +22,76 @@ struct QuickCopyWindowView: View {
 
 // MARK: - Shared bits
 
+private enum QCPanelStyle {
+    /// Copy From / Save To: the data cards, headed loud.
+    case data(icon: String)
+    /// Settings: recessed, darker, dashed — reads as "how", not "what".
+    case settings
+}
+
 private struct QCPanel<Content: View>: View {
     let title: String
     var trailing: String?
+    var style: QCPanelStyle = .settings
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(title).font(FilmCanFont.label(12)).foregroundColor(FilmCanTheme.textSecondary)
-                Spacer()
-                if let trailing {
-                    Text(trailing).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textTertiary)
-                }
-            }
+            header
             content
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FilmCanTheme.panel)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(FilmCanTheme.cardStroke, lineWidth: 1))
+        .background(background)
+        .overlay(border)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder private var header: some View {
+        switch style {
+        case .data(let icon):
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(FilmCanTheme.brandYellow)
+                Text(title).font(FilmCanFont.title(16)).foregroundColor(FilmCanTheme.textPrimary)
+                Spacer()
+                if let trailing {
+                    Text(trailing).font(FilmCanFont.label(11)).foregroundColor(FilmCanTheme.textSecondary)
+                }
+            }
+            .padding(.bottom, 2)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(FilmCanTheme.brandYellow).frame(height: 2).offset(y: 6)
+            }
+            .padding(.bottom, 6)
+        case .settings:
+            HStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title).font(FilmCanFont.label(11))
+                Spacer()
+                if let trailing {
+                    Text(trailing).font(FilmCanFont.body(11))
+                }
+            }
+            .foregroundColor(FilmCanTheme.textTertiary)
+        }
+    }
+
+    private var background: Color {
+        if case .data = style { return FilmCanTheme.panel }
+        return FilmCanTheme.settingsCard
+    }
+
+    @ViewBuilder private var border: some View {
+        switch style {
+        case .data:
+            RoundedRectangle(cornerRadius: 8).stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1)
+        case .settings:
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(FilmCanTheme.cardStroke, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        }
     }
 }
 
@@ -132,7 +181,8 @@ struct QuickCopySetupView: View {
     private var sourcesPanel: some View {
         QCPanel(title: "COPY FROM",
                 trailing: "\(session.form.items.count) item\(session.form.items.count == 1 ? "" : "s")"
-                    + (totalSize.isEmpty ? "" : " · \(totalSize)")) {
+                    + (totalSize.isEmpty ? "" : " · \(totalSize)"),
+                style: .data(icon: "sdcard.fill")) {
             ForEach(Array(session.form.items.enumerated()), id: \.element.id) { index, item in
                 HStack(spacing: 10) {
                     Text("\(index + 1)")
@@ -173,7 +223,7 @@ struct QuickCopySetupView: View {
 
     // Copy To
     private var destinationsPanel: some View {
-        QCPanel(title: "COPY TO") {
+        QCPanel(title: "SAVE TO", style: .data(icon: "externaldrive.fill")) {
             ForEach(Array(session.form.destinations.enumerated()), id: \.element) { index, path in
                 let capacity = session.capacities[path] ?? (total: nil, available: nil)
                 if index > 0 { Divider().padding(.vertical, 2) }
@@ -494,7 +544,7 @@ struct QuickCopyProgressView: View {
     @ViewBuilder
     private func destinationCard(_ destination: String) -> some View {
         let name = (destination as NSString).lastPathComponent
-        QCPanel(title: name.uppercased()) {
+        QCPanel(title: name.uppercased(), style: .data(icon: "externaldrive.fill")) {
             ForEach(session.form.copyFolders(for: destination), id: \.self) { folder in
                 Button { openInFinder(folder, under: destination) } label: {
                     Label(folder, systemImage: "folder")
