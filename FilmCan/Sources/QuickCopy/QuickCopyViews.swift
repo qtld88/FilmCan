@@ -72,12 +72,25 @@ struct QuickCopySetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    sourcesPanel
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sourcesPanel
+                        Button { session.addSourceViaPanel() } label: {
+                            Label("Add source", systemImage: "plus")
+                        }
+                        .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+                        .padding(.leading, 4)
+                    }
+                    .frame(width: 300)
+                    flowArrow
+                    VStack(alignment: .leading, spacing: 10) {
+                        settingsPanel
+                        if session.form.selectedPresetId == nil { savePresetPanel }
+                    }
+                    .frame(width: 300)
+                    flowArrow
                     destinationsPanel
-                    settingsPanel
-                    if session.form.organizationActive { organizationPanel }
-                    if session.form.selectedPresetId == nil { savePresetPanel }
+                        .frame(minWidth: 340, maxWidth: .infinity)
                 }
                 .padding(16)
             }
@@ -87,6 +100,13 @@ struct QuickCopySetupView: View {
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
             session.refreshCapacities()
         }
+    }
+
+    private var flowArrow: some View {
+        Image(systemName: "arrow.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(FilmCanTheme.textTertiary)
+            .padding(.top, 40)
     }
 
     // Copy From
@@ -116,7 +136,12 @@ struct QuickCopySetupView: View {
                         Picker("", selection: $session.form.items[index].kind) {
                             ForEach(SourceMediaKind.allCases) { Text($0.displayName).tag($0) }
                         }
-                        .labelsHidden().frame(width: 100)
+                        .labelsHidden().frame(width: 90)
+                    }
+                    if session.form.items.count > 1 {
+                        Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
+                            .help("Remove source")
                     }
                 }
             }
@@ -126,8 +151,9 @@ struct QuickCopySetupView: View {
     // Copy To
     private var destinationsPanel: some View {
         QCPanel(title: "COPY TO") {
-            ForEach(session.form.destinations, id: \.self) { path in
+            ForEach(Array(session.form.destinations.enumerated()), id: \.element) { index, path in
                 let capacity = session.capacities[path] ?? (total: nil, available: nil)
+                if index > 0 { Divider().padding(.vertical, 2) }
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text((path as NSString).lastPathComponent).font(FilmCanFont.label(13)).lineLimit(1)
@@ -146,6 +172,7 @@ struct QuickCopySetupView: View {
                         .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                         .help("Remove destination")
                 }
+                folderTree(for: path, autoEdit: index == 0)
             }
             Button { session.addDestinationViaPanel() } label: {
                 Label("Add destination", systemImage: "plus")
@@ -194,31 +221,33 @@ struct QuickCopySetupView: View {
                     }
                 }
             }
+            if session.form.organizationActive {
+                if session.form.showsProjectField {
+                    QCSettingRow(label: "Project") {
+                        TextField("Project", text: $session.form.project).textFieldStyle(.roundedBorder)
+                    }
+                }
+                if session.form.showsDayField {
+                    QCSettingRow(label: "Day (optional)") {
+                        TextField("Day", text: $session.form.day).textFieldStyle(.roundedBorder)
+                    }
+                }
+            }
         }
     }
 
-    // Organization
-    private var organizationPanel: some View {
-        QCPanel(title: "ORGANIZATION") {
-            if session.form.showsProjectField {
-                QCSettingRow(label: "Project") {
-                    TextField("Project", text: $session.form.project).textFieldStyle(.roundedBorder)
-                }
-            }
-            if session.form.showsDayField {
-                QCSettingRow(label: "Day (optional)") {
-                    TextField("Day", text: $session.form.day).textFieldStyle(.roundedBorder)
-                }
-            }
-            if let first = session.form.destinations.first {
-                Divider()
-                Text("Will be created in \((first as NSString).lastPathComponent)")
-                    .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textTertiary)
-                let lines = session.form.treePreview(for: first)
+    /// Folders the copy will create under `destination`. Renames are shared by every
+    /// destination; only the first one opens an empty required name by itself.
+    @ViewBuilder
+    private func folderTree(for destination: String, autoEdit: Bool) -> some View {
+        let lines = session.form.treePreview(for: destination)
+        if !lines.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     QCTreeRow(
                         line: line,
                         edited: session.form.isFolderNameEdited(root: line.isRoot, kind: line.mediaKind),
+                        autoEdit: autoEdit,
                         onRename: { session.form.setFolderName($0, root: line.isRoot, kind: line.mediaKind) },
                         onReset: {
                             if line.isRoot { session.form.rootFolderName = nil }
@@ -227,6 +256,9 @@ struct QuickCopySetupView: View {
                     .padding(.leading, CGFloat(line.depth) * 16)
                 }
             }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 6).fill(FilmCanTheme.background.opacity(0.6)))
         }
     }
 
@@ -264,6 +296,7 @@ struct QuickCopySetupView: View {
 private struct QCTreeRow: View {
     let line: QuickCopyFormModel.TreeLine
     let edited: Bool
+    var autoEdit = true
     let onRename: (String) -> Void
     let onReset: () -> Void
 
@@ -310,7 +343,7 @@ private struct QCTreeRow: View {
             }
         }
         .foregroundColor(line.isNew ? FilmCanTheme.brandYellow : FilmCanTheme.textSecondary)
-        .onAppear { if needsName { startEditing() } }
+        .onAppear { if needsName && autoEdit { startEditing() } }
     }
 
     private func startEditing() {

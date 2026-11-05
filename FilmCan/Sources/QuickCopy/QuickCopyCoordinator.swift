@@ -67,14 +67,14 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
 
     private func present(_ session: QuickCopySession) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 720),
+            contentRect: NSRect(x: 0, y: 0, width: 1080, height: 560),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "FilmCan Copy"
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.appearance = NSAppearance(named: .darkAqua)
-        window.minSize = NSSize(width: 520, height: 480)
+        window.minSize = NSSize(width: 1000, height: 420)
         window.delegate = self
         window.contentView = NSHostingView(rootView: QuickCopyWindowView(session: session))
         if let point = nextCascadePoint, sessions.count > 1 {

@@ -93,6 +93,24 @@ final class QuickCopySession: ObservableObject, Identifiable {
         refreshCapacities()
     }
 
+    func addSourceViaPanel() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        let known = Set(form.items.map(\.path))
+        let added = QuickCopyFormModel.items(for: panel.urls.map(\.path).filter { !known.contains($0) })
+        form.items.append(contentsOf: added)
+        loadSizes(for: added)
+    }
+
+    func removeSource(_ path: String) {
+        guard form.items.count > 1 else { return }
+        form.items.removeAll { $0.path == path }
+    }
+
     func removeDestination(_ path: String) {
         form.destinations.removeAll { $0 == path }
     }
@@ -181,8 +199,8 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     // MARK: Sizes
 
-    private func loadSizes() {
-        for item in form.items {
+    private func loadSizes(for items: [QuickCopyFormModel.Item]? = nil) {
+        for item in items ?? form.items {
             let path = item.path
             Task { @MainActor [weak self] in
                 let bytes = await Task.detached(priority: .utility) {
