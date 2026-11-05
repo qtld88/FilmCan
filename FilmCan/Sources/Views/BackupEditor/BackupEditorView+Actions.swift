@@ -41,7 +41,7 @@ extension BackupEditorView {
         guard viewModel.validate() else { return }
 
         if !skipNetflixValidation && isNetflixPresetSelected {
-            let rolls = viewModel.sourcePaths.map { ($0 as NSString).lastPathComponent }
+            let rolls = viewModel.includedSourcePaths.map { ($0 as NSString).lastPathComponent }
             let issues = NetflixNameValidator.validate(rollNames: rolls)
             if !issues.isEmpty {
                 netflixValidation = NetflixValidationInfo(issues: issues)
@@ -76,7 +76,7 @@ extension BackupEditorView {
     /// how the engine will disambiguate them (e.g. "DJI → DJI, DJI-2"). Nil if no clash.
     func duplicateSourceNameWarning() -> String? {
         let fm = FileManager.default
-        let dirSources = viewModel.sourcePaths.filter {
+        let dirSources = viewModel.includedSourcePaths.filter {
             var isDir: ObjCBool = false
             return fm.fileExists(atPath: $0, isDirectory: &isDir) && isDir.boolValue
         }

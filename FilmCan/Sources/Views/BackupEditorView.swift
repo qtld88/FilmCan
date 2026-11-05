@@ -181,6 +181,7 @@ struct BackupEditorView: View {
         }
         .onAppear(perform: editorDidAppear)
         .onChange(of: viewModel.sourcePaths) { _ in refreshPreview() }
+        .onChange(of: viewModel.config.excludedSourcePaths) { _ in refreshPreview() }
         .onChange(of: viewModel.sourceAutoDetectEnabled) { enabled in
             if enabled {
                 viewModel.refreshAutoDetectedSources()

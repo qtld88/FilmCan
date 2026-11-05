@@ -26,10 +26,38 @@ class BackupEditorViewModel: ObservableObject {
     var sourcePaths: [String] {
         get { config.sourcePaths }
         set {
+            let previous = config.sourcePaths
             config.sourcePaths = newValue
             storage.lastSourcePath = newValue.last
+            let removed = Set(previous).subtracting(newValue)
+            config.excludedSourcePaths.subtract(removed)
             save()
+            if !removed.isEmpty { keepReaddedSourcesUnchecked(removed, previous: previous) }
         }
+    }
+
+    var includedSourcePaths: [String] { config.includedSourcePaths }
+
+    func isSourceIncluded(_ path: String) -> Bool { !config.excludedSourcePaths.contains(path) }
+
+    func setSourcesIncluded(_ paths: [String], _ included: Bool) {
+        if included { config.excludedSourcePaths.subtract(paths) } else { config.excludedSourcePaths.formUnion(paths) }
+        save()
+    }
+
+    /// With auto-detect on, a removed drive that is still plugged in comes straight back.
+    /// Keep it where it was, unchecked, so it stays visibly out of the backup.
+    private func keepReaddedSourcesUnchecked(_ removed: Set<String>, previous: [String]) {
+        refreshAutoDetectedSources()
+        refreshAutoDetectedSoundSources()
+        refreshAutoDetectedCards()
+        let readded = removed.intersection(config.sourcePaths)
+        guard !readded.isEmpty else { return }
+        let current = Set(config.sourcePaths)
+        config.sourcePaths = previous.filter { current.contains($0) }
+            + config.sourcePaths.filter { !previous.contains($0) }
+        config.excludedSourcePaths.formUnion(readded)
+        save()
     }
     
     func addSource(_ path: String) {
@@ -41,7 +69,8 @@ class BackupEditorViewModel: ObservableObject {
     
     func removeSource(at index: Int) {
         guard index < config.sourcePaths.count else { return }
-        config.sourcePaths.remove(at: index)
+        let path = config.sourcePaths.remove(at: index)
+        config.excludedSourcePaths.remove(path)
         save()
     }
     
@@ -49,12 +78,36 @@ class BackupEditorViewModel: ObservableObject {
     var destinations: [String] {
         get { config.destinationPaths }
         set {
+            let previous = config.destinationPaths
             config.destinationPaths = newValue
             if let first = newValue.first {
                 storage.lastDestinationPath = first
             }
+            let removed = Set(previous).subtracting(newValue)
+            config.excludedDestinationPaths.subtract(removed)
             save()
+            if !removed.isEmpty { keepReaddedDestinationsUnchecked(removed, previous: previous) }
         }
+    }
+
+    var includedDestinationPaths: [String] { config.includedDestinationPaths }
+
+    func isDestinationIncluded(_ path: String) -> Bool { !config.excludedDestinationPaths.contains(path) }
+
+    func setDestinationsIncluded(_ paths: [String], _ included: Bool) {
+        if included { config.excludedDestinationPaths.subtract(paths) } else { config.excludedDestinationPaths.formUnion(paths) }
+        save()
+    }
+
+    private func keepReaddedDestinationsUnchecked(_ removed: Set<String>, previous: [String]) {
+        refreshAutoDetectedDestinations()
+        let readded = removed.intersection(config.destinationPaths)
+        guard !readded.isEmpty else { return }
+        let current = Set(config.destinationPaths)
+        config.destinationPaths = previous.filter { current.contains($0) }
+            + config.destinationPaths.filter { !previous.contains($0) }
+        config.excludedDestinationPaths.formUnion(readded)
+        save()
     }
     
     func addDestination(_ path: String) {
@@ -67,7 +120,8 @@ class BackupEditorViewModel: ObservableObject {
     
     func removeDestination(at index: Int) {
         guard index < config.destinationPaths.count else { return }
-        config.destinationPaths.remove(at: index)
+        let path = config.destinationPaths.remove(at: index)
+        config.excludedDestinationPaths.remove(path)
         save()
     }
     
@@ -288,7 +342,7 @@ class BackupEditorViewModel: ObservableObject {
         guard config.rollNumbering.enabled else { return nil }
         let state = RollNumberingStore.shared.state(for: config.id)
         let result = RollNumberer.assign(
-            sources: config.sourcePaths,
+            sources: config.includedSourcePaths,
             isDirectory: Self.isDirectory,
             kinds: config.sourceMediaKinds,
             settings: config.rollNumbering,
@@ -813,13 +867,13 @@ class BackupEditorViewModel: ObservableObject {
         if config.cardAutoDetectEnabled {
             refreshAutoDetectedCards()
         }
-        if config.sourcePaths.isEmpty {
+        if config.includedSourcePaths.isEmpty {
             validationMessage = "Please add at least one source file or folder"
             showValidationError = true
             return false
         }
         
-        if config.destinationPaths.isEmpty {
+        if config.includedDestinationPaths.isEmpty {
             validationMessage = "Please add at least one destination folder"
             showValidationError = true
             return false
@@ -828,7 +882,7 @@ class BackupEditorViewModel: ObservableObject {
         let fm = FileManager.default
         
         // Validate sources exist and are accessible
-        for src in config.sourcePaths {
+        for src in config.includedSourcePaths {
             if !fm.fileExists(atPath: src) {
                 validationMessage = "Source does not exist: \(src)"
                 showValidationError = true
@@ -851,8 +905,8 @@ class BackupEditorViewModel: ObservableObject {
         }
 
         // Prevent destinations inside sources (and exact matches).
-        let normalizedSources = config.sourcePaths.map(normalizedPath)
-        let normalizedDestinations = config.destinationPaths.map(normalizedPath)
+        let normalizedSources = config.includedSourcePaths.map(normalizedPath)
+        let normalizedDestinations = config.includedDestinationPaths.map(normalizedPath)
         for sourcePath in normalizedSources {
             var isDirectory: ObjCBool = false
             _ = fm.fileExists(atPath: sourcePath, isDirectory: &isDirectory)
@@ -874,7 +928,7 @@ class BackupEditorViewModel: ObservableObject {
         }
         
         // Validate destinations
-        for dest in config.destinationPaths {
+        for dest in config.includedDestinationPaths {
             let summary = DriveUtilities.summary(for: dest)
             if summary.isReadOnly == true {
                 let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""

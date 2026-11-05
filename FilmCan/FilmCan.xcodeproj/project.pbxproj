@@ -179,6 +179,7 @@
 		D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB447055BB58FF19A4C7992 /* FailedDestRetryPanel.swift */; };
 		D7A83CF121B3D61390AF5391 /* DestResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7BCF3596001402A6F510FC /* DestResult.swift */; };
 		D8F87EE9078D7D13575CD694 /* RollIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A85B74290F6644A739120F6 /* RollIdentityTests.swift */; };
+		D97A2288C4AAE29B53CB4294 /* DriveIncludeColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2397C31C6386DF722864F2E6 /* DriveIncludeColumn.swift */; };
 		D9CFB01FF5A83E377CAAECAB /* SourceOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C52D0096DF4C754581380449 /* SourceOptionsView.swift */; };
 		DA45FF55210F8AB5FBBA3967 /* BackupReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1917E833CA5D8C0AEED3CBAD /* BackupReport.swift */; };
 		DA54C6EDDF200DBCBDCE5DC8 /* LogItemizeParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B27306257A56E2C8B8AF2B /* LogItemizeParserTests.swift */; };
@@ -250,6 +251,7 @@
 		209A0A98482A692929BD2180 /* FastVerifyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastVerifyTests.swift; sourceTree = "<group>"; };
 		2314F69E3FD8DCE91282F1FA /* DestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestWriter.swift; sourceTree = "<group>"; };
 		2385EEBD2967F607E913824F /* BackupConfigurationCodableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupConfigurationCodableTests.swift; sourceTree = "<group>"; };
+		2397C31C6386DF722864F2E6 /* DriveIncludeColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveIncludeColumn.swift; sourceTree = "<group>"; };
 		244ADA509455AE3EBC04AC4D /* ExplodeFanOutResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplodeFanOutResultTests.swift; sourceTree = "<group>"; };
 		25785302A4FCE3EF859B358F /* DryRunSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunSheet.swift; sourceTree = "<group>"; };
 		26B11F28CFE5DF0FB03C3D73 /* NotificationSummaryBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSummaryBuilder.swift; sourceTree = "<group>"; };
@@ -622,6 +624,7 @@
 			isa = PBXGroup;
 			children = (
 				A00BE60DE15265BA3F27886D /* AlreadyBackedUpSheet.swift */,
+				2397C31C6386DF722864F2E6 /* DriveIncludeColumn.swift */,
 				0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */,
 				C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */,
 				DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */,
@@ -1000,6 +1003,7 @@
 				0CB0AFC966B7D447FC9D6A99 /* DonationPromptView.swift in Sources */,
 				94A8CC6F6C3E782E7A3802B5 /* DriveAnchorPreferences.swift in Sources */,
 				A29FDCB8A2EE46E85F197C4E /* DriveEjector.swift in Sources */,
+				D97A2288C4AAE29B53CB4294 /* DriveIncludeColumn.swift in Sources */,
 				8CFA818BB15A1431BD7D0411 /* DriveInfoCache.swift in Sources */,
 				7E0BCE6EA9ADCC0AA0BC33A5 /* DriveSettingsView.swift in Sources */,
 				A630CD6871F678915F92AC17 /* DriveSpeedClassifier.swift in Sources */,

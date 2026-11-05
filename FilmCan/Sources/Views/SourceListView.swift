@@ -25,6 +25,10 @@ struct SourceListView: View {
     var cardSignature: ((String) -> CardSignature?)? = nil
     var rollNamePreview: ((String) -> String?)? = nil
     var setCardRole: ((String, CardRole?) -> Void)? = nil
+    /// Checkbox per drive: unchecked drives stay listed, greyed, but are not backed up.
+    var isIncluded: (String) -> Bool = { _ in true }
+    var setIncluded: (([String], Bool) -> Void)? = nil
+    var isSelectionLocked: Bool = false
     
     var body: some View {
         let _ = refreshToken
@@ -122,14 +126,19 @@ struct SourceListView: View {
     
     private var driveBlocks: some View {
         let summaries = driveSummaries(for: sources)
-        let indexed = Array(summaries.enumerated())
+        let numbers = DriveIncludeColumn.numbers(for: summaries.map(\.id)) { id in
+            summaries.first { $0.id == id }?.paths.contains { isIncluded($0.path) } ?? true
+        }
         return VStack(alignment: .leading, spacing: 12) {
-            ForEach(indexed, id: \.element.id) { index, summary in
+            ForEach(summaries) { summary in
+                let paths = summary.paths.map(\.path)
+                let driveIncluded = paths.contains(where: isIncluded)
                 HStack(alignment: .center, spacing: 12) {
-                    Text("\(index + 1)")
-                        .font(FilmCanFont.label(11))
-                        .foregroundColor(FilmCanTheme.textSecondary)
-                        .frame(width: 20)
+                    DriveIncludeColumn(
+                        number: numbers[summary.id],
+                        isIncluded: driveIncluded,
+                        isLocked: isSelectionLocked,
+                        setIncluded: setIncluded.map { set in { set(paths, $0) } })
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: DriveUtilities.driveIconName(isExternal: summary.isExternal, style: .filled))
@@ -138,6 +147,11 @@ struct SourceListView: View {
                             Text(summary.name)
                                 .font(FilmCanFont.body(11))
                                 .foregroundColor(FilmCanTheme.textSecondary)
+                            if !driveIncluded {
+                                Text("Skipped")
+                                    .font(FilmCanFont.body(10))
+                                    .foregroundColor(FilmCanTheme.textTertiary)
+                            }
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -173,6 +187,7 @@ struct SourceListView: View {
                             .padding(.leading, 26)
                         }
                     }
+                    .opacity(driveIncluded ? 1 : 0.4)
                 }
                 .padding(10)
                 .background(
@@ -210,24 +225,36 @@ struct SourceListView: View {
         }
     }
 
-    /// Discreet Camera/Sound toggle: a single white glyph — a video camera for
-    /// Camera, a speaker for Sound. Click switches between them (which destination
-    /// folder template the source uses).
+    /// Discreet two-position Camera/Sound switch: the active side is filled. Picks which
+    /// destination folder template the source uses.
     private func mediaKindToggle(path: String, kind: SourceMediaKind,
                                  set: @escaping (String, SourceMediaKind) -> Void) -> some View {
-        let isCamera = kind == .camera
-        return Button {
-            set(path, isCamera ? .sound : .camera)
-        } label: {
-            Image(systemName: isCamera ? "video.fill" : "speaker.wave.2.fill")
-                .font(.system(size: 12))
-                .foregroundColor(FilmCanTheme.textPrimary)
-                .frame(width: 20, height: 16)
-                .contentShape(Rectangle())
+        HStack(spacing: 0) {
+            mediaKindSegment(.camera, icon: "video.fill", current: kind) { set(path, .camera) }
+            mediaKindSegment(.sound, icon: "speaker.wave.2.fill", current: kind) { set(path, .sound) }
+        }
+        .padding(2)
+        .background(Capsule().fill(FilmCanTheme.card))
+        .overlay(Capsule().stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1))
+        .animation(.easeInOut(duration: 0.12), value: kind)
+        .help(kind == .camera ? "Camera source — goes to the Camera folder. Click the speaker for Sound."
+                              : "Sound source — goes to the Sound folder. Click the camera for Camera.")
+    }
+
+    private func mediaKindSegment(_ segment: SourceMediaKind, icon: String, current: SourceMediaKind,
+                                  action: @escaping () -> Void) -> some View {
+        let isOn = segment == current
+        return Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(isOn ? FilmCanTheme.background : FilmCanTheme.textTertiary)
+                .frame(width: 22, height: 15)
+                .background(Capsule().fill(isOn ? FilmCanTheme.textPrimary : Color.clear))
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(isCamera ? "Camera source — click to switch to Sound (uses the Sound folder)"
-                       : "Sound source — click to switch to Camera (uses the Camera folder)")
+        .accessibilityLabel(segment == .camera ? "Camera" : "Sound")
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
     @ViewBuilder

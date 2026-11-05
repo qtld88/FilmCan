@@ -44,7 +44,10 @@ extension BackupEditorView {
                 setMediaKind: { viewModel.setMediaKind($1, for: $0) },
                 cardSignature: { viewModel.detectedCard(for: $0) },
                 rollNamePreview: { viewModel.rollNamePreview(for: $0) },
-                setCardRole: { viewModel.setCardRole($1, for: $0) }
+                setCardRole: { viewModel.setCardRole($1, for: $0) },
+                isIncluded: { viewModel.isSourceIncluded($0) },
+                setIncluded: { viewModel.setSourcesIncluded($0, $1) },
+                isSelectionLocked: transferViewModel.isTransferActive(for: viewModel.config.id)
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("sourcePanel")
@@ -79,15 +82,17 @@ extension BackupEditorView {
                 ),
                 footerView: nil,
                 isTourHighlighted: appState.activeTourTargetId == "destinationPanel",
-                requiredBytes: previewInfo.totalBytes,
+                requiredBytes: includedRequiredBytes,
                 organizationPreset: previewOrganizationPreset,
-                sourcePaths: viewModel.sourcePaths,
+                sourcePaths: viewModel.includedSourcePaths,
                 mediaKind: { viewModel.mediaKind(for: $0) },
                 shootMetadata: previewShootMetadata,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
                 postVerifyEnabled: verifyEnabled,
-                fulfilledDestinations: fulfilledDestinationsForCurrentConfig()
+                fulfilledDestinations: fulfilledDestinationsForCurrentConfig(),
+                isIncluded: { viewModel.isDestinationIncluded($0) },
+                setIncluded: { viewModel.setDestinationsIncluded($0, $1) }
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("destinationPanel")
@@ -148,7 +153,10 @@ extension BackupEditorView {
                 setMediaKind: { viewModel.setMediaKind($1, for: $0) },
                 cardSignature: { viewModel.detectedCard(for: $0) },
                 rollNamePreview: { viewModel.rollNamePreview(for: $0) },
-                setCardRole: { viewModel.setCardRole($1, for: $0) }
+                setCardRole: { viewModel.setCardRole($1, for: $0) },
+                isIncluded: { viewModel.isSourceIncluded($0) },
+                setIncluded: { viewModel.setSourcesIncluded($0, $1) },
+                isSelectionLocked: transferViewModel.isTransferActive(for: viewModel.config.id)
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("sourcePanel")
@@ -185,13 +193,15 @@ extension BackupEditorView {
                 ),
                 footerView: nil,
                 isTourHighlighted: appState.activeTourTargetId == "destinationPanel",
-                requiredBytes: previewInfo.totalBytes,
+                requiredBytes: includedRequiredBytes,
                 organizationPreset: selectedOrganizationPreset,
-                sourcePaths: viewModel.sourcePaths,
+                sourcePaths: viewModel.includedSourcePaths,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
                 postVerifyEnabled: verifyEnabled,
-                fulfilledDestinations: fulfilledDestinationsForCurrentConfig()
+                fulfilledDestinations: fulfilledDestinationsForCurrentConfig(),
+                isIncluded: { viewModel.isDestinationIncluded($0) },
+                setIncluded: { viewModel.setDestinationsIncluded($0, $1) }
             )
             .frame(maxWidth: .infinity)
             .tourAnchor("destinationPanel")
@@ -199,12 +209,20 @@ extension BackupEditorView {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Bytes the checked sources need on each checked destination.
+    private var includedRequiredBytes: Int64 { previewInfo.totalBytes }
+
+    /// Per-card sizes cover every listed source; the totals only the checked ones.
     func refreshPreview() {
         let sources = viewModel.sourcePaths
+        let included = viewModel.includedSourcePaths
         previewInfo.isLoading = true
 
         Task.detached(priority: .utility) {
-            let (bytes, files, folders, sizes, itemCounts) = PreviewCalculator.calculateTotalsAndSizes(for: sources)
+            var (bytes, files, folders, sizes, itemCounts) = PreviewCalculator.calculateTotalsAndSizes(for: sources)
+            if included.count != sources.count {
+                (bytes, files, folders, _, _) = PreviewCalculator.calculateTotalsAndSizes(for: included)
+            }
             await MainActor.run {
                 previewInfo.totalBytes = bytes
                 previewInfo.fileCount = files
@@ -223,7 +241,7 @@ extension BackupEditorView {
             var totals: [String: Int64] = [:]
             var available: [String: Int64] = [:]
             var order: [String] = []
-            for source in viewModel.sourcePaths {
+            for source in viewModel.includedSourcePaths {
                 let cached = DriveInfoCache.shared.info(for: source)
                 let summary = cached.summary
                 if sizes[summary.id] == nil {
@@ -273,7 +291,7 @@ extension BackupEditorView {
             var totals: [String: Int64] = [:]
             var names: [String: String] = [:]
             var order: [String] = []
-            for destination in viewModel.destinations {
+            for destination in viewModel.includedDestinationPaths {
                 let cached = DriveInfoCache.shared.info(for: destination)
                 let summary = cached.summary
                 if available[summary.id] == nil {

@@ -47,6 +47,9 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     /// Transient: source path -> roll name for the current run. Filled by
     /// `TransferViewModel`; deliberately NOT in CodingKeys (never persisted).
     var runRollNames: [String: String] = [:]
+    /// Sources/destinations kept in the list but left out of the backup (unchecked).
+    var excludedSourcePaths: Set<String> = []
+    var excludedDestinationPaths: Set<String> = []
     var destinationAutoDetectEnabled: Bool = false
     var destinationAutoDetectPatterns: [String] = []
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .ask
@@ -148,6 +151,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         webhookTemplateFormatVersion = try c.decodeIfPresent(Int.self, forKey: .webhookTemplateFormatVersion) ?? 1
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
         sourcePaths = try c.decodeIfPresent([String].self, forKey: .sourcePaths) ?? []
+        excludedSourcePaths = try c.decodeIfPresent(Set<String>.self, forKey: .excludedSourcePaths) ?? []
+        excludedDestinationPaths = try c.decodeIfPresent(Set<String>.self, forKey: .excludedDestinationPaths) ?? []
     }
     
     // Explicit memberwise init used internally
@@ -186,6 +191,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(rollNumbering, forKey: .rollNumbering)
         try c.encode(dayAutoAdvance, forKey: .dayAutoAdvance)
         try c.encode(cardAutoDetectEnabled, forKey: .cardAutoDetectEnabled)
+        try c.encode(excludedSourcePaths.sorted(), forKey: .excludedSourcePaths)
+        try c.encode(excludedDestinationPaths.sorted(), forKey: .excludedDestinationPaths)
         try c.encode(destinationAutoDetectEnabled, forKey: .destinationAutoDetectEnabled)
         try c.encode(destinationAutoDetectPatterns, forKey: .destinationAutoDetectPatterns)
         try c.encode(duplicatePolicy, forKey: .duplicatePolicy)
@@ -226,6 +233,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case cameraFolderTemplate, soundFolderTemplate
         case rollNumbering, dayAutoAdvance, cardAutoDetectEnabled
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
+        case excludedSourcePaths, excludedDestinationPaths
         case logFileNameTemplate, reportEnabled
         case selectedOrganizationPresetId, organizationReuseByDestination, copyFolderContents, forceRecopy
         case duplicatePolicy, duplicateCounterTemplate, reVerifyExistingOnResume
@@ -241,10 +249,23 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case offOrganizationUseCustomDate, offOrganizationCustomDate
     }
     
+    var includedSourcePaths: [String] { sourcePaths.filter { !excludedSourcePaths.contains($0) } }
+    var includedDestinationPaths: [String] { destinationPaths.filter { !excludedDestinationPaths.contains($0) } }
+
+    /// This config as a run sees it: unchecked sources and destinations dropped.
+    func restrictedToIncluded() -> BackupConfiguration {
+        var copy = self
+        copy.sourcePaths = includedSourcePaths
+        copy.destinationPaths = includedDestinationPaths
+        copy.excludedSourcePaths = []
+        copy.excludedDestinationPaths = []
+        return copy
+    }
+
     var isValid: Bool {
-        !sourcePaths.isEmpty &&
-        !destinationPaths.isEmpty &&
-        sourcePaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } &&
+        !includedSourcePaths.isEmpty &&
+        !includedDestinationPaths.isEmpty &&
+        includedSourcePaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } &&
         !name.isEmpty
     }
     

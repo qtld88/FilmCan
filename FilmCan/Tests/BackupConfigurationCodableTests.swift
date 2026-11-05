@@ -78,3 +78,26 @@ final class BackupConfigurationCodableTests: XCTestCase {
         XCTAssertEqual(back.rollNames, ["/a": "A001"])
     }
 }
+
+extension BackupConfigurationCodableTests {
+    func testExcludedPathsDefaultEmptyRoundTripAndAreDroppedForTheRun() throws {
+        let json = #"{"id":"\#(UUID().uuidString)","name":"Old"}"#.data(using: .utf8)!
+        let legacy = try JSONDecoder().decode(BackupConfiguration.self, from: json)
+        XCTAssertTrue(legacy.excludedSourcePaths.isEmpty)
+        XCTAssertTrue(legacy.excludedDestinationPaths.isEmpty)
+
+        var cfg = BackupConfiguration()
+        cfg.sourcePaths = ["/Volumes/A", "/Volumes/B", "/Volumes/C"]
+        cfg.destinationPaths = ["/Volumes/S1", "/Volumes/S2"]
+        cfg.excludedSourcePaths = ["/Volumes/B"]
+        cfg.excludedDestinationPaths = ["/Volumes/S2"]
+        let back = try JSONDecoder().decode(BackupConfiguration.self, from: JSONEncoder().encode(cfg))
+        XCTAssertEqual(back.excludedSourcePaths, ["/Volumes/B"])
+        XCTAssertEqual(back.excludedDestinationPaths, ["/Volumes/S2"])
+
+        let run = back.restrictedToIncluded()
+        XCTAssertEqual(run.sourcePaths, ["/Volumes/A", "/Volumes/C"])
+        XCTAssertEqual(run.destinationPaths, ["/Volumes/S1"])
+        XCTAssertEqual(back.sourcePaths.count, 3, "the stored list keeps unchecked drives")
+    }
+}

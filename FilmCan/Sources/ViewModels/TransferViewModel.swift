@@ -105,7 +105,7 @@ class TransferViewModel: ObservableObject {
             .first(where: { $0.id == config.id }) ?? config
         // Roll numbers and the shoot day are fixed before anything else reads the config,
         // and saved before the copy starts, so a cancelled run resumes into the same roll.
-        let activeConfig = applyRollNumberingAndDay(to: storedConfig)
+        let activeConfig = applyRollNumberingAndDay(to: storedConfig.restrictedToIncluded())
         self.config = activeConfig
         activeConfigId = activeConfig.id
         if !isBackgroundWorker {

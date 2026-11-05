@@ -29,6 +29,9 @@ struct DestinationListView: View {
     var configId: UUID
     var postVerifyEnabled: Bool = false
     var fulfilledDestinations: Set<String> = []
+    /// Checkbox per drive: unchecked drives stay listed, greyed, but get no copy.
+    var isIncluded: (String) -> Bool = { _ in true }
+    var setIncluded: (([String], Bool) -> Void)? = nil
     private let previewDate = Date()
     private var isActiveTransfer: Bool {
         transferViewModel.isTransferActive(for: configId)
@@ -148,10 +151,14 @@ struct DestinationListView: View {
     private var driveBlocks: some View {
         let summaries = driveSummaries(for: destinations)
         let fulfilled = fulfilledDestinationsForCurrentConfig()
-        let indexed = Array(summaries.enumerated())
+        let numbers = DriveIncludeColumn.numbers(for: summaries.map(\.id)) { id in
+            summaries.first { $0.id == id }?.paths.contains { isIncluded($0.path) } ?? true
+        }
         return VStack(alignment: .leading, spacing: 12) {
-            ForEach(indexed, id: \.element.id) { index, summary in
-                let driveRequiredBytes = requiredBytes
+            ForEach(summaries) { summary in
+                let paths = summary.paths.map(\.path)
+                let driveIncluded = paths.contains(where: isIncluded)
+                let driveRequiredBytes = driveIncluded ? requiredBytes : 0
                 let backupStoredOnDrive = !isActiveTransfer
                     ? driveHasStoredBackup(
                         summary: summary,
@@ -166,17 +173,18 @@ struct DestinationListView: View {
                     )
                     : nil
                 HStack(alignment: .center, spacing: 12) {
-                    Text("\(index + 1)")
-                        .font(FilmCanFont.label(11))
-                        .foregroundColor(FilmCanTheme.textSecondary)
-                        .frame(width: 20)
+                    DriveIncludeColumn(
+                        number: numbers[summary.id],
+                        isIncluded: driveIncluded,
+                        isLocked: isActiveTransfer,
+                        setIncluded: setIncluded.map { set in { set(paths, $0) } })
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: DriveUtilities.driveIconName(isExternal: summary.isExternal, style: .filled))
                                 .foregroundColor(FilmCanTheme.textSecondary)
                                 .frame(width: 18)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(summary.name)
+                                Text(driveIncluded ? summary.name : "\(summary.name) · Skipped")
                                     .font(FilmCanFont.body(11))
                                     .foregroundColor(FilmCanTheme.textSecondary)
                                 if let summaryLine {
@@ -221,6 +229,7 @@ struct DestinationListView: View {
                             .padding(.leading, 26)
                         }
                     }
+                    .opacity(driveIncluded ? 1 : 0.4)
                 }
                 .padding(10)
                 .background(
