@@ -210,44 +210,26 @@ struct QuickCopySetupView: View {
                     TextField("Day", text: $session.form.day).textFieldStyle(.roundedBorder)
                 }
             }
-            if let suggested = session.form.defaultRootFolderName {
-                QCSettingRow(label: "Folder name") {
-                    QCFolderNameField(suggested: suggested, override: $session.form.rootFolderName)
-                }
-            }
             if let first = session.form.destinations.first {
                 Divider()
                 Text("Will be created in \((first as NSString).lastPathComponent)")
                     .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textTertiary)
                 let lines = session.form.treePreview(for: first)
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    HStack(spacing: 6) {
-                        Image(systemName: "folder").font(.system(size: 10))
-                        if let kind = line.mediaKind {
-                            mediaFolderField(kind)
-                        } else {
-                            Text(line.name).font(.system(size: 11, design: .monospaced))
-                        }
-                    }
+                    QCTreeRow(
+                        line: line,
+                        edited: session.form.isFolderNameEdited(root: line.isRoot, kind: line.mediaKind),
+                        onRename: { session.form.setFolderName($0, root: line.isRoot, kind: line.mediaKind) },
+                        onReset: {
+                            if line.isRoot { session.form.rootFolderName = nil }
+                            else if let kind = line.mediaKind { session.form.mediaFolderNames[kind] = nil }
+                        })
                     .padding(.leading, CGFloat(line.depth) * 16)
-                    .foregroundColor(line.isNew ? FilmCanTheme.brandYellow : FilmCanTheme.textSecondary)
                 }
             }
         }
     }
 
-    private func mediaFolderField(_ kind: SourceMediaKind) -> some View {
-        let missing = session.form.mediaFolder(for: kind) == nil
-        return TextField("\(kind.displayName) folder name", text: Binding(
-            get: { session.form.mediaFolderNames[kind] ?? "" },
-            set: { session.form.mediaFolderNames[kind] = $0 }))
-            .font(.system(size: 11, design: .monospaced))
-            .textFieldStyle(.plain)
-            .padding(.horizontal, 4).padding(.vertical, 1)
-            .frame(maxWidth: 220)
-            .overlay(RoundedRectangle(cornerRadius: 4)
-                .stroke(missing ? FilmCanTheme.brandRed : FilmCanTheme.cardStroke, lineWidth: 1))
-    }
 
     // Save as preset
     private var savePresetPanel: some View {
@@ -276,26 +258,66 @@ struct QuickCopySetupView: View {
     }
 }
 
-/// Local state, not a computed binding: a focused macOS TextField commits its
-/// buffer on blur and would save a stale suggestion as a user override.
-private struct QCFolderNameField: View {
-    let suggested: String
-    @Binding var override: String?
+/// One folder of the preview. Editable folders (top folder, Camera/Sound folder)
+/// are renamed in place; the text lives in local state so a focused field never
+/// writes back a stale suggestion.
+private struct QCTreeRow: View {
+    let line: QuickCopyFormModel.TreeLine
+    let edited: Bool
+    let onRename: (String) -> Void
+    let onReset: () -> Void
+
+    @State private var editing = false
     @State private var text = ""
+    @State private var original = ""
+    @FocusState private var focused: Bool
+
+    private var needsName: Bool { line.isEditable && line.name.isEmpty }
+    private var mono: Font { .system(size: 11, design: .monospaced) }
 
     var body: some View {
         HStack(spacing: 6) {
-            TextField(suggested, text: $text).textFieldStyle(.roundedBorder)
-            if override != nil {
-                Button { override = nil } label: { Image(systemName: "arrow.uturn.backward") }
-                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
-                    .help("Back to the preset's name")
+            Image(systemName: "folder").font(.system(size: 10))
+            if editing {
+                TextField(line.mediaKind.map { "\($0.displayName) folder name" } ?? "Folder name", text: $text)
+                    .font(mono)
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .padding(.horizontal, 4).padding(.vertical, 1)
+                    .frame(maxWidth: 260)
+                    .overlay(RoundedRectangle(cornerRadius: 4)
+                        .stroke(text.isEmpty ? FilmCanTheme.brandRed : FilmCanTheme.brandYellow, lineWidth: 1))
+                    .onChange(of: text) { onRename($0) }
+                    .onSubmit { if !text.isEmpty { editing = false } }
+                    .onExitCommand { text = original; editing = needsName }
+                    .onChange(of: focused) { if !$0, !text.isEmpty { editing = false } }
+            } else {
+                Text(line.name).font(mono)
+                if line.isEditable {
+                    Button(action: startEditing) {
+                        Image(systemName: "pencil").font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
+                    .help("Rename this folder")
+                    if edited {
+                        Button(action: onReset) {
+                            Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
+                        }
+                        .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
+                        .help("Back to the preset's name")
+                    }
+                }
             }
         }
-        .onAppear { text = override ?? suggested }
-        .onChange(of: suggested) { new in if override == nil { text = new } }
-        .onChange(of: override) { new in if new == nil { text = suggested } }
-        .onChange(of: text) { new in override = new == suggested ? nil : new }
+        .foregroundColor(line.isNew ? FilmCanTheme.brandYellow : FilmCanTheme.textSecondary)
+        .onAppear { if needsName { startEditing() } }
+    }
+
+    private func startEditing() {
+        original = line.name
+        text = line.name
+        editing = true
+        DispatchQueue.main.async { focused = true }
     }
 }
 

@@ -138,9 +138,54 @@ struct QuickCopyFormModel {
         return parts.count > 1 ? String(parts[0]) : nil
     }
 
-    static func replacingRoot(of template: String, with root: String) -> String {
-        guard let slash = template.firstIndex(of: "/") else { return root }
-        return root + template[slash...]
+    /// The Camera/Sound folder name the templates produce for `kind`.
+    func defaultMediaFolderName(for kind: SourceMediaKind) -> String? {
+        guard !lacksMediaFolder, let p = organizedPreset(),
+              let index = Self.mediaComponentIndex(in: Self.template(for: kind, in: p), kind: kind),
+              let item = items.first(where: { $0.kind == kind }) ?? items.first else { return nil }
+        var plain = self
+        plain.mediaFolderNames[kind] = nil
+        var probe = item
+        probe.kind = kind
+        plain.items = [probe]
+        guard let rel = plain.relativePaths(for: "/").first else { return nil }
+        let parts = rel.split(separator: "/")
+        return index < parts.count - 1 ? String(parts[index]) : nil
+    }
+
+    private static func template(for kind: SourceMediaKind, in p: OrganizationPreset) -> String {
+        kind == .sound && !isBlank(p.soundFolderTemplate) ? p.soundFolderTemplate : p.folderTemplate
+    }
+
+    /// The `Camera_Media` / `Sound_Media` component, else the last one below the root.
+    static func mediaComponentIndex(in template: String, kind: SourceMediaKind) -> Int? {
+        let parts = template.split(separator: "/")
+        let marker = kind == .sound ? "Sound_Media" : "Camera_Media"
+        if let index = parts.firstIndex(where: { $0 == marker }), index > 0 { return index }
+        return parts.count >= 2 ? parts.count - 1 : nil
+    }
+
+    static func replacingComponent(_ index: Int, of template: String, with name: String) -> String {
+        var parts = template.split(separator: "/").map(String.init)
+        guard index < parts.count else { return template }
+        parts[index] = name
+        return parts.joined(separator: "/")
+    }
+
+    /// Stores a typed name; one equal to the suggestion stores nothing.
+    mutating func setFolderName(_ raw: String, root: Bool, kind: SourceMediaKind?) {
+        if root {
+            rootFolderName = raw == defaultRootFolderName ? nil : raw
+        } else if let kind {
+            let suggestion = lacksMediaFolder ? nil : defaultMediaFolderName(for: kind)
+            mediaFolderNames[kind] = raw == suggestion ? nil : raw
+        }
+    }
+
+    func isFolderNameEdited(root: Bool, kind: SourceMediaKind?) -> Bool {
+        if root { return rootFolderOverride != nil }
+        guard let kind, !lacksMediaFolder else { return false }
+        return mediaFolder(for: kind) != nil
     }
 
     var showsProjectField: Bool {
@@ -185,11 +230,22 @@ struct QuickCopyFormModel {
                 let base = preset.folderTemplate
                 preset.folderTemplate = Self.appending(mediaFolder(for: .camera), to: base)
                 preset.soundFolderTemplate = Self.appending(mediaFolder(for: .sound), to: base)
+            } else {
+                if let name = mediaFolder(for: .camera),
+                   let index = Self.mediaComponentIndex(in: preset.folderTemplate, kind: .camera) {
+                    preset.folderTemplate = Self.replacingComponent(index, of: preset.folderTemplate, with: name)
+                }
+                if let name = mediaFolder(for: .sound), !Self.isBlank(preset.soundFolderTemplate),
+                   let index = Self.mediaComponentIndex(in: preset.soundFolderTemplate, kind: .sound) {
+                    preset.soundFolderTemplate = Self.replacingComponent(index, of: preset.soundFolderTemplate,
+                                                                         with: name)
+                }
             }
             if let root = rootFolderOverride {
-                preset.folderTemplate = Self.replacingRoot(of: preset.folderTemplate, with: root)
+                preset.folderTemplate = Self.replacingComponent(0, of: preset.folderTemplate, with: root)
                 if !Self.isBlank(preset.soundFolderTemplate) {
-                    preset.soundFolderTemplate = Self.replacingRoot(of: preset.soundFolderTemplate, with: root)
+                    preset.soundFolderTemplate = Self.replacingComponent(0, of: preset.soundFolderTemplate,
+                                                                         with: root)
                 }
             }
         }
@@ -373,6 +429,8 @@ extension QuickCopyFormModel {
         let isNew: Bool
         /// Set on the user-named Camera/Sound folder line (name "" = still to name).
         var mediaKind: SourceMediaKind? = nil
+        var isRoot = false
+        var isEditable: Bool { isRoot || mediaKind != nil }
     }
 
     /// Path of each item under `destination`, relative to it, resolved with the
@@ -412,6 +470,10 @@ extension QuickCopyFormModel {
                 } else {
                     mediaIndex = end - 1
                 }
+            } else if organizationActive, let p = organizedPreset() {
+                let folderCount = rollName != nil ? components.count : components.count - 1
+                mediaIndex = Self.mediaComponentIndex(in: Self.template(for: item.kind, in: p), kind: item.kind)
+                    .flatMap { $0 < folderCount ? $0 : nil }
             }
             var cumulative = destination
             for (depth, component) in components.enumerated() {
@@ -424,8 +486,9 @@ extension QuickCopyFormModel {
                 }
                 cumulative = (cumulative as NSString).appendingPathComponent(component)
                 if seen.insert(cumulative).inserted {
+                    let isRoot = organizationActive && depth == 0
                     lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative),
-                                          mediaKind: isMedia ? item.kind : nil))
+                                          mediaKind: isMedia && !isRoot ? item.kind : nil, isRoot: isRoot))
                 }
             }
             if let rollName {

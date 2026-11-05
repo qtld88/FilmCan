@@ -507,4 +507,30 @@ final class QuickCopyFormModelTests: XCTestCase {
         let form = QuickCopyFormModel(items: [dir("A001")])
         XCTAssertEqual(form.copyFolders(for: "/Volumes/SSD"), ["/Volumes/SSD"])
     }
+
+    func test_mediaFolderRename_replacesOnlyThatKindsFolder() {
+        var form = previewForm()
+        XCTAssertEqual(form.defaultMediaFolderName(for: .camera), "Camera_Media")
+        XCTAssertEqual(form.defaultMediaFolderName(for: .sound), "Sound_Media")
+        form.setFolderName("Cam A", root: false, kind: .camera)
+        XCTAssertEqual(form.relativePaths(for: "/Volumes/SSD"),
+                       ["20261014_Docu_Truc_itw/Cam_A/A001", "20261014_Docu_Truc_itw/Sound_Media/ZOOM_F8"])
+        XCTAssertTrue(form.isFolderNameEdited(root: false, kind: .camera))
+        XCTAssertFalse(form.isFolderNameEdited(root: false, kind: .sound))
+        form.setFolderName("Camera_Media", root: false, kind: .camera)
+        XCTAssertNil(form.mediaFolderNames[.camera], "typing the suggestion back clears the override")
+    }
+
+    func test_treePreview_marksRootAndMediaFoldersEditable() {
+        let lines = previewForm().treePreview(for: "/Volumes/SSD")
+        XCTAssertEqual(lines.map(\.isRoot), [true, false, false, false, false])
+        XCTAssertEqual(lines.map(\.mediaKind), [nil, .camera, nil, .sound, nil])
+    }
+
+    func test_netflixTemplate_mediaFolderIsCameraMediaNotFormat() {
+        XCTAssertEqual(QuickCopyFormModel.mediaComponentIndex(
+            in: "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}", kind: .camera), 1)
+        XCTAssertEqual(QuickCopyFormModel.replacingComponent(
+            1, of: "{date}/Camera_Media/{cameraFormat}", with: "CAM"), "{date}/CAM/{cameraFormat}")
+    }
 }

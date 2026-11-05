@@ -27,7 +27,7 @@ Each request opens its own window, so two selections run side by side.
   - **If file exists**: Skip (default), Overwrite, Add counter or Verify using hash list.
   - **Copy**: the folder (default) or its contents only.
   - **Organization**: None, Date only, or Project + day.
-- **Organization** section (when organized): **Folder name** is pre-filled from the preset (date, project, day) and you can type over it; the arrow button restores the preset's name. Then **Project** and **Day** (Day is optional). A live preview shows the folders that will be created on the first destination, with new ones highlighted.
+- **Organization** section (when organized): **Project** and **Day** (Day is optional), then a live preview of the folders that will be created on the first destination, new ones highlighted. The top folder and the Camera/Sound folder (`Camera_Media`, `Sound_Media`) have a pencil: click it to rename that folder in place for this copy; the arrow restores the preset's name.
 - **Save as preset**: type a name to keep these settings as a preset. Leave it empty to skip. A picked date is never saved.
 
 Project and Day are cleaned before use: spaces and characters Netflix prohibits become `_`.
@@ -115,7 +115,7 @@ Chaque demande ouvre sa propre fenêtre : deux sélections tournent côte à cô
   - **If file exists** : Skip (par défaut), Overwrite, Add counter ou Verify using hash list.
   - **Copy** : le dossier (par défaut) ou son contenu seulement.
   - **Organization** : None, Date only ou Project + day.
-- Section **Organization** (si les dossiers sont organisés) : **Folder name** est pré-rempli d'après le preset (date, projet, jour) et vous pouvez le remplacer ; la flèche rétablit le nom du preset. Puis **Project** et **Day** (Day est facultatif). Un aperçu en direct montre les dossiers qui seront créés sur la première destination, les nouveaux étant mis en évidence.
+- Section **Organization** (si les dossiers sont organisés) : **Project** et **Day** (Day est facultatif), puis un aperçu en direct des dossiers qui seront créés sur la première destination, les nouveaux étant mis en évidence. Le dossier du haut et le dossier Camera/Sound (`Camera_Media`, `Sound_Media`) ont un crayon : cliquez dessus pour renommer ce dossier sur place pour cette copie ; la flèche rétablit le nom du preset.
 - **Save as preset** : saisissez un nom pour garder ces réglages comme préset. Laissez vide pour ne rien enregistrer. Une date choisie n'est jamais enregistrée.
 
 Project et Day sont nettoyés avant usage : les espaces et les caractères interdits par Netflix deviennent `_`.
@@ -203,7 +203,7 @@ Jede Anfrage öffnet ein eigenes Fenster, zwei Auswahlen laufen also nebeneinand
   - **If file exists**: Skip (Standard), Overwrite, Add counter oder Verify using hash list.
   - **Copy**: der Ordner (Standard) oder nur sein Inhalt.
   - **Organization**: None, Date only oder Project + day.
-- Abschnitt **Organization** (bei organisierten Ordnern): **Folder name** wird aus dem Preset (Datum, Projekt, Tag) vorausgefüllt und lässt sich überschreiben; der Pfeil stellt den Namen des Presets wieder her. Dann **Project** und **Day** (Day ist optional). Eine Live-Vorschau zeigt die Ordner, die auf dem ersten Ziel angelegt werden, neue hervorgehoben.
+- Abschnitt **Organization** (bei organisierten Ordnern): **Project** und **Day** (Day ist optional), dann eine Live-Vorschau der Ordner, die auf dem ersten Ziel angelegt werden, neue hervorgehoben. Der oberste Ordner und der Camera/Sound-Ordner (`Camera_Media`, `Sound_Media`) haben einen Stift: Ein Klick benennt den Ordner direkt für diese Kopie um; der Pfeil stellt den Namen des Presets wieder her.
 - **Save as preset**: geben Sie einen Namen ein, um diese Einstellungen als Voreinstellung zu behalten. Leer lassen, um nichts zu speichern. Ein gewähltes Datum wird nie gespeichert.
 
 Project und Day werden vor der Verwendung bereinigt: Leerzeichen und von Netflix verbotene Zeichen werden zu `_`.
@@ -291,7 +291,7 @@ Cada solicitud abre su propia ventana, así que dos selecciones se ejecutan en p
   - **If file exists**: Skip (por defecto), Overwrite, Add counter o Verify using hash list.
   - **Copy**: la carpeta (por defecto) o solo su contenido.
   - **Organization**: None, Date only o Project + day.
-- Sección **Organization** (cuando se organiza): **Folder name** se rellena a partir del preset (fecha, proyecto, día) y puede sobrescribirse; la flecha restaura el nombre del preset. Luego **Project** y **Day** (Day es opcional). Una vista previa en directo muestra las carpetas que se crearán en el primer destino, con las nuevas resaltadas.
+- Sección **Organization** (cuando se organiza): **Project** y **Day** (Day es opcional), luego una vista previa en directo de las carpetas que se crearán en el primer destino, con las nuevas resaltadas. La carpeta superior y la carpeta Camera/Sound (`Camera_Media`, `Sound_Media`) tienen un lápiz: haga clic para renombrarla en el sitio para esta copia; la flecha restaura el nombre del preset.
 - **Save as preset**: escriba un nombre para guardar estos ajustes como preajuste. Déjelo vacío para no guardar. Una fecha elegida nunca se guarda.
 
 Project y Day se limpian antes de usarse: los espacios y los caracteres que Netflix prohíbe pasan a `_`.
