@@ -229,14 +229,20 @@ struct SourceListView: View {
     /// destination folder template the source uses.
     private func mediaKindToggle(path: String, kind: SourceMediaKind,
                                  set: @escaping (String, SourceMediaKind) -> Void) -> some View {
-        HStack(spacing: 0) {
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(FilmCanTheme.textPrimary)
+                .frame(width: 22, height: 15)
+                .offset(x: kind == .camera ? 0 : 22)
+            HStack(spacing: 0) {
             mediaKindSegment(.camera, icon: "video.fill", current: kind) { set(path, kind == .camera ? .sound : .camera) }
             mediaKindSegment(.sound, icon: "speaker.wave.2.fill", current: kind) { set(path, kind == .camera ? .sound : .camera) }
+            }
         }
         .padding(2)
         .background(Capsule().fill(FilmCanTheme.card))
         .overlay(Capsule().stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1))
-        .animation(.easeInOut(duration: 0.12), value: kind)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: kind)
         .help(kind == .camera ? "Camera source — goes to the Camera folder. Click to switch to Sound."
                               : "Sound source — goes to the Sound folder. Click to switch to Camera.")
     }
@@ -249,7 +255,6 @@ struct SourceListView: View {
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundColor(isOn ? FilmCanTheme.background : FilmCanTheme.textTertiary)
                 .frame(width: 22, height: 15)
-                .background(Capsule().fill(isOn ? FilmCanTheme.textPrimary : Color.clear))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
