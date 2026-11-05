@@ -40,6 +40,8 @@ struct QuickCopyFormModel {
     var verification: VerifyMode = .fast
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .skip
     var copyFolderContents = false
+    /// Folder-vs-contents picked in the preview for this copy only, over the preset's.
+    var copyFolderContentsOverride: Bool?
     var organization: OrganizationMode = .none
     /// nil ⇒ today.
     var pickedDate: Date?
@@ -217,7 +219,19 @@ struct QuickCopyFormModel {
     /// True when the chosen preset says "Ask each time" and Quick Copy runs Skip.
     var duplicatePolicyWasMapped: Bool { selectedPreset?.duplicatePolicy == .ask }
 
-    var effectiveCopyFolderContents: Bool { selectedPreset?.copyFolderContents ?? copyFolderContents }
+    var effectiveCopyFolderContents: Bool {
+        copyFolderContentsOverride ?? selectedPreset?.copyFolderContents ?? copyFolderContents
+    }
+
+    /// Without a preset the basic option is edited; with one, an override for this copy.
+    mutating func setCopyFolderContents(_ value: Bool) {
+        if let preset = selectedPreset {
+            copyFolderContentsOverride = value == preset.copyFolderContents ? nil : value
+        } else {
+            copyFolderContentsOverride = nil
+            copyFolderContents = value
+        }
+    }
     var effectiveHashListStyle: HashListStyle { selectedPreset?.hashListStyle ?? .ascMHL }
 
     // MARK: Run preset
@@ -413,7 +427,7 @@ extension QuickCopyFormModel {
         let policy = duplicatePolicyWasMapped
             ? "Skip (preset says Ask each time)"
             : p.duplicatePolicy.displayName
-        let copy = p.copyFolderContents ? "contents only" : "whole folder"
+        let copy = effectiveCopyFolderContents ? "contents only" : "whole folder"
         return "\(effectiveVerification.displayName) verification · If exists: \(policy) · "
             + "\(copy) · \(effectiveHashListStyle.shortName)"
     }
@@ -430,7 +444,12 @@ extension QuickCopyFormModel {
         /// Set on the user-named Camera/Sound folder line (name "" = still to name).
         var mediaKind: SourceMediaKind? = nil
         var isRoot = false
+        var role: Role = .folder
         var isEditable: Bool { isRoot || mediaKind != nil }
+        /// The copied folder itself, or its contents: the line that switches between both.
+        var togglesCopyMode: Bool { role == .copiedFolder || role == .contents }
+
+        enum Role: Equatable { case folder, copiedFolder, copiedFile, contents, hashListOnly }
     }
 
     /// Path of each item under `destination`, relative to it, resolved with the
@@ -439,13 +458,15 @@ extension QuickCopyFormModel {
     func relativePaths(for destination: String) -> [String] {
         let preset = runPreset()
         let metadata = ShootMetadata(episode: sanitizedProject, day: sanitizedDay)
-        let prefix = destination.hasSuffix("/") ? destination : destination + "/"
+        let prefixes = [destination, (destination as NSString).resolvingSymlinksInPath]
+            .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
         return items.map { item in
             let full = FanOutCopier.resolveDestFilePath(
                 destRoot: destination, rootName: item.name, rootPath: item.path, relPath: "",
                 preset: preset, copyFolderContents: false,
                 date: today, metadata: metadata, mediaKind: item.kind)
-            return full.hasPrefix(prefix) ? String(full.dropFirst(prefix.count)) : item.name
+            guard let prefix = prefixes.first(where: { full.hasPrefix($0) }) else { return item.name }
+            return String(full.dropFirst(prefix.count))
         }
     }
 
@@ -486,16 +507,20 @@ extension QuickCopyFormModel {
                 }
                 cumulative = (cumulative as NSString).appendingPathComponent(component)
                 if seen.insert(cumulative).inserted {
-                    let isRoot = organizationActive && depth == 0
+                    let isItem = rollName == nil && depth == components.count - 1
+                    let isRoot = organizationActive && depth == 0 && !isItem
+                    let role: TreeLine.Role = isItem ? (item.isDirectory ? .copiedFolder : .copiedFile) : .folder
                     lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative),
-                                          mediaKind: isMedia && !isRoot ? item.kind : nil, isRoot: isRoot))
+                                          mediaKind: isMedia && !isRoot && !isItem ? item.kind : nil,
+                                          isRoot: isRoot, role: role))
                 }
             }
             if let rollName {
                 let rollPath = (cumulative as NSString).appendingPathComponent(rollName)
-                lines.append(TreeLine(depth: components.count, name: "contents of \(item.name)", isNew: true))
+                lines.append(TreeLine(depth: components.count, name: "contents of \(item.name)", isNew: true,
+                                      role: .contents))
                 lines.append(TreeLine(depth: components.count, name: "\(rollName) (hash list only)",
-                                      isNew: !pathExists(rollPath)))
+                                      isNew: !pathExists(rollPath), role: .hashListOnly))
             }
         }
         return lines

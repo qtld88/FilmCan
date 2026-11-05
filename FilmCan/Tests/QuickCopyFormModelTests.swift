@@ -533,4 +533,34 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(QuickCopyFormModel.replacingComponent(
             1, of: "{date}/Camera_Media/{cameraFormat}", with: "CAM"), "{date}/CAM/{cameraFormat}")
     }
+
+    // MARK: folder vs contents from the preview (2026-11-05)
+    func test_copyModeOverride_flipsTreeAndConfig_withoutTouchingPreset() {
+        var p = OrganizationPreset()
+        p.name = "P"
+        p.copyFolderContents = true
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        form.destinations = ["/Volumes/SSD"]
+        XCTAssertTrue(form.treePreview(for: "/Volumes/SSD").contains { $0.role == .contents })
+
+        form.setCopyFolderContents(false)
+        XCTAssertEqual(form.copyFolderContentsOverride, false)
+        let lines = form.treePreview(for: "/Volumes/SSD")
+        XCTAssertEqual(lines.last?.role, .copiedFolder)
+        XCTAssertFalse(lines.contains { $0.role == .contents || $0.role == .hashListOnly })
+        XCTAssertFalse(form.makeConfiguration().copyFolderContents)
+        XCTAssertTrue(form.savedPresets[0].copyFolderContents)
+
+        form.setCopyFolderContents(true)
+        XCTAssertNil(form.copyFolderContentsOverride)
+    }
+
+    func test_copyModeWithoutPreset_editsBasicOption() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.setCopyFolderContents(true)
+        XCTAssertTrue(form.copyFolderContents)
+        XCTAssertNil(form.copyFolderContentsOverride)
+    }
 }

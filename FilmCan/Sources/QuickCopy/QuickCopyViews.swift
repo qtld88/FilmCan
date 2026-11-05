@@ -64,24 +64,43 @@ private struct QCSettingRow<Control: View>: View {
 struct QuickCopySetupView: View {
     @ObservedObject var session: QuickCopySession
 
+    private var totalBytes: Int64 {
+        session.form.items.compactMap { session.sizes[$0.path] }.reduce(0, +)
+    }
+
     private var totalSize: String {
-        let total = session.form.items.compactMap { session.sizes[$0.path] }.reduce(0, +)
-        return total > 0 ? FilmCanFormatters.bytes(total) : ""
+        totalBytes > 0 ? FilmCanFormatters.bytes(totalBytes) : ""
+    }
+
+    private func capacityLegend(info: DriveCapacityInfo, free: Int64, total: Int64) -> some View {
+        let toCopy = min(totalBytes, free)
+        let used = max(total - free, 0)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                legendItem(info.backupSegmentColor.opacity(0.6), "\(FilmCanFormatters.bytes(toCopy)) to copy")
+                legendItem(info.usedColor, "\(FilmCanFormatters.bytes(used)) used")
+                legendItem(info.freeColor, "\(FilmCanFormatters.bytes(max(free - toCopy, 0))) left")
+            }
+            if info.notEnoughSpace {
+                Label("Not enough space", systemImage: "exclamationmark.triangle.fill")
+                    .font(FilmCanFont.label(11)).foregroundColor(.red)
+            }
+        }
+    }
+
+    private func legendItem(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(text).font(FilmCanFont.body(10)).foregroundColor(FilmCanTheme.textTertiary)
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sourcesPanel
-                        Button { session.addSourceViaPanel() } label: {
-                            Label("Add source", systemImage: "plus")
-                        }
-                        .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
-                        .padding(.leading, 4)
-                    }
-                    .frame(width: 300)
+                    sourcesPanel
+                        .frame(width: 300)
                     flowArrow
                     VStack(alignment: .leading, spacing: 10) {
                         settingsPanel
@@ -145,6 +164,10 @@ struct QuickCopySetupView: View {
                     }
                 }
             }
+            Button { session.addSourceViaPanel() } label: {
+                Label("Add source", systemImage: "plus")
+            }
+            .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
         }
     }
 
@@ -158,10 +181,10 @@ struct QuickCopySetupView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text((path as NSString).lastPathComponent).font(FilmCanFont.label(13)).lineLimit(1)
                         if let total = capacity.total, let free = capacity.available, total > 0 {
-                            ProgressView(value: Double(total - free), total: Double(total))
-                                .tint(FilmCanTheme.brandYellow)
-                            Text("\(FilmCanFormatters.bytes(free)) free of \(FilmCanFormatters.bytes(total))")
-                                .font(FilmCanFont.body(10)).foregroundColor(FilmCanTheme.textTertiary)
+                            let info = DriveCapacityInfo(requiredBytes: totalBytes, available: free, total: total)
+                            DriveCapacityBar(info: info, requiredBytes: totalBytes)
+                                .padding(.vertical, 2)
+                            capacityLegend(info: info, free: free, total: total)
                         } else {
                             Text(path).font(FilmCanFont.body(10)).foregroundColor(FilmCanTheme.textTertiary)
                                 .lineLimit(1).truncationMode(.middle)
@@ -248,6 +271,10 @@ struct QuickCopySetupView: View {
                         line: line,
                         edited: session.form.isFolderNameEdited(root: line.isRoot, kind: line.mediaKind),
                         autoEdit: autoEdit,
+                        copyContents: session.form.effectiveCopyFolderContents,
+                        copyModeEdited: session.form.copyFolderContentsOverride != nil,
+                        onSetCopyContents: { session.form.setCopyFolderContents($0) },
+                        onResetCopyMode: { session.form.copyFolderContentsOverride = nil },
                         onRename: { session.form.setFolderName($0, root: line.isRoot, kind: line.mediaKind) },
                         onReset: {
                             if line.isRoot { session.form.rootFolderName = nil }
@@ -297,6 +324,10 @@ private struct QCTreeRow: View {
     let line: QuickCopyFormModel.TreeLine
     let edited: Bool
     var autoEdit = true
+    var copyContents = false
+    var copyModeEdited = false
+    var onSetCopyContents: (Bool) -> Void = { _ in }
+    var onResetCopyMode: () -> Void = {}
     let onRename: (String) -> Void
     let onReset: () -> Void
 
@@ -306,11 +337,21 @@ private struct QCTreeRow: View {
     @FocusState private var focused: Bool
 
     private var needsName: Bool { line.isEditable && line.name.isEmpty }
+
+    private var icon: String {
+        switch line.role {
+        case .folder: return "folder"
+        case .copiedFolder: return "folder.fill"
+        case .copiedFile: return "doc"
+        case .contents: return "doc.on.doc"
+        case .hashListOnly: return "number.square"
+        }
+    }
     private var mono: Font { .system(size: 11, design: .monospaced) }
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "folder").font(.system(size: 10))
+            Image(systemName: icon).font(.system(size: 10)).frame(width: 14)
             if editing {
                 TextField(line.mediaKind.map { "\($0.displayName) folder name" } ?? "Folder name", text: $text)
                     .font(mono)
@@ -324,6 +365,20 @@ private struct QCTreeRow: View {
                     .onSubmit { if !text.isEmpty { editing = false } }
                     .onExitCommand { text = original; editing = needsName }
                     .onChange(of: focused) { if !$0, !text.isEmpty { editing = false } }
+            } else if line.togglesCopyMode {
+                Text(line.name).font(mono)
+                Button { onSetCopyContents(!copyContents) } label: {
+                    Image(systemName: "pencil").font(.system(size: 10))
+                }
+                .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
+                .help(copyContents ? "Copy the whole folder instead" : "Copy only its contents instead")
+                if copyModeEdited {
+                    Button(action: onResetCopyMode) {
+                        Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
+                    .help("Back to the preset's choice")
+                }
             } else {
                 Text(line.name).font(mono)
                 if line.isEditable {

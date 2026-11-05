@@ -561,19 +561,7 @@ struct DestinationListView: View {
         }
     }
 
-    private struct CapacityInfo {
-        let ratioToAvailable: Double?
-        let hasTotal: Bool
-        let usedRatio: Double
-        let backupRatio: Double
-        let freeRatio: Double
-        let usedPercent: Int
-        let backupPercent: Int
-        let freePercent: Int
-        let usedColor: Color
-        let freeColor: Color
-        let backupSegmentColor: Color
-    }
+    private typealias CapacityInfo = DriveCapacityInfo
 
     private func capacityInfo(
         requiredBytes: Int64,
@@ -581,70 +569,8 @@ struct DestinationListView: View {
         total: Int64?,
         treatBackupAsUsed: Bool = false
     ) -> CapacityInfo {
-        let totalBytes = total ?? 0
-        let hasTotal = totalBytes > 0 && available != nil
-        let availableBytes = available ?? 0
-        let usedBytes = max(totalBytes - availableBytes, 0)
-        let backupBytes: Int64
-        let usedOtherBytes: Int64
-        let freeAfterBytes: Int64
-        let effectiveRequiredForSpace: Int64
-        if treatBackupAsUsed {
-            backupBytes = min(requiredBytes, usedBytes)
-            usedOtherBytes = max(usedBytes - backupBytes, 0)
-            freeAfterBytes = max(totalBytes - usedBytes, 0)
-            effectiveRequiredForSpace = 0
-        } else {
-            backupBytes = min(requiredBytes, max(availableBytes, 0))
-            usedOtherBytes = usedBytes
-            freeAfterBytes = max(totalBytes - usedBytes - backupBytes, 0)
-            effectiveRequiredForSpace = requiredBytes
-        }
-        let ratioToAvailable = available.map { availableBytes in
-            if effectiveRequiredForSpace <= 0 {
-                return 0.0
-            }
-            if availableBytes <= 0 {
-                return Double.infinity
-            }
-            return Double(effectiveRequiredForSpace) / Double(availableBytes)
-        }
-        let usedRatio = hasTotal ? Double(usedOtherBytes) / Double(totalBytes) : 0
-        let backupRatio = hasTotal ? Double(backupBytes) / Double(totalBytes) : 0
-        let freeRatio = hasTotal ? Double(freeAfterBytes) / Double(totalBytes) : 0
-        let usedPercent = Int(round(usedRatio * 100))
-        let backupPercent = Int(round(backupRatio * 100))
-        let freePercent = max(0, 100 - usedPercent - backupPercent)
-        // Free space is the light grey; other-used space is the darker grey.
-        let usedColor = Color.gray.opacity(0.55)
-        let freeColor = Color.gray.opacity(0.22)
-        let backupSegmentColor: Color
-        if treatBackupAsUsed {
-            backupSegmentColor = FilmCanTheme.brandGreen
-        } else {
-            if let ratio = ratioToAvailable, ratio > 1.0 {
-                backupSegmentColor = .red
-            } else if backupPercent > 80 {
-                backupSegmentColor = .red
-            } else if backupPercent > 60 {
-                backupSegmentColor = .orange
-            } else {
-                backupSegmentColor = FilmCanTheme.brandGreen
-            }
-        }
-        return CapacityInfo(
-            ratioToAvailable: ratioToAvailable,
-            hasTotal: hasTotal,
-            usedRatio: usedRatio,
-            backupRatio: backupRatio,
-            freeRatio: freeRatio,
-            usedPercent: usedPercent,
-            backupPercent: backupPercent,
-            freePercent: freePercent,
-            usedColor: usedColor,
-            freeColor: freeColor,
-            backupSegmentColor: backupSegmentColor
-        )
+        DriveCapacityInfo(requiredBytes: requiredBytes, available: available, total: total,
+                          treatBackupAsUsed: treatBackupAsUsed)
     }
 
     private func destinationSummaryLine(
@@ -666,33 +592,7 @@ struct DestinationListView: View {
     }
 
     private func capacityBarVisualization(info: CapacityInfo, requiredBytes: Int64) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                if info.hasTotal {
-                    HStack(spacing: 0) {
-                        Rectangle()
-                            .fill(info.freeColor)
-                            .frame(width: geo.size.width * info.freeRatio)
-                        Rectangle()
-                            .fill(info.backupSegmentColor.opacity(0.6))
-                            .frame(width: geo.size.width * info.backupRatio)
-                        Rectangle()
-                            .fill(info.usedColor)
-                            .frame(width: geo.size.width * info.usedRatio)
-                    }
-                    .animation(.easeInOut(duration: 0.5), value: requiredBytes)
-                } else {
-                    Rectangle()
-                        .fill(info.backupSegmentColor.opacity(0.6))
-                        .frame(width: geo.size.width * min(1.0, info.ratioToAvailable ?? 0))
-                        .animation(.easeInOut(duration: 0.5), value: requiredBytes)
-                }
-            }
-            .cornerRadius(4)
-        }
-        .frame(height: 12)
+        DriveCapacityBar(info: info, requiredBytes: requiredBytes)
     }
 
     private func capacityLegend(info: CapacityInfo, treatBackupAsUsed: Bool = false) -> some View {
