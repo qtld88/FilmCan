@@ -52,7 +52,7 @@ A wrong guess is corrected with a right-click on the source: **Camera card**, **
 **Not a camera card** or **Reset recognition**. The correction is remembered per drive
 (volume UUID).
 
-See [Roll numbering](./roll-numbering.md) for automatic roll names.
+See [Roll numbering](https://github.com/qtld88/FilmCan/blob/main/docs/features/roll-numbering.md) for automatic roll names.
 
 ---
 
