@@ -68,7 +68,7 @@ hashes, and ASC MHL, it just lands under `Sound_Media/` instead of `Camera_Media
 - The **Save To** card's folder tree (**Folders on every drive**) updates as you toggle, so you can confirm a
   sound card resolves to `…/Sound_Media/<SoundRoll>/` (with its own `ascmhl/`, verify
   and resume), a sibling of the camera media in the same shoot-day root.
-- **Options › Sources › Auto-detect sound sources**: drive/folder name patterns (e.g.
+- **Options › Source › Auto-detect sound sources**: drive/folder name patterns (e.g.
   `SOUND`, `MIXPRE*`, `ZOOM*`) auto-add matching drives and tag them Sound.
 - **Options › Destinations › Folder templates**: both the **Camera folder** and **Sound
   folder** sub-paths are editable (defaults `…/Camera_Media/{cameraFormat}` and
@@ -183,7 +183,7 @@ hachages et ASC MHL, il se retrouve juste sous `Sound_Media/` au lieu de `Camera
 - L'arborescence de la carte **Save To** (**Folders on every drive**) se met à jour lorsque vous basculez, vous pouvez donc confirmer qu'une
   carte son se résout en `…/Sound_Media/<SoundRoll>/` (avec son propre `ascmhl/`, vérification
   et reprise), un frère des médias caméra dans la même racine jour de tournage.
-- **Options › Sources › Auto-detect sound sources** : les modèles de noms de disque/dossier (par ex.
+- **Options › Source › Auto-detect sound sources** : les modèles de noms de disque/dossier (par ex.
   `SOUND`, `MIXPRE*`, `ZOOM*`) ajoutent automatiquement les disques correspondants et les marquent comme Son.
 - **Options › Destinations › Folder templates** : les chemins de sous-dossiers **Camera folder** et **Sound
   folder** sont tous deux modifiables (par défaut `…/Camera_Media/{cameraFormat}` et
@@ -297,7 +297,7 @@ Hashes und ASC MHL, es landet nur unter `Sound_Media/` statt `Camera_Media/`.
 - Der Ordnerbaum der **Save To**-Karte (**Folders on every drive**) wird aktualisiert, wenn Sie umschalten, damit Sie bestätigen können, dass eine
   Sound-Karte in `…/Sound_Media/<SoundRoll>/` aufgelöst wird (mit seinem eigenen `ascmhl/`, Verifizierung
   und Fortsetzen), ein Nebeneinander der Kameramedia in der gleichen Drehtags-Wurzel.
-- **Options › Sources › Auto-detect sound sources** : Muster für Laufwerk-/Ordnernamen (z. B.
+- **Options › Source › Auto-detect sound sources** : Muster für Laufwerk-/Ordnernamen (z. B.
   `SOUND`, `MIXPRE*`, `ZOOM*`) fügen automatisch entsprechende Laufwerke hinzu und kennzeichnen sie als Sound.
 - **Options › Destinations › Folder templates** : Beide **Camera folder** und **Sound
   folder** Unterpfade sind bearbeitbar (Standard `…/Camera_Media/{cameraFormat}` und
@@ -412,7 +412,7 @@ hashes y ASC MHL, solo se guardan bajo `Sound_Media/` en lugar de `Camera_Media/
 - El árbol de carpetas de la tarjeta **Save To** (**Folders on every drive**) se actualiza al alternar, para que pueda confirmar que una
   tarjeta de sonido se resuelve en `…/Sound_Media/<SoundRoll>/` (con su propio `ascmhl/`, verificación
   y reanudación), un hermano de los medios de cámara en la misma raíz de día de rodaje.
-- **Options › Sources › Auto-detect sound sources** : patrones de nombres de unidad/carpeta (por ejemplo,
+- **Options › Source › Auto-detect sound sources** : patrones de nombres de unidad/carpeta (por ejemplo,
   `SOUND`, `MIXPRE*`, `ZOOM*`) añaden automáticamente unidades coincidentes y las etiquetan como Sonido.
 - **Options › Destinations › Folder templates** : tanto la **Camera folder** como **Sound
   folder** rutas secundarias son editables (por defecto `…/Camera_Media/{cameraFormat}` y

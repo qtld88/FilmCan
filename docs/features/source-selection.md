@@ -42,7 +42,7 @@ and sound folders (e.g. **Netflix Ingest**).
 
 ## Card recognition
 
-Options › Sources › **Detect camera and sound cards automatically** (off by default).
+Options › Source › **Detect camera and sound cards automatically** (off by default).
 FilmCan recognises a card from the folders the camera writes: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. A drive holding only WAV/BWF files is a sound card and is
 tagged Sound. Recognised cards get a badge ("Sony card") on their source row and are added to
@@ -52,7 +52,7 @@ A wrong guess is corrected with a right-click on the source: **Camera card**, **
 **Not a camera card** or **Reset recognition**. The correction is remembered per drive
 (volume UUID).
 
-See [Roll numbering](https://github.com/qtld88/FilmCan/blob/main/docs/features/roll-numbering.md) for automatic roll names.
+See [Roll numbering](./roll-numbering.md) for automatic roll names.
 
 ---
 
@@ -140,6 +140,22 @@ caméra et son séparés (par exemple **Netflix Ingest**).
 
 ---
 
+## Reconnaissance des cartes
+
+Options › Source › **Detect camera and sound cards automatically** (désactivé par défaut).
+FilmCan reconnaît une carte d'après les dossiers écrits par la caméra : ARRI, RED, Sony, Canon,
+Panasonic, Blackmagic, DJI, GoPro. Un disque ne contenant que des fichiers WAV/BWF est une carte son et est
+marqué Sound. Les cartes reconnues reçoivent un badge (« Sony card ») sur leur ligne de source et sont ajoutées aux
+sources quand elles sont branchées. Les destinations ne sont jamais ajoutées.
+
+Une mauvaise détection se corrige par un clic droit sur la source : **Camera card**, **Sound card**,
+**Not a camera card** ou **Reset recognition**. La correction est mémorisée par disque
+(UUID du volume).
+
+Voir [Numérotation des rolls](./roll-numbering.md) pour les noms de roll automatiques.
+
+---
+
 ## Modèles d'inclusion / exclusion
 
 **Inclure** (copier seulement ceux-ci):
@@ -224,6 +240,22 @@ und Sound-Ordnern (z. B. **Netflix Ingest**).
 
 ---
 
+## Kartenerkennung
+
+Options › Source › **Detect camera and sound cards automatically** (standardmäßig aus).
+FilmCan erkennt eine Karte an den Ordnern, die die Kamera schreibt: ARRI, RED, Sony, Canon,
+Panasonic, Blackmagic, DJI, GoPro. Ein Laufwerk mit nur WAV/BWF-Dateien ist eine Soundkarte und wird
+als Sound markiert. Erkannte Karten erhalten ein Badge („Sony card“) in ihrer Quellzeile und werden den
+Quellen hinzugefügt, sobald sie angesteckt werden. Ziele werden nie hinzugefügt.
+
+Eine falsche Erkennung korrigieren Sie mit einem Rechtsklick auf die Quelle: **Camera card**, **Sound card**,
+**Not a camera card** oder **Reset recognition**. Die Korrektur wird pro Laufwerk
+(Volume-UUID) gespeichert.
+
+Siehe [Roll-Nummerierung](./roll-numbering.md) für automatische Roll-Namen.
+
+---
+
 ## Ein- und Ausschlussmuster
 
 **Einschließen** (nur diese kopieren):
@@ -305,6 +337,22 @@ Sonido:
 La vista previa **Save To** se actualiza para mostrar dónde aterrizará cada origen. Esto solo cambia
 la carpeta de destino; no tiene efecto a menos que use un ajuste predefinido con cámaras separadas
 y carpetas de sonido (por ejemplo, **Netflix Ingest**).
+
+---
+
+## Reconocimiento de tarjetas
+
+Options › Source › **Detect camera and sound cards automatically** (desactivado por defecto).
+FilmCan reconoce una tarjeta por las carpetas que escribe la cámara: ARRI, RED, Sony, Canon,
+Panasonic, Blackmagic, DJI, GoPro. Una unidad que solo contiene archivos WAV/BWF es una tarjeta de sonido y se
+marca como Sound. Las tarjetas reconocidas reciben una insignia («Sony card») en su fila de origen y se añaden a los
+orígenes al conectarse. Los destinos nunca se añaden.
+
+Una detección errónea se corrige con clic derecho en el origen: **Camera card**, **Sound card**,
+**Not a camera card** o **Reset recognition**. La corrección se recuerda por unidad
+(UUID del volumen).
+
+Consulte [Numeración de rolls](./roll-numbering.md) para los nombres de roll automáticos.
 
 ---
 
