@@ -1,0 +1,38 @@
+[
+ {
+  "copyFolderContents": true,
+  "copyOnlyPatterns": [],
+  "customDate": "2026-06-13T18:41:22Z",
+  "customLogPath": "",
+  "duplicateCounterTemplate": "_001",
+  "duplicatePolicy": "ask",
+  "engineOptions": {
+   "allowResume": true,
+   "customVerifyEnabled": true,
+   "fileOrdering": "defaultOrder",
+   "onlyCopyChanged": true,
+   "parallelCopyEnabled": true,
+   "postVerify": true,
+   "reuseOrganizedFiles": false,
+   "useHashListPrecheck": false,
+   "verificationMode": "fast"
+  },
+  "excludePatterns": [],
+  "folderTemplate": "CITIZENK/RUSHES/Camera_Media/{source}",
+  "hashListStyle": "ascMHL",
+  "id": "BD40520D-F76D-42B9-9BEE-D1243B77C3F0",
+  "includePatterns": [],
+  "logEnabled": true,
+  "logFileNameTemplate": "transfer_{datetime}",
+  "logLocation": "same",
+  "name": "Alexa35",
+  "projectName": "",
+  "renameOnlyPatterns": [],
+  "renameTemplate": "",
+  "runInParallel": true,
+  "soundFolderTemplate": "CITIZENK/RUSHES/Sound_Media/{source}",
+  "useCustomDate": false,
+  "useFolderTemplate": true,
+  "useRenameTemplate": false
+ }
+]

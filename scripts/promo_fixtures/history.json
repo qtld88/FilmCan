@@ -1,0 +1,266 @@
+[
+ {
+  "configId": "4ACDF072-F9FB-4108-A808-D2DCE2032AD5",
+  "configName": "Quick Copy \u2014 A003R1KD",
+  "destinations": [
+   "/Volumes/CK_backup_01",
+   "/Volumes/CK_backup_02"
+  ],
+  "endedAt": "2026-11-06T08:33:40Z",
+  "hashRoots": [],
+  "id": "1A3453E1-99F6-4861-B0D9-55A62BB62FC0",
+  "options": {
+   "allowResume": true,
+   "checksumChoice": "xxh128",
+   "copyEngine": "custom",
+   "copyFolderContents": true,
+   "customArgs": "",
+   "deleteExtraFiles": false,
+   "duplicateCounterTemplate": "_001",
+   "duplicatePolicy": "skip",
+   "logEnabled": true,
+   "onlyCopyChanged": true,
+   "organizationPresetName": "Alexa35",
+   "postVerify": true,
+   "reuseOrganizedFiles": false,
+   "runInParallel": true,
+   "updateInPlace": false,
+   "useChecksum": false
+  },
+  "results": [
+   {
+    "bytesTransferred": 14990000000,
+    "destination": "/Volumes/CK_backup_01",
+    "duplicateHits": 0,
+    "endTime": "2026-11-06T08:33:40Z",
+    "filesSkipped": 0,
+    "filesTransferred": 34,
+    "hashListPath": "/Volumes/CK_backup_01/CITIZENK/RUSHES/Camera_Media/A003R1KD/ascmhl/0001_A003R1KD_2026-11-06_082946Z.mhl",
+    "hashRoots": [],
+    "id": "EA122C82-A537-4F5E-822F-F3F5ED525A04",
+    "logFilePath": "/Volumes/CK_backup_01/transfer_20261105-223340.log",
+    "startTime": "2026-11-06T08:29:46Z",
+    "success": true,
+    "totalBytes": 14990000000,
+    "visibleFilesSkipped": 0,
+    "visibleFilesTransferred": 34,
+    "wasPaused": false,
+    "wasVerified": false
+   },
+   {
+    "bytesTransferred": 14990000000,
+    "destination": "/Volumes/CK_backup_02",
+    "duplicateHits": 0,
+    "endTime": "2026-11-06T08:33:40Z",
+    "filesSkipped": 0,
+    "filesTransferred": 34,
+    "hashListPath": "/Volumes/CK_backup_02/CITIZENK/RUSHES/Camera_Media/A003R1KD/ascmhl/0001_A003R1KD_2026-11-06_082946Z.mhl",
+    "hashRoots": [],
+    "id": "51A62AED-BC26-411B-9718-4194F4927AEA",
+    "logFilePath": "/Volumes/CK_backup_02/transfer_20261105-223340.log",
+    "startTime": "2026-11-06T08:29:46Z",
+    "success": true,
+    "totalBytes": 14990000000,
+    "visibleFilesSkipped": 0,
+    "visibleFilesTransferred": 34,
+    "wasPaused": false,
+    "wasVerified": false
+   }
+  ],
+  "runContext": {
+   "cameraFolderTemplate": "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}",
+   "copyFolderContents": true,
+   "duplicatePolicy": "skip",
+   "hashListStyle": "ascMHL",
+   "organizationPresetId": "BD40520D-F76D-42B9-9BEE-D1243B77C3F0",
+   "rollNames": {},
+   "soundFolderTemplate": "{date}_{episode}_{day}_{unit}/Sound_Media",
+   "sourceMediaKinds": {
+    "/Volumes/A003R1KD": "camera",
+    "/Volumes/DJI_RONIN": "camera"
+   }
+  },
+  "sources": [
+   "/Volumes/A003R1KD",
+   "/Volumes/DJI_RONIN"
+  ],
+  "startedAt": "2026-11-06T08:29:46Z",
+  "success": true
+ },
+ {
+  "configId": "50C0C643-DAA3-4182-BCAF-50CFF5D8BE04",
+  "configName": "Citizen K",
+  "destinations": [
+   "/Volumes/CK_backup_01",
+   "/Volumes/CK_backup_02"
+  ],
+  "endedAt": "2026-11-06T08:17:41Z",
+  "hashRoots": [],
+  "id": "EC19495D-3EC8-418E-8FFE-B8AC3E18EB3F",
+  "options": {
+   "allowResume": true,
+   "checksumChoice": "xxh128",
+   "copyEngine": "custom",
+   "copyFolderContents": true,
+   "customArgs": "",
+   "deleteExtraFiles": false,
+   "duplicateCounterTemplate": "_001",
+   "duplicatePolicy": "ask",
+   "logEnabled": true,
+   "onlyCopyChanged": true,
+   "organizationPresetName": "Alexa35",
+   "postVerify": true,
+   "reuseOrganizedFiles": false,
+   "runInParallel": true,
+   "updateInPlace": false,
+   "useChecksum": false
+  },
+  "results": [
+   {
+    "bytesTransferred": 14990000000,
+    "destination": "/Volumes/CK_backup_01",
+    "duplicateHits": 0,
+    "endTime": "2026-11-06T08:17:41Z",
+    "filesSkipped": 0,
+    "filesTransferred": 34,
+    "hashListPath": "/Volumes/CK_backup_01/CITIZENK/RUSHES/Camera_Media/A003R1KD/ascmhl/0001_A003R1KD_2026-11-06_081335Z.mhl",
+    "hashRoots": [],
+    "id": "EC2D7DDD-2620-4156-B9DD-3F8122F9ADE4",
+    "logFilePath": "/Volumes/CK_backup_01/transfer_20261105-221741.log",
+    "startTime": "2026-11-06T08:13:35Z",
+    "success": true,
+    "totalBytes": 14990000000,
+    "visibleFilesSkipped": 0,
+    "visibleFilesTransferred": 34,
+    "wasPaused": false,
+    "wasVerified": false
+   },
+   {
+    "bytesTransferred": 14990000000,
+    "destination": "/Volumes/CK_backup_02",
+    "duplicateHits": 0,
+    "endTime": "2026-11-06T08:17:41Z",
+    "filesSkipped": 0,
+    "filesTransferred": 34,
+    "hashListPath": "/Volumes/CK_backup_02/CITIZENK/RUSHES/Camera_Media/A003R1KD/ascmhl/0001_A003R1KD_2026-11-06_081335Z.mhl",
+    "hashRoots": [],
+    "id": "6574F46D-EE78-4F66-8370-C260EBAE5F02",
+    "logFilePath": "/Volumes/CK_backup_02/transfer_20261105-221741.log",
+    "startTime": "2026-11-06T08:13:35Z",
+    "success": true,
+    "totalBytes": 14990000000,
+    "visibleFilesSkipped": 0,
+    "visibleFilesTransferred": 34,
+    "wasPaused": false,
+    "wasVerified": false
+   }
+  ],
+  "runContext": {
+   "cameraFolderTemplate": "CITIZENK/RUSHES/Camera_Media/{source}",
+   "copyFolderContents": true,
+   "duplicatePolicy": "ask",
+   "hashListStyle": "ascMHL",
+   "organizationPresetId": "BD40520D-F76D-42B9-9BEE-D1243B77C3F0",
+   "rollNames": {},
+   "soundFolderTemplate": "CITIZENK/RUSHES/Sound_Media/{source}",
+   "sourceMediaKinds": {
+    "/Volumes/ZOOM_F6": "sound"
+   }
+  },
+  "sources": [
+   "/Volumes/A003R1KD",
+   "/Volumes/DJI_RONIN",
+   "/Volumes/ZOOM_F6"
+  ],
+  "startedAt": "2026-11-06T08:13:35Z",
+  "success": true
+ },
+ {
+  "configId": "50C0C643-DAA3-4182-BCAF-50CFF5D8BE04",
+  "configName": "Citizen K",
+  "destinations": [
+   "/Volumes/CK_backup_01",
+   "/Volumes/CK_backup_02"
+  ],
+  "endedAt": "2026-11-06T07:58:36Z",
+  "hashRoots": [],
+  "id": "2B0130E2-26BC-43EA-8F42-EAE32FC1C36C",
+  "options": {
+   "allowResume": true,
+   "checksumChoice": "xxh128",
+   "copyEngine": "custom",
+   "copyFolderContents": true,
+   "customArgs": "",
+   "deleteExtraFiles": false,
+   "duplicateCounterTemplate": "_001",
+   "duplicatePolicy": "ask",
+   "logEnabled": true,
+   "onlyCopyChanged": true,
+   "organizationPresetName": "Alexa35",
+   "postVerify": true,
+   "reuseOrganizedFiles": false,
+   "runInParallel": true,
+   "updateInPlace": false,
+   "useChecksum": false
+  },
+  "results": [
+   {
+    "bytesTransferred": 14990000000,
+    "destination": "/Volumes/CK_backup_01",
+    "duplicateHits": 0,
+    "endTime": "2026-11-06T07:58:36Z",
+    "filesSkipped": 0,
+    "filesTransferred": 34,
+    "hashListPath": "/Volumes/CK_backup_01/CITIZENK/RUSHES/Camera_Media/A003R1KD/ascmhl/0001_A003R1KD_2026-11-06_075336Z.mhl",
+    "hashRoots": [],
+    "id": "62B637A4-B39F-4271-9F1D-4C170EE3AE97",
+    "logFilePath": "/Volumes/CK_backup_01/transfer_20261105-215836.log",
+    "startTime": "2026-11-06T07:53:35Z",
+    "success": true,
+    "totalBytes": 14990000000,
+    "visibleFilesSkipped": 0,
+    "visibleFilesTransferred": 34,
+    "wasPaused": false,
+    "wasVerified": false
+   },
+   {
+    "bytesTransferred": 14990000000,
+    "destination": "/Volumes/CK_backup_02",
+    "duplicateHits": 0,
+    "endTime": "2026-11-06T07:58:36Z",
+    "filesSkipped": 0,
+    "filesTransferred": 34,
+    "hashListPath": "/Volumes/CK_backup_02/CITIZENK/RUSHES/Camera_Media/A003R1KD/ascmhl/0001_A003R1KD_2026-11-06_075336Z.mhl",
+    "hashRoots": [],
+    "id": "3299308F-A0EC-4CD8-B512-4A1D218DD005",
+    "logFilePath": "/Volumes/CK_backup_02/transfer_20261105-215836.log",
+    "startTime": "2026-11-06T07:53:35Z",
+    "success": true,
+    "totalBytes": 14990000000,
+    "visibleFilesSkipped": 0,
+    "visibleFilesTransferred": 34,
+    "wasPaused": false,
+    "wasVerified": false
+   }
+  ],
+  "runContext": {
+   "cameraFolderTemplate": "CITIZENK/RUSHES/Camera_Media/{source}",
+   "copyFolderContents": true,
+   "duplicatePolicy": "ask",
+   "hashListStyle": "ascMHL",
+   "organizationPresetId": "BD40520D-F76D-42B9-9BEE-D1243B77C3F0",
+   "rollNames": {},
+   "soundFolderTemplate": "CITIZENK/RUSHES/Sound_Media/{source}",
+   "sourceMediaKinds": {
+    "/Volumes/ZOOM_F6": "sound"
+   }
+  },
+  "sources": [
+   "/Volumes/A003R1KD",
+   "/Volumes/DJI_RONIN",
+   "/Volumes/ZOOM_F6"
+  ],
+  "startedAt": "2026-11-06T07:53:35Z",
+  "success": true
+ }
+]

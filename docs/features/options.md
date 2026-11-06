@@ -1,7 +1,9 @@
 <!-- lang:en -->
 # Options
 
-Options are grouped into tabs in the **Backup Editor**.
+Options are grouped into tabs in the **Backup Editor**. Click the open tab again to collapse the options, or a tab to expand them.
+
+The preset menu shows **(modified)** after the preset name when this movie's settings differ from the preset; hover it to list the differences.
 
 > The copy-engine picker was removed in 1.2.0, the FilmCan Engine handles every
 > backup. See [Copy Engines](./copy-engines.md).
@@ -74,7 +76,9 @@ See [Destination Presets](./destination-presets.md) for templates and tokens.
 <!-- lang:fr -->
 # Options
 
-Les options sont regroupées dans les onglets de l'**Backup Editor**.
+Les options sont regroupées dans les onglets de l'**Backup Editor**. Cliquez à nouveau sur l'onglet ouvert pour replier les options, ou sur un onglet pour les déplier.
+
+Le menu des présets affiche **(modified)** après le nom du préset quand les réglages de ce film s'en écartent ; survolez-le pour lister les différences.
 
 > Le sélecteur de moteur de copie a été supprimé dans la version 1.2.0, le moteur FilmCan gère chaque
 > backup. Voir [Copy Engines](./copy-engines.md).
@@ -147,7 +151,9 @@ Voir [Destination Presets](./destination-presets.md) pour les modèles et les je
 <!-- lang:de -->
 # Optionen
 
-Optionen sind in Registerkarten im **Backup Editor** gruppiert.
+Optionen sind in Registerkarten im **Backup Editor** gruppiert. Ein Klick auf die geöffnete Registerkarte klappt die Optionen ein, ein Klick auf eine Registerkarte klappt sie aus.
+
+Das Preset-Menü zeigt **(modified)** hinter dem Preset-Namen, wenn die Einstellungen dieses Films vom Preset abweichen; fahren Sie darüber, um die Unterschiede aufzulisten.
 
 > Die Auswahl des Kopier-Engines wurde in Version 1.2.0 entfernt. Das FilmCan Engine verwaltet jeden
 > Backup. Siehe [Copy Engines](./copy-engines.md).
@@ -220,7 +226,9 @@ Siehe [Destination Presets](./destination-presets.md) für Vorlagen und Token.
 <!-- lang:es -->
 # Opciones
 
-Las opciones se agrupan en pestañas en el **Backup Editor**.
+Las opciones se agrupan en pestañas en el **Backup Editor**. Haga clic de nuevo en la pestaña abierta para contraer las opciones, o en una pestaña para desplegarlas.
+
+El menú de presets muestra **(modified)** tras el nombre del preset cuando los ajustes de esta película difieren de él; pase el cursor para ver las diferencias.
 
 > El selector de motor de copia se eliminó en la versión 1.2.0, el Motor FilmCan maneja cada
 > backup. Ver [Copy Engines](./copy-engines.md).

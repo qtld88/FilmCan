@@ -23,7 +23,7 @@ Get alerts when backups finish or fail.
 
 1. Create a free account at https://ntfy.sh (or use a self‑hosted ntfy) and install the app on your phone.
 2. Create a topic: e.g. `ntfy.sh/mymovie_backup`
-3. Paste the topic URL in FilmCan **Settings**
+3. Paste the topic URL in the **Topic URL** field in FilmCan **Settings**
 4. (Optional) Paste a **Bearer token** if your topic requires auth
 
 ---
@@ -122,7 +122,7 @@ Recevez des alertes lorsque les backups se terminent ou échouent.
 
 1. Créez un compte gratuit sur https://ntfy.sh (ou utilisez un ntfy auto-hébergé) et installez l'application sur votre téléphone.
 2. Créez un sujet : par ex. `ntfy.sh/mymovie_backup`
-3. Collez l'URL du sujet dans FilmCan **Settings**
+3. Collez l'URL du sujet dans le champ **Topic URL** de FilmCan **Settings**
 4. (Optionnel) Collez un **Bearer token** si votre sujet nécessite une authentification
 
 ---
@@ -223,7 +223,7 @@ Erhalten Sie Benachrichtigungen, wenn Backups abgeschlossen sind oder fehlschlag
 
 1. Erstellen Sie ein kostenloses Konto unter https://ntfy.sh (oder verwenden Sie eine selbst gehostete ntfy) und installieren Sie die App auf Ihrem Telefon.
 2. Erstellen Sie ein Thema: z. B. `ntfy.sh/mymovie_backup`
-3. Fügen Sie die Thema-URL in FilmCan **Settings** ein
+3. Fügen Sie die Thema-URL in das Feld **Topic URL** in FilmCan **Settings** ein
 4. (Optional) Fügen Sie ein **Bearer token** ein, wenn Ihr Thema Authentifizierung erfordert
 
 ---
@@ -324,7 +324,7 @@ Reciba alertas cuando los backups se completen o fallen.
 
 1. Cree una cuenta gratuita en https://ntfy.sh (o use un ntfy autoalojado) e instale la aplicación en su teléfono.
 2. Cree un tema: por ejemplo, `ntfy.sh/mymovie_backup`
-3. Pegue la URL del tema en FilmCan **Settings**
+3. Pegue la URL del tema en el campo **Topic URL** de FilmCan **Settings**
 4. (Opcional) Pegue un **Bearer token** si su tema requiere autenticación
 
 ---

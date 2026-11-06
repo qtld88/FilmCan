@@ -282,7 +282,10 @@ struct DestinationListView: View {
         let status = presentation.status
         let progressLabelWidth: CGFloat = 120
         let percentLabelWidth: CGFloat = 42
+        let rowHasContent = !destination.isRoot || treeSources.isEmpty || showProgress
+            || (!sharedTree && isIncluded(destination.path))
         return VStack(alignment: .leading, spacing: 6) {
+            if rowHasContent || status != .pending {
             HStack(spacing: 10) {
                 statusOrDriveIcon(status: status, systemIcon: icon)
                     .frame(width: 18, height: 18)
@@ -375,6 +378,7 @@ struct DestinationListView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
                 Spacer()
+            }
             }
 
             if isFanOutActive {

@@ -75,6 +75,7 @@ Local data lives in `~/Application Support`.
 
 Finder right-click → Services → "FilmCan Copy" (or a Dock-icon drop) opens a small window, copies with the same fan-out engine, and never shows the main window. User doc: `docs/features/quick-copy.md`. Spec: `docs/superpowers/specs/2026-10-15-quick-copy-design.md` (gitignored, local).
 
+- **Layout**: ~900 pt window, two columns (Copy From + Settings left, Save To right); the preset summary is a row of chips (details in the tooltip); the folder tree is shared and fully expanded.
 - **Units** (`Sources/QuickCopy/`): `QuickCopyFormModel` (pure struct: form → temporary `BackupConfiguration` + run `OrganizationPreset`, blockers, folder-tree preview), `MediaKindGuesser` (Camera/Sound from content), `QuickCopySession` (one window's state + its own `TransferViewModel(isBackgroundWorker: true)`), `QuickCopyViews`, `QuickCopyCoordinator` (`@MainActor` singleton: one `NSWindow` + `NSHostingView` per request, launch flag, auto-quit, hides the SwiftUI main window), `QuickCopyServiceProvider` (`NSServices` handler).
 - **Hooks in existing code**: `TransferViewModel.startTransfer(config:organizationPresetOverride:)` (the run preset travels outside the config because the `offOrganization*` fallback drops `soundFolderTemplate`) and `markAsUsed` only for configs that exist in storage. `FilmCanApp` registers the services provider, handles `application(_:open:)` and Dock reopen, and counts running quick copies in the quit guard. `Info.plist` declares `NSServices` + `CFBundleDocumentTypes` (rank Alternate).
 - **Temporary config**: never written to `configs.json`. Presets: `OrganizationPreset.projectName` / `hashListStyle` are read only by Quick Copy.
@@ -91,6 +92,10 @@ Finder right-click → Services → "FilmCan Copy" (or a Dock-icon drop) opens a
 | `InlineFanOutProgress` | `Views/Components/InlineFanOutProgress.swift` | Per-dest progress row: bar + speed + ETA + current file + status badge |
 | `FailedDestRetryPanel` | `Views/Components/FailedDestRetryPanel.swift` | Retry sheet after partial fan-out failure |
 | `ExFATBanner` | in `DestinationListView.swift` | Warning banner when exFAT/F_FULLFSYNC destination detected |
+| `DriveCapacityBar` | `Views/Components/DriveCapacityBar.swift` | Capacity bar, left to right = used · to copy · free (same order as the vertical bar bottom-up); used by Save To cards and Quick Copy |
+| `FolderTreePreview` | `Views/Components/FolderTreePreview.swift` | Resolved destination folder tree, always fully expanded; "Folders on every drive" when all destinations match, else one per drive (main window Save To + Quick Copy) |
+| `CameraSoundSwitch` | `Views/Components/CameraSoundSwitch.swift` | Two-position Camera/Sound switch (either side flips it); main window source cards + Quick Copy rows |
+| `FCCard` | `Views/Components/FCCard.swift` | Shared card chrome for the main window and Quick Copy |
 
 Progress is mounted **inside each destination card** in `DestinationListView` — not in a separate block below.
 

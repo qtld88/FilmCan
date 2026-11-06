@@ -1,0 +1,225 @@
+[
+ {
+  "configId": "50C0C643-DAA3-4182-BCAF-50CFF5D8BE04",
+  "copies": [
+   {
+    "date": "2026-11-06T08:13:35Z",
+    "destVolumeName": "CK_backup_01",
+    "destVolumeUUID": "5F33A7F3-8DFD-424F-81EB-BD668C59DF52",
+    "rollFolderPath": "/Volumes/CK_backup_01/CITIZENK/RUSHES/Camera_Media/DJI_RONIN",
+    "verified": true
+   },
+   {
+    "date": "2026-11-06T08:13:35Z",
+    "destVolumeName": "CK_backup_02",
+    "destVolumeUUID": "6B043301-ECA5-4BE6-BAC1-5318776E9C7F",
+    "rollFolderPath": "/Volumes/CK_backup_02/CITIZENK/RUSHES/Camera_Media/DJI_RONIN",
+    "verified": true
+   }
+  ],
+  "files": [
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0001.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0002.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0003.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0004.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0005.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0006.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0007.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0008.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0009.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0010.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0011.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0012.MP4",
+    "size": 377000000
+   },
+   {
+    "relPath": "DCIM/100MEDIA/DJI_0013.MP4",
+    "size": 377000000
+   }
+  ],
+  "firstBackedUp": "2026-11-06T07:53:35Z",
+  "id": "818A088C-1CF2-454B-B5E0-37D513032961",
+  "mediaKind": "camera",
+  "projectName": "Citizen K",
+  "rollName": "DJI_RONIN",
+  "shootDay": "2026-11-05",
+  "sourcePath": "/Volumes/DJI_RONIN",
+  "sourceVolumeUUID": "724FE6E2-D18E-4111-B498-4898101375AE"
+ },
+ {
+  "configId": "50C0C643-DAA3-4182-BCAF-50CFF5D8BE04",
+  "copies": [
+   {
+    "date": "2026-11-06T08:13:35Z",
+    "destVolumeName": "CK_backup_01",
+    "destVolumeUUID": "5F33A7F3-8DFD-424F-81EB-BD668C59DF52",
+    "rollFolderPath": "/Volumes/CK_backup_01/CITIZENK/RUSHES/Camera_Media/A003R1KD",
+    "verified": true
+   },
+   {
+    "date": "2026-11-06T08:13:35Z",
+    "destVolumeName": "CK_backup_02",
+    "destVolumeUUID": "6B043301-ECA5-4BE6-BAC1-5318776E9C7F",
+    "rollFolderPath": "/Volumes/CK_backup_02/CITIZENK/RUSHES/Camera_Media/A003R1KD",
+    "verified": true
+   }
+  ],
+  "files": [
+   {
+    "relPath": "A003C001_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C002_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C003_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C004_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C005_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C006_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C007_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C008_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C009_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C010_261104_R1KD.mov",
+    "size": 890000000
+   },
+   {
+    "relPath": "A003C011_261104_R1KD.mov",
+    "size": 890000000
+   }
+  ],
+  "firstBackedUp": "2026-11-06T07:53:35Z",
+  "id": "01AF1807-0C0F-448B-9FB5-E1D6D019770A",
+  "mediaKind": "camera",
+  "projectName": "Citizen K",
+  "rollName": "A003R1KD",
+  "shootDay": "2026-11-05",
+  "sourcePath": "/Volumes/A003R1KD",
+  "sourceVolumeUUID": "EA84634D-3F97-4D3B-951F-4EF81A21CA0E"
+ },
+ {
+  "configId": "50C0C643-DAA3-4182-BCAF-50CFF5D8BE04",
+  "copies": [
+   {
+    "date": "2026-11-06T08:13:35Z",
+    "destVolumeName": "CK_backup_01",
+    "destVolumeUUID": "5F33A7F3-8DFD-424F-81EB-BD668C59DF52",
+    "rollFolderPath": "/Volumes/CK_backup_01/CITIZENK/RUSHES/Sound_Media/ZOOM_F6",
+    "verified": true
+   },
+   {
+    "date": "2026-11-06T08:13:35Z",
+    "destVolumeName": "CK_backup_02",
+    "destVolumeUUID": "6B043301-ECA5-4BE6-BAC1-5318776E9C7F",
+    "rollFolderPath": "/Volumes/CK_backup_02/CITIZENK/RUSHES/Sound_Media/ZOOM_F6",
+    "verified": true
+   }
+  ],
+  "files": [
+   {
+    "relPath": "SOUND/F8_001.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_002.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_003.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_004.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_005.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_006.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_007.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_008.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_009.WAV",
+    "size": 30000000
+   },
+   {
+    "relPath": "SOUND/F8_010.WAV",
+    "size": 30000000
+   }
+  ],
+  "firstBackedUp": "2026-11-06T07:53:35Z",
+  "id": "B7A1F0D2-5C4E-4E7B-9D43-2F6A8C0E1A11",
+  "mediaKind": "sound",
+  "projectName": "Citizen K",
+  "rollName": "ZOOM_F6",
+  "shootDay": "2026-11-05",
+  "sourcePath": "/Volumes/ZOOM_F6",
+  "sourceVolumeUUID": "3D0C7B5E-1F42-4A9B-8E65-9C2B7D4F6A10"
+ }
+]

@@ -133,6 +133,9 @@ struct SourceListView: View {
                         isLocked: isSelectionLocked,
                         setIncluded: setIncluded.map { set in { set(paths, $0) } })
                     VStack(alignment: .leading, spacing: 8) {
+                        // A source that is the whole drive already shows the drive name.
+                        let isWholeDrive = summary.paths.count == 1 && summary.paths[0].isRoot
+                        if !isWholeDrive || !driveIncluded {
                         HStack(spacing: 8) {
                             Image(systemName: DriveUtilities.driveIconName(isExternal: summary.isExternal, style: .filled))
                                 .foregroundColor(FilmCanTheme.textSecondary)
@@ -159,14 +162,15 @@ struct SourceListView: View {
                                 ejectDriveGroup(paths: summary.paths)
                             }
                         }
-                        
+                        }
+
                         if summary.isConnected {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { source in
                                     sourceRow(source: source, isExternal: summary.isExternal)
                                 }
                             }
-                            .padding(.leading, 26)
+                            .padding(.leading, isWholeDrive && driveIncluded ? 0 : 26)
 
                         } else {
                             VStack(alignment: .leading, spacing: 6) {
@@ -258,7 +262,7 @@ struct SourceListView: View {
             treatRootAsDrive: true
         )
         
-        return HStack(spacing: 10) {
+        return HStack(alignment: .top, spacing: 10) {
             Image(systemName: iconName)
                 .foregroundColor(FilmCanTheme.textSecondary)
                 .frame(width: 18)
@@ -311,7 +315,6 @@ struct SourceListView: View {
 
             if let mediaKind, let setMediaKind {
                 mediaKindToggle(path: source.path, kind: mediaKind(source.path), set: setMediaKind)
-                    .frame(maxHeight: .infinity, alignment: .top)
             }
         }
         .contentShape(Rectangle())

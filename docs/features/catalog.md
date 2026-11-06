@@ -1,7 +1,7 @@
 # Catalog
 
 FilmCan remembers every roll it backs up: which drives hold it and which clips it contains.
-Open it with **Shift+Cmd+K**, Window > Catalog, or the books icon in the top bar.
+Open it with **Shift+Cmd+K**, Window > Catalog, or the books icon in the top bar. It opens in the right pane of the main window, next to History; drag its edge to resize it (250 to 420 pt). **Window > Open Catalog in Window** opens it in a separate window instead.
 
 ## What it records
 
@@ -24,7 +24,7 @@ as two. Two folders on the same drive count once. Unverified copies do not count
 - Grey "Not verified": copies exist, none verified.
 
 An orange dot on the toolbar button means at least one roll is not yet safe. A filled dot on a
-drive chip means the drive is connected.
+drive chip means the drive is connected. A roll whose clip list was not recorded shows "Files not indexed" instead of a file count.
 
 ## Search
 
@@ -32,9 +32,11 @@ Type a clip name (for example `C0042`) in the search field. Matching is case-ins
 file name. Each hit shows project, day, roll and the drives holding it, even if a drive is unplugged.
 Results are capped at 200.
 
+Click a drive chip to reveal that clip on that drive in the Finder (connected drives only). Double-clicking a hit reveals it too.
+
 ## Context menu
 
-- **Reveal in Finder**: only when the drive is connected.
+- **Reveal on <drive>**: one entry per drive holding a copy. A drive that is unplugged is greyed out and marked "(not connected)".
 - **Forget this roll**: removes the roll from the catalog; no file is deleted.
 
 ## Limits

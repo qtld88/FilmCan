@@ -61,11 +61,11 @@ Main unit, ARRI:
 Netflix protects production sound (OPA) exactly like camera (OCF), same copies,
 hashes, and ASC MHL, it just lands under `Sound_Media/` instead of `Camera_Media/`.
 
-- **Click the icon at the top-right of each source card to switch it between Camera and
-  Sound.** A **🎥 video-camera** icon means the source is treated as Camera
-  (→ `Camera_Media/`); a **🔊 speaker** icon means Sound (→ `Sound_Media/`). It's a
-  toggle, each click flips it. Sources default to Camera.
-- The **Save To** card's path preview updates as you toggle, so you can confirm a
+- **Use the Camera / Sound switch on each source card to set its kind.** The **🎥
+  video-camera** side means the source is treated as Camera (→ `Camera_Media/`); the **🔊
+  speaker** side means Sound (→ `Sound_Media/`). Click either side to flip it. Sources
+  default to Camera.
+- The **Save To** card's folder tree (**Folders on every drive**) updates as you toggle, so you can confirm a
   sound card resolves to `…/Sound_Media/<SoundRoll>/` (with its own `ascmhl/`, verify
   and resume), a sibling of the camera media in the same shoot-day root.
 - **Options › Sources › Auto-detect sound sources**: drive/folder name patterns (e.g.
@@ -176,11 +176,11 @@ Unité principale, ARRI :
 Netflix protège le son de production (OPA) exactement comme la caméra (OCF), mêmes copies,
 hachages et ASC MHL, il se retrouve juste sous `Sound_Media/` au lieu de `Camera_Media/`.
 
-- **Cliquez sur l'icône en haut à droite de chaque carte source pour la basculer entre Caméra et
-  Son.** Une icône **🎥 vidéo-caméra** signifie que la source est traitée comme Caméra
-  (→ `Camera_Media/`); une icône **🔊 haut-parleur** signifie Son (→ `Sound_Media/`). C'est un
-  basculeur, chaque clic le change. Les sources sont par défaut en Caméra.
-- L'aperçu du chemin de la carte **Save To** se met à jour lorsque vous basculez, vous pouvez donc confirmer qu'une
+- **Utilisez l'interrupteur Caméra / Son de chaque carte source pour définir son type.** Le côté **🎥
+  vidéo-caméra** signifie que la source est traitée comme Caméra (→ `Camera_Media/`); le côté
+  **🔊 haut-parleur** signifie Son (→ `Sound_Media/`). Cliquez sur l'un ou l'autre côté pour le
+  basculer. Les sources sont par défaut en Caméra.
+- L'arborescence de la carte **Save To** (**Folders on every drive**) se met à jour lorsque vous basculez, vous pouvez donc confirmer qu'une
   carte son se résout en `…/Sound_Media/<SoundRoll>/` (avec son propre `ascmhl/`, vérification
   et reprise), un frère des médias caméra dans la même racine jour de tournage.
 - **Options › Sources › Auto-detect sound sources** : les modèles de noms de disque/dossier (par ex.
@@ -291,10 +291,10 @@ Haupteinheit, ARRI:
 Netflix schützt Production Sound (OPA) genau wie Kamera (OCF), gleiche Kopien,
 Hashes und ASC MHL, es landet nur unter `Sound_Media/` statt `Camera_Media/`.
 
-- **Klicken Sie auf das Symbol oben rechts auf jeder Quellkarte, um zwischen Kamera und Sound zu wechseln.** Ein **🎥 Videokamera**-Symbol bedeutet, dass die Quelle als Kamera behandelt wird
-  (→ `Camera_Media/`); ein **🔊 Lautsprecher**-Symbol bedeutet Sound (→ `Sound_Media/`). Es ist ein
-  Umschalter, jeder Klick schaltet um. Quellen sind standardmäßig auf Kamera eingestellt.
-- Die Pfadvorschau der **Save To**-Karte wird aktualisiert, wenn Sie umschalten, damit Sie bestätigen können, dass eine
+- **Legen Sie den Typ mit dem Kamera/Sound-Schalter auf jeder Quellkarte fest.** Die **🎥 Videokamera**-Seite bedeutet, dass die Quelle als Kamera behandelt wird
+  (→ `Camera_Media/`); die **🔊 Lautsprecher**-Seite bedeutet Sound (→ `Sound_Media/`). Ein Klick auf
+  eine der beiden Seiten schaltet um. Quellen sind standardmäßig auf Kamera eingestellt.
+- Der Ordnerbaum der **Save To**-Karte (**Folders on every drive**) wird aktualisiert, wenn Sie umschalten, damit Sie bestätigen können, dass eine
   Sound-Karte in `…/Sound_Media/<SoundRoll>/` aufgelöst wird (mit seinem eigenen `ascmhl/`, Verifizierung
   und Fortsetzen), ein Nebeneinander der Kameramedia in der gleichen Drehtags-Wurzel.
 - **Options › Sources › Auto-detect sound sources** : Muster für Laufwerk-/Ordnernamen (z. B.
@@ -405,11 +405,11 @@ Unidad principal, ARRI:
 Netflix protege el sonido de producción (OPA) exactamente como la cámara (OCF), las mismas copias,
 hashes y ASC MHL, solo se guardan bajo `Sound_Media/` en lugar de `Camera_Media/`.
 
-- **Haga clic en el icono en la parte superior derecha de cada tarjeta de origen para cambiar entre Cámara y
-  Sonido.** Un icono **🎥 cámara de vídeo** significa que el origen se trata como Cámara
-  (→ `Camera_Media/`); un icono **🔊 altavoz** significa Sonido (→ `Sound_Media/`). Es un
-  alternador, cada clic lo activa. Los orígenes están configurados de forma predeterminada en Cámara.
-- La vista previa de ruta de la tarjeta **Save To** se actualiza al alternar, para que pueda confirmar que una
+- **Use el interruptor Cámara / Sonido de cada tarjeta de origen para definir su tipo.** El lado **🎥 cámara de vídeo**
+  significa que el origen se trata como Cámara (→ `Camera_Media/`); el lado **🔊 altavoz** significa
+  Sonido (→ `Sound_Media/`). Haga clic en cualquiera de los dos lados para cambiarlo. Los orígenes están
+  configurados de forma predeterminada en Cámara.
+- El árbol de carpetas de la tarjeta **Save To** (**Folders on every drive**) se actualiza al alternar, para que pueda confirmar que una
   tarjeta de sonido se resuelve en `…/Sound_Media/<SoundRoll>/` (con su propio `ascmhl/`, verificación
   y reanudación), un hermano de los medios de cámara en la misma raíz de día de rodaje.
 - **Options › Sources › Auto-detect sound sources** : patrones de nombres de unidad/carpeta (por ejemplo,

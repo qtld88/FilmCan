@@ -198,3 +198,15 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
         }
     }
 }
+
+#if DEBUG
+extension QuickCopyCoordinator {
+    func openDemo(_ settings: DemoSettings) {
+        let paths = settings.quickCopySources.filter { FileManager.default.fileExists(atPath: $0) }
+        let session = QuickCopySession(paths: paths)
+        session.applyDemo(settings)
+        sessions[session.id] = session
+        present(session)
+    }
+}
+#endif

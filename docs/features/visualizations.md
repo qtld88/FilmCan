@@ -8,7 +8,8 @@ Real-time transfer status.
 ## Before Transfer
 
 - Source size and file count
-- Destination free space
+- Destination capacity bar, left to right: used (grey), to copy (green), free (black), with a legend "X used · Y to copy · Z left"
+- The resolved folder tree (**Folders on every drive**) showing where files will land
 - Size indicators
 
 ---
@@ -21,14 +22,14 @@ Real-time transfer status.
 
 ---
 
-## Blue vs Green Bars
+## Yellow vs Green Bars
 
-- **Green**: copy progress
-- **Blue**: verification progress (may stay empty if verification is off)
+- **Yellow**: copy progress
+- **Green**: verification progress (drawn over the yellow bar) (may stay empty if verification is off)
 
 **Behavior**
-- During copy, the green bar advances.
-- If verification is enabled, the blue bar advances as files are verified.
+- During copy, the yellow bar advances.
+- If verification is enabled, the green bar advances as files are verified.
 - A destination is fully done when the copy bar is complete (and the verification bar too, if verification is enabled).
 
 ---
@@ -50,7 +51,8 @@ Statut de transfert en temps réel.
 ## Avant transfert
 
 - Taille de la source et nombre de fichiers
-- Espace libre du disque destination
+- Barre de capacité du disque destination, de gauche à droite : utilisé (gris), à copier (vert), libre (noir), avec une légende « X used · Y to copy · Z left »
+- L'arborescence résolue (**Folders on every drive**) qui montre où iront les fichiers
 - Indicateurs de taille
 
 ---
@@ -63,14 +65,14 @@ Statut de transfert en temps réel.
 
 ---
 
-## Barres bleues vs vertes
+## Barres jaunes vs vertes
 
-- **Vert** : progression de la copie
-- **Bleu** : progression de la vérification (peut rester vide si la vérification est désactivée)
+- **Jaune** : progression de la copie
+- **Vert** : progression de la vérification (par-dessus la barre jaune) (peut rester vide si la vérification est désactivée)
 
 **Comportement**
-- Pendant la copie, la barre verte avance.
-- Si la vérification est activée, la barre bleue avance au fur et à mesure que les fichiers sont vérifiés.
+- Pendant la copie, la barre jaune avance.
+- Si la vérification est activée, la barre verte avance au fur et à mesure que les fichiers sont vérifiés.
 - Une destination est entièrement terminée lorsque la barre de copie est complète (et aussi la barre de vérification, si la vérification est activée).
 
 ---
@@ -92,7 +94,8 @@ Echtzeitübertragungsstatus.
 ## Vor Übertragung
 
 - Quellgröße und Dateianzahl
-- Freier Platz auf der Ziel-Laufwerk
+- Kapazitätsbalken des Ziellaufwerks, von links nach rechts: belegt (grau), zu kopieren (grün), frei (schwarz), mit Legende „X used · Y to copy · Z left“
+- Der aufgelöste Ordnerbaum (**Folders on every drive**), der zeigt, wohin die Dateien kommen
 - Größenindikatoren
 
 ---
@@ -105,14 +108,14 @@ Echtzeitübertragungsstatus.
 
 ---
 
-## Blaue vs. grüne Balken
+## Gelbe vs. grüne Balken
 
-- **Grün** : Kopierfortschritt
-- **Blau** : Verifizierungsfortschritt (kann leer bleiben, wenn Verifizierung aus ist)
+- **Gelb** : Kopierfortschritt
+- **Grün** : Verifizierungsfortschritt (über dem gelben Balken) (kann leer bleiben, wenn Verifizierung aus ist)
 
 **Verhalten**
-- Während des Kopierens schreitet der grüne Balken voran.
-- Wenn die Verifizierung aktiviert ist, wird der blaue Balken vorangebracht, während Dateien verifiziert werden.
+- Während des Kopierens schreitet der gelbe Balken voran.
+- Wenn die Verifizierung aktiviert ist, wird der grüne Balken vorangebracht, während Dateien verifiziert werden.
 - Ein Ziel ist vollständig erledigt, wenn der Kopierbalken vollständig ist (und auch der Verifizierungsbalken, wenn Verifizierung aktiviert ist).
 
 ---
@@ -134,7 +137,8 @@ Estado de transferencia en tiempo real.
 ## Antes de transferir
 
 - Tamaño de origen y número de archivos
-- Espacio libre en el destino
+- Barra de capacidad del destino, de izquierda a derecha: usado (gris), por copiar (verde), libre (negro), con leyenda «X used · Y to copy · Z left»
+- El árbol de carpetas resuelto (**Folders on every drive**) que muestra dónde irán los archivos
 - Indicadores de tamaño
 
 ---
@@ -147,14 +151,14 @@ Estado de transferencia en tiempo real.
 
 ---
 
-## Barras azules vs verdes
+## Barras amarillas vs verdes
 
-- **Verde** : progreso de copia
-- **Azul** : progreso de verificación (puede permanecer vacío si la verificación está desactivada)
+- **Amarillo** : progreso de copia
+- **Verde** : progreso de verificación (sobre la barra amarilla) (puede permanecer vacío si la verificación está desactivada)
 
 **Comportamiento**
-- Durante la copia, la barra verde avanza.
-- Si la verificación está habilitada, la barra azul avanza a medida que se verifican los archivos.
+- Durante la copia, la barra amarilla avanza.
+- Si la verificación está habilitada, la barra verde avanza a medida que se verifican los archivos.
 - Un destino se completa cuando la barra de copia está completa (y también la barra de verificación, si la verificación está habilitada).
 
 ---

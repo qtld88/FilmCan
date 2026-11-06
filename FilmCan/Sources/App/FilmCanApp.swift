@@ -111,6 +111,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = QuickCopyServiceProvider.shared
+        #if DEBUG
+        DemoMode.launch()
+        #endif
         // Ensure app is properly registered as a regular app (in dock)
         NSApp.setActivationPolicy(.regular)
         
@@ -155,6 +158,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        #if DEBUG
+        if DemoSettings.isActive { return .terminateNow }
+        #endif
         let transferViewModel = TransferViewModel.shared
         let quickCopy = QuickCopyCoordinator.shared
         let progress = transferViewModel.progress

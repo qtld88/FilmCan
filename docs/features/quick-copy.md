@@ -19,15 +19,17 @@ Each request opens its own window, so two selections run side by side.
 
 ## The setup window
 
-- **Copy From**: your selection, with its size. When folders are organized, each item has a **Camera / Sound** menu, pre-filled from the content (an item is Sound when most of its files are audio).
-- **Copy To**: one destination to start. Click **Add destination** for more. The source is read once and written to every destination.
-- **Preset**: pick **None** or one of your saved organization presets. With a preset, the window shows a one-line summary of its options. A preset set to *Ask each time* runs as *Skip*.
+The window is about 900 pt wide and has two columns: **Copy From** and **Settings** on the left, **Save To** on the right.
+
+- **Copy From**: your selection. Each row shows the full name and size, then the path. When folders are organized, each row also has a **Camera / Sound** switch (click either side to flip it), pre-filled from the content (an item is Sound when most of its files are audio), and an **x** to remove the source.
+- **Save To**: one destination to start. Click **Add destination** for more. The source is read once and written to every destination. Each destination shows a capacity bar (used, to copy, free, left to right) with a legend.
+- **Preset** (in **Settings**): pick **None** or one of your saved organization presets. With a preset, the window shows its options as chips (for example *Paranoid check*, *Skip existing files*, *Whole folder* or *Contents only*, *ASC MHL*); hover them for details. A preset set to *Ask each time* runs as *Skip*.
 - With **None**, the basic options are:
   - **Verification**: Fast (default), Paranoid or Off.
   - **If file exists**: Skip (default), Overwrite, Add counter or Verify using hash list.
   - **Copy**: the folder (default) or its contents only.
   - **Organization**: None, Date only, or Project + day.
-- **Organization** section (when organized): **Project** and **Day** (Day is optional), then a live preview of the folders that will be created on the first destination, new ones highlighted. The top folder and the Camera/Sound folder (`Camera_Media`, `Sound_Media`) have a pencil: click it to rename that folder in place for this copy; the arrow restores the preset's name.
+- **Organization** section (when organized): **Project** and **Day** (Day is optional), then a live preview of the folders that will be created, always fully expanded, new ones highlighted. One **Folders on every drive** tree is shown when all destinations get the same folders, otherwise one tree per drive. The top folder and the Camera/Sound folder (`Camera_Media`, `Sound_Media`) have a pencil: click it to rename that folder in place for this copy; the arrow restores the preset's name.
 - **Save as preset**: type a name to keep these settings as a preset. Leave it empty to skip. A picked date is never saved.
 
 Project and Day are cleaned before use: spaces and characters Netflix prohibits become `_`.
@@ -107,15 +109,17 @@ Chaque demande ouvre sa propre fenêtre : deux sélections tournent côte à cô
 
 ## La fenêtre de réglage
 
-- **Copy From** : votre sélection, avec sa taille. Quand les dossiers sont organisés, chaque élément a un menu **Camera / Sound**, pré-rempli selon le contenu (un élément est Sound quand la plupart de ses fichiers sont de l'audio).
-- **Copy To** : une destination au départ. **Add destination** en ajoute d'autres. La source est lue une seule fois et écrite sur chaque destination.
-- **Preset** : choisissez **None** ou l'un de vos présets d'organisation. Avec un préset, la fenêtre affiche un résumé de ses options. Un préset réglé sur *Ask each time* s'exécute en *Skip*.
+La fenêtre fait environ 900 pt de large sur deux colonnes : **Copy From** et **Settings** à gauche, **Save To** à droite.
+
+- **Copy From** : votre sélection. Chaque ligne affiche le nom complet et la taille, puis le chemin. Quand les dossiers sont organisés, chaque ligne a aussi un interrupteur **Camera / Sound** (cliquez sur l'un ou l'autre côté pour le basculer), pré-rempli selon le contenu (un élément est Sound quand la plupart de ses fichiers sont de l'audio), et un **x** pour retirer la source.
+- **Save To** : une destination au départ. **Add destination** en ajoute d'autres. La source est lue une seule fois et écrite sur chaque destination. Chaque destination affiche une barre de capacité (utilisé, à copier, libre, de gauche à droite) avec une légende.
+- **Preset** (dans **Settings**) : choisissez **None** ou l'un de vos présets d'organisation. Avec un préset, la fenêtre affiche ses options sous forme de pastilles (par ex. *Paranoid check*, *Skip existing files*, *Whole folder* ou *Contents only*, *ASC MHL*) ; survolez-les pour le détail. Un préset réglé sur *Ask each time* s'exécute en *Skip*.
 - Avec **None**, les options de base sont :
   - **Verification** : Fast (par défaut), Paranoid ou Off.
   - **If file exists** : Skip (par défaut), Overwrite, Add counter ou Verify using hash list.
   - **Copy** : le dossier (par défaut) ou son contenu seulement.
   - **Organization** : None, Date only ou Project + day.
-- Section **Organization** (si les dossiers sont organisés) : **Project** et **Day** (Day est facultatif), puis un aperçu en direct des dossiers qui seront créés sur la première destination, les nouveaux étant mis en évidence. Le dossier du haut et le dossier Camera/Sound (`Camera_Media`, `Sound_Media`) ont un crayon : cliquez dessus pour renommer ce dossier sur place pour cette copie ; la flèche rétablit le nom du preset.
+- Section **Organization** (si les dossiers sont organisés) : **Project** et **Day** (Day est facultatif), puis un aperçu en direct des dossiers qui seront créés, toujours entièrement dépliés, les nouveaux étant mis en évidence. Un seul arbre **Folders on every drive** s'affiche quand toutes les destinations reçoivent les mêmes dossiers, sinon un arbre par disque. Le dossier du haut et le dossier Camera/Sound (`Camera_Media`, `Sound_Media`) ont un crayon : cliquez dessus pour renommer ce dossier sur place pour cette copie ; la flèche rétablit le nom du preset.
 - **Save as preset** : saisissez un nom pour garder ces réglages comme préset. Laissez vide pour ne rien enregistrer. Une date choisie n'est jamais enregistrée.
 
 Project et Day sont nettoyés avant usage : les espaces et les caractères interdits par Netflix deviennent `_`.
@@ -195,15 +199,17 @@ Jede Anfrage öffnet ein eigenes Fenster, zwei Auswahlen laufen also nebeneinand
 
 ## Das Einrichtungsfenster
 
-- **Copy From**: Ihre Auswahl mit Größe. Bei organisierten Ordnern hat jedes Element ein Menü **Camera / Sound**, das nach dem Inhalt vorbelegt wird (ein Element ist Sound, wenn die meisten Dateien Audio sind).
-- **Copy To**: zunächst ein Ziel. **Add destination** fügt weitere hinzu. Die Quelle wird einmal gelesen und auf jedes Ziel geschrieben.
-- **Preset**: wählen Sie **None** oder eine Ihrer gespeicherten Organisationsvoreinstellungen. Mit einer Voreinstellung zeigt das Fenster eine einzeilige Zusammenfassung. Eine Voreinstellung auf *Ask each time* läuft als *Skip*.
+Das Fenster ist etwa 900 pt breit und hat zwei Spalten: **Copy From** und **Settings** links, **Save To** rechts.
+
+- **Copy From**: Ihre Auswahl. Jede Zeile zeigt den vollen Namen und die Größe, darunter den Pfad. Bei organisierten Ordnern hat jede Zeile außerdem einen **Camera / Sound**-Schalter (auf eine der beiden Seiten klicken, um umzuschalten), der nach dem Inhalt vorbelegt wird (ein Element ist Sound, wenn die meisten Dateien Audio sind), und ein **x** zum Entfernen der Quelle.
+- **Save To**: zunächst ein Ziel. **Add destination** fügt weitere hinzu. Die Quelle wird einmal gelesen und auf jedes Ziel geschrieben. Jedes Ziel zeigt einen Kapazitätsbalken (belegt, zu kopieren, frei, von links nach rechts) mit Legende.
+- **Preset** (unter **Settings**): wählen Sie **None** oder eine Ihrer gespeicherten Organisationsvoreinstellungen. Mit einer Voreinstellung zeigt das Fenster deren Optionen als Chips (z. B. *Paranoid check*, *Skip existing files*, *Whole folder* oder *Contents only*, *ASC MHL*); Details im Tooltip. Eine Voreinstellung auf *Ask each time* läuft als *Skip*.
 - Mit **None** gelten die Grundoptionen:
   - **Verification**: Fast (Standard), Paranoid oder Off.
   - **If file exists**: Skip (Standard), Overwrite, Add counter oder Verify using hash list.
   - **Copy**: der Ordner (Standard) oder nur sein Inhalt.
   - **Organization**: None, Date only oder Project + day.
-- Abschnitt **Organization** (bei organisierten Ordnern): **Project** und **Day** (Day ist optional), dann eine Live-Vorschau der Ordner, die auf dem ersten Ziel angelegt werden, neue hervorgehoben. Der oberste Ordner und der Camera/Sound-Ordner (`Camera_Media`, `Sound_Media`) haben einen Stift: Ein Klick benennt den Ordner direkt für diese Kopie um; der Pfeil stellt den Namen des Presets wieder her.
+- Abschnitt **Organization** (bei organisierten Ordnern): **Project** und **Day** (Day ist optional), dann eine Live-Vorschau der Ordner, die angelegt werden, immer vollständig aufgeklappt, neue hervorgehoben. Ein einziger Baum **Folders on every drive** erscheint, wenn alle Ziele dieselben Ordner erhalten, sonst ein Baum pro Laufwerk. Der oberste Ordner und der Camera/Sound-Ordner (`Camera_Media`, `Sound_Media`) haben einen Stift: Ein Klick benennt den Ordner direkt für diese Kopie um; der Pfeil stellt den Namen des Presets wieder her.
 - **Save as preset**: geben Sie einen Namen ein, um diese Einstellungen als Voreinstellung zu behalten. Leer lassen, um nichts zu speichern. Ein gewähltes Datum wird nie gespeichert.
 
 Project und Day werden vor der Verwendung bereinigt: Leerzeichen und von Netflix verbotene Zeichen werden zu `_`.
@@ -283,15 +289,17 @@ Cada solicitud abre su propia ventana, así que dos selecciones se ejecutan en p
 
 ## La ventana de configuración
 
-- **Copy From**: su selección, con su tamaño. Cuando las carpetas se organizan, cada elemento tiene un menú **Camera / Sound**, rellenado según el contenido (un elemento es Sound cuando la mayoría de sus archivos son de audio).
-- **Copy To**: un destino al principio. **Add destination** añade más. El origen se lee una vez y se escribe en cada destino.
-- **Preset**: elija **None** o uno de sus ajustes preestablecidos de organización. Con un preajuste, la ventana muestra un resumen de una línea de sus opciones. Un preajuste en *Ask each time* se ejecuta como *Skip*.
+La ventana mide unos 900 pt de ancho y tiene dos columnas: **Copy From** y **Settings** a la izquierda, **Save To** a la derecha.
+
+- **Copy From**: su selección. Cada fila muestra el nombre completo y el tamaño, y debajo la ruta. Cuando las carpetas se organizan, cada fila tiene además un interruptor **Camera / Sound** (haga clic en cualquiera de los dos lados para cambiarlo), rellenado según el contenido (un elemento es Sound cuando la mayoría de sus archivos son de audio), y una **x** para quitar el origen.
+- **Save To**: un destino al principio. **Add destination** añade más. El origen se lee una vez y se escribe en cada destino. Cada destino muestra una barra de capacidad (usado, por copiar, libre, de izquierda a derecha) con leyenda.
+- **Preset** (en **Settings**): elija **None** o uno de sus ajustes preestablecidos de organización. Con un preajuste, la ventana muestra sus opciones como etiquetas (p. ej. *Paranoid check*, *Skip existing files*, *Whole folder* o *Contents only*, *ASC MHL*); pase el cursor para ver el detalle. Un preajuste en *Ask each time* se ejecuta como *Skip*.
 - Con **None**, las opciones básicas son:
   - **Verification**: Fast (por defecto), Paranoid u Off.
   - **If file exists**: Skip (por defecto), Overwrite, Add counter o Verify using hash list.
   - **Copy**: la carpeta (por defecto) o solo su contenido.
   - **Organization**: None, Date only o Project + day.
-- Sección **Organization** (cuando se organiza): **Project** y **Day** (Day es opcional), luego una vista previa en directo de las carpetas que se crearán en el primer destino, con las nuevas resaltadas. La carpeta superior y la carpeta Camera/Sound (`Camera_Media`, `Sound_Media`) tienen un lápiz: haga clic para renombrarla en el sitio para esta copia; la flecha restaura el nombre del preset.
+- Sección **Organization** (cuando se organiza): **Project** y **Day** (Day es opcional), luego una vista previa en directo de las carpetas que se crearán, siempre desplegadas por completo, con las nuevas resaltadas. Se muestra un solo árbol **Folders on every drive** cuando todos los destinos reciben las mismas carpetas; si no, un árbol por unidad. La carpeta superior y la carpeta Camera/Sound (`Camera_Media`, `Sound_Media`) tienen un lápiz: haga clic para renombrarla en el sitio para esta copia; la flecha restaura el nombre del preset.
 - **Save as preset**: escriba un nombre para guardar estos ajustes como preajuste. Déjelo vacío para no guardar. Una fecha elegida nunca se guarda.
 
 Project y Day se limpian antes de usarse: los espacios y los caracteres que Netflix prohíbe pasan a `_`.

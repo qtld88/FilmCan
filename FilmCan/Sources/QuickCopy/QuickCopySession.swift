@@ -211,3 +211,19 @@ final class QuickCopySession: ObservableObject, Identifiable {
         }
     }
 }
+
+#if DEBUG
+extension QuickCopySession {
+    func applyDemo(_ settings: DemoSettings) {
+        form.destinations = settings.quickCopyDestinations.filter { FileManager.default.fileExists(atPath: $0) }
+        refreshCapacities()
+        guard settings.state != .setup else { return }
+        worker.applyDemoRun(configId: nil,
+                            sources: form.items.map(\.path),
+                            destinations: form.destinations,
+                            verifyMode: form.effectiveVerification,
+                            settings: settings)
+        phase = settings.state == .done ? .finished : .running
+    }
+}
+#endif
