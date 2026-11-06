@@ -12,6 +12,8 @@ The preset menu shows **(modified)** after the preset name when this movie's set
 
 ## Basic options
 
+![Options card with the Basic, Source, Destinations and Logs tabs](../../website/assets/docs/options-tabs.jpg)
+
 See [Copy Engines](./copy-engines.md) for engine behavior.
 
 - **Verification**: `Off`, `Fast`, or `Paranoid`. Default for new projects is
@@ -86,6 +88,8 @@ Le menu des présets affiche **(modified)** après le nom du préset quand les r
 ---
 
 ## Options de base
+
+![Carte Options avec les onglets Basic, Source, Destinations et Logs](../../website/assets/docs/options-tabs.jpg)
 
 Voir [Copy Engines](./copy-engines.md) pour le comportement du moteur.
 
@@ -162,6 +166,8 @@ Das Preset-Menü zeigt **(modified)** hinter dem Preset-Namen, wenn die Einstell
 
 ## Grundlegende Optionen
 
+![Optionen-Karte mit den Tabs Basic, Source, Destinations und Logs](../../website/assets/docs/options-tabs.jpg)
+
 Siehe [Copy Engines](./copy-engines.md) für das Engine-Verhalten.
 
 - **Verification** : `Off`, `Fast` oder `Paranoid`. Standard für neue Projekte ist
@@ -236,6 +242,8 @@ El menú de presets muestra **(modified)** tras el nombre del preset cuando los 
 ---
 
 ## Opciones básicas
+
+![Tarjeta de opciones con las pestañas Basic, Source, Destinations y Logs](../../website/assets/docs/options-tabs.jpg)
 
 Ver [Copy Engines](./copy-engines.md) para el comportamiento del motor.
 

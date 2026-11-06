@@ -19,6 +19,8 @@ Each request opens its own window, so two selections run side by side.
 
 ## The setup window
 
+![Quick Copy setup window](../../website/assets/docs/quick-copy-setup.jpg)
+
 The window is about 900 pt wide and has two columns: **Copy From** and **Settings** on the left, **Save To** on the right.
 
 - **Copy From**: your selection. Each row shows the full name and size, then the path. When folders are organized, each row also has a **Camera / Sound** switch (click either side to flip it), pre-filled from the content (an item is Sound when most of its files are audio), and an **x** to remove the source.
@@ -51,6 +53,8 @@ Each roll gets its own `ascmhl` folder, like a normal backup.
 ---
 
 ## Progress and result
+
+![Quick Copy finished](../../website/assets/docs/quick-copy-done.jpg)
 
 The setup window turns into the progress window. Each destination shows the copy bar (yellow) and the verify bar (green), speed, estimated time and the current file.
 
@@ -109,6 +113,8 @@ Chaque demande ouvre sa propre fenêtre : deux sélections tournent côte à cô
 
 ## La fenêtre de réglage
 
+![Fenêtre de réglage de Quick Copy](../../website/assets/docs/quick-copy-setup.jpg)
+
 La fenêtre fait environ 900 pt de large sur deux colonnes : **Copy From** et **Settings** à gauche, **Save To** à droite.
 
 - **Copy From** : votre sélection. Chaque ligne affiche le nom complet et la taille, puis le chemin. Quand les dossiers sont organisés, chaque ligne a aussi un interrupteur **Camera / Sound** (cliquez sur l'un ou l'autre côté pour le basculer), pré-rempli selon le contenu (un élément est Sound quand la plupart de ses fichiers sont de l'audio), et un **x** pour retirer la source.
@@ -141,6 +147,8 @@ Chaque roll reçoit son propre dossier `ascmhl`, comme dans un backup normal.
 ---
 
 ## Progression et résultat
+
+![Quick Copy terminée](../../website/assets/docs/quick-copy-done.jpg)
 
 La fenêtre de réglage devient la fenêtre de progression. Chaque destination affiche la barre de copie (jaune) et la barre de vérification (verte), la vitesse, le temps restant estimé et le fichier en cours.
 
@@ -199,6 +207,8 @@ Jede Anfrage öffnet ein eigenes Fenster, zwei Auswahlen laufen also nebeneinand
 
 ## Das Einrichtungsfenster
 
+![Quick-Copy-Einrichtungsfenster](../../website/assets/docs/quick-copy-setup.jpg)
+
 Das Fenster ist etwa 900 pt breit und hat zwei Spalten: **Copy From** und **Settings** links, **Save To** rechts.
 
 - **Copy From**: Ihre Auswahl. Jede Zeile zeigt den vollen Namen und die Größe, darunter den Pfad. Bei organisierten Ordnern hat jede Zeile außerdem einen **Camera / Sound**-Schalter (auf eine der beiden Seiten klicken, um umzuschalten), der nach dem Inhalt vorbelegt wird (ein Element ist Sound, wenn die meisten Dateien Audio sind), und ein **x** zum Entfernen der Quelle.
@@ -231,6 +241,8 @@ Jeder Roll erhält einen eigenen `ascmhl`-Ordner, wie bei einem normalen Backup.
 ---
 
 ## Fortschritt und Ergebnis
+
+![Quick Copy abgeschlossen](../../website/assets/docs/quick-copy-done.jpg)
 
 Das Einrichtungsfenster wird zum Fortschrittsfenster. Jedes Ziel zeigt den Kopierbalken (gelb) und den Verifizierungsbalken (grün), Geschwindigkeit, geschätzte Restzeit und die aktuelle Datei.
 
@@ -289,6 +301,8 @@ Cada solicitud abre su propia ventana, así que dos selecciones se ejecutan en p
 
 ## La ventana de configuración
 
+![Ventana de configuración de Quick Copy](../../website/assets/docs/quick-copy-setup.jpg)
+
 La ventana mide unos 900 pt de ancho y tiene dos columnas: **Copy From** y **Settings** a la izquierda, **Save To** a la derecha.
 
 - **Copy From**: su selección. Cada fila muestra el nombre completo y el tamaño, y debajo la ruta. Cuando las carpetas se organizan, cada fila tiene además un interruptor **Camera / Sound** (haga clic en cualquiera de los dos lados para cambiarlo), rellenado según el contenido (un elemento es Sound cuando la mayoría de sus archivos son de audio), y una **x** para quitar el origen.
@@ -321,6 +335,8 @@ Cada roll recibe su propia carpeta `ascmhl`, como en un backup normal.
 ---
 
 ## Progreso y resultado
+
+![Quick Copy terminada](../../website/assets/docs/quick-copy-done.jpg)
 
 La ventana de configuración se convierte en la ventana de progreso. Cada destino muestra la barra de copia (amarilla) y la barra de verificación (verde), la velocidad, el tiempo estimado y el archivo actual.
 

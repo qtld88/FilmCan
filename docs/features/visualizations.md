@@ -16,6 +16,8 @@ Real-time transfer status.
 
 ## During Transfer
 
+![Copy in progress: yellow copy bar, green verify bar](../../website/assets/docs/main-window-copying.jpg)
+
 - Progress bars per destination
 - Speed and estimated time
 - Current file
@@ -23,6 +25,8 @@ Real-time transfer status.
 ---
 
 ## Yellow vs Green Bars
+
+![Verification in progress](../../website/assets/docs/main-window-verifying.jpg)
 
 - **Yellow**: copy progress
 - **Green**: verification progress (drawn over the yellow bar) (may stay empty if verification is off)
@@ -59,6 +63,8 @@ Statut de transfert en temps réel.
 
 ## Pendant le transfert
 
+![Copie en cours : barre jaune de copie, barre verte de vérification](../../website/assets/docs/main-window-copying.jpg)
+
 - Barres de progression par destination
 - Vitesse et temps estimé
 - Fichier actuel
@@ -66,6 +72,8 @@ Statut de transfert en temps réel.
 ---
 
 ## Barres jaunes vs vertes
+
+![Vérification en cours](../../website/assets/docs/main-window-verifying.jpg)
 
 - **Jaune** : progression de la copie
 - **Vert** : progression de la vérification (par-dessus la barre jaune) (peut rester vide si la vérification est désactivée)
@@ -102,6 +110,8 @@ Echtzeitübertragungsstatus.
 
 ## Während Übertragung
 
+![Kopie läuft: gelber Kopierbalken, grüner Verifizierungsbalken](../../website/assets/docs/main-window-copying.jpg)
+
 - Fortschrittsbalken pro Ziel
 - Geschwindigkeit und geschätzte Zeit
 - Aktuelle Datei
@@ -109,6 +119,8 @@ Echtzeitübertragungsstatus.
 ---
 
 ## Gelbe vs. grüne Balken
+
+![Verifizierung läuft](../../website/assets/docs/main-window-verifying.jpg)
 
 - **Gelb** : Kopierfortschritt
 - **Grün** : Verifizierungsfortschritt (über dem gelben Balken) (kann leer bleiben, wenn Verifizierung aus ist)
@@ -145,6 +157,8 @@ Estado de transferencia en tiempo real.
 
 ## Durante la transferencia
 
+![Copia en curso: barra amarilla de copia, barra verde de verificación](../../website/assets/docs/main-window-copying.jpg)
+
 - Barras de progreso por destino
 - Velocidad y tiempo estimado
 - Archivo actual
@@ -152,6 +166,8 @@ Estado de transferencia en tiempo real.
 ---
 
 ## Barras amarillas vs verdes
+
+![Verificación en curso](../../website/assets/docs/main-window-verifying.jpg)
 
 - **Amarillo** : progreso de copia
 - **Verde** : progreso de verificación (sobre la barra amarilla) (puede permanecer vacío si la verificación está desactivada)

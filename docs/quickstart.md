@@ -7,6 +7,8 @@ Get your first backup running quickly.
 
 ## 1. Create a Backup
 
+![FilmCan main window, ready to copy](../website/assets/docs/main-window-ready.jpg)
+
 Click **+** in the top bar (or press `⌘N`)
 
 ---
@@ -91,6 +93,8 @@ Lancez votre premier backup rapidement.
 ---
 
 ## 1. Créer un backup
+
+![Fenêtre principale de FilmCan, prête à copier](../website/assets/docs/main-window-ready.jpg)
 
 Cliquez sur **+** dans la barre de titre (ou appuyez sur `⌘N`)
 
@@ -177,6 +181,8 @@ Starten Sie Ihren ersten backup schnell.
 
 ## 1. Ein Backup erstellen
 
+![FilmCan-Hauptfenster, bereit zum Kopieren](../website/assets/docs/main-window-ready.jpg)
+
 Klicken Sie auf **+** in der oberen Leiste (oder drücken Sie `⌘N`)
 
 ---
@@ -261,6 +267,8 @@ Ejecute su primer backup rápidamente.
 ---
 
 ## 1. Crear un backup
+
+![Ventana principal de FilmCan, lista para copiar](../website/assets/docs/main-window-ready.jpg)
 
 Haga clic en **+** en la barra superior (o presione `⌘N`)
 

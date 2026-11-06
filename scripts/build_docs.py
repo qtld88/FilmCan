@@ -128,7 +128,10 @@ def rewrite_links(html, src, loc):
             return f'href="{root}docs/{out_path(target)}{frag}"'
         return m.group(0)
 
-    return re.sub(r'href="([^"]+)"', repl, html)
+    html = re.sub(r'href="([^"]+)"', repl, html)
+    # Docs reference images relatively (../../website/assets/...) so they also render on
+    # GitHub; the site serves website/assets at /assets.
+    return re.sub(r'src="(?:\.\./)+website/assets/([^"]+)"', r'src="/assets/\1"', html)
 
 
 def switcher(src, loc):

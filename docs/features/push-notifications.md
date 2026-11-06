@@ -21,6 +21,8 @@ Get alerts when backups finish or fail.
 
 ## ntfy (Phone/Remote)
 
+![Settings › Push](../../website/assets/docs/settings-push.jpg)
+
 1. Create a free account at https://ntfy.sh (or use a self‑hosted ntfy) and install the app on your phone.
 2. Create a topic: e.g. `ntfy.sh/mymovie_backup`
 3. Paste the topic URL in the **Topic URL** field in FilmCan **Settings**
@@ -119,6 +121,8 @@ Recevez des alertes lorsque les backups se terminent ou échouent.
 ---
 
 ## ntfy (Téléphone/Distant)
+
+![Réglages › Push](../../website/assets/docs/settings-push.jpg)
 
 1. Créez un compte gratuit sur https://ntfy.sh (ou utilisez un ntfy auto-hébergé) et installez l'application sur votre téléphone.
 2. Créez un sujet : par ex. `ntfy.sh/mymovie_backup`
@@ -221,6 +225,8 @@ Erhalten Sie Benachrichtigungen, wenn Backups abgeschlossen sind oder fehlschlag
 
 ## ntfy (Telefon/Fern)
 
+![Einstellungen › Push](../../website/assets/docs/settings-push.jpg)
+
 1. Erstellen Sie ein kostenloses Konto unter https://ntfy.sh (oder verwenden Sie eine selbst gehostete ntfy) und installieren Sie die App auf Ihrem Telefon.
 2. Erstellen Sie ein Thema: z. B. `ntfy.sh/mymovie_backup`
 3. Fügen Sie die Thema-URL in das Feld **Topic URL** in FilmCan **Settings** ein
@@ -321,6 +327,8 @@ Reciba alertas cuando los backups se completen o fallen.
 ---
 
 ## ntfy (Teléfono/Remoto)
+
+![Ajustes › Push](../../website/assets/docs/settings-push.jpg)
 
 1. Cree una cuenta gratuita en https://ntfy.sh (o use un ntfy autoalojado) e instale la aplicación en su teléfono.
 2. Cree un tema: por ejemplo, `ntfy.sh/mymovie_backup`

@@ -28,6 +28,8 @@ drive chip means the drive is connected. A roll whose clip list was not recorded
 
 ## Search
 
+![Catalog in the right pane, searching for a clip](../../website/assets/docs/catalog-pane.jpg)
+
 Type a clip name (for example `C0042`) in the search field. Matching is case-insensitive on the
 file name. Each hit shows project, day, roll and the drives holding it, even if a drive is unplugged.
 Results are capped at 200.
