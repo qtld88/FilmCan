@@ -113,7 +113,6 @@ private struct QCSettingRow<Control: View>: View {
 
 struct QuickCopySetupView: View {
     @ObservedObject var session: QuickCopySession
-    @State private var treeExpanded = false
 
     private var totalBytes: Int64 {
         session.form.items.compactMap { session.sizes[$0.path] }.reduce(0, +)
@@ -209,10 +208,7 @@ struct QuickCopySetupView: View {
                                 .help(item.path)
                             Spacer(minLength: 4)
                             if session.form.showsMediaKind {
-                                Picker("", selection: $session.form.items[index].kind) {
-                                    ForEach(SourceMediaKind.allCases) { Text($0.displayName).tag($0) }
-                                }
-                                .labelsHidden().frame(width: 90)
+                                CameraSoundSwitch(kind: item.kind) { session.form.items[index].kind = $0 }
                             }
                             if session.form.items.count > 1 {
                                 Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
@@ -336,46 +332,23 @@ struct QuickCopySetupView: View {
 
     /// Folders the copy will create under `destination`. Renames are shared by every
     /// destination; only the first one opens an empty required name by itself.
-    @ViewBuilder
     private func folderTree(for destination: String, autoEdit: Bool) -> some View {
-        let lines = session.form.treePreview(for: destination)
-        let isHidden: (QuickCopyFormModel.TreeLine) -> Bool = { $0.depth >= 2 && !($0.isEditable && $0.name.isEmpty) }
-        let hiddenCount = lines.filter(isHidden).count
-        if !lines.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                if hiddenCount > 0 || treeExpanded {
-                    Button { treeExpanded.toggle() } label: {
-                        Label(treeExpanded ? "Show less" : "Show all (\(hiddenCount) more)",
-                              systemImage: treeExpanded ? "chevron.up" : "chevron.down")
-                            .font(FCType.meta)
-                    }
-                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
-                }
-                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                  if treeExpanded || !isHidden(line) {
-                    QCTreeRow(
-                        line: line,
-                        edited: session.form.isFolderNameEdited(root: line.isRoot, kind: line.mediaKind),
-                        autoEdit: autoEdit,
-                        copyContents: session.form.effectiveCopyFolderContents,
-                        copyModeEdited: session.form.copyFolderContentsOverride != nil,
-                        onSetCopyContents: { session.form.setCopyFolderContents($0) },
-                        onResetCopyMode: { session.form.copyFolderContentsOverride = nil },
-                        onRename: { session.form.setFolderName($0, root: line.isRoot, kind: line.mediaKind) },
-                        onReset: {
-                            if line.isRoot { session.form.rootFolderName = nil }
-                            else if let kind = line.mediaKind { session.form.mediaFolderNames[kind] = nil }
-                        })
-                    .padding(.leading, CGFloat(line.depth) * 16)
-                  }
-                }
-            }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 6).fill(FilmCanTheme.background.opacity(0.6)))
-        }
+        let form = session.form
+        return FolderTreePreview(
+            lines: form.treePreview(for: destination),
+            editing: FolderTreeEditing(
+                autoEdit: autoEdit,
+                copyContents: form.effectiveCopyFolderContents,
+                copyModeEdited: form.copyFolderContentsOverride != nil,
+                isEdited: { form.isFolderNameEdited(root: $0.isRoot, kind: $0.mediaKind) },
+                onSetCopyContents: { session.form.setCopyFolderContents($0) },
+                onResetCopyMode: { session.form.copyFolderContentsOverride = nil },
+                onRename: { line, name in session.form.setFolderName(name, root: line.isRoot, kind: line.mediaKind) },
+                onReset: { line in
+                    if line.isRoot { session.form.rootFolderName = nil }
+                    else if let kind = line.mediaKind { session.form.mediaFolderNames[kind] = nil }
+                }))
     }
-
 
     // Save as preset
     private var savePresetPanel: some View {
@@ -402,98 +375,6 @@ struct QuickCopySetupView: View {
                 .disabled(blocker != nil)
         }
         .padding(12)
-    }
-}
-
-/// One folder of the preview. Editable folders (top folder, Camera/Sound folder)
-/// are renamed in place; the text lives in local state so a focused field never
-/// writes back a stale suggestion.
-private struct QCTreeRow: View {
-    let line: QuickCopyFormModel.TreeLine
-    let edited: Bool
-    var autoEdit = true
-    var copyContents = false
-    var copyModeEdited = false
-    var onSetCopyContents: (Bool) -> Void = { _ in }
-    var onResetCopyMode: () -> Void = {}
-    let onRename: (String) -> Void
-    let onReset: () -> Void
-
-    @State private var editing = false
-    @State private var text = ""
-    @State private var original = ""
-    @FocusState private var focused: Bool
-
-    private var needsName: Bool { line.isEditable && line.name.isEmpty }
-
-    private var icon: String {
-        switch line.role {
-        case .folder: return "folder"
-        case .copiedFolder: return "folder.fill"
-        case .copiedFile: return "doc"
-        case .contents: return "doc.on.doc"
-        case .hashListOnly: return "number.square"
-        }
-    }
-    private var mono: Font { .system(size: 11, design: .monospaced) }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 10)).frame(width: 14)
-            if editing {
-                TextField(line.mediaKind.map { "\($0.displayName) folder name" } ?? "Folder name", text: $text)
-                    .font(mono)
-                    .textFieldStyle(.plain)
-                    .focused($focused)
-                    .padding(.horizontal, 4).padding(.vertical, 1)
-                    .frame(maxWidth: 260)
-                    .overlay(RoundedRectangle(cornerRadius: 4)
-                        .stroke(text.isEmpty ? FilmCanTheme.brandRed : FilmCanTheme.brandYellow, lineWidth: 1))
-                    .onChange(of: text) { onRename($0) }
-                    .onSubmit { if !text.isEmpty { editing = false } }
-                    .onExitCommand { text = original; editing = needsName }
-                    .onChange(of: focused) { if !$0, !text.isEmpty { editing = false } }
-            } else if line.togglesCopyMode {
-                Text(line.name).font(mono)
-                Button { onSetCopyContents(!copyContents) } label: {
-                    Image(systemName: "pencil").font(.system(size: 10))
-                }
-                .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
-                .help(copyContents ? "Copy the whole folder instead" : "Copy only its contents instead")
-                if copyModeEdited {
-                    Button(action: onResetCopyMode) {
-                        Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
-                    .help("Back to the preset's choice")
-                }
-            } else {
-                Text(line.name).font(mono)
-                if line.isEditable {
-                    Button(action: startEditing) {
-                        Image(systemName: "pencil").font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
-                    .help("Rename this folder")
-                    if edited {
-                        Button(action: onReset) {
-                            Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
-                        }
-                        .buttonStyle(.plain).foregroundColor(FilmCanTheme.textTertiary)
-                        .help("Back to the preset's name")
-                    }
-                }
-            }
-        }
-        .foregroundColor(line.isNew ? FilmCanTheme.brandYellow : FilmCanTheme.textSecondary)
-        .onAppear { if needsName && autoEdit { startEditing() } }
-    }
-
-    private func startEditing() {
-        original = line.name
-        text = line.name
-        editing = true
-        DispatchQueue.main.async { focused = true }
     }
 }
 

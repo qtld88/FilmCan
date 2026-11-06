@@ -214,48 +214,79 @@ extension BackupEditorView {
 
     private var optionsTabBar: some View {
         let isWide = effectiveOptionsWidth >= 600
-        let tabBinding = Binding<OptionsTab>(
-            get: { selectedOptionsTab },
-            set: { tab in
-                selectedOptionsTab = tab
-                if isOptionsCollapsed {
-                    withAnimation(.easeInOut(duration: 0.15)) { isOptionsCollapsed = false }
-                }
-            }
-        )
-        let picker = Picker("Options section", selection: tabBinding) {
-            ForEach(availableOptionsTabs) { tab in
-                Text(tab.shortTitle).tag(tab)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        let collapseButton = Button {
-            withAnimation(.easeInOut(duration: 0.15)) { isOptionsCollapsed.toggle() }
-        } label: {
-            Image(systemName: isOptionsCollapsed ? "chevron.down" : "chevron.up")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundColor(FilmCanTheme.textSecondary)
-        .help(isOptionsCollapsed ? "Show options" : "Hide options")
-        .accessibilityLabel(isOptionsCollapsed ? "Show options" : "Hide options")
         return Group {
             if isWide {
                 HStack(spacing: 8) {
-                    picker.frame(maxWidth: 420)
-                    collapseButton
+                    ForEach(availableOptionsTabs) { tab in
+                        let isSelected = selectedOptionsTab == tab
+                        Button {
+                            if isSelected {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    isOptionsCollapsed.toggle()
+                                }
+                            } else {
+                                selectedOptionsTab = tab
+                                if isOptionsCollapsed {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        isOptionsCollapsed = false
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(tab.shortTitle)
+                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
                     Spacer(minLength: 0)
                     presetSelector
                 }
                 .tourAnchor("optionsTabs")
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        picker
-                        collapseButton
+                    ForEach(availableOptionsTabs) { tab in
+                        let isSelected = selectedOptionsTab == tab
+                        Button {
+                            if isSelected {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    isOptionsCollapsed.toggle()
+                                }
+                            } else {
+                                selectedOptionsTab = tab
+                                if isOptionsCollapsed {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        isOptionsCollapsed = false
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(tab.shortTitle)
+                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
                     presetSelector
                 }

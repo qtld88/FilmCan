@@ -221,15 +221,7 @@ struct SourceListView: View {
     /// Picks which destination folder template the source uses (Camera vs Sound).
     private func mediaKindToggle(path: String, kind: SourceMediaKind,
                                  set: @escaping (String, SourceMediaKind) -> Void) -> some View {
-        Picker("Source type", selection: Binding(get: { kind }, set: { set(path, $0) })) {
-            Text("Camera").tag(SourceMediaKind.camera)
-            Text("Sound").tag(SourceMediaKind.sound)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 150)
-        .help(kind == .camera ? "Camera source — goes to the Camera folder."
-                              : "Sound source — goes to the Sound folder.")
+        CameraSoundSwitch(kind: kind) { set(path, $0) }
     }
 
     @ViewBuilder

@@ -156,15 +156,11 @@ struct QuickCopyFormModel {
     }
 
     private static func template(for kind: SourceMediaKind, in p: OrganizationPreset) -> String {
-        kind == .sound && !isBlank(p.soundFolderTemplate) ? p.soundFolderTemplate : p.folderTemplate
+        FolderTreeBuilder.template(for: kind, in: p)
     }
 
-    /// The `Camera_Media` / `Sound_Media` component, else the last one below the root.
     static func mediaComponentIndex(in template: String, kind: SourceMediaKind) -> Int? {
-        let parts = template.split(separator: "/")
-        let marker = kind == .sound ? "Sound_Media" : "Camera_Media"
-        if let index = parts.firstIndex(where: { $0 == marker }), index > 0 { return index }
-        return parts.count >= 2 ? parts.count - 1 : nil
+        FolderTreeBuilder.mediaComponentIndex(in: template, kind: kind)
     }
 
     static func replacingComponent(_ index: Int, of template: String, with name: String) -> String {
@@ -449,93 +445,34 @@ extension QuickCopyFormModel {
 
 extension QuickCopyFormModel {
 
-    struct TreeLine: Equatable {
-        let depth: Int
-        let name: String
-        let isNew: Bool
-        /// Set on the user-named Camera/Sound folder line (name "" = still to name).
-        var mediaKind: SourceMediaKind? = nil
-        var isRoot = false
-        var role: Role = .folder
-        var isEditable: Bool { isRoot || mediaKind != nil }
-        /// The copied folder itself, or its contents: the line that switches between both.
-        var togglesCopyMode: Bool { role == .copiedFolder || role == .contents }
+    typealias TreeLine = FolderTreeLine
 
-        enum Role: Equatable { case folder, copiedFolder, copiedFile, contents, hashListOnly }
+    private var treeSources: [FolderTreeBuilder.Source] {
+        items.map { FolderTreeBuilder.Source(path: $0.path, isDirectory: $0.isDirectory, kind: $0.kind) }
+    }
+
+    private var treeOptions: FolderTreeBuilder.Options {
+        var o = FolderTreeBuilder.Options()
+        o.preset = runPreset()
+        o.organizationActive = organizationActive
+        o.copyContents = effectiveCopyFolderContents
+        o.date = today
+        o.metadata = ShootMetadata(episode: sanitizedProject, day: sanitizedDay)
+        o.lacksMediaFolder = lacksMediaFolder
+        o.hasTypedMediaFolder = { mediaFolder(for: $0) != nil }
+        o.mediaIndexPreset = organizedPreset()
+        o.pathExists = pathExists
+        return o
     }
 
     /// Path of each item under `destination`, relative to it, resolved with the
-    /// SAME function the engine uses (`FanOutCopier.resolveDestFilePath`) so the
-    /// preview cannot drift from what is written.
+    /// SAME function the engine uses so the preview cannot drift from what is written.
     func relativePaths(for destination: String) -> [String] {
-        let preset = runPreset()
-        let metadata = ShootMetadata(episode: sanitizedProject, day: sanitizedDay)
-        let prefixes = [destination, (destination as NSString).resolvingSymlinksInPath]
-            .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
-        return items.map { item in
-            let full = FanOutCopier.resolveDestFilePath(
-                destRoot: destination, rootName: item.name, rootPath: item.path, relPath: "",
-                preset: preset, copyFolderContents: false,
-                date: today, metadata: metadata, mediaKind: item.kind)
-            guard let prefix = prefixes.first(where: { full.hasPrefix($0) }) else { return item.name }
-            return String(full.dropFirst(prefix.count))
-        }
+        FolderTreeBuilder.relativePaths(for: destination, sources: treeSources, options: treeOptions)
     }
 
-    /// What will be created under `destination`; `isNew` = does not exist yet.
     func treePreview(for destination: String) -> [TreeLine] {
-        var lines: [TreeLine] = []
-        var seen = Set<String>()
-        for (item, rel) in zip(items, relativePaths(for: destination)) {
-            var components = rel.split(separator: "/").map(String.init)
-            var rollName: String?
-            if effectiveCopyFolderContents && item.isDirectory {
-                // Contents land flat in the parent; the roll folder is still created
-                // beside them, holding only the hash list (`ascmhl/`, `.filmcan/`).
-                rollName = components.popLast()
-            }
-            var mediaIndex: Int?
-            if lacksMediaFolder {
-                let end = rollName != nil ? components.count : components.count - 1
-                if mediaFolder(for: item.kind) == nil {
-                    components.insert("", at: max(end, 0))
-                    mediaIndex = max(end, 0)
-                } else {
-                    mediaIndex = end - 1
-                }
-            } else if organizationActive, let p = organizedPreset() {
-                let folderCount = rollName != nil ? components.count : components.count - 1
-                mediaIndex = Self.mediaComponentIndex(in: Self.template(for: item.kind, in: p), kind: item.kind)
-                    .flatMap { $0 < folderCount ? $0 : nil }
-            }
-            var cumulative = destination
-            for (depth, component) in components.enumerated() {
-                let isMedia = depth == mediaIndex
-                if component.isEmpty {
-                    if seen.insert(cumulative + "/\u{0}\(item.kind.rawValue)").inserted {
-                        lines.append(TreeLine(depth: depth, name: "", isNew: true, mediaKind: item.kind))
-                    }
-                    continue
-                }
-                cumulative = (cumulative as NSString).appendingPathComponent(component)
-                if seen.insert(cumulative).inserted {
-                    let isItem = rollName == nil && depth == components.count - 1
-                    let isRoot = organizationActive && depth == 0 && !isItem
-                    let role: TreeLine.Role = isItem ? (item.isDirectory ? .copiedFolder : .copiedFile) : .folder
-                    lines.append(TreeLine(depth: depth, name: component, isNew: !pathExists(cumulative),
-                                          mediaKind: isMedia && !isRoot && !isItem ? item.kind : nil,
-                                          isRoot: isRoot, role: role))
-                }
-            }
-            if let rollName {
-                let rollPath = (cumulative as NSString).appendingPathComponent(rollName)
-                lines.append(TreeLine(depth: components.count, name: "contents of \(item.name)", isNew: true,
-                                      role: .contents))
-                lines.append(TreeLine(depth: components.count, name: "\(rollName) (hash list only)",
-                                      isNew: !pathExists(rollPath), role: .hashListOnly))
-            }
-        }
-        return lines
+        FolderTreeBuilder.lines(for: destination, sources: treeSources, options: treeOptions)
     }
 
     func copyFolders(for destination: String) -> [String] {

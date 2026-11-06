@@ -3,7 +3,6 @@ import SwiftUI
 struct BasicOptionsView: View {
     @ObservedObject var viewModel: BackupEditorViewModel
     let availableWidth: CGFloat
-    @AppStorage("basicOptionsAdvancedExpanded") private var advancedExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -73,6 +72,53 @@ struct BasicOptionsView: View {
             }
 
             hashListStyleRow
+
+            optionsRow(
+                icon: "checkmark.shield",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Re-verify on resume",
+                subtitle: "",
+                isOn: $viewModel.reVerifyExistingOnResume,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: InfoPopoverContent(
+                    title: "Re-verify existing files on resume",
+                    description: "When resuming a backup, re-read and hash each already-copied source file to confirm it hasn't changed since the last run.",
+                    options: [
+                        .init("Off (trust size)",
+                              good: ["Fast resume — skips based on file size match"],
+                              bad: ["Won't catch same-size content changes"]),
+                        .init("On (re-hash source)",
+                              good: ["Detects same-size file replacements cryptographically"],
+                              bad: ["Slower — re-reads every already-backed-up file"])
+                    ],
+                    notes: ["Use when card contents may have been silently corrupted or replaced with same-size data."]
+                ),
+                availableWidth: availableWidth
+            )
+
+            optionsRow(
+                icon: "arrow.triangle.2.circlepath",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Force re-copy",
+                subtitle: "",
+                isOn: $viewModel.forceRecopy,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: InfoPopoverContent(
+                    title: "Force re-copy",
+                    description: "Whether a re-run copies files that are already backed up.",
+                    options: [
+                        .init("Off (resume skip)",
+                              good: ["Skips files already in every destination's hash list and still present",
+                                     "Fast re-runs — only new/changed files are copied"],
+                              bad: ["A file deleted from a destination is re-copied (presence is checked)"]),
+                        .init("On (force re-copy)",
+                              good: ["Re-copies every file — guarantees a fresh copy"],
+                              bad: ["Slower — ignores the hash list entirely"])
+                    ],
+                    notes: ["With a {date} folder template, resuming on a different day re-copies into that day's folder (earlier files aren't matched)."]
+                ),
+                availableWidth: availableWidth
+            )
 
             HStack(spacing: OptionsLayout.spacing) {
                 Image(systemName: "doc.on.doc")
@@ -159,164 +205,112 @@ struct BasicOptionsView: View {
                 }
             }
 
-            DisclosureGroup("Advanced", isExpanded: $advancedExpanded) {
-                VStack(alignment: .leading, spacing: 12) {
-                    let copyModeInfo = InfoPopoverContent(
-                        title: "Copy mode",
-                        description: "How FilmCan writes to multiple destinations.",
-                        options: [
-                            .init("Automatic",
-                                  good: ["Parallel for SSDs, sequential for hard drives / shared buses",
-                                         "Sensible default — no need to think about it"]),
-                            .init("All destinations at once (parallel)",
-                                  good: ["Reads the source once, writes everywhere together",
-                                         "Fastest with multiple SSDs"],
-                                  bad: ["More bandwidth and disk activity",
-                                        "Can thrash if destinations share one drive/bus"]),
-                            .init("One destination at a time (sequential)",
-                                  good: ["Gentler on shared buses and hard drives"],
-                                  bad: ["Re-reads the source for each destination",
-                                        "Slower total time with multiple destinations"])
-                        ],
-                        notes: ["With one destination this setting has no effect."]
-                    )
+            let copyModeInfo = InfoPopoverContent(
+                title: "Copy mode",
+                description: "How FilmCan writes to multiple destinations.",
+                options: [
+                    .init("Automatic",
+                          good: ["Parallel for SSDs, sequential for hard drives / shared buses",
+                                 "Sensible default — no need to think about it"]),
+                    .init("All destinations at once (parallel)",
+                          good: ["Reads the source once, writes everywhere together",
+                                 "Fastest with multiple SSDs"],
+                          bad: ["More bandwidth and disk activity",
+                                "Can thrash if destinations share one drive/bus"]),
+                    .init("One destination at a time (sequential)",
+                          good: ["Gentler on shared buses and hard drives"],
+                          bad: ["Re-reads the source for each destination",
+                                "Slower total time with multiple destinations"])
+                ],
+                notes: ["With one destination this setting has no effect."]
+            )
 
-                    HStack(spacing: OptionsLayout.spacing) {
-                        Image(systemName: "square.stack.3d.down.right")
-                            .font(.title3)
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                            .frame(width: OptionsLayout.iconWidth)
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text("Copy mode")
-                                    .font(FCType.itemTitle)
-                                    .foregroundColor(FilmCanTheme.textPrimary)
-                                InfoPopoverButton(content: copyModeInfo)
-                            }
-                        }
-                        .frame(width: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), alignment: .leading)
-                        Menu {
-                            ForEach(DestinationCopyMode.allCases) { mode in
-                                Button(action: { viewModel.destinationCopyMode = mode }) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(mode.displayName)
-                                        Text(mode.description)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(viewModel.destinationCopyMode.displayName)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(FilmCanTheme.card)
-                            .cornerRadius(6)
-                            .frame(width: optionsResolvedMenuWidth(OptionsLayout.menuWidth + 100, textWidth: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), availableWidth: availableWidth), alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
+            HStack(spacing: OptionsLayout.spacing) {
+                Image(systemName: "square.stack.3d.down.right")
+                    .font(.title3)
+                    .foregroundColor(FilmCanTheme.textSecondary)
+                    .frame(width: OptionsLayout.iconWidth)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Copy mode")
+                            .font(FCType.itemTitle)
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                        InfoPopoverButton(content: copyModeInfo)
                     }
-
-                    let fileOrderInfo = InfoPopoverContent(
-                        title: "Copy order",
-                        description: "The order FilmCan copies files in.",
-                        options: [
-                            .init("Default", good: ["Preserves the filesystem order"]),
-                            .init("Smallest first",
-                                  good: ["Can speed up cards with lots of tiny files"],
-                                  bad: ["May not help on all drives"]),
-                            .init("Largest first",
-                                  good: ["Can stabilize throughput on big files"]),
-                            .init("Creation date",
-                                  good: ["Keeps footage order consistent"])
-                        ]
-                    )
-
-                    HStack(spacing: OptionsLayout.spacing) {
-                        Image(systemName: "arrow.up.arrow.down.circle")
-                            .font(.title3)
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                            .frame(width: OptionsLayout.iconWidth)
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text("Copy order")
-                                    .font(FCType.itemTitle)
-                                    .foregroundColor(FilmCanTheme.textPrimary)
-                                InfoPopoverButton(content: fileOrderInfo)
-                            }
-                        }
-                        .frame(width: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), alignment: .leading)
-                        Menu {
-                            ForEach(FileOrdering.allCases) { ordering in
-                                Button(ordering.displayName) { viewModel.engineOptions.fileOrdering = ordering }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(viewModel.engineOptions.fileOrdering.displayName)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(FilmCanTheme.card)
-                            .cornerRadius(6)
-                            .frame(width: optionsResolvedMenuWidth(OptionsLayout.menuWidth + 100, textWidth: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), availableWidth: availableWidth), alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    optionsRow(
-                        icon: "checkmark.shield",
-                        iconColor: FilmCanTheme.textSecondary,
-                        title: "Re-verify on resume",
-                        subtitle: "",
-                        isOn: $viewModel.reVerifyExistingOnResume,
-                        textWidth: OptionsLayout.basicTextWidth,
-                        info: InfoPopoverContent(
-                            title: "Re-verify existing files on resume",
-                            description: "When resuming a backup, re-read and hash each already-copied source file to confirm it hasn't changed since the last run.",
-                            options: [
-                                .init("Off (trust size)",
-                                      good: ["Fast resume — skips based on file size match"],
-                                      bad: ["Won't catch same-size content changes"]),
-                                .init("On (re-hash source)",
-                                      good: ["Detects same-size file replacements cryptographically"],
-                                      bad: ["Slower — re-reads every already-backed-up file"])
-                            ],
-                            notes: ["Use when card contents may have been silently corrupted or replaced with same-size data."]
-                        ),
-                        availableWidth: availableWidth
-                    )
-
-                    optionsRow(
-                        icon: "arrow.triangle.2.circlepath",
-                        iconColor: FilmCanTheme.textSecondary,
-                        title: "Force re-copy",
-                        subtitle: "",
-                        isOn: $viewModel.forceRecopy,
-                        textWidth: OptionsLayout.basicTextWidth,
-                        info: InfoPopoverContent(
-                            title: "Force re-copy",
-                            description: "Whether a re-run copies files that are already backed up.",
-                            options: [
-                                .init("Off (resume skip)",
-                                      good: ["Skips files already in every destination's hash list and still present",
-                                             "Fast re-runs — only new/changed files are copied"],
-                                      bad: ["A file deleted from a destination is re-copied (presence is checked)"]),
-                                .init("On (force re-copy)",
-                                      good: ["Re-copies every file — guarantees a fresh copy"],
-                                      bad: ["Slower — ignores the hash list entirely"])
-                            ],
-                            notes: ["With a {date} folder template, resuming on a different day re-copies into that day's folder (earlier files aren't matched)."]
-                        ),
-                        availableWidth: availableWidth
-                    )
                 }
-                .padding(.top, 8)
+                .frame(width: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), alignment: .leading)
+                Menu {
+                    ForEach(DestinationCopyMode.allCases) { mode in
+                        Button(action: { viewModel.destinationCopyMode = mode }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.displayName)
+                                Text(mode.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(viewModel.destinationCopyMode.displayName)
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(FilmCanTheme.card)
+                    .cornerRadius(6)
+                    .frame(width: optionsResolvedMenuWidth(OptionsLayout.menuWidth + 100, textWidth: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), availableWidth: availableWidth), alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
+
+            let fileOrderInfo = InfoPopoverContent(
+                title: "Copy order",
+                description: "The order FilmCan copies files in.",
+                options: [
+                    .init("Default", good: ["Preserves the filesystem order"]),
+                    .init("Smallest first",
+                          good: ["Can speed up cards with lots of tiny files"],
+                          bad: ["May not help on all drives"]),
+                    .init("Largest first",
+                          good: ["Can stabilize throughput on big files"]),
+                    .init("Creation date",
+                          good: ["Keeps footage order consistent"])
+                ]
+            )
+
+            HStack(spacing: OptionsLayout.spacing) {
+                Image(systemName: "arrow.up.arrow.down.circle")
+                    .font(.title3)
+                    .foregroundColor(FilmCanTheme.textSecondary)
+                    .frame(width: OptionsLayout.iconWidth)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Copy order")
+                            .font(FCType.itemTitle)
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                        InfoPopoverButton(content: fileOrderInfo)
+                    }
+                }
+                .frame(width: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), alignment: .leading)
+                Menu {
+                    ForEach(FileOrdering.allCases) { ordering in
+                        Button(ordering.displayName) { viewModel.engineOptions.fileOrdering = ordering }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(viewModel.engineOptions.fileOrdering.displayName)
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(FilmCanTheme.card)
+                    .cornerRadius(6)
+                    .frame(width: optionsResolvedMenuWidth(OptionsLayout.menuWidth + 100, textWidth: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), availableWidth: availableWidth), alignment: .leading)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

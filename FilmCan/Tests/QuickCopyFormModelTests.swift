@@ -352,7 +352,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(lines.map(\.name), ["A001"])
     }
 
-    func test_treePreview_copyContents_showsFlatContentsAndHashListFolder() {
+    func test_treePreview_copyContents_showsFlatContentsOnly() {
         var form = QuickCopyFormModel(items: [dir("A001")])
         form.copyFolderContents = true
         form.organization = .dateOnly
@@ -360,14 +360,9 @@ final class QuickCopyFormModelTests: XCTestCase {
         form.pathExists = { _ in false }
         let lines = form.treePreview(for: "/Volumes/SSD")
         XCTAssertEqual(lines.map(\.name), [
-            "20261014", "Camera_Media", "contents of A001", "A001 (hash list only)"])
-        XCTAssertEqual(lines.map(\.depth), [0, 1, 2, 2])
+            "20261014", "Camera_Media", "contents of A001"])
+        XCTAssertEqual(lines.map(\.depth), [0, 1, 2])
         XCTAssertTrue(lines.allSatisfy(\.isNew))
-
-        form.pathExists = { $0 == "/Volumes/SSD/20261014/Camera_Media/A001" }
-        let existing = form.treePreview(for: "/Volumes/SSD")
-        XCTAssertTrue(existing[2].isNew)
-        XCTAssertFalse(existing[3].isNew)
     }
 
     func test_revealPath_isTopCreatedFolder() {
@@ -562,7 +557,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(form.copyFolderContentsOverride, false)
         let lines = form.treePreview(for: "/Volumes/SSD")
         XCTAssertEqual(lines.last?.role, .copiedFolder)
-        XCTAssertFalse(lines.contains { $0.role == .contents || $0.role == .hashListOnly })
+        XCTAssertFalse(lines.contains { $0.role == .contents })
         XCTAssertFalse(form.makeConfiguration().copyFolderContents)
         XCTAssertTrue(form.savedPresets[0].copyFolderContents)
 

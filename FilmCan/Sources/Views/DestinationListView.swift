@@ -74,6 +74,15 @@ struct DestinationListView: View {
                     }
                     .buttonStyle(.borderless)
                 }
+
+                if sharedTree, let first = treeDestinations.first {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Folders on every drive")
+                            .font(FCType.metaStrong)
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                        FolderTreePreview(lines: treeLines(for: first))
+                    }
+                }
                 
                 if let footerView {
                     footerView
@@ -268,9 +277,6 @@ struct DestinationListView: View {
             progress: progress
         )
         let rootLabel = destinationRootLabel(destination.path)
-        let pathDetail = displayPaths
-            .map { $0.source.isEmpty ? $0.path : "\(sourceLabel($0.source)) → \($0.path)" }
-            .joined(separator: "\n")
         let isFanOutActive = !progress.perDestProgress.isEmpty
         let showProgress = presentation.shouldShowInfo && !isFanOutActive
         let status = presentation.status
@@ -287,12 +293,15 @@ struct DestinationListView: View {
                             .foregroundColor(FilmCanTheme.textPrimary)
                             .lineLimit(1)
                     }
-                    Text("→ \(rootLabel)")
-                        .font(FCType.meta)
-                        .foregroundColor(FilmCanTheme.textTertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(pathDetail)
+                    if treeSources.isEmpty {
+                        Text("→ \(rootLabel)")
+                            .font(FCType.meta)
+                            .foregroundColor(FilmCanTheme.textTertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else if !sharedTree, isIncluded(destination.path) {
+                        FolderTreePreview(lines: treeLines(for: destination.path))
+                    }
                     ForEach(displayPaths) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             if showProgress {
@@ -414,6 +423,45 @@ struct DestinationListView: View {
         )
     }
 
+    private var treeSources: [FolderTreeBuilder.Source] {
+        sourcePaths.map { path in
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path))
+        }
+    }
+
+    private var treeOptions: FolderTreeBuilder.Options {
+        var o = FolderTreeBuilder.Options()
+        o.preset = organizationPreset
+        o.organizationActive = organizationPreset.map {
+            $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
+        } ?? false
+        o.copyContents = copyFolderContents
+        o.date = previewDate
+        o.metadata = shootMetadata
+        o.mediaIndexPreset = organizationPreset
+        return o
+    }
+
+    private func treeLines(for destination: String) -> [FolderTreeLine] {
+        FolderTreeBuilder.lines(for: destination, sources: treeSources, options: treeOptions)
+    }
+
+    /// Destinations that will receive the copy (unchecked drives get none).
+    private var treeDestinations: [String] {
+        let included = destinations.filter(isIncluded)
+        return included.isEmpty ? destinations : included
+    }
+
+    /// One tree stands for every destination unless they would differ (a folder that
+    /// exists on one drive only changes the "new" highlight).
+    private var sharedTree: Bool {
+        guard !treeSources.isEmpty, let first = treeDestinations.first else { return false }
+        let reference = treeLines(for: first)
+        return treeDestinations.dropFirst().allSatisfy { treeLines(for: $0) == reference }
+    }
+
     private func destinationRootLabel(_ path: String) -> String {
         let trimmed = displayPath(path).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return trimmed.isEmpty ? "/" : trimmed + "/"
@@ -449,10 +497,6 @@ struct DestinationListView: View {
             paths.append(DestinationDisplayPath(id: id, source: source, path: display))
         }
         return paths
-    }
-
-    private func sourceLabel(_ source: String) -> String {
-        (source as NSString).lastPathComponent
     }
 
     private func resolveDestinationPath(
