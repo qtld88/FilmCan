@@ -48,7 +48,7 @@ struct LogsOptionsView: View {
                 .frame(width: 32)
             HStack(spacing: 6) {
                 Text("PDF report with thumbnails")
-                    .font(FilmCanFont.label(13))
+                    .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 InfoPopoverButton(content: reportInfo)
             }

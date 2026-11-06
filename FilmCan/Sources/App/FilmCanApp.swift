@@ -55,9 +55,13 @@ struct FilmCanApp: App {
 
             CommandGroup(after: .windowArrangement) {
                 Button("Catalog") {
-                    CatalogWindowController.shared.show()
+                    NotificationCenter.default.post(name: .filmCanShowCatalogPane, object: nil)
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
+
+                Button("Open Catalog in Window") {
+                    CatalogWindowController.shared.show()
+                }
             }
 
             CommandGroup(after: .appInfo) {

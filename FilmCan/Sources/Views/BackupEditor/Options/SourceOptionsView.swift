@@ -38,7 +38,7 @@ struct SourceOptionsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Text("Camera drive and folder names to detect")
-                            .font(FilmCanFont.label(13))
+                            .font(FCType.itemTitle)
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(
                             content: InfoPopoverContent(
@@ -86,7 +86,7 @@ struct SourceOptionsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Text("Sound drive and folder names to detect")
-                            .font(FilmCanFont.label(13))
+                            .font(FCType.itemTitle)
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(
                             content: InfoPopoverContent(
@@ -360,12 +360,12 @@ private struct CardsAndRollsSection: View {
                     }
                     Toggle("ARRI and RED keep their reel name", isOn: $viewModel.rollNumbering.keepCameraReelNames)
                     Text(viewModel.nextRollSummary)
-                        .font(FilmCanFont.body(11))
+                        .font(FCType.meta)
                         .foregroundColor(FilmCanTheme.textSecondary)
                     Button("Reset numbering…") { showResetAlert = true }
                         .buttonStyle(.bordered)
                 }
-                .font(FilmCanFont.body(12))
+                .font(FCType.body)
                 .padding(.leading, indent)
                 .alert("Reset numbering?", isPresented: $showResetAlert) {
                     Button("Reset", role: .destructive) { viewModel.resetRollNumbering() }
@@ -391,7 +391,7 @@ private struct CardsAndRollsSection: View {
 
             if viewModel.dayAutoAdvance {
                 Text("Today: \(viewModel.shootDayToday.isEmpty ? "Day01" : viewModel.shootDayToday)")
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .padding(.leading, indent)
             }

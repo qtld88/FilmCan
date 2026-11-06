@@ -35,7 +35,7 @@ struct SourceListView: View {
         VStack(alignment: .leading, spacing: 8) {
             if showsTitle {
                 Text("Copy From")
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
             
@@ -58,7 +58,7 @@ struct SourceListView: View {
                             Image(systemName: "plus.circle.fill")
                                 .foregroundColor(FilmCanTheme.brandYellow)
                             Text("Add more files or folders")
-                                .font(FilmCanFont.body(12))
+                                .font(FCType.body)
                         }
                     }
                     .buttonStyle(.borderless)
@@ -100,10 +100,10 @@ struct SourceListView: View {
             
             VStack(spacing: 4) {
                 Text("Drop files or folders here")
-                    .font(FilmCanFont.label(16))
+                    .font(FCType.cardTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Text("or")
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
             
@@ -138,11 +138,11 @@ struct SourceListView: View {
                                 .foregroundColor(FilmCanTheme.textSecondary)
                                 .frame(width: 18)
                             Text(summary.name)
-                                .font(FilmCanFont.body(11))
+                                .font(FCType.meta)
                                 .foregroundColor(FilmCanTheme.textSecondary)
                             if !driveIncluded {
                                 Text("Skipped")
-                                    .font(FilmCanFont.body(10))
+                                    .font(FCType.meta)
                                     .foregroundColor(FilmCanTheme.textTertiary)
                             }
                             Spacer()
@@ -174,7 +174,7 @@ struct SourceListView: View {
                                     sourceRow(source: source, isExternal: summary.isExternal)
                                 }
                                 Text(summary.connectionMessage)
-                                    .font(FilmCanFont.body(10))
+                                    .font(FCType.meta)
                                     .foregroundColor(FilmCanTheme.brandRed)
                             }
                             .padding(.leading, 26)
@@ -218,41 +218,18 @@ struct SourceListView: View {
         }
     }
 
-    /// Discreet two-position Camera/Sound switch: the active side is filled. Picks which
-    /// destination folder template the source uses.
+    /// Picks which destination folder template the source uses (Camera vs Sound).
     private func mediaKindToggle(path: String, kind: SourceMediaKind,
                                  set: @escaping (String, SourceMediaKind) -> Void) -> some View {
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(FilmCanTheme.textPrimary)
-                .frame(width: 22, height: 15)
-                .offset(x: kind == .camera ? 0 : 22)
-            HStack(spacing: 0) {
-            mediaKindSegment(.camera, icon: "video.fill", current: kind) { set(path, kind == .camera ? .sound : .camera) }
-            mediaKindSegment(.sound, icon: "speaker.wave.2.fill", current: kind) { set(path, kind == .camera ? .sound : .camera) }
-            }
+        Picker("Source type", selection: Binding(get: { kind }, set: { set(path, $0) })) {
+            Text("Camera").tag(SourceMediaKind.camera)
+            Text("Sound").tag(SourceMediaKind.sound)
         }
-        .padding(2)
-        .background(Capsule().fill(FilmCanTheme.card))
-        .overlay(Capsule().stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1))
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: kind)
-        .help(kind == .camera ? "Camera source — goes to the Camera folder. Click to switch to Sound."
-                              : "Sound source — goes to the Sound folder. Click to switch to Camera.")
-    }
-
-    private func mediaKindSegment(_ segment: SourceMediaKind, icon: String, current: SourceMediaKind,
-                                  action: @escaping () -> Void) -> some View {
-        let isOn = segment == current
-        return Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(isOn ? FilmCanTheme.background : FilmCanTheme.textTertiary)
-                .frame(width: 22, height: 15)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(segment == .camera ? "Camera" : "Sound")
-        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 150)
+        .help(kind == .camera ? "Camera source — goes to the Camera folder."
+                              : "Sound source — goes to the Sound folder.")
     }
 
     @ViewBuilder
@@ -263,7 +240,7 @@ struct SourceListView: View {
             HStack(spacing: 6) {
                 if let signature {
                     Text("\(signature.brand.displayName) card")
-                        .font(FilmCanFont.body(10))
+                        .font(FCType.meta)
                         .foregroundColor(FilmCanTheme.textPrimary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
@@ -271,7 +248,7 @@ struct SourceListView: View {
                 }
                 if let preview {
                     Text("→ \(preview)")
-                        .font(FilmCanFont.body(11))
+                        .font(FCType.meta)
                         .foregroundColor(FilmCanTheme.textSecondary)
                 }
             }
@@ -296,7 +273,7 @@ struct SourceListView: View {
             
             VStack(alignment: .leading, spacing: 3) {
                 Text(metadata.name)
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .lineLimit(1)
 
@@ -305,11 +282,11 @@ struct SourceListView: View {
                 HStack(spacing: 8) {
                     if let size = metadata.formattedSize {
                         Text(size)
-                            .font(FilmCanFont.body(11))
+                            .font(FCType.meta)
                             .foregroundColor(FilmCanTheme.textSecondary)
                     } else if isLoading {
                         Text("--")
-                            .font(FilmCanFont.body(11))
+                            .font(FCType.meta)
                             .foregroundColor(FilmCanTheme.textSecondary)
                     }
                     if metadata.isDirectory {
@@ -317,20 +294,20 @@ struct SourceListView: View {
                             Text("•")
                                 .foregroundColor(FilmCanTheme.textSecondary)
                             Text("\(count) items")
-                                .font(FilmCanFont.body(11))
+                                .font(FCType.meta)
                                 .foregroundColor(FilmCanTheme.textSecondary)
                         } else if isLoading {
                             Text("•")
                                 .foregroundColor(FilmCanTheme.textSecondary)
                             Text("-- items")
-                                .font(FilmCanFont.body(11))
+                                .font(FCType.meta)
                                 .foregroundColor(FilmCanTheme.textSecondary)
                         }
                     }
                 }
                 
                 Text(source.path)
-                    .font(FilmCanFont.body(10))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textTertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -611,7 +588,7 @@ struct SourceListView: View {
 
         var body: some View {
             content
-                .font(FilmCanFont.body(11))
+                .font(FCType.meta)
                 .task(id: sourcePath) {
                     state = await CardSealService.evaluate(source: URL(fileURLWithPath: sourcePath))
                 }

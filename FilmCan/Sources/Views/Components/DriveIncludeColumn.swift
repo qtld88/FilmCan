@@ -19,7 +19,7 @@ struct DriveIncludeColumn: View {
                                      : "Skipped — check to include this drive in the backup")
             }
             Text(number.map(String.init) ?? "")
-                .font(FilmCanFont.label(11))
+                .font(FCType.metaStrong)
                 .foregroundColor(FilmCanTheme.textSecondary)
                 .frame(width: 14)
         }

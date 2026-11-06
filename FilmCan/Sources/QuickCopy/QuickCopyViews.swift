@@ -55,7 +55,7 @@ private struct QCChipFlow: View {
         QCWrapLayout(spacing: 6) {
             ForEach(chips, id: \.self) { chip in
                 Text(chip)
-                    .font(FilmCanFont.label(11))
+                    .font(FCType.metaStrong)
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Capsule().fill(FilmCanTheme.background.opacity(0.7)))
@@ -102,7 +102,7 @@ private struct QCSettingRow<Control: View>: View {
 
     var body: some View {
         HStack {
-            Text(label).font(FilmCanFont.body(12)).foregroundColor(FilmCanTheme.textSecondary)
+            Text(label).font(FCType.body).foregroundColor(FilmCanTheme.textSecondary)
             Spacer()
             control.labelsHidden().frame(maxWidth: 220, alignment: .trailing)
         }
@@ -134,7 +134,7 @@ struct QuickCopySetupView: View {
             }
             if info.notEnoughSpace {
                 Label("Not enough space", systemImage: "exclamationmark.triangle.fill")
-                    .font(FilmCanFont.label(11)).foregroundColor(FilmCanTheme.dangerText)
+                    .font(FCType.metaStrong).foregroundColor(FilmCanTheme.dangerText)
             }
         }
     }
@@ -142,7 +142,7 @@ struct QuickCopySetupView: View {
     private func legendItem(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 6, height: 6)
-            Text(text).font(FilmCanFont.body(10)).foregroundColor(FilmCanTheme.textTertiary)
+            Text(text).font(FCType.meta).foregroundColor(FilmCanTheme.textTertiary)
         }
     }
 
@@ -186,24 +186,24 @@ struct QuickCopySetupView: View {
             ForEach(Array(session.form.items.enumerated()), id: \.element.id) { index, item in
                 HStack(alignment: .top, spacing: 10) {
                     Text("\(index + 1)")
-                        .font(FilmCanFont.label(11))
+                        .font(FCType.metaStrong)
                         .foregroundColor(.black)
                         .frame(width: 20, height: 20)
                         .background(Circle().fill(FilmCanTheme.brandYellow))
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
                             Label(item.name, systemImage: item.kind == .sound ? "waveform" : "sdcard.fill")
-                                .font(FilmCanFont.label(13)).lineLimit(1).truncationMode(.middle)
+                                .font(FCType.itemTitle).lineLimit(1).truncationMode(.middle)
                                 .help(item.name)
                             Spacer(minLength: 4)
                             if let bytes = session.sizes[item.path] {
                                 Text(FilmCanFormatters.bytes(bytes))
-                                    .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
+                                    .font(FCType.meta).foregroundColor(FilmCanTheme.textSecondary)
                                     .fixedSize()
                             }
                         }
                         HStack(spacing: 8) {
-                            Text(item.path).font(FilmCanFont.body(10))
+                            Text(item.path).font(FCType.meta)
                                 .foregroundColor(FilmCanTheme.textTertiary)
                                 .lineLimit(1).truncationMode(.middle)
                                 .help(item.path)
@@ -239,14 +239,14 @@ struct QuickCopySetupView: View {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Label((path as NSString).lastPathComponent, systemImage: "externaldrive.fill")
-                            .font(FilmCanFont.label(13)).lineLimit(1)
+                            .font(FCType.itemTitle).lineLimit(1)
                         if let total = capacity.total, let free = capacity.available, total > 0 {
                             let info = DriveCapacityInfo(requiredBytes: totalBytes, available: free, total: total)
                             DriveCapacityBar(info: info, requiredBytes: totalBytes)
                                 .padding(.vertical, 2)
                             capacityLegend(info: info, free: free, total: total)
                         } else {
-                            Text(path).font(FilmCanFont.body(10)).foregroundColor(FilmCanTheme.textTertiary)
+                            Text(path).font(FCType.meta).foregroundColor(FilmCanTheme.textTertiary)
                                 .lineLimit(1).truncationMode(.middle)
                         }
                     }
@@ -264,7 +264,7 @@ struct QuickCopySetupView: View {
             if sharedTree, let first = session.form.destinations.first {
                 Divider().padding(.vertical, 2)
                 Text("Folders on every drive")
-                    .font(FilmCanFont.label(11)).foregroundColor(FilmCanTheme.textSecondary)
+                    .font(FCType.metaStrong).foregroundColor(FilmCanTheme.textSecondary)
                 folderTree(for: first, autoEdit: true)
             }
         }
@@ -347,7 +347,7 @@ struct QuickCopySetupView: View {
                     Button { treeExpanded.toggle() } label: {
                         Label(treeExpanded ? "Show less" : "Show all (\(hiddenCount) more)",
                               systemImage: treeExpanded ? "chevron.up" : "chevron.down")
-                            .font(FilmCanFont.body(10))
+                            .font(FCType.meta)
                     }
                     .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
                 }
@@ -390,7 +390,7 @@ struct QuickCopySetupView: View {
         let blocker = session.form.blocker
         return HStack {
             if let message = blocker?.message {
-                Text(message).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.dangerText)
+                Text(message).font(FCType.meta).foregroundColor(FilmCanTheme.dangerText)
                     .lineLimit(2)
             }
             Spacer()
@@ -593,7 +593,7 @@ struct QuickCopyProgressView: View {
             Spacer()
             Text("\(session.form.items.count) item\(session.form.items.count == 1 ? "" : "s") → "
                  + "\(destinations.count) destination\(destinations.count == 1 ? "" : "s")")
-                .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
+                .font(FCType.meta).foregroundColor(FilmCanTheme.textSecondary)
         }
     }
 
@@ -604,7 +604,7 @@ struct QuickCopyProgressView: View {
             ForEach(session.form.copyFolders(for: destination), id: \.self) { folder in
                 Button { openInFinder(folder, under: destination) } label: {
                     Label(folder, systemImage: "folder")
-                        .font(FilmCanFont.body(11)).lineLimit(1).truncationMode(.middle)
+                        .font(FCType.meta).lineLimit(1).truncationMode(.middle)
                 }
                 .buttonStyle(.link)
                 .help("Open in Finder")
@@ -639,9 +639,9 @@ struct QuickCopyProgressView: View {
                     .foregroundColor(FilmCanTheme.successText)
                 Text("\(result.filesTransferred) file\(result.filesTransferred == 1 ? "" : "s") copied"
                      + (result.filesSkipped > 0 ? ", \(result.filesSkipped) already present" : ""))
-                    .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
+                    .font(FCType.meta).foregroundColor(FilmCanTheme.textSecondary)
                 if let warning = result.warningMessage {
-                    Text(warning).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.brandOrange)
+                    Text(warning).font(FCType.meta).foregroundColor(FilmCanTheme.brandOrange)
                 }
             }
         } else {

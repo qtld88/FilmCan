@@ -123,7 +123,7 @@ private struct MovieTabButton: View {
             if isEditingTitle {
                 TextField("Movie name", text: bindingForName)
                     .textFieldStyle(.plain)
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(textColor)
                     .focused($isTitleFocused)
                     .lineLimit(1)
@@ -134,7 +134,7 @@ private struct MovieTabButton: View {
                     .frame(maxWidth: 160, alignment: .leading)
             } else {
                 Text(displayName)
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(textColor)
                     .lineLimit(1)
                     .truncationMode(.tail)

@@ -43,7 +43,7 @@ struct BackupEditorView: View {
     let basicOptionTextWidth: CGFloat = 268
     let optionSpacing: CGFloat = 20
     let optionIconWidth: CGFloat = 32
-    let historyPanelWidth: CGFloat = 250
+    let historyPanelWidth: CGFloat
 
     enum OptionsTab: String, CaseIterable, Identifiable {
         case basic = "Basic options"
@@ -71,8 +71,10 @@ struct BackupEditorView: View {
         config: BackupConfiguration,
         transferViewModel: TransferViewModel,
         isHistoryVisible: Bool,
+        rightPaneWidth: CGFloat = 250,
         onToggleHistory: @escaping () -> Void
     ) {
+        self.historyPanelWidth = rightPaneWidth
         self.config = config
         let vm = BackupEditorViewModel(config: config)
         _viewModel = StateObject(wrappedValue: vm)

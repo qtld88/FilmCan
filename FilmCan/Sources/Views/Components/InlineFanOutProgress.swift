@@ -112,7 +112,7 @@ struct InlineFanOutProgress: View {
                                   status: progress.status)
                     .frame(maxWidth: .infinity)
                 Text(percentText)
-                    .font(FilmCanFont.label(15))
+                    .font(FCType.figure)
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .monospacedDigit()
                     .frame(width: 44, alignment: .trailing)
@@ -123,10 +123,10 @@ struct InlineFanOutProgress: View {
                 if isVerifyOnly {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.shield")
-                            .font(FilmCanFont.label(9))
+                            .font(FCType.metaStrong)
                             .foregroundColor(FilmCanTheme.successText)
                         Text("Verifying…")
-                            .font(FilmCanFont.label(9))
+                            .font(FCType.metaStrong)
                             .foregroundColor(FilmCanTheme.textTertiary)
                     }
                 }
@@ -134,10 +134,10 @@ struct InlineFanOutProgress: View {
             if progress.filesSkipped > 0 {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.uturn.forward")
-                        .font(FilmCanFont.label(9))
+                        .font(FCType.metaStrong)
                         .foregroundColor(FilmCanTheme.textTertiary)
                     Text(skipText)
-                        .font(FilmCanFont.label(9))
+                        .font(FCType.metaStrong)
                         .foregroundColor(FilmCanTheme.textTertiary)
                 }
             }
@@ -158,10 +158,10 @@ struct InlineFanOutProgress: View {
     private func pill(icon: String, text: String, width: CGFloat) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(FilmCanFont.label(10))
+                .font(FCType.metaStrong)
                 .foregroundColor(FilmCanTheme.textTertiary)
             Text(text)
-                .font(FilmCanFont.label(10))
+                .font(FCType.metaStrong)
                 .foregroundColor(FilmCanTheme.textSecondary)
                 .monospacedDigit()
                 .lineLimit(1)
@@ -180,13 +180,13 @@ struct InlineFanOutProgress: View {
             }
         case .pending:
             Text("Waiting…")
-                .font(FilmCanFont.label(10))
+                .font(FCType.metaStrong)
                 .foregroundColor(FilmCanTheme.textTertiary)
         case .preparing:
             HStack(spacing: 4) {
                 ProgressView().progressViewStyle(.circular).controlSize(.mini)
                 Text("Preparing…")
-                    .font(FilmCanFont.label(10))
+                    .font(FCType.metaStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
         case .failed(let reason):
@@ -198,8 +198,8 @@ struct InlineFanOutProgress: View {
 
     private func badge(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: icon).font(FilmCanFont.label(10)).foregroundColor(color)
-            Text(text).font(FilmCanFont.label(10)).foregroundColor(color).lineLimit(1)
+            Image(systemName: icon).font(FCType.metaStrong).foregroundColor(color)
+            Text(text).font(FCType.metaStrong).foregroundColor(color).lineLimit(1)
         }
     }
 }

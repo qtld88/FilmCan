@@ -158,7 +158,7 @@ struct QuickTourView: View {
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Spacer()
                 Text("Step \(currentIndex + 1) of \(steps.count)")
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
 
@@ -173,7 +173,7 @@ struct QuickTourView: View {
                         .font(.system(size: 11))
                         .foregroundColor(FilmCanTheme.brandYellow)
                     Text("Complete the highlighted action to continue.")
-                        .font(FilmCanFont.body(11))
+                        .font(FCType.meta)
                         .foregroundColor(FilmCanTheme.textSecondary)
                 }
                 .padding(8)

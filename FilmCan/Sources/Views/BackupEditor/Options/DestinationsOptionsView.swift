@@ -31,7 +31,7 @@ struct DestinationsOptionsView: View {
         if model.selectedOrganizationPresetName == OrganizationPreset.netflixIngestName {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Shoot metadata")
-                    .font(FilmCanFont.label(13))
+                    .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 netflixMetaField("Episode / Block", placeholder: "EP103 / B01",
                                  text: model.binding(\.episode))
@@ -52,7 +52,7 @@ struct DestinationsOptionsView: View {
     private func netflixMetaField(_ label: String, placeholder: String, text: Binding<String>) -> some View {
         HStack(spacing: OptionsLayout.spacing) {
             Text(label)
-                .font(FilmCanFont.body(12))
+                .font(FCType.body)
                 .foregroundColor(FilmCanTheme.textSecondary)
                 .frame(width: 130, alignment: .leading)
             TextField(placeholder, text: text)
@@ -68,7 +68,7 @@ struct DestinationsOptionsView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("Folder templates")
-                    .font(FilmCanFont.label(13))
+                    .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 InfoPopoverButton(content: InfoPopoverContent(
                     title: "Folder templates",
@@ -93,7 +93,7 @@ struct DestinationsOptionsView: View {
             Image(systemName: count < 3 ? "exclamationmark.triangle.fill" : "info.circle")
                 .foregroundColor(count < 3 ? .orange : FilmCanTheme.textTertiary)
             Text("Netflix recommends ≥3 copies on ≥2 media types, with ≥1 off-site. You have \(count) destination\(count == 1 ? "" : "s").")
-                .font(FilmCanFont.body(11))
+                .font(FCType.meta)
                 .foregroundColor(FilmCanTheme.textSecondary)
         }
         .padding(.top, 2)
@@ -113,7 +113,7 @@ struct DestinationsOptionsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
                                 Text("Folder template")
-                                    .font(FilmCanFont.label(13))
+                                    .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
@@ -167,7 +167,7 @@ struct DestinationsOptionsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
                                 Text("File Rename Template")
-                                    .font(FilmCanFont.label(13))
+                                    .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
@@ -248,7 +248,7 @@ struct DestinationsOptionsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
                                 Text("Custom date for tokens")
-                                    .font(FilmCanFont.label(13))
+                                    .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
@@ -335,7 +335,7 @@ struct DestinationAutoDetectSection: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Text("Drive and folder names to detect")
-                            .font(FilmCanFont.label(13))
+                            .font(FCType.itemTitle)
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(
                             content: InfoPopoverContent(

@@ -52,7 +52,7 @@ func optionsRow(
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(title)
-                    .font(FilmCanFont.label(13))
+                    .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 if let info {
                     InfoPopoverButton(content: info)
@@ -60,7 +60,7 @@ func optionsRow(
             }
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
         }

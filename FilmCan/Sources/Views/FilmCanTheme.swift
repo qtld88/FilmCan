@@ -195,6 +195,25 @@ enum FilmCanFont {
     }
 }
 
+enum FCType {
+    static var display: Font { FilmCanFont.title(26) }
+    static var cardTitle: Font { FilmCanFont.title(15) }
+    static var itemTitle: Font { FilmCanFont.label(13) }
+    static var body: Font { FilmCanFont.body(12) }
+    static var bodyStrong: Font { FilmCanFont.label(12) }
+    static var meta: Font { FilmCanFont.body(11) }
+    static var metaStrong: Font { FilmCanFont.label(11) }
+    static var figure: Font { FilmCanFont.label(15).monospacedDigit() }
+}
+
+enum FCSpace {
+    static let xs: CGFloat = 4
+    static let s: CGFloat = 8
+    static let m: CGFloat = 12
+    static let l: CGFloat = 16
+    static let xl: CGFloat = 24
+}
+
 private extension Color {
     init(hex: Int) {
         let red = Double((hex >> 16) & 0xFF) / 255.0

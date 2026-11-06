@@ -1,13 +1,21 @@
 import SwiftUI
 import AppKit
 
+extension Notification.Name {
+    static let filmCanShowCatalogPane = Notification.Name("filmCanShowCatalogPane")
+}
+
 struct MainView: View {
+    enum RightPane { case none, history, catalog }
+
     @EnvironmentObject var appState: AppState
     @StateObject private var listViewModel = BackupListViewModel()
     @ObservedObject private var transferViewModel = TransferViewModel.shared
     @ObservedObject private var storage = ConfigurationStorage.shared
     @ObservedObject private var catalogStore = MediaCatalogStore.shared
-    @State private var showHistoryPanel: Bool = true
+    @State private var rightPane: RightPane = .history
+    @State private var catalogDragStartWidth: Double?
+    @AppStorage("catalogPaneWidth") private var catalogPaneWidth: Double = 380
     @State private var showQuickTour: Bool = false
     @State private var quickTourIndex: Int = 0
     @State private var quickTourNameConfirmed: Bool = false
@@ -67,6 +75,10 @@ struct MainView: View {
                 if canAdvanceTourStep {
                     advanceTour(by: 1)
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .filmCanShowCatalogPane)) { _ in
+                guard rightPane != .catalog else { return }
+                withAnimation(.easeInOut(duration: 0.2)) { rightPane = .catalog }
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanRestartTour)) { _ in
                 didShowQuickTour = false
@@ -132,14 +144,66 @@ struct MainView: View {
     private var mainContent: some View {
         HStack(spacing: 0) {
             editorPanel
-            if showHistoryPanel {
+            switch rightPane {
+            case .none:
+                EmptyView()
+            case .history:
                 Divider()
                     .ignoresSafeArea()
                 TransferHistoryView(transferViewModel: transferViewModel)
                     .frame(width: 250)
                     .transition(.move(edge: .trailing))
                     .tourAnchor("historyPanel")
+            case .catalog:
+                Divider()
+                    .ignoresSafeArea()
+                catalogPane
+                    .transition(.move(edge: .trailing))
             }
+        }
+    }
+
+    private var clampedCatalogWidth: CGFloat {
+        CGFloat(min(max(catalogPaneWidth, 250), 420))
+    }
+
+    private var catalogPane: some View {
+        VStack(spacing: 0) {
+            Text("Catalog — all movies")
+                .font(FCType.itemTitle)
+                .foregroundColor(FilmCanTheme.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            Divider().background(FilmCanTheme.cardStroke)
+            CatalogView(paneWidth: clampedCatalogWidth)
+                .environmentObject(catalogStore)
+        }
+        .frame(width: clampedCatalogWidth)
+        .background(FilmCanTheme.sidebar)
+        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 6)
+                .contentShape(Rectangle())
+                .onHover { inside in
+                    if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                }
+                .gesture(
+                    DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .onChanged { value in
+                            let start = catalogDragStartWidth ?? Double(clampedCatalogWidth)
+                            catalogDragStartWidth = start
+                            catalogPaneWidth = min(max(start - Double(value.translation.width), 250), 420)
+                        }
+                        .onEnded { _ in catalogDragStartWidth = nil }
+                )
+                .accessibilityLabel("Resize catalog pane")
+        }
+    }
+
+    private func togglePane(_ pane: RightPane) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            rightPane = (rightPane == pane) ? .none : pane
         }
     }
 
@@ -150,12 +214,9 @@ struct MainView: View {
             BackupEditorView(
                 config: config,
                 transferViewModel: transferViewModel,
-                isHistoryVisible: showHistoryPanel,
-                onToggleHistory: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showHistoryPanel.toggle()
-                    }
-                }
+                isHistoryVisible: rightPane != .none,
+                rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
+                onToggleHistory: { togglePane(.history) }
             )
             .id(config.id)
         } else {
@@ -172,9 +233,11 @@ struct MainView: View {
                 trailingInset: 0
             )
 
-            catalogButton
-            historyButton
-                .padding(.trailing, 8)
+            HStack(spacing: 4) {
+                historyButton
+                catalogButton
+            }
+            .padding(.trailing, 8)
         }
         .frame(height: 44)
         .background(FilmCanTheme.sidebar)
@@ -224,7 +287,7 @@ struct MainView: View {
             
             VStack(spacing: 8) {
                 Text(appState.storage.configurations.isEmpty ? "No Movies Yet" : "No Movie Selected")
-                    .font(FilmCanFont.title(28))
+                    .font(FCType.display)
                 Text(appState.storage.configurations.isEmpty
                     ? "Create your first movie to get started"
                     : "Select a movie tab above or create a new one")
@@ -235,7 +298,7 @@ struct MainView: View {
             
             HoverButton(action: { _ = appState.createNewConfig() }) {
                 Label(appState.storage.configurations.isEmpty ? "Create First Movie" : "Create New Movie", systemImage: "plus.circle.fill")
-                    .font(FilmCanFont.label(15))
+                    .font(FCType.cardTitle)
                     .foregroundColor(.black)
             }
             .buttonStyle(.borderedProminent)
@@ -261,39 +324,38 @@ struct MainView: View {
     }
 
     private var catalogButton: some View {
-        Button(action: { CatalogWindowController.shared.show() }) {
-            Image(systemName: "books.vertical")
-                .foregroundColor(FilmCanTheme.textSecondary)
+        let atRisk = !MediaCatalog.atRisk(catalogStore.rolls).isEmpty
+        let active = rightPane == .catalog
+        return Button(action: { togglePane(.catalog) }) {
+            Image(systemName: active ? "books.vertical.fill" : "books.vertical")
+                .foregroundColor(active ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
                 .font(.system(size: 13, weight: .semibold))
                 .padding(6)
         }
         .frame(width: 28, height: 28)
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) {
-            if !MediaCatalog.atRisk(catalogStore.rolls).isEmpty {
+            if atRisk {
                 Circle().fill(FilmCanTheme.brandOrange).frame(width: 7, height: 7)
             }
         }
         .help("Catalog — where every roll is")
-        .accessibilityLabel("Catalog")
-        .accessibilityValue(MediaCatalog.atRisk(catalogStore.rolls).isEmpty ? "" : "Some rolls are on one drive only")
+        .accessibilityLabel(active ? "Hide catalog" : "Show catalog")
+        .accessibilityValue(atRisk ? "Some rolls are on one drive only" : "")
     }
 
     private var historyButton: some View {
-        Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showHistoryPanel.toggle()
-            }
-        }) {
-            Image(systemName: showHistoryPanel ? "clock.fill" : "clock")
-                .foregroundColor(FilmCanTheme.textSecondary)
+        let active = rightPane == .history
+        return Button(action: { togglePane(.history) }) {
+            Image(systemName: active ? "clock.fill" : "clock")
+                .foregroundColor(active ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
                 .font(.system(size: 13, weight: .semibold))
                 .padding(6)
         }
         .frame(width: 28, height: 28)
         .buttonStyle(.plain)
         .help("Transfer history")
-        .accessibilityLabel(showHistoryPanel ? "Hide history" : "Show history")
+        .accessibilityLabel(active ? "Hide history" : "Show history")
         .tourAnchor("historyButton")
     }
 
@@ -349,9 +411,9 @@ struct MainView: View {
 
     private func updateTourSideEffects() {
         appState.activeTourTargetId = showQuickTour ? currentTourStep.targetId : nil
-        if currentTourStep.targetId == "historyPanel", !showHistoryPanel {
+        if currentTourStep.targetId == "historyPanel", rightPane != .history {
             withAnimation(.easeInOut(duration: 0.2)) {
-                showHistoryPanel = true
+                rightPane = .history
             }
         }
     }

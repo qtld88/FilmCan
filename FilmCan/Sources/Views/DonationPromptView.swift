@@ -27,7 +27,7 @@ struct DonationPromptView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Support FilmCan")
-                .font(FilmCanFont.title(26))
+                .font(FCType.display)
                 .foregroundColor(FilmCanTheme.textPrimary)
             Text("Thanks for using FilmCan to keep your backups safe.")
                 .font(FilmCanFont.body(14))
@@ -40,7 +40,7 @@ struct DonationPromptView: View {
         VStack(alignment: .leading, spacing: 8) {
             if transferCount > 0 {
                 Text("You have completed \(transferCount) transfers.")
-                    .font(FilmCanFont.label(14))
+                    .font(FCType.cardTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
             }
             Text("If FilmCan saves you time, please consider supporting development with a donation.")
@@ -52,7 +52,7 @@ struct DonationPromptView: View {
     private var wireTransferCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Best for EU: Wire Transfer")
-                .font(FilmCanFont.label(14))
+                .font(FCType.cardTitle)
                 .foregroundColor(FilmCanTheme.textPrimary)
             VStack(alignment: .leading, spacing: 6) {
                 labeledLine(label: "Recipient", value: "Quentin Devillers")
@@ -72,7 +72,7 @@ struct DonationPromptView: View {
     private var donationLinks: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Other Ways to Donate")
-                .font(FilmCanFont.label(14))
+                .font(FCType.cardTitle)
                 .foregroundColor(FilmCanTheme.textPrimary)
             DonationLinkRow(
                 title: "Liberapay",
@@ -134,7 +134,7 @@ struct DonationPromptView: View {
     private func labeledLine(label: String, value: String, monospaced: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(label + ":")
-                .font(FilmCanFont.body(12))
+                .font(FCType.body)
                 .foregroundColor(FilmCanTheme.textSecondary)
                 .frame(width: 70, alignment: .leading)
             Text(value)
@@ -158,10 +158,10 @@ private struct DonationLinkRow: View {
         } label: {
             HStack {
                 Text(title)
-                    .font(FilmCanFont.label(13))
+                    .font(FCType.itemTitle)
                 Spacer()
                 Text(subtitle)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
             .foregroundColor(FilmCanTheme.textPrimary)

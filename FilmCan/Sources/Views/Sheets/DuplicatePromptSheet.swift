@@ -29,25 +29,25 @@ struct DuplicatePromptSheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(UIStrings.DuplicatePrompt.sourceLabel)
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
                 Text(prompt.sourceName)
                     .font(FilmCanFont.body(14))
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Text(prompt.sourcePath)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textTertiary)
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(UIStrings.DuplicatePrompt.destinationLabel)
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
                 Text(prompt.destinationName)
                     .font(FilmCanFont.body(14))
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Text(prompt.destinationPath)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textTertiary)
             }
 
@@ -73,7 +73,7 @@ struct DuplicatePromptSheet: View {
 
             if !prompt.canVerifyWithHashList && prompt.hashListMissing {
                 Text(UIStrings.DuplicatePrompt.noHashList)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
         }
@@ -130,7 +130,7 @@ struct DuplicatePromptSheet: View {
     private var counterStyleSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(UIStrings.DuplicatePrompt.counterStyleTitle)
-                .font(FilmCanFont.title(16))
+                .font(FCType.cardTitle)
                 .foregroundColor(FilmCanTheme.textPrimary)
             TextField(UIStrings.DuplicatePrompt.counterStylePlaceholder, text: $counterTemplate)
                 .textFieldStyle(.roundedBorder)
@@ -138,7 +138,7 @@ struct DuplicatePromptSheet: View {
                 .frame(width: 160, alignment: .leading)
                 .focused($isCounterFocused)
             Text(UIStrings.DuplicatePrompt.counterStyleHint)
-                .font(FilmCanFont.body(11))
+                .font(FCType.meta)
                 .foregroundColor(FilmCanTheme.textSecondary)
             HStack(spacing: 12) {
                 Spacer()

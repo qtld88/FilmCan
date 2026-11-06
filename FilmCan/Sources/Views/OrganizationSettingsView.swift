@@ -88,10 +88,10 @@ struct OrganizationSettingsView: View {
                                 .frame(width: rowIconWidth)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Folder template")
-                                    .font(FilmCanFont.label(13))
+                                    .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 Text("Creates the folder structure inside the destination. Use \"/\" for subfolders.")
-                                    .font(FilmCanFont.body(11))
+                                    .font(FCType.meta)
                                     .foregroundColor(FilmCanTheme.textSecondary)
                             }
                             .frame(width: rowTextWidth, alignment: .leading)
@@ -145,10 +145,10 @@ struct OrganizationSettingsView: View {
                                 .frame(width: rowIconWidth)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("File name template")
-                                    .font(FilmCanFont.label(13))
+                                    .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 Text("Renames each copied item before it is placed in the destination.")
-                                    .font(FilmCanFont.body(11))
+                                    .font(FCType.meta)
                                     .foregroundColor(FilmCanTheme.textSecondary)
                             }
                             .frame(width: rowTextWidth, alignment: .leading)
@@ -189,10 +189,10 @@ struct OrganizationSettingsView: View {
                                 .frame(width: rowIconWidth)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Custom date for tokens")
-                                    .font(FilmCanFont.label(13))
+                                    .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 Text("Use a specific date for {date}, {time}, {datetime}.")
-                                    .font(FilmCanFont.body(11))
+                                    .font(FCType.meta)
                                     .foregroundColor(FilmCanTheme.textSecondary)
                             }
                             .frame(width: rowTextWidth, alignment: .leading)

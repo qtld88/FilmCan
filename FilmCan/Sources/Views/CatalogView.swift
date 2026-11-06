@@ -7,6 +7,11 @@ struct CatalogView: View {
     @State private var mounted: Set<String> = []
     @State private var rollToForget: CatalogRoll?
 
+    /// Set when hosted in the main window's right pane; nil in the standalone window.
+    var paneWidth: CGFloat? = nil
+
+    private var isCompact: Bool { (paneWidth ?? .infinity) < 420 }
+
     private static let byteFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.countStyle = .file
@@ -25,7 +30,7 @@ struct CatalogView: View {
                 resultsList
             }
         }
-        .frame(minWidth: 560, minHeight: 360)
+        .frame(minWidth: paneWidth == nil ? 560 : 0, minHeight: 360)
         .background(FilmCanTheme.background)
         .onAppear { mounted = store.mountedVolumeUUIDs() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in
@@ -70,7 +75,7 @@ struct CatalogView: View {
                 List {
                     if !atRisk.isEmpty {
                         Text("\(atRisk.count) roll\(atRisk.count == 1 ? " is" : "s are") on one drive only. Copy \(atRisk.count == 1 ? "it" : "them") to a second drive before formatting the card.")
-                            .font(FilmCanFont.label(12))
+                            .font(FCType.bodyStrong)
                             .foregroundColor(FilmCanTheme.brandOrange)
                             .padding(8)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,7 +85,7 @@ struct CatalogView: View {
                     ForEach(projectGroups, id: \.name) { project in
                         ForEach(project.days, id: \.day) { day in
                             Section(header: Text("\(project.name) › \(day.day)")
-                                .font(FilmCanFont.label(12))
+                                .font(FCType.bodyStrong)
                                 .foregroundColor(FilmCanTheme.textSecondary)) {
                                 ForEach(day.rolls) { roll in
                                     rollRow(roll)
@@ -110,29 +115,42 @@ struct CatalogView: View {
     }
 
     private func rollRow(_ roll: CatalogRoll) -> some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: roll.mediaKind == .sound ? "waveform" : "camera")
                 .foregroundColor(FilmCanTheme.textSecondary)
                 .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(roll.rollName)
-                    .font(FilmCanFont.title(13))
-                    .foregroundColor(FilmCanTheme.textPrimary)
-                Text(roll.files.isEmpty
-                     ? "Files not indexed · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))"
-                     : "\(roll.files.count) files · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))")
-                    .font(FilmCanFont.label(11))
-                    .foregroundColor(FilmCanTheme.textTertiary)
+            VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(roll.rollName)
+                        .font(FCType.itemTitle)
+                        .foregroundColor(FilmCanTheme.textPrimary)
+                    Text(roll.files.isEmpty
+                         ? "Files not indexed · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))"
+                         : "\(roll.files.count) files · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))")
+                        .font(FCType.metaStrong)
+                        .foregroundColor(FilmCanTheme.textTertiary)
+                }
+                if isCompact {
+                    chipsAndBadge(roll.copies, coverage: roll.coverage) { reveal($0, relPath: nil) }
+                }
             }
-            Spacer(minLength: 8)
-            driveChips(roll.copies) { reveal($0, relPath: nil) }
-            coverageBadge(roll.coverage)
+            if !isCompact {
+                Spacer(minLength: 8)
+                chipsAndBadge(roll.copies, coverage: roll.coverage) { reveal($0, relPath: nil) }
+            }
         }
         .padding(.vertical, 4)
         .contextMenu {
             revealMenu(roll.copies, relPath: nil)
             Divider()
             Button("Forget this roll") { rollToForget = roll }
+        }
+    }
+
+    private func chipsAndBadge(_ copies: [CatalogCopy], coverage: CatalogCoverage?, onReveal: @escaping (CatalogCopy) -> Void) -> some View {
+        HStack(spacing: 6) {
+            driveChips(copies, onReveal: onReveal)
+            if let coverage { coverageBadge(coverage) }
         }
     }
 
@@ -181,7 +199,7 @@ struct CatalogView: View {
                         .background(Circle().fill(isMounted(copy) ? FilmCanTheme.textPrimary : Color.clear))
                         .frame(width: 7, height: 7)
                     Text(copy.destVolumeName)
-                        .font(FilmCanFont.label(11))
+                        .font(FCType.metaStrong)
                         .foregroundColor(FilmCanTheme.textPrimary)
                 }
                 .padding(.horizontal, 7)
@@ -207,7 +225,7 @@ struct CatalogView: View {
             }
         }()
         return Text(text)
-            .font(FilmCanFont.title(11))
+            .font(FCType.metaStrong)
             .foregroundColor(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -226,19 +244,24 @@ struct CatalogView: View {
             } else {
                 List {
                     ForEach(hits) { hit in
-                        HStack(spacing: 10) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text((hit.file.relPath as NSString).lastPathComponent)
-                                    .font(FilmCanFont.title(13))
-                                    .foregroundColor(FilmCanTheme.textPrimary)
-                                Text("\(hit.projectName) › \(hit.shootDay) › \(hit.rollName)")
-                                    .font(FilmCanFont.label(11))
-                                    .foregroundColor(FilmCanTheme.textTertiary)
+                        let hitCoverage = store.rolls.first(where: { $0.id == hit.rollId })?.coverage
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text((hit.file.relPath as NSString).lastPathComponent)
+                                        .font(FCType.itemTitle)
+                                        .foregroundColor(FilmCanTheme.textPrimary)
+                                    Text("\(hit.projectName) › \(hit.shootDay) › \(hit.rollName)")
+                                        .font(FCType.metaStrong)
+                                        .foregroundColor(FilmCanTheme.textTertiary)
+                                }
+                                if isCompact {
+                                    chipsAndBadge(hit.copies, coverage: hitCoverage) { reveal($0, relPath: hit.file.relPath) }
+                                }
                             }
-                            Spacer(minLength: 8)
-                            driveChips(hit.copies) { reveal($0, relPath: hit.file.relPath) }
-                            if let roll = store.rolls.first(where: { $0.id == hit.rollId }) {
-                                coverageBadge(roll.coverage)
+                            if !isCompact {
+                                Spacer(minLength: 8)
+                                chipsAndBadge(hit.copies, coverage: hitCoverage) { reveal($0, relPath: hit.file.relPath) }
                             }
                         }
                         .padding(.vertical, 3)
@@ -252,7 +275,7 @@ struct CatalogView: View {
                     }
                     if hits.count >= limit {
                         Text("Showing first \(limit) results")
-                            .font(FilmCanFont.label(11))
+                            .font(FCType.metaStrong)
                             .foregroundColor(FilmCanTheme.textTertiary)
                     }
                 }

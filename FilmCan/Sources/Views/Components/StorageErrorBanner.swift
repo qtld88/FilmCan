@@ -36,11 +36,11 @@ struct StorageErrorBanner: View {
                     .font(.system(size: 12, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(headline)
-                        .font(FilmCanFont.label(12))
+                        .font(FCType.bodyStrong)
                         .foregroundColor(FilmCanTheme.textPrimary)
                     ForEach(Array(details.enumerated()), id: \.offset) { _, detail in
                         Text(detail)
-                            .font(FilmCanFont.body(11))
+                            .font(FCType.meta)
                             .foregroundColor(FilmCanTheme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

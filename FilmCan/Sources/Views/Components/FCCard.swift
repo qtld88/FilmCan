@@ -80,12 +80,12 @@ struct FCCardHeader: View {
                         .foregroundColor(accent ?? FilmCanTheme.textTertiary)
                 }
                 Text(title)
-                    .font(FilmCanFont.label(13))
+                    .font(FCType.itemTitle)
                     .foregroundColor(role == .data ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
                 Spacer()
                 if let trailing {
                     Text(trailing)
-                        .font(FilmCanFont.label(11))
+                        .font(FCType.metaStrong)
                         .foregroundColor(FilmCanTheme.textSecondary)
                 }
             }

@@ -20,12 +20,12 @@ struct TransferHistoryView: View {
             VStack(spacing: 10) {
                 HStack {
                     Text("History")
-                        .font(FilmCanFont.title(16))
+                        .font(FCType.cardTitle)
                         .foregroundColor(FilmCanTheme.textPrimary)
                     Spacer()
                     Toggle(isOn: $historyListView) {
                         Text("List view")
-                            .font(FilmCanFont.body(10))
+                            .font(FCType.meta)
                             .foregroundColor(FilmCanTheme.textSecondary)
                     }
                     .toggleStyle(.switch)
@@ -64,7 +64,7 @@ struct TransferHistoryView: View {
                             Image(systemName: "line.3.horizontal.decrease.circle")
                                 .font(.system(size: 12, weight: .semibold))
                             Text(statusFilter.label)
-                                .font(FilmCanFont.label(9))
+                                .font(FCType.metaStrong)
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 10, weight: .semibold))
                         }
@@ -125,7 +125,7 @@ struct TransferHistoryView: View {
 
                     if visibleHistoryIsEmpty {
                         Text(emptyHistoryMessage)
-                            .font(FilmCanFont.body(11))
+                            .font(FCType.meta)
                             .foregroundColor(FilmCanTheme.textSecondary)
                             .padding(.top, 24)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -141,7 +141,7 @@ struct TransferHistoryView: View {
                 Spacer()
                 Button(action: { showClearConfirmation = true }) {
                     Text(clearHistoryLabel)
-                        .font(FilmCanFont.label(11))
+                        .font(FCType.metaStrong)
                         .foregroundColor(canClearHistory ? FilmCanTheme.textSecondary : FilmCanTheme.textTertiary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -219,7 +219,7 @@ struct TransferHistoryView: View {
 
             VStack(spacing: 8) {
                 Text(displayConfigName(for: entry))
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .lineLimit(1)
                     .multilineTextAlignment(.center)
@@ -227,7 +227,7 @@ struct TransferHistoryView: View {
                     .padding(.bottom, -4)
 
                 Text(sourceName)
-                    .font(FilmCanFont.title(27))
+                    .font(FCType.display)
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .lineLimit(1)
                     .multilineTextAlignment(.center)
@@ -239,7 +239,7 @@ struct TransferHistoryView: View {
                         HStack(spacing: 6) {
                             destinationStatusIcon(for: result, entryId: entry.id)
                             Text(truncatedDestinationName(result.destination))
-                                .font(FilmCanFont.label(11))
+                                .font(FCType.metaStrong)
                                 .foregroundColor(FilmCanTheme.textSecondary)
                                 .help(destinationHoverText(for: result))
                         }
@@ -251,7 +251,7 @@ struct TransferHistoryView: View {
             Spacer(minLength: 0)
             if let presetLabel = presetLabel(for: entry) {
                 Text(presetLabel)
-                    .font(FilmCanFont.label(10))
+                    .font(FCType.metaStrong)
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 1)
@@ -440,13 +440,13 @@ struct TransferHistoryView: View {
                     .foregroundColor(color)
                     .font(.system(size: 12, weight: .semibold))
                 Text(sourceLabelText(for: entry.sources))
-                    .font(FilmCanFont.body(12))
+                    .font(FCType.body)
                     .foregroundColor(color)
                     .lineLimit(1)
             }
             if !isSuccess, let error = entryErrorMessage(entry), !error.isEmpty {
                 Text(error)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .lineLimit(2)
             }
@@ -484,7 +484,7 @@ struct TransferHistoryView: View {
 
             VStack(spacing: 8) {
                 Text(displayConfigName(for: item.entry))
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .lineLimit(1)
                     .multilineTextAlignment(.center)
@@ -502,7 +502,7 @@ struct TransferHistoryView: View {
                 HStack(spacing: 6) {
                     destinationStatusIcon(for: result, entryId: item.entry.id)
                     Text(truncatedDestinationName(result.destination))
-                        .font(FilmCanFont.label(11))
+                        .font(FCType.metaStrong)
                         .foregroundColor(FilmCanTheme.textSecondary)
                         .help(destinationHoverText(for: result))
                 }
@@ -512,7 +512,7 @@ struct TransferHistoryView: View {
             Spacer(minLength: 0)
             if let presetLabel = presetLabel(for: item.entry) {
                 Text(presetLabel)
-                    .font(FilmCanFont.label(10))
+                    .font(FCType.metaStrong)
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 1)
@@ -531,14 +531,14 @@ struct TransferHistoryView: View {
                     .padding(.bottom, 0)
             } else if result.wasPaused {
                 Text("STOPPED")
-                    .font(FilmCanFont.title(16))
+                    .font(FCType.cardTitle)
                     .foregroundColor(.orange)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 10)
                     .help(result.errorMessage ?? "Stopped by user")
             } else {
                 Text("FAILED")
-                    .font(FilmCanFont.title(16))
+                    .font(FCType.cardTitle)
                     .foregroundColor(FilmCanTheme.brandRed)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 10)
@@ -926,7 +926,7 @@ struct TransferHistoryView: View {
 
     private func historySticker(text: String) -> some View {
         Text(text)
-            .font(FilmCanFont.label(11))
+            .font(FCType.metaStrong)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .foregroundColor(FCHistoryCard.stickerText)
@@ -1101,12 +1101,12 @@ struct TransferHistoryView: View {
         var body: some View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Verification")
-                    .font(FilmCanFont.title(16))
+                    .font(FCType.cardTitle)
                 if let details = alert.details {
                     verificationDetails(details)
                 } else {
                     Text(alert.message)
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .foregroundColor(FilmCanTheme.textSecondary)
                 }
                 HStack {

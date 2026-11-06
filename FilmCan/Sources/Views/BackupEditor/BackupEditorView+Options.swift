@@ -11,6 +11,11 @@ extension BackupEditorView {
         return "Off"
     }
 
+    private var selectedPresetDifferences: [PresetDifference] {
+        guard let preset = selectedOrganizationPreset else { return [] }
+        return viewModel.config.differences(from: preset)
+    }
+
     var selectedOrganizationPreset: OrganizationPreset? {
         let presets = viewModel.organizationPresets
         guard let id = viewModel.selectedOrganizationPresetId else { return nil }
@@ -113,7 +118,7 @@ extension BackupEditorView {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(title)
-                        .font(FilmCanFont.label(13))
+                        .font(FCType.itemTitle)
                         .foregroundColor(FilmCanTheme.textPrimary)
                     if let info {
                         InfoPopoverButton(content: info)
@@ -121,7 +126,7 @@ extension BackupEditorView {
                 }
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(FilmCanFont.body(11))
+                        .font(FCType.meta)
                         .foregroundColor(FilmCanTheme.textSecondary)
                 }
             }
@@ -158,7 +163,7 @@ extension BackupEditorView {
                         .foregroundColor(iconColor)
                 }
                 Text(title)
-                    .font(icon == nil ? FilmCanFont.title(16) : FilmCanFont.label(13))
+                    .font(icon == nil ? FCType.cardTitle : FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Spacer()
             }
@@ -209,79 +214,48 @@ extension BackupEditorView {
 
     private var optionsTabBar: some View {
         let isWide = effectiveOptionsWidth >= 600
+        let tabBinding = Binding<OptionsTab>(
+            get: { selectedOptionsTab },
+            set: { tab in
+                selectedOptionsTab = tab
+                if isOptionsCollapsed {
+                    withAnimation(.easeInOut(duration: 0.15)) { isOptionsCollapsed = false }
+                }
+            }
+        )
+        let picker = Picker("Options section", selection: tabBinding) {
+            ForEach(availableOptionsTabs) { tab in
+                Text(tab.shortTitle).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        let collapseButton = Button {
+            withAnimation(.easeInOut(duration: 0.15)) { isOptionsCollapsed.toggle() }
+        } label: {
+            Image(systemName: isOptionsCollapsed ? "chevron.down" : "chevron.up")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(FilmCanTheme.textSecondary)
+        .help(isOptionsCollapsed ? "Show options" : "Hide options")
+        .accessibilityLabel(isOptionsCollapsed ? "Show options" : "Hide options")
         return Group {
             if isWide {
                 HStack(spacing: 8) {
-                    ForEach(availableOptionsTabs) { tab in
-                        let isSelected = selectedOptionsTab == tab
-                        Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(tab.shortTitle)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    picker.frame(maxWidth: 420)
+                    collapseButton
                     Spacer(minLength: 0)
                     presetSelector
                 }
                 .tourAnchor("optionsTabs")
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(availableOptionsTabs) { tab in
-                        let isSelected = selectedOptionsTab == tab
-                        Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(tab.shortTitle)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
+                    HStack(spacing: 8) {
+                        picker
+                        collapseButton
                     }
                     presetSelector
                 }
@@ -318,6 +292,11 @@ extension BackupEditorView {
             } label: {
                 HStack(spacing: 6) {
                     Text(selectedOrganizationPresetName)
+                    if !selectedPresetDifferences.isEmpty {
+                        Text("(modified)")
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                            .help(selectedPresetDifferences.map(\.summary).joined(separator: "\n"))
+                    }
                     Image(systemName: "chevron.down")
                         .font(.caption)
                 }
@@ -488,7 +467,7 @@ extension BackupEditorView {
 
             if let customDateStatusText {
                 Text(customDateStatusText)
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(.accentColor)
             }
 
@@ -497,7 +476,7 @@ extension BackupEditorView {
             }) {
                 HStack(spacing: 6) {
                     Text("Refresh drives")
-                        .font(FilmCanFont.label(12))
+                        .font(FCType.bodyStrong)
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 12, weight: .semibold))
                 }
@@ -566,7 +545,7 @@ extension BackupEditorView {
                         .font(FilmCanFont.title(20))
                         .foregroundColor(FilmCanTheme.textPrimary)
                     Text("\(fileLabel) • \(folderLabel)")
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .foregroundColor(FilmCanTheme.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)

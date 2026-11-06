@@ -42,7 +42,7 @@ struct DestinationListView: View {
         VStack(alignment: .leading, spacing: 8) {
             if showsTitle {
                 Text("Save To")
-                    .font(FilmCanFont.label(12))
+                    .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
             
@@ -69,7 +69,7 @@ struct DestinationListView: View {
                             Image(systemName: "plus.circle.fill")
                                 .foregroundColor(FilmCanTheme.brandYellow)
                             Text("Add another destination")
-                                .font(FilmCanFont.body(12))
+                                .font(FCType.body)
                         }
                     }
                     .buttonStyle(.borderless)
@@ -124,10 +124,10 @@ struct DestinationListView: View {
             
             VStack(spacing: 4) {
                 Text("Drop destination folder here")
-                    .font(FilmCanFont.label(16))
+                    .font(FCType.cardTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 Text("or")
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
             
@@ -170,7 +170,7 @@ struct DestinationListView: View {
                                 .foregroundColor(FilmCanTheme.textSecondary)
                                 .frame(width: 18)
                             Text(driveIncluded ? summary.name : "\(summary.name) · Skipped")
-                                .font(FilmCanFont.label(13))
+                                .font(FCType.itemTitle)
                                 .foregroundColor(FilmCanTheme.textPrimary)
                                 .lineLimit(1)
                             Spacer()
@@ -208,7 +208,7 @@ struct DestinationListView: View {
                                     destinationPathRow(destination: destination, isExternal: summary.isExternal)
                                 }
                                 Text(summary.connectionMessage)
-                                    .font(FilmCanFont.body(10))
+                                    .font(FCType.meta)
                                     .foregroundColor(FilmCanTheme.dangerText)
                             }
                             .padding(.leading, 26)
@@ -283,12 +283,12 @@ struct DestinationListView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if !destination.isRoot {
                         Text((destination.path as NSString).lastPathComponent)
-                            .font(FilmCanFont.label(12))
+                            .font(FCType.bodyStrong)
                             .foregroundColor(FilmCanTheme.textPrimary)
                             .lineLimit(1)
                     }
                     Text("→ \(rootLabel)")
-                        .font(FilmCanFont.body(11))
+                        .font(FCType.meta)
                         .foregroundColor(FilmCanTheme.textTertiary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -299,7 +299,7 @@ struct DestinationListView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 8) {
                                         Text(copyLabelText(for: destination.path, source: item.source))
-                                            .font(FilmCanFont.label(10))
+                                            .font(FCType.metaStrong)
                                             .foregroundColor(FilmCanTheme.textSecondary)
                                             .lineLimit(1)
                                             .frame(width: progressLabelWidth, alignment: .leading)
@@ -318,7 +318,7 @@ struct DestinationListView: View {
                                             source: item.source
                                         )
                                         Text(percentText ?? "")
-                                            .font(FilmCanFont.label(10))
+                                            .font(FCType.metaStrong)
                                             .foregroundColor(FilmCanTheme.textSecondary)
                                             .frame(width: percentLabelWidth, alignment: .trailing)
                                             .opacity(percentText == nil ? 0 : 1)
@@ -331,7 +331,7 @@ struct DestinationListView: View {
                                     ) {
                                         HStack(spacing: 8) {
                                             Text(verificationLabelText(for: destination.path, source: item.source))
-                                                .font(FilmCanFont.label(10))
+                                                .font(FCType.metaStrong)
                                                 .foregroundColor(FilmCanTheme.textSecondary)
                                                 .lineLimit(1)
                                                 .frame(width: progressLabelWidth, alignment: .leading)
@@ -352,7 +352,7 @@ struct DestinationListView: View {
                                                 showProgress: showProgress
                                             )
                                             Text(verifyPercent ?? "")
-                                                .font(FilmCanFont.label(10))
+                                                .font(FCType.metaStrong)
                                                 .foregroundColor(FilmCanTheme.textSecondary)
                                                 .frame(width: percentLabelWidth, alignment: .trailing)
                                                 .opacity(verifyPercent == nil ? 0 : 1)
@@ -516,7 +516,7 @@ struct DestinationListView: View {
                         Text(destinations.count > 1
                              ? "Stopping the backups properly…"
                              : "Stopping the backup properly…")
-                            .font(FilmCanFont.label(11))
+                            .font(FCType.metaStrong)
                             .foregroundColor(FilmCanTheme.textSecondary)
                     }
                 }
@@ -560,7 +560,7 @@ struct DestinationListView: View {
             }
             if info.notEnoughSpace {
                 Label("Not enough space", systemImage: "exclamationmark.triangle.fill")
-                    .font(FilmCanFont.label(11))
+                    .font(FCType.metaStrong)
                     .foregroundColor(FilmCanTheme.dangerText)
             }
         }
@@ -601,7 +601,7 @@ struct DestinationListView: View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(text)
-                .font(FilmCanFont.body(11))
+                .font(FCType.meta)
                 .foregroundColor(FilmCanTheme.textSecondary)
         }
     }
@@ -641,7 +641,7 @@ struct DestinationListView: View {
             if let failureText {
                 HStack(alignment: .top, spacing: 10) {
                     Text(failureText)
-                        .font(FilmCanFont.label(14))
+                        .font(FCType.cardTitle)
                         .foregroundColor(FilmCanTheme.dangerText)
                         .multilineTextAlignment(.leading)
                         .lineLimit(nil)
@@ -669,22 +669,22 @@ struct DestinationListView: View {
                 HStack {
                     Spacer(minLength: 0)
                     Text(warning)
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .foregroundColor(FilmCanTheme.textSecondary)
                     Spacer(minLength: 0)
                 }
             }
             HStack(spacing: 16) {
                 Label(presentation.progressText, systemImage: "externaldrive")
-                    .font(FilmCanFont.body(12))
+                    .font(FCType.body)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .frame(width: 160, alignment: .leading)
                 Label(presentation.speedText, systemImage: "speedometer")
-                    .font(FilmCanFont.body(12))
+                    .font(FCType.body)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .frame(width: 140, alignment: .leading)
                 Label(presentation.etaText, systemImage: "clock")
-                    .font(FilmCanFont.body(12))
+                    .font(FCType.body)
                     .foregroundColor(FilmCanTheme.textSecondary)
                     .frame(width: 120, alignment: .leading)
             }

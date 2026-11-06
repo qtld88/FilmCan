@@ -56,7 +56,7 @@ struct LogSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text("Create log file")
-                            .font(FilmCanFont.label(13))
+                            .font(FCType.itemTitle)
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(content: logEnabledInfo)
                     }

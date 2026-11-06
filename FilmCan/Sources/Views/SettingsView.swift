@@ -355,7 +355,7 @@ struct PushSettingsView: View {
                         + "tk_ and contain no spaces.",
                         systemImage: "exclamationmark.triangle.fill"
                     )
-                    .font(FilmCanFont.body(11))
+                    .font(FCType.meta)
                     .foregroundColor(.orange)
                 }
 
@@ -367,17 +367,17 @@ struct PushSettingsView: View {
                             outcome.userMessage,
                             systemImage: outcome.isSuccess ? "checkmark.circle.fill" : "xmark.octagon.fill"
                         )
-                        .font(FilmCanFont.body(11))
+                        .font(FCType.meta)
                         .foregroundColor(outcome.isSuccess ? .green : .red)
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Custom notification title")
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .foregroundColor(FilmCanTheme.textPrimary)
                     TextEditor(text: $ntfyTitleTemplate)
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .frame(minHeight: 44)
                         .padding(6)
                         .background(Color(nsColor: .textBackgroundColor))
@@ -391,10 +391,10 @@ struct PushSettingsView: View {
                             handleTokenDrop(providers: providers, into: $ntfyTitleTemplate)
                         }
                     Text("Custom message")
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .foregroundColor(FilmCanTheme.textPrimary)
                     TextEditor(text: $ntfyMessageTemplate)
-                        .font(FilmCanFont.body(12))
+                        .font(FCType.body)
                         .frame(minHeight: 80)
                         .padding(6)
                         .background(Color(nsColor: .textBackgroundColor))
@@ -432,10 +432,10 @@ struct PushSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .disabled(!webhookEnabled)
                 Text("Custom headers (one per line)")
-                    .font(FilmCanFont.body(12))
+                    .font(FCType.body)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 TextEditor(text: $webhookHeaders)
-                    .font(FilmCanFont.body(12))
+                    .font(FCType.body)
                     .frame(minHeight: 80)
                     .padding(6)
                     .background(Color(nsColor: .textBackgroundColor))
