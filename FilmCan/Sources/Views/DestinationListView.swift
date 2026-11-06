@@ -79,18 +79,11 @@ struct DestinationListView: View {
                     footerView
                 }
             }
-            .padding(12)
-            .background(FilmCanTheme.panel)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(
-                        isDropTargeted || isTourHighlighted ? FilmCanTheme.brandYellow : FilmCanTheme.cardStrokeStrong,
-                        style: StrokeStyle(
-                            lineWidth: isDropTargeted || isTourHighlighted ? 2 : 1,
-                            dash: isDropTargeted ? [6, 4] : []
-                        )
-                    )
+            .fcCardSurface(
+                role: .data,
+                strokeColor: isDropTargeted || isTourHighlighted ? FilmCanTheme.brandYellow : nil,
+                lineWidth: isDropTargeted || isTourHighlighted ? 2 : FCStroke.hairline,
+                dash: isDropTargeted ? [6, 4] : []
             )
             .shadow(color: isTourHighlighted ? FilmCanTheme.brandYellow.opacity(0.35) : .clear, radius: 10)
             .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
@@ -165,13 +158,6 @@ struct DestinationListView: View {
                         fulfilledDestinations: fulfilled
                     )
                     : false
-                let summaryLine = summary.isConnected
-                    ? destinationSummaryLine(
-                        summary: summary,
-                        requiredBytes: driveRequiredBytes,
-                        backupStoredOnDrive: backupStoredOnDrive
-                    )
-                    : nil
                 HStack(alignment: .center, spacing: 12) {
                     DriveIncludeColumn(
                         number: numbers[summary.id],
@@ -183,16 +169,10 @@ struct DestinationListView: View {
                             Image(systemName: DriveUtilities.driveIconName(isExternal: summary.isExternal, style: .filled))
                                 .foregroundColor(FilmCanTheme.textSecondary)
                                 .frame(width: 18)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(driveIncluded ? summary.name : "\(summary.name) · Skipped")
-                                    .font(FilmCanFont.body(11))
-                                    .foregroundColor(FilmCanTheme.textSecondary)
-                                if let summaryLine {
-                                    Text(summaryLine)
-                                        .font(FilmCanFont.body(10))
-                                        .foregroundColor(FilmCanTheme.textSecondary)
-                                }
-                            }
+                            Text(driveIncluded ? summary.name : "\(summary.name) · Skipped")
+                                .font(FilmCanFont.label(13))
+                                .foregroundColor(FilmCanTheme.textPrimary)
+                                .lineLimit(1)
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -209,11 +189,16 @@ struct DestinationListView: View {
                         }
                     
                         if summary.isConnected {
+                            destinationCapacityBlock(
+                                summary: summary,
+                                requiredBytes: driveRequiredBytes,
+                                backupStoredOnDrive: backupStoredOnDrive
+                            )
+                            .padding(.leading, 26)
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { destination in
                                     destinationPathRow(destination: destination, isExternal: summary.isExternal)
                                 }
-                                
                             }
                             .padding(.leading, 26)
 
@@ -233,15 +218,15 @@ struct DestinationListView: View {
                 }
                 .padding(10)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: FCRadius.inner)
                         .fill(FilmCanTheme.card)
                         .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: FCRadius.inner)
                         .stroke(FilmCanTheme.cardStroke, lineWidth: 1)
                 )
-                .cornerRadius(8)
+                .cornerRadius(FCRadius.inner)
                 .anchorPreference(key: DriveAnchorPreferenceKey.self, value: .bounds) { bounds in
                     DriveAnchorData(destinations: [summary.id: bounds])
                 }
@@ -282,6 +267,10 @@ struct DestinationListView: View {
             configId: configId,
             progress: progress
         )
+        let rootLabel = destinationRootLabel(destination.path)
+        let pathDetail = displayPaths
+            .map { $0.source.isEmpty ? $0.path : "\(sourceLabel($0.source)) → \($0.path)" }
+            .joined(separator: "\n")
         let isFanOutActive = !progress.perDestProgress.isEmpty
         let showProgress = presentation.shouldShowInfo && !isFanOutActive
         let status = presentation.status
@@ -292,20 +281,20 @@ struct DestinationListView: View {
                 statusOrDriveIcon(status: status, systemIcon: icon)
                     .frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text((destination.path as NSString).lastPathComponent)
-                        .font(FilmCanFont.label(12))
-                        .foregroundColor(FilmCanTheme.textPrimary)
+                    if !destination.isRoot {
+                        Text((destination.path as NSString).lastPathComponent)
+                            .font(FilmCanFont.label(12))
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                            .lineLimit(1)
+                    }
+                    Text("→ \(rootLabel)")
+                        .font(FilmCanFont.body(11))
+                        .foregroundColor(FilmCanTheme.textTertiary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(pathDetail)
                     ForEach(displayPaths) { item in
-                        let label = item.source.isEmpty
-                            ? item.path
-                            : "\(sourceLabel(item.source)) -> \(item.path)"
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(label)
-                                .font(FilmCanFont.body(10))
-                                .foregroundColor(FilmCanTheme.textTertiary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
                             if showProgress {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 8) {
@@ -425,6 +414,11 @@ struct DestinationListView: View {
         )
     }
 
+    private func destinationRootLabel(_ path: String) -> String {
+        let trimmed = displayPath(path).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return trimmed.isEmpty ? "/" : trimmed + "/"
+    }
+
     private func displayPath(_ path: String) -> String {
         let volumesPrefix = "/Volumes/"
         guard path.hasPrefix(volumesPrefix) else { return path }
@@ -542,90 +536,74 @@ struct DestinationListView: View {
             .flatMap { $0.destinationResults }
     }
 
-    private func capacityBar(
-        requiredBytes: Int64,
-        available: Int64?,
-        total: Int64?,
-        driveName: String,
-        backupStoredOnDrive: Bool = false
-    ) -> some View {
-        let info = capacityInfo(
-            requiredBytes: requiredBytes,
-            available: available,
-            total: total,
-            treatBackupAsUsed: backupStoredOnDrive
-        )
-        return VStack(alignment: .leading, spacing: 6) {
-            capacityBarVisualization(info: info, requiredBytes: requiredBytes)
-            if info.ratioToAvailable.map({ $0 > 1.0 }) == true {
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(FilmCanTheme.dangerText)
-                    Text("Not enough space!")
-                        .font(FilmCanFont.label(11))
-                        .foregroundColor(FilmCanTheme.dangerText)
-                }
-            }
-            capacityLegend(info: info, treatBackupAsUsed: backupStoredOnDrive)
-        }
-    }
-
-    private typealias CapacityInfo = DriveCapacityInfo
-
-    private func capacityInfo(
-        requiredBytes: Int64,
-        available: Int64?,
-        total: Int64?,
-        treatBackupAsUsed: Bool = false
-    ) -> CapacityInfo {
-        DriveCapacityInfo(requiredBytes: requiredBytes, available: available, total: total,
-                          treatBackupAsUsed: treatBackupAsUsed)
-    }
-
-    private func destinationSummaryLine(
+    private func destinationCapacityBlock(
         summary: DriveSummary,
         requiredBytes: Int64,
         backupStoredOnDrive: Bool
-    ) -> String? {
-        let info = capacityInfo(
+    ) -> some View {
+        let info = DriveCapacityInfo(
             requiredBytes: requiredBytes,
             available: summary.availableBytes,
             total: summary.totalBytes,
             treatBackupAsUsed: backupStoredOnDrive
         )
-        let freeText = info.freePercent == 0 ? "<1%" : "\(info.freePercent)%"
-        let backupText = info.backupPercent == 0 ? "<1%" : "\(info.backupPercent)%"
-        let usedText = info.usedPercent == 0 ? "<1%" : "\(info.usedPercent)%"
-        let backupLabel = backupStoredOnDrive ? "already there" : "backup"
-        return "\(freeText) free · \(usedText) occupied · \(backupText) \(backupLabel)"
-    }
-
-    private func capacityBarVisualization(info: CapacityInfo, requiredBytes: Int64) -> some View {
-        DriveCapacityBar(info: info, requiredBytes: requiredBytes)
-    }
-
-    private func capacityLegend(info: CapacityInfo, treatBackupAsUsed: Bool = false) -> some View {
-        let backupLabel = treatBackupAsUsed ? "already there" : "for backup"
-        return HStack(spacing: 12) {
-            legendDot(color: info.usedColor)
-            Text("\(info.usedPercent)% already full")
-                .font(FilmCanFont.body(10))
-                .foregroundColor(FilmCanTheme.textSecondary)
-            legendDot(color: info.backupSegmentColor.opacity(FCCapacity.toCopyOpacity))
-            Text("\(info.backupPercent)% \(backupLabel)")
-                .font(FilmCanFont.body(10))
-                .foregroundColor(FilmCanTheme.textSecondary)
-            legendDot(color: info.freeColor)
-            Text("\(info.freePercent)% will remain free")
-                .font(FilmCanFont.body(10))
-                .foregroundColor(FilmCanTheme.textSecondary)
+        return VStack(alignment: .leading, spacing: 4) {
+            DriveCapacityBar(info: info, requiredBytes: requiredBytes)
+            if info.hasTotal, let total = summary.totalBytes, let available = summary.availableBytes {
+                capacityLegend(
+                    info: info,
+                    requiredBytes: requiredBytes,
+                    available: available,
+                    total: total,
+                    treatBackupAsUsed: backupStoredOnDrive
+                )
+            }
+            if info.notEnoughSpace {
+                Label("Not enough space", systemImage: "exclamationmark.triangle.fill")
+                    .font(FilmCanFont.label(11))
+                    .foregroundColor(FilmCanTheme.dangerText)
+            }
         }
     }
-    
-    private func legendDot(color: Color) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: 6, height: 6)
+
+    private func capacityLegend(
+        info: DriveCapacityInfo,
+        requiredBytes: Int64,
+        available: Int64,
+        total: Int64,
+        treatBackupAsUsed: Bool
+    ) -> some View {
+        let usedBytes = max(total - available, 0)
+        let toCopy: Int64
+        let usedOther: Int64
+        let left: Int64
+        if treatBackupAsUsed {
+            toCopy = min(requiredBytes, usedBytes)
+            usedOther = max(usedBytes - toCopy, 0)
+            left = max(total - usedBytes, 0)
+        } else {
+            toCopy = min(requiredBytes, max(available, 0))
+            usedOther = usedBytes
+            left = max(total - usedBytes - toCopy, 0)
+        }
+        let copyLabel = treatBackupAsUsed ? "already there" : "to copy"
+        func pct(_ value: Int) -> String { value == 0 ? "<1%" : "\(value)%" }
+        return HStack(spacing: 10) {
+            legendItem(info.usedColor, "\(FilmCanFormatters.bytes(usedOther)) used")
+            legendItem(info.backupSegmentColor.opacity(FCCapacity.toCopyOpacity),
+                       "\(FilmCanFormatters.bytes(toCopy)) \(copyLabel)")
+            legendItem(info.freeColor, "\(FilmCanFormatters.bytes(left)) left")
+        }
+        .help("\(pct(info.usedPercent)) used · \(pct(info.backupPercent)) \(copyLabel) · \(pct(info.freePercent)) left")
+    }
+
+    private func legendItem(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(text)
+                .font(FilmCanFont.body(11))
+                .foregroundColor(FilmCanTheme.textSecondary)
+        }
     }
 
     private func fulfilledDestinationsForCurrentConfig() -> Set<String> {

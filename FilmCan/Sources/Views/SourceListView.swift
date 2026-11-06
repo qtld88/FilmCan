@@ -68,18 +68,11 @@ struct SourceListView: View {
                     footerView
                 }
             }
-            .padding(12)
-            .background(FilmCanTheme.panel)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(
-                        isDropTargeted || isTourHighlighted ? FilmCanTheme.brandYellow : FilmCanTheme.cardStrokeStrong,
-                        style: StrokeStyle(
-                            lineWidth: isDropTargeted || isTourHighlighted ? 2 : 1,
-                            dash: isDropTargeted ? [6, 4] : []
-                        )
-                    )
+            .fcCardSurface(
+                role: .data,
+                strokeColor: isDropTargeted || isTourHighlighted ? FilmCanTheme.brandYellow : nil,
+                lineWidth: isDropTargeted || isTourHighlighted ? 2 : FCStroke.hairline,
+                dash: isDropTargeted ? [6, 4] : []
             )
             .shadow(color: isTourHighlighted ? FilmCanTheme.brandYellow.opacity(0.35) : .clear, radius: 10)
             .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
@@ -191,15 +184,15 @@ struct SourceListView: View {
                 }
                 .padding(10)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: FCRadius.inner)
                         .fill(FilmCanTheme.card)
                         .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: FCRadius.inner)
                         .stroke(FilmCanTheme.cardStroke, lineWidth: 1)
                 )
-                .cornerRadius(8)
+                .cornerRadius(FCRadius.inner)
                 .anchorPreference(key: DriveAnchorPreferenceKey.self, value: .bounds) { bounds in
                     DriveAnchorData(sources: [summary.id: bounds])
                 }

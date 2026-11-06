@@ -421,15 +421,27 @@ extension QuickCopyFormModel {
     }
 
     // MARK: Summary
-    /// One-line description of the chosen preset's options (nil with Preset = None).
-    var presetSummary: String? {
+    /// Short chips describing the chosen preset's options (nil with Preset = None).
+    var presetChips: [String]? {
         guard let p = selectedPreset else { return nil }
-        let policy = duplicatePolicyWasMapped
-            ? "Skip (preset says Ask each time)"
-            : p.duplicatePolicy.displayName
-        let copy = effectiveCopyFolderContents ? "contents only" : "whole folder"
-        return "\(effectiveVerification.displayName) verification · If exists: \(policy) · "
-            + "\(copy) · \(effectiveHashListStyle.shortName)"
+        let verify = effectiveVerification == .off
+            ? "No verification" : "\(effectiveVerification.displayName) check"
+        let policy = duplicatePolicyWasMapped ? OrganizationPreset.DuplicatePolicy.skip : p.duplicatePolicy
+        let existing: String
+        switch policy {
+        case .skip, .ask: existing = "Skip existing files"
+        case .overwrite: existing = "Overwrite existing files"
+        case .increment: existing = "Add counter if exists"
+        case .verify: existing = "Verify existing files"
+        }
+        return [verify, existing, effectiveCopyFolderContents ? "Contents only" : "Whole folder",
+                effectiveHashListStyle.shortName]
+    }
+
+    /// Tooltip for the "Ask each time" to Skip mapping (nil when it does not apply).
+    var presetChipsHelp: String? {
+        guard selectedPreset != nil, duplicatePolicyWasMapped else { return nil }
+        return "The preset says \"Ask each time\"; Quick Copy skips existing files instead."
     }
 }
 

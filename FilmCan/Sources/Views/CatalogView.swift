@@ -118,24 +118,50 @@ struct CatalogView: View {
                 Text(roll.rollName)
                     .font(FilmCanFont.title(13))
                     .foregroundColor(FilmCanTheme.textPrimary)
-                Text("\(roll.files.count) files · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))")
+                Text(roll.files.isEmpty
+                     ? "Files not indexed · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))"
+                     : "\(roll.files.count) files · \(Self.byteFormatter.string(fromByteCount: roll.totalBytes))")
                     .font(FilmCanFont.label(11))
                     .foregroundColor(FilmCanTheme.textTertiary)
             }
             Spacer(minLength: 8)
-            driveChips(roll.copies)
+            driveChips(roll.copies) { reveal($0, relPath: nil) }
             coverageBadge(roll.coverage)
         }
         .padding(.vertical, 4)
         .contextMenu {
-            if let copy = roll.copies.first(where: { isMounted($0) }) {
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting(
-                        [URL(fileURLWithPath: copy.rollFolderPath)])
-                }
-            }
+            revealMenu(roll.copies, relPath: nil)
+            Divider()
             Button("Forget this roll") { rollToForget = roll }
         }
+    }
+
+    private func distinctDrives(_ copies: [CatalogCopy]) -> [CatalogCopy] {
+        var seen = Set<String>()
+        return copies.filter { seen.insert($0.driveKey).inserted }
+    }
+
+    @ViewBuilder
+    private func revealMenu(_ copies: [CatalogCopy], relPath: String?) -> some View {
+        ForEach(distinctDrives(copies), id: \.driveKey) { copy in
+            if isMounted(copy) {
+                Button("Reveal on \(copy.destVolumeName)") { reveal(copy, relPath: relPath) }
+            } else {
+                Button("Reveal on \(copy.destVolumeName) (not connected)") {}
+                    .disabled(true)
+            }
+        }
+    }
+
+    /// Selects the file when it exists on that drive, otherwise the roll folder.
+    private func reveal(_ copy: CatalogCopy, relPath: String?) {
+        let folder = URL(fileURLWithPath: copy.rollFolderPath)
+        var target = folder
+        if let relPath {
+            let file = folder.appendingPathComponent(relPath)
+            if FileManager.default.fileExists(atPath: file.path) { target = file }
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([target])
     }
 
     private func isMounted(_ copy: CatalogCopy) -> Bool {
@@ -143,18 +169,17 @@ struct CatalogView: View {
         return FileManager.default.fileExists(atPath: copy.rollFolderPath)
     }
 
-    /// One chip per distinct drive.
-    private func driveChips(_ copies: [CatalogCopy]) -> some View {
-        var seen = Set<String>()
-        let distinct = copies.filter { seen.insert($0.driveKey).inserted }
-        return HStack(spacing: 6) {
-            ForEach(distinct, id: \.driveKey) { copy in
+    /// One chip per distinct drive; a connected chip reveals the item on that drive.
+    private func driveChips(_ copies: [CatalogCopy], onReveal: @escaping (CatalogCopy) -> Void) -> some View {
+        HStack(spacing: 6) {
+            ForEach(distinctDrives(copies), id: \.driveKey) { copy in
+                let connected = isMounted(copy)
+                Button { onReveal(copy) } label: {
                 HStack(spacing: 4) {
                     Circle()
                         .strokeBorder(FilmCanTheme.textSecondary, lineWidth: 1)
                         .background(Circle().fill(isMounted(copy) ? FilmCanTheme.textPrimary : Color.clear))
                         .frame(width: 7, height: 7)
-                        .help(isMounted(copy) ? "Connected" : "Not connected")
                     Text(copy.destVolumeName)
                         .font(FilmCanFont.label(11))
                         .foregroundColor(FilmCanTheme.textPrimary)
@@ -163,6 +188,12 @@ struct CatalogView: View {
                 .padding(.vertical, 3)
                 .background(copy.verified ? FilmCanTheme.brandGreen.opacity(0.25) : FilmCanTheme.card)
                 .cornerRadius(6)
+                .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!connected)
+                .help(connected ? "Reveal on \(copy.destVolumeName)" : "\(copy.destVolumeName) not connected")
+                .accessibilityLabel(connected ? "Reveal on \(copy.destVolumeName)" : "\(copy.destVolumeName), not connected")
             }
         }
     }
@@ -205,9 +236,19 @@ struct CatalogView: View {
                                     .foregroundColor(FilmCanTheme.textTertiary)
                             }
                             Spacer(minLength: 8)
-                            driveChips(hit.copies)
+                            driveChips(hit.copies) { reveal($0, relPath: hit.file.relPath) }
+                            if let roll = store.rolls.first(where: { $0.id == hit.rollId }) {
+                                coverageBadge(roll.coverage)
+                            }
                         }
                         .padding(.vertical, 3)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            if let copy = hit.copies.first(where: { isMounted($0) }) {
+                                reveal(copy, relPath: hit.file.relPath)
+                            }
+                        }
+                        .contextMenu { revealMenu(hit.copies, relPath: hit.file.relPath) }
                     }
                     if hits.count >= limit {
                         Text("Showing first \(limit) results")

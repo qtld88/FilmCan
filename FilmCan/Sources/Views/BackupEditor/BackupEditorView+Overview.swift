@@ -29,15 +29,7 @@ extension BackupEditorView {
                 isTourHighlighted: appState.activeTourTargetId == "sourcePanel",
                 showsTitle: false,
                 headerView: AnyView(
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(FilmCanTheme.brandYellow)
-                            .frame(width: 8, height: 8)
-                        Text("COPY FROM")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        Spacer()
-                    }
+                    FCCardHeader(title: "COPY FROM", dot: FilmCanTheme.brandYellow)
                 ),
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
@@ -70,15 +62,7 @@ extension BackupEditorView {
                 refreshToken: driveRefreshCounter,
                 showsTitle: false,
                 headerView: AnyView(
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(FilmCanTheme.brandYellow)
-                            .frame(width: 8, height: 8)
-                        Text("SAVE TO")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        Spacer()
-                    }
+                    FCCardHeader(title: "SAVE TO", dot: FilmCanTheme.brandYellow)
                 ),
                 footerView: nil,
                 isTourHighlighted: appState.activeTourTargetId == "destinationPanel",
@@ -138,15 +122,7 @@ extension BackupEditorView {
                 isTourHighlighted: appState.activeTourTargetId == "sourcePanel",
                 showsTitle: false,
                 headerView: AnyView(
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(FilmCanTheme.brandYellow)
-                            .frame(width: 8, height: 8)
-                        Text("COPY FROM")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        Spacer()
-                    }
+                    FCCardHeader(title: "COPY FROM", dot: FilmCanTheme.brandYellow)
                 ),
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
@@ -181,15 +157,7 @@ extension BackupEditorView {
                 refreshToken: driveRefreshCounter,
                 showsTitle: false,
                 headerView: AnyView(
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(FilmCanTheme.brandYellow)
-                            .frame(width: 8, height: 8)
-                        Text("SAVE TO")
-                            .font(FilmCanFont.label(13))
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        Spacer()
-                    }
+                    FCCardHeader(title: "SAVE TO", dot: FilmCanTheme.brandYellow)
                 ),
                 footerView: nil,
                 isTourHighlighted: appState.activeTourTargetId == "destinationPanel",

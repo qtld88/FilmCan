@@ -38,63 +38,60 @@ private struct QCPanel<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
-            content
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background)
-        .overlay(border)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    @ViewBuilder private var header: some View {
         switch style {
         case .data(let icon, let accent):
-            let accentColor = accent ?? FilmCanTheme.brandYellow
-            HStack(spacing: 8) {
-                if let icon {
-                    Image(systemName: icon)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(accentColor)
-                }
-                Text(title).font(FilmCanFont.title(16)).foregroundColor(FilmCanTheme.textPrimary)
-                Spacer()
-                if let trailing {
-                    Text(trailing).font(FilmCanFont.label(11)).foregroundColor(FilmCanTheme.textSecondary)
-                }
-            }
-            .padding(.bottom, 2)
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(accentColor).frame(height: 2).offset(y: 6)
-            }
-            .padding(.bottom, 6)
+            FCCard(title: title, trailing: trailing, role: .data, dot: icon == nil ? FilmCanTheme.brandYellow : nil,
+                   icon: icon, accent: accent ?? FilmCanTheme.brandYellow) { content }
         case .settings:
-            HStack(spacing: 6) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(title).font(FilmCanFont.label(11))
-                Spacer()
-                if let trailing {
-                    Text(trailing).font(FilmCanFont.body(11))
-                }
-            }
-            .foregroundColor(FilmCanTheme.textTertiary)
+            FCCard(title: title, trailing: trailing, role: .settings, icon: "slider.horizontal.3") { content }
         }
     }
+}
 
-    private var background: Color {
-        if case .data = style { return FilmCanTheme.panel }
-        return FilmCanTheme.settingsCard
+private struct QCChipFlow: View {
+    let chips: [String]
+
+    var body: some View {
+        QCWrapLayout(spacing: 6) {
+            ForEach(chips, id: \.self) { chip in
+                Text(chip)
+                    .font(FilmCanFont.label(11))
+                    .foregroundColor(FilmCanTheme.textPrimary)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Capsule().fill(FilmCanTheme.background.opacity(0.7)))
+                    .overlay(Capsule().stroke(FilmCanTheme.cardStroke, lineWidth: 1))
+            }
+        }
+    }
+}
+
+private struct QCWrapLayout: Layout {
+    var spacing: CGFloat
+
+    private func place(_ subviews: Subviews, in width: CGFloat) -> (positions: [CGPoint], size: CGSize) {
+        var positions: [CGPoint] = []
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0; y += rowHeight + spacing; rowHeight = 0
+            }
+            positions.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return (positions, CGSize(width: maxX, height: y + rowHeight))
     }
 
-    @ViewBuilder private var border: some View {
-        switch style {
-        case .data:
-            RoundedRectangle(cornerRadius: 8).stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1)
-        case .settings:
-            RoundedRectangle(cornerRadius: 8).stroke(FilmCanTheme.cardStroke, lineWidth: 1)
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        place(subviews, in: proposal.width ?? .infinity).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = place(subviews, in: bounds.width)
+        for (view, point) in zip(subviews, result.positions) {
+            view.place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y), proposal: .unspecified)
         }
     }
 }
@@ -116,6 +113,7 @@ private struct QCSettingRow<Control: View>: View {
 
 struct QuickCopySetupView: View {
     @ObservedObject var session: QuickCopySession
+    @State private var treeExpanded = false
 
     private var totalBytes: Int64 {
         session.form.items.compactMap { session.sizes[$0.path] }.reduce(0, +)
@@ -152,14 +150,12 @@ struct QuickCopySetupView: View {
         VStack(spacing: 0) {
             ScrollView {
                 HStack(alignment: .top, spacing: 10) {
-                    sourcesPanel
-                        .frame(width: 300)
-                    flowArrow
                     VStack(alignment: .leading, spacing: 10) {
+                        sourcesPanel
                         settingsPanel
                         if session.form.selectedPresetId == nil { savePresetPanel }
                     }
-                    .frame(width: 300)
+                    .frame(minWidth: 300, idealWidth: 340, maxWidth: 380)
                     flowArrow
                     destinationsPanel
                         .frame(minWidth: 340, maxWidth: .infinity)
@@ -188,34 +184,42 @@ struct QuickCopySetupView: View {
                     + (totalSize.isEmpty ? "" : " · \(totalSize)"),
                 style: .data()) {
             ForEach(Array(session.form.items.enumerated()), id: \.element.id) { index, item in
-                HStack(spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     Text("\(index + 1)")
                         .font(FilmCanFont.label(11))
                         .foregroundColor(.black)
                         .frame(width: 20, height: 20)
                         .background(Circle().fill(FilmCanTheme.brandYellow))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Label(item.name, systemImage: item.kind == .sound ? "waveform" : "sdcard.fill")
-                            .font(FilmCanFont.label(13)).lineLimit(1)
-                        Text(item.path).font(FilmCanFont.body(10))
-                            .foregroundColor(FilmCanTheme.textTertiary)
-                            .lineLimit(1).truncationMode(.middle)
-                    }
-                    Spacer()
-                    if let bytes = session.sizes[item.path] {
-                        Text(FilmCanFormatters.bytes(bytes))
-                            .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
-                    }
-                    if session.form.showsMediaKind {
-                        Picker("", selection: $session.form.items[index].kind) {
-                            ForEach(SourceMediaKind.allCases) { Text($0.displayName).tag($0) }
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 8) {
+                            Label(item.name, systemImage: item.kind == .sound ? "waveform" : "sdcard.fill")
+                                .font(FilmCanFont.label(13)).lineLimit(1).truncationMode(.middle)
+                                .help(item.name)
+                            Spacer(minLength: 4)
+                            if let bytes = session.sizes[item.path] {
+                                Text(FilmCanFormatters.bytes(bytes))
+                                    .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
+                                    .fixedSize()
+                            }
                         }
-                        .labelsHidden().frame(width: 90)
-                    }
-                    if session.form.items.count > 1 {
-                        Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
-                            .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
-                            .help("Remove source")
+                        HStack(spacing: 8) {
+                            Text(item.path).font(FilmCanFont.body(10))
+                                .foregroundColor(FilmCanTheme.textTertiary)
+                                .lineLimit(1).truncationMode(.middle)
+                                .help(item.path)
+                            Spacer(minLength: 4)
+                            if session.form.showsMediaKind {
+                                Picker("", selection: $session.form.items[index].kind) {
+                                    ForEach(SourceMediaKind.allCases) { Text($0.displayName).tag($0) }
+                                }
+                                .labelsHidden().frame(width: 90)
+                            }
+                            if session.form.items.count > 1 {
+                                Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
+                                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
+                                    .help("Remove source")
+                            }
+                        }
                     }
                 }
             }
@@ -251,13 +255,28 @@ struct QuickCopySetupView: View {
                         .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                         .help("Remove destination")
                 }
-                folderTree(for: path, autoEdit: index == 0)
+                if !sharedTree { folderTree(for: path, autoEdit: index == 0) }
             }
             Button { session.addDestinationViaPanel() } label: {
                 Label("Add destination", systemImage: "plus")
             }
             .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+            if sharedTree, let first = session.form.destinations.first {
+                Divider().padding(.vertical, 2)
+                Text("Folders on every drive")
+                    .font(FilmCanFont.label(11)).foregroundColor(FilmCanTheme.textSecondary)
+                folderTree(for: first, autoEdit: true)
+            }
         }
+    }
+
+    /// One tree stands for every destination unless they would differ (a folder that
+    /// exists on one drive only changes the "new" highlight).
+    private var sharedTree: Bool {
+        let destinations = session.form.destinations
+        guard let first = destinations.first else { return false }
+        let reference = session.form.treePreview(for: first)
+        return destinations.dropFirst().allSatisfy { session.form.treePreview(for: $0) == reference }
     }
 
     // Settings
@@ -269,8 +288,8 @@ struct QuickCopySetupView: View {
                     ForEach(session.form.savedPresets) { Text($0.name).tag(UUID?.some($0.id)) }
                 }
             }
-            if let summary = session.form.presetSummary {
-                Text(summary).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
+            if let chips = session.form.presetChips {
+                QCChipFlow(chips: chips).help(session.form.presetChipsHelp ?? "")
                 Button("Edit in FilmCan…") { QuickCopyCoordinator.shared.showMainWindow() }
                     .buttonStyle(.link)
             } else {
@@ -320,9 +339,20 @@ struct QuickCopySetupView: View {
     @ViewBuilder
     private func folderTree(for destination: String, autoEdit: Bool) -> some View {
         let lines = session.form.treePreview(for: destination)
+        let isHidden: (QuickCopyFormModel.TreeLine) -> Bool = { $0.depth >= 2 && !($0.isEditable && $0.name.isEmpty) }
+        let hiddenCount = lines.filter(isHidden).count
         if !lines.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
+                if hiddenCount > 0 || treeExpanded {
+                    Button { treeExpanded.toggle() } label: {
+                        Label(treeExpanded ? "Show less" : "Show all (\(hiddenCount) more)",
+                              systemImage: treeExpanded ? "chevron.up" : "chevron.down")
+                            .font(FilmCanFont.body(10))
+                    }
+                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+                }
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                  if treeExpanded || !isHidden(line) {
                     QCTreeRow(
                         line: line,
                         edited: session.form.isFolderNameEdited(root: line.isRoot, kind: line.mediaKind),
@@ -337,6 +367,7 @@ struct QuickCopySetupView: View {
                             else if let kind = line.mediaKind { session.form.mediaFolderNames[kind] = nil }
                         })
                     .padding(.leading, CGFloat(line.depth) * 16)
+                  }
                 }
             }
             .padding(8)

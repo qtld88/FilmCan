@@ -165,13 +165,7 @@ extension BackupEditorView {
             .contentShape(Rectangle())
             .onTapGesture { isExpanded.wrappedValue.toggle() }
         }
-        .padding(12)
-        .background(FilmCanTheme.panel)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(FilmCanTheme.cardStroke, lineWidth: 1)
-        )
+        .fcCardSurface(role: .data)
         .frame(width: width, alignment: .leading)
         .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
@@ -209,13 +203,7 @@ extension BackupEditorView {
         }
         .onAppear { if selectedOptionsTab == .destinations { scheduleDestinationsLoad() } }
         .onChange(of: selectedOptionsTab) { if $0 == .destinations { scheduleDestinationsLoad() } }
-        .padding(12)
-        .background(FilmCanTheme.settingsCard)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(FilmCanTheme.cardStroke, lineWidth: 1)
-        )
+        .fcCardSurface(role: .settings)
         .frame(minWidth: isWide ? 600 : nil, maxWidth: .infinity, alignment: .leading)
     }
 

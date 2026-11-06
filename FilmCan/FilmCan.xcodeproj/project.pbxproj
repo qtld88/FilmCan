@@ -95,6 +95,7 @@
 		76FFAC074FCE73E27D1D935B /* MediaCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C12EAE285D77C1BCB10BD3E /* MediaCatalogTests.swift */; };
 		787DD0894D87EF93B4C3D695 /* MainThreadWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 461775DA159F8BCD137BF26C /* MainThreadWatchdogTests.swift */; };
 		79458448EEA736E0D35A9E42 /* QuickCopyViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A9D8D70328C2CB09CE64786 /* QuickCopyViews.swift */; };
+		7A9B503E6B5097B65FC075A1 /* FCCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 312EFE8F6ADBEC0FC91E0A38 /* FCCard.swift */; };
 		7E0BCE6EA9ADCC0AA0BC33A5 /* DriveSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA00DEC86FD446A9F34B5B32 /* DriveSettingsView.swift */; };
 		7E135086E0399B9B614CF679 /* BackupLogWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */; };
 		7E7F9A215F183FD32052AF27 /* AppIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = E25E2599CEF3906032A4D5A9 /* AppIcon.png */; };
@@ -279,6 +280,7 @@
 		2F67DC91E4B3EC90EB8F6AFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3066C90EFA131CD742855EB5 /* FanOutCopierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierTests.swift; sourceTree = "<group>"; };
 		306E45648061C026B8F28A6A /* RollNumberingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollNumberingEngineTests.swift; sourceTree = "<group>"; };
+		312EFE8F6ADBEC0FC91E0A38 /* FCCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FCCard.swift; sourceTree = "<group>"; };
 		31E297808A920BE36CE33E0B /* ASCMHLConformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASCMHLConformanceTests.swift; sourceTree = "<group>"; };
 		35F60B4F314EB312BB4E580F /* IOPerfProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOPerfProbe.swift; sourceTree = "<group>"; };
 		3622B8C4F47A914F473D8798 /* LogFolderNamer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogFolderNamer.swift; sourceTree = "<group>"; };
@@ -670,6 +672,7 @@
 				2397C31C6386DF722864F2E6 /* DriveIncludeColumn.swift */,
 				0F0DD06EC7ECB97D8645DF6A /* ExFATBanner.swift */,
 				C6B85F2C3736A9CE8AB9E8BA /* FanOutProgressBar.swift */,
+				312EFE8F6ADBEC0FC91E0A38 /* FCCard.swift */,
 				DA7F0ABBEEA210F59B2886C1 /* InlineFanOutProgress.swift */,
 				F7BE5C204AB2FB815099B2D4 /* RollIdentitySheet.swift */,
 				9ACBAAD91D37D9498AEBBEC2 /* StorageErrorBanner.swift */,
@@ -1067,6 +1070,7 @@
 				AC0D7BA40F0814AB5305A2ED /* EngineOptions.swift in Sources */,
 				8FA18785A60525202826D859 /* ExFATBanner.swift in Sources */,
 				9A5D1736A87B604795828764 /* Extensions.swift in Sources */,
+				7A9B503E6B5097B65FC075A1 /* FCCard.swift in Sources */,
 				D7A83C90CEDD75D5EA772503 /* FailedDestRetryPanel.swift in Sources */,
 				029978F378E16E78F04A2F82 /* FanOutCopier.swift in Sources */,
 				1AB7A04FDB21CBA5B2E08A68 /* FanOutProgressBar.swift in Sources */,

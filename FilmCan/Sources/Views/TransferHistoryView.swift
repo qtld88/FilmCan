@@ -14,11 +14,6 @@ struct TransferHistoryView: View {
     @State private var deleteCandidate: TransferHistoryEntry? = nil
     @State private var sortOption: HistorySortOption = .mostRecent
     @State private var historyCounts: [UUID: HistoryCounts] = [:]
-    private let historyCardOuter = Color(red: 56.0 / 255.0, green: 56.0 / 255.0, blue: 56.0 / 255.0)
-    private let historyCardMiddle = Color(white: 0.4)
-    private let historyCardInner = Color(red: 56.0 / 255.0, green: 56.0 / 255.0, blue: 56.0 / 255.0)
-    private let historyCardStroke = Color(white: 0.16)
-    private let historyCardStrokeStrong = Color(white: 0.12)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -208,18 +203,18 @@ struct TransferHistoryView: View {
         let bottomPadding = stickerHeight + 20
         let outerStrokeColor = entry.success ? FilmCanTheme.brandGreen : FilmCanTheme.brandRed
         return ZStack {
-            RoundedRectangle(cornerRadius: 40)
-                .fill(historyCardOuter)
-            RoundedRectangle(cornerRadius: 40)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Source.outerRadius)
+                .fill(FCHistoryCard.outer)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Source.outerRadius)
                 .stroke(outerStrokeColor, lineWidth: 1)
-            RoundedRectangle(cornerRadius: 35)
-                .fill(historyCardMiddle)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Source.innerRadius)
+                .fill(FCHistoryCard.middle)
                 .padding(lightInset)
-            RoundedRectangle(cornerRadius: 35)
-                .fill(historyCardInner)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Source.innerRadius)
+                .fill(FCHistoryCard.inner)
                 .padding(innerInset)
-            RoundedRectangle(cornerRadius: 35)
-                .stroke(historyCardStrokeStrong, lineWidth: 1)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Source.innerRadius)
+                .stroke(FCHistoryCard.strokeStrong, lineWidth: 1)
                 .padding(lightInset)
 
             VStack(spacing: 8) {
@@ -473,18 +468,18 @@ struct TransferHistoryView: View {
         let bottomPadding = stickerHeight + 20
         let outerStrokeColor = result.success ? FilmCanTheme.brandGreen : FilmCanTheme.brandRed
         return ZStack {
-            RoundedRectangle(cornerRadius: 26)
-                .fill(historyCardOuter)
-            RoundedRectangle(cornerRadius: 26)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Destination.outerRadius)
+                .fill(FCHistoryCard.outer)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Destination.outerRadius)
                 .stroke(outerStrokeColor, lineWidth: 1)
-            RoundedRectangle(cornerRadius: 20)
-                .fill(historyCardMiddle)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Destination.middleRadius)
+                .fill(FCHistoryCard.middle)
                 .padding(lightInset)
-            RoundedRectangle(cornerRadius: 15)
-                .fill(historyCardInner)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Destination.coreRadius)
+                .fill(FCHistoryCard.inner)
                 .padding(innerInset)
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(historyCardStrokeStrong, lineWidth: 1)
+            RoundedRectangle(cornerRadius: FCHistoryCard.Destination.middleRadius)
+                .stroke(FCHistoryCard.strokeStrong, lineWidth: 1)
                 .padding(lightInset)
 
             VStack(spacing: 8) {
@@ -931,14 +926,14 @@ struct TransferHistoryView: View {
 
     private func historySticker(text: String) -> some View {
         Text(text)
-            .font(FilmCanFont.label(10))
+            .font(FilmCanFont.label(11))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .foregroundColor(FilmCanTheme.textPrimary)
+            .foregroundColor(FCHistoryCard.stickerText)
             .padding(.horizontal, 6)
             .frame(width: 100, height: 31)
             .background(FilmCanTheme.brandGreen)
-            .clipShape(TopRoundedRectangle(radius: 10))
+            .clipShape(TopRoundedRectangle(radius: FCRadius.card))
             .frame(maxWidth: .infinity, alignment: .center)
     }
 

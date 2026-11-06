@@ -291,18 +291,31 @@ final class QuickCopyFormModelTests: XCTestCase {
     }
 
     // MARK: Summary line
-    func test_presetSummary_mentionsMappedAsk() {
+    func test_presetChips_mappedAskBecomesSkipWithHelp() {
         var form = QuickCopyFormModel(items: [dir("A001")])
         var p = netflixLike()
         p.duplicatePolicy = .ask
         form.savedPresets = [p]
         form.selectedPresetId = p.id
-        let summary = form.presetSummary ?? ""
-        XCTAssertTrue(summary.contains("Fast"), summary)
-        XCTAssertTrue(summary.contains("Skip"), summary)
-        XCTAssertTrue(summary.contains("Ask each time"), summary)
+        let chips = form.presetChips ?? []
+        XCTAssertTrue(chips.contains("Fast check"), "\(chips)")
+        XCTAssertTrue(chips.contains("Skip existing files"), "\(chips)")
+        XCTAssertTrue(chips.contains("ASC MHL"), "\(chips)")
+        XCTAssertEqual(chips.count, 4)
+        XCTAssertTrue(form.presetChipsHelp?.contains("Ask each time") == true)
         form.selectedPresetId = nil
-        XCTAssertNil(form.presetSummary)
+        XCTAssertNil(form.presetChips)
+        XCTAssertNil(form.presetChipsHelp)
+    }
+
+    func test_presetChips_overwriteHasNoHelp() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var p = netflixLike()
+        p.duplicatePolicy = .overwrite
+        form.savedPresets = [p]
+        form.selectedPresetId = p.id
+        XCTAssertTrue(form.presetChips?.contains("Overwrite existing files") == true)
+        XCTAssertNil(form.presetChipsHelp)
     }
 
     // MARK: Folder tree preview

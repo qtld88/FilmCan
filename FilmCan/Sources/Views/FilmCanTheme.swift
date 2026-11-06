@@ -42,7 +42,7 @@ enum FilmCanTheme {
     /// Settings card grey — darker than `panel`/`card` so the settings card reads as
     /// distinct from the Copy From / Save To data cards.
     static var settingsCard: Color {
-        Color(hex: 0x1F1F1F)
+        sidebar
     }
     static var cardStroke: Color {
         textPrimary.opacity(0.2)
@@ -113,6 +113,25 @@ enum FCCapacity {
         if backupFraction > 0.8 { return FilmCanTheme.brandRed }
         if backupFraction > 0.6 { return FilmCanTheme.brandOrange }
         return FilmCanTheme.brandGreen
+    }
+}
+
+enum FCHistoryCard {
+    static let outer = Color(hex: 0x383838)
+    static let middle = Color(white: 0.4)
+    static let inner = Color(hex: 0x383838)
+    static let strokeStrong = Color(white: 0.12)
+    // Black on #3B9953 is 5.87:1; the light text colour was 3.2:1.
+    static let stickerText = Color.black
+
+    enum Source {
+        static let outerRadius: CGFloat = 40
+        static let innerRadius: CGFloat = 35
+    }
+    enum Destination {
+        static let outerRadius: CGFloat = 26
+        static let middleRadius: CGFloat = 20
+        static let coreRadius: CGFloat = 15
     }
 }
 
