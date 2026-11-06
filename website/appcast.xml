@@ -6,6 +6,20 @@
         <description>Most recent changes for FilmCan.</description>
         <language>en</language>
         <item>
+            <title>Version 1.5.0</title>
+            <pubDate>Fri, 06 Nov 2026 09:47:39 +0000</pubDate>
+            <sparkle:version>38</sparkle:version>
+            <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description>FilmCan 1.5.0 — Quick Copy, Catalog, PDF reports, roll numbering
+
+Copy straight from the Finder (right-click › Services › FilmCan Copy), find
+any clip and the drives that hold it in the Catalog, get a PDF report per
+destination, and let FilmCan name rolls and recognise camera cards. The
+main window and Quick Copy now share one clearer, more readable design.</description>
+            <enclosure url="https://github.com/qtld88/FilmCan/releases/download/Release_1.5.0/FilmCan-1.5.0-universal.dmg" sparkle:edSignature="Ew6jMIwehtpd1mLJuyezRvVDFoHIn5Xt12+6EmTODVZlAPlv4HHjx7fXJPgEohdQb7xqr+kXltCbMqGTGldSCA==" length="14060325" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 1.4.2</title>
             <pubDate>Sat, 08 Aug 2026 22:39:41 +0000</pubDate>
             <sparkle:version>37</sparkle:version>
