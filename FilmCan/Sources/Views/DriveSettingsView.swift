@@ -12,6 +12,8 @@ struct DriveSettingsView: View {
                     .foregroundColor(.secondary)
             }
         }
+        .formStyle(.grouped)
         .padding()
+        .padding(.top, 30)
     }
 }

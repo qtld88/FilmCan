@@ -37,15 +37,15 @@ struct FilmCanApp: App {
                 }
                 .keyboardShortcut("b", modifiers: .command)
                 
-                Button("Add Source") {
+                Button("Add Source…") {
                     NotificationCenter.default.post(name: .filmCanHotkeyAddSource, object: nil)
                 }
-                .keyboardShortcut("s", modifiers: .command)
+                .keyboardShortcut("o", modifiers: [.command, .shift])
                 
-                Button("Add Destination") {
+                Button("Add Destination…") {
                     NotificationCenter.default.post(name: .filmCanHotkeyAddDestination, object: nil)
                 }
-                .keyboardShortcut("d", modifiers: .command)
+                .keyboardShortcut("o", modifiers: [.command, .option])
                 
                 Button("Refresh Drives") {
                     NotificationCenter.default.post(name: .filmCanHotkeyRefreshDrives, object: nil)

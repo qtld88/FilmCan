@@ -48,6 +48,9 @@ struct FanOutProgressBar: View {
             }
         }
         .frame(height: 12)
+        .accessibilityElement()
+        .accessibilityLabel("Backup progress")
+        .accessibilityValue("\(Int(safeCopy * 100)) percent copied, \(Int(safeVerify * 100)) percent verified")
     }
 }
 

@@ -72,7 +72,7 @@ extension BackupEditorView {
                 headerView: AnyView(
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(FilmCanTheme.brandOrange)
+                            .fill(FilmCanTheme.brandYellow)
                             .frame(width: 8, height: 8)
                         Text("SAVE TO")
                             .font(FilmCanFont.label(13))
@@ -183,7 +183,7 @@ extension BackupEditorView {
                 headerView: AnyView(
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(FilmCanTheme.brandOrange)
+                            .fill(FilmCanTheme.brandYellow)
                             .frame(width: 8, height: 8)
                         Text("SAVE TO")
                             .font(FilmCanFont.label(13))

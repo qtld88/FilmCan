@@ -84,6 +84,61 @@ enum FilmCanTheme {
     static var highlight: Color {
         brandYellow.opacity(0.2)
     }
+
+    // Fill green #3B9953 is 4.0:1 on a card (fails WCAG AA); text needs 4.5:1.
+    static var successText: Color {
+        let stored = UserDefaults.standard.string(forKey: "appearanceSuccessHex")
+        if stored == nil || stored?.uppercased() == AppearanceDefaults.successHex {
+            return Color(hex: 0x52B86B)
+        }
+        return brandGreen
+    }
+    // brandRed is 3.8:1 on a card; this shade is 5.2:1.
+    static var dangerText: Color {
+        Color(hex: 0xF2786A)
+    }
+}
+
+// Bars sit on different backgrounds (window vs card): drawing every segment over the
+// opaque track keeps the translucent "to copy" colour identical in both windows.
+enum FCCapacity {
+    static let track = Color(hex: 0x3A3A3C)
+    static let free = track
+    static let used = Color(hex: 0x8A8A8E)
+    static let toCopyOpacity = 0.6
+
+    static func toCopyColor(ratioToAvailable: Double?, backupFraction: Double, alreadyStored: Bool) -> Color {
+        if alreadyStored { return FilmCanTheme.brandGreen }
+        if let ratio = ratioToAvailable, ratio > 1.0 { return FilmCanTheme.brandRed }
+        if backupFraction > 0.8 { return FilmCanTheme.brandRed }
+        if backupFraction > 0.6 { return FilmCanTheme.brandOrange }
+        return FilmCanTheme.brandGreen
+    }
+}
+
+struct FCPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        FCPrimaryButtonBody(configuration: configuration)
+    }
+
+    private struct FCPrimaryButtonBody: View {
+        let configuration: ButtonStyle.Configuration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(FilmCanFont.label(13))
+                .foregroundColor(isEnabled ? .black : FilmCanTheme.textTertiary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(FilmCanTheme.brandYellow.opacity(isEnabled ? 1 : 0.3))
+                )
+                .opacity(configuration.isPressed ? 0.8 : 1)
+                .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
 }
 
 enum FilmCanFont {

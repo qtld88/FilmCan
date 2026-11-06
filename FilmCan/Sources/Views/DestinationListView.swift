@@ -224,7 +224,7 @@ struct DestinationListView: View {
                                 }
                                 Text(summary.connectionMessage)
                                     .font(FilmCanFont.body(10))
-                                    .foregroundColor(FilmCanTheme.brandRed)
+                                    .foregroundColor(FilmCanTheme.dangerText)
                             }
                             .padding(.leading, 26)
                         }
@@ -513,7 +513,7 @@ struct DestinationListView: View {
                     transferViewModel.cancelAll(for: configId)
                 }
                 .buttonStyle(.bordered)
-                .tint(.red)
+                .tint(FilmCanTheme.dangerText)
                 .disabled(transferViewModel.isCancellingAll)
                 if transferViewModel.isCancellingAll, isActiveTransfer {
                     HStack(spacing: 6) {
@@ -560,10 +560,10 @@ struct DestinationListView: View {
             if info.ratioToAvailable.map({ $0 > 1.0 }) == true {
                 HStack(spacing: 4) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
+                        .foregroundColor(FilmCanTheme.dangerText)
                     Text("Not enough space!")
                         .font(FilmCanFont.label(11))
-                        .foregroundColor(.red)
+                        .foregroundColor(FilmCanTheme.dangerText)
                 }
             }
             capacityLegend(info: info, treatBackupAsUsed: backupStoredOnDrive)
@@ -607,16 +607,16 @@ struct DestinationListView: View {
     private func capacityLegend(info: CapacityInfo, treatBackupAsUsed: Bool = false) -> some View {
         let backupLabel = treatBackupAsUsed ? "already there" : "for backup"
         return HStack(spacing: 12) {
-            legendDot(color: info.freeColor)
-            Text("\(info.freePercent)% will remain free")
+            legendDot(color: info.usedColor)
+            Text("\(info.usedPercent)% already full")
                 .font(FilmCanFont.body(10))
                 .foregroundColor(FilmCanTheme.textSecondary)
-            legendDot(color: info.backupSegmentColor.opacity(0.6))
+            legendDot(color: info.backupSegmentColor.opacity(FCCapacity.toCopyOpacity))
             Text("\(info.backupPercent)% \(backupLabel)")
                 .font(FilmCanFont.body(10))
                 .foregroundColor(FilmCanTheme.textSecondary)
-            legendDot(color: info.usedColor)
-            Text("\(info.usedPercent)% already full")
+            legendDot(color: info.freeColor)
+            Text("\(info.freePercent)% will remain free")
                 .font(FilmCanFont.body(10))
                 .foregroundColor(FilmCanTheme.textSecondary)
         }
@@ -664,7 +664,7 @@ struct DestinationListView: View {
                 HStack(alignment: .top, spacing: 10) {
                     Text(failureText)
                         .font(FilmCanFont.label(14))
-                        .foregroundColor(FilmCanTheme.brandRed)
+                        .foregroundColor(FilmCanTheme.dangerText)
                         .multilineTextAlignment(.leading)
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
@@ -860,7 +860,7 @@ struct DestinationListView: View {
         case .failed:
             return AnyView(Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.red))
+                .foregroundColor(FilmCanTheme.brandRed))
         case .paused:
             return AnyView(Image(systemName: "stop.circle.fill")
                 .font(.system(size: 18, weight: .semibold))

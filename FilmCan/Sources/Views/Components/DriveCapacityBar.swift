@@ -48,20 +48,13 @@ struct DriveCapacityInfo {
         usedPercent = Int(round(usedRatio * 100))
         backupPercent = Int(round(backupRatio * 100))
         freePercent = max(0, 100 - usedPercent - backupPercent)
-        // Free space is the light grey; other-used space is the darker grey.
-        usedColor = Color.gray.opacity(0.55)
-        freeColor = Color.gray.opacity(0.22)
-        if treatBackupAsUsed {
-            backupSegmentColor = FilmCanTheme.brandGreen
-        } else if let ratio = ratioToAvailable, ratio > 1.0 {
-            backupSegmentColor = .red
-        } else if backupPercent > 80 {
-            backupSegmentColor = .red
-        } else if backupPercent > 60 {
-            backupSegmentColor = .orange
-        } else {
-            backupSegmentColor = FilmCanTheme.brandGreen
-        }
+        usedColor = FCCapacity.used
+        freeColor = FCCapacity.free
+        backupSegmentColor = FCCapacity.toCopyColor(
+            ratioToAvailable: ratioToAvailable,
+            backupFraction: backupRatio,
+            alreadyStored: treatBackupAsUsed
+        )
     }
 
     var notEnoughSpace: Bool { ratioToAvailable.map { $0 > 1.0 } == true }
@@ -75,23 +68,24 @@ struct DriveCapacityBar: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Rectangle()
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(FCCapacity.track)
                 if info.hasTotal {
                     HStack(spacing: 0) {
-                        Rectangle()
-                            .fill(info.freeColor)
-                            .frame(width: geo.size.width * info.freeRatio)
-                        Rectangle()
-                            .fill(info.backupSegmentColor.opacity(0.6))
-                            .frame(width: geo.size.width * info.backupRatio)
+                        // Same order as the main window's vertical bar read bottom to top.
                         Rectangle()
                             .fill(info.usedColor)
                             .frame(width: geo.size.width * info.usedRatio)
+                        Rectangle()
+                            .fill(info.backupSegmentColor.opacity(FCCapacity.toCopyOpacity))
+                            .frame(width: geo.size.width * info.backupRatio)
+                        Rectangle()
+                            .fill(info.freeColor)
+                            .frame(width: geo.size.width * info.freeRatio)
                     }
                     .animation(.easeInOut(duration: 0.5), value: requiredBytes)
                 } else {
                     Rectangle()
-                        .fill(info.backupSegmentColor.opacity(0.6))
+                        .fill(info.backupSegmentColor.opacity(FCCapacity.toCopyOpacity))
                         .frame(width: geo.size.width * min(1.0, info.ratioToAvailable ?? 0))
                         .animation(.easeInOut(duration: 0.5), value: requiredBytes)
                 }
@@ -99,5 +93,10 @@ struct DriveCapacityBar: View {
             .cornerRadius(4)
         }
         .frame(height: 12)
+        .accessibilityElement()
+        .accessibilityLabel("Drive space")
+        .accessibilityValue(info.hasTotal
+            ? "\(info.usedPercent) percent used, \(info.backupPercent) percent to copy, \(info.freePercent) percent free after"
+            : "Capacity unknown")
     }
 }

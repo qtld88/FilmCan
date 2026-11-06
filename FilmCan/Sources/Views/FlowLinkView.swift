@@ -167,7 +167,7 @@ struct FlowLinkView: View {
             usedRatio: usedRatio,
             backupRatio: backupRatio,
             freeRatio: freeRatio,
-            backupColor: FilmCanTheme.brandGreen.opacity(0.6),
+            backupColor: FilmCanTheme.brandGreen.opacity(FCCapacity.toCopyOpacity),
             backupOfUsedPercent: backupOfUsedPercent,
             driveName: node.name
         )
@@ -207,19 +207,11 @@ struct FlowLinkView: View {
         } else {
             ratioToAvailable = Double.infinity
         }
-        let backupPercent = total > 0 ? Double(backupBytes) / Double(total) : 0
-        let backupColor: Color
-        if isStored {
-            backupColor = FilmCanTheme.brandGreen
-        } else {
-            if let ratio = ratioToAvailable, ratio > 1.0 {
-                backupColor = .red
-            } else if backupPercent > 0.8 {
-                backupColor = .red
-            } else {
-                backupColor = FilmCanTheme.brandGreen
-            }
-        }
+        let backupColor = FCCapacity.toCopyColor(
+            ratioToAvailable: ratioToAvailable,
+            backupFraction: Double(backupRatio),
+            alreadyStored: isStored
+        )
 
         return makeDiskBarInfo(
             centerY: centerY,
@@ -228,7 +220,7 @@ struct FlowLinkView: View {
             usedRatio: usedRatio,
             backupRatio: backupRatio,
             freeRatio: freeRatio,
-            backupColor: backupColor.opacity(0.6),
+            backupColor: backupColor.opacity(FCCapacity.toCopyOpacity),
             backupOfUsedPercent: nil,
             driveName: node.name
         )
@@ -262,9 +254,8 @@ struct FlowLinkView: View {
                 usedHeight = max(0, usedHeight - remaining)
             }
         }
-        // Free space is the light grey; other-used space is the darker grey.
-        let usedColor = Color.gray.opacity(0.55)
-        let freeColor = Color.gray.opacity(0.22)
+        let usedColor = FCCapacity.used
+        let freeColor = FCCapacity.free
         let backupCenterY = rect.minY + freeHeight + backupHeight / 2
         let usedPercent = Int(round(usedRatio * 100))
         let backupPercent = Int(round(backupRatio * 100))
@@ -300,9 +291,10 @@ struct FlowLinkView: View {
 
     private func drawDiskBar(info: DiskBarInfo, context: GraphicsContext) {
         let rect = info.rect
-        let corner: CGFloat = 3
+        let corner: CGFloat = 4
         context.drawLayer { layer in
             layer.clip(to: Path(roundedRect: rect, cornerRadius: corner))
+            layer.fill(Path(rect), with: .color(FCCapacity.track))
             var cursor = rect.minY
             if info.freeHeight > 0 {
                 let freeRect = CGRect(x: rect.minX, y: cursor, width: rect.width, height: info.freeHeight)

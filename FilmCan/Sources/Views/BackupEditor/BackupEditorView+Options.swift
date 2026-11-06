@@ -522,16 +522,8 @@ extension BackupEditorView {
             .cornerRadius(8)
             .help("Refresh drives")
 
-            Button(action: { startTransfer() }) {
-                Text("Run Now")
-                    .font(FilmCanFont.label(13))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
-            .background(FilmCanTheme.brandYellow)
-            .cornerRadius(8)
+            Button("Run Now") { startTransfer() }
+            .buttonStyle(FCPrimaryButtonStyle())
             .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
         }
         .frame(maxWidth: .infinity)

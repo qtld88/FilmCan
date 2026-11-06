@@ -17,6 +17,8 @@ struct QuickCopyWindowView: View {
             }
         }
         .foregroundColor(FilmCanTheme.textPrimary)
+        .accentColor(FilmCanTheme.brandYellow)
+        .tint(FilmCanTheme.brandYellow)
     }
 }
 
@@ -24,8 +26,8 @@ struct QuickCopyWindowView: View {
 
 private enum QCPanelStyle {
     /// Copy From / Save To: the data cards, headed loud.
-    case data(icon: String? = nil)
-    /// Settings: recessed, darker, dashed — reads as "how", not "what".
+    case data(icon: String? = nil, accent: Color? = nil)
+    /// Settings: recessed and darker — reads as "how", not "what".
     case settings
 }
 
@@ -49,12 +51,13 @@ private struct QCPanel<Content: View>: View {
 
     @ViewBuilder private var header: some View {
         switch style {
-        case .data(let icon):
+        case .data(let icon, let accent):
+            let accentColor = accent ?? FilmCanTheme.brandYellow
             HStack(spacing: 8) {
                 if let icon {
                     Image(systemName: icon)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(FilmCanTheme.brandYellow)
+                    .foregroundColor(accentColor)
                 }
                 Text(title).font(FilmCanFont.title(16)).foregroundColor(FilmCanTheme.textPrimary)
                 Spacer()
@@ -64,7 +67,7 @@ private struct QCPanel<Content: View>: View {
             }
             .padding(.bottom, 2)
             .overlay(alignment: .bottom) {
-                Rectangle().fill(FilmCanTheme.brandYellow).frame(height: 2).offset(y: 6)
+                Rectangle().fill(accentColor).frame(height: 2).offset(y: 6)
             }
             .padding(.bottom, 6)
         case .settings:
@@ -91,8 +94,7 @@ private struct QCPanel<Content: View>: View {
         case .data:
             RoundedRectangle(cornerRadius: 8).stroke(FilmCanTheme.cardStrokeStrong, lineWidth: 1)
         case .settings:
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(FilmCanTheme.cardStroke, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            RoundedRectangle(cornerRadius: 8).stroke(FilmCanTheme.cardStroke, lineWidth: 1)
         }
     }
 }
@@ -128,13 +130,13 @@ struct QuickCopySetupView: View {
         let used = max(total - free, 0)
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 10) {
-                legendItem(info.backupSegmentColor.opacity(0.6), "\(FilmCanFormatters.bytes(toCopy)) to copy")
                 legendItem(info.usedColor, "\(FilmCanFormatters.bytes(used)) used")
+                legendItem(info.backupSegmentColor.opacity(FCCapacity.toCopyOpacity), "\(FilmCanFormatters.bytes(toCopy)) to copy")
                 legendItem(info.freeColor, "\(FilmCanFormatters.bytes(max(free - toCopy, 0))) left")
             }
             if info.notEnoughSpace {
                 Label("Not enough space", systemImage: "exclamationmark.triangle.fill")
-                    .font(FilmCanFont.label(11)).foregroundColor(.red)
+                    .font(FilmCanFont.label(11)).foregroundColor(FilmCanTheme.dangerText)
             }
         }
     }
@@ -357,13 +359,14 @@ struct QuickCopySetupView: View {
         let blocker = session.form.blocker
         return HStack {
             if let message = blocker?.message {
-                Text(message).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.brandRed)
+                Text(message).font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.dangerText)
                     .lineLimit(2)
             }
             Spacer()
             Button("Cancel") { session.window?.performClose(nil) }
                 .keyboardShortcut(.cancelAction)
             Button("Run") { session.run() }
+                .buttonStyle(FCPrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
                 .disabled(blocker != nil)
         }
@@ -480,6 +483,23 @@ struct QuickCopyProgressView: View {
 
     private var anySuccess: Bool { worker.results.contains { $0.success } }
 
+    private var allActiveDestsVerifying: Bool {
+        let active = worker.progress.perDestProgress.filter { dest in
+            guard destinations.contains(dest.id) else { return false }
+            if case .active = dest.status { return true }
+            return false
+        }
+        return !active.isEmpty && active.allSatisfy(\.isVerifyOnly)
+    }
+
+    private func cardAccent(for destination: String) -> Color {
+        if worker.alreadyBackedUp != nil { return FilmCanTheme.brandGreen }
+        if let result = result(for: destination) {
+            return result.success ? FilmCanTheme.brandGreen : FilmCanTheme.brandRed
+        }
+        return finished ? FilmCanTheme.brandRed : FilmCanTheme.brandYellow
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -536,7 +556,8 @@ struct QuickCopyProgressView: View {
                     Text("Finalizing…").font(FilmCanFont.title(18))
                 }
             } else {
-                Text(fullyFinished ? "Finished" : "Copying…").font(FilmCanFont.title(18))
+                Text(fullyFinished ? "Finished" : (allActiveDestsVerifying ? "Verifying…" : "Copying…"))
+                    .font(FilmCanFont.title(18))
             }
             Spacer()
             Text("\(session.form.items.count) item\(session.form.items.count == 1 ? "" : "s") → "
@@ -548,7 +569,7 @@ struct QuickCopyProgressView: View {
     @ViewBuilder
     private func destinationCard(_ destination: String) -> some View {
         let name = (destination as NSString).lastPathComponent
-        QCPanel(title: name.uppercased(), style: .data(icon: "externaldrive.fill")) {
+        QCPanel(title: name, style: .data(icon: "externaldrive.fill", accent: cardAccent(for: destination))) {
             ForEach(session.form.copyFolders(for: destination), id: \.self) { folder in
                 Button { openInFinder(folder, under: destination) } label: {
                     Label(folder, systemImage: "folder")
@@ -559,13 +580,13 @@ struct QuickCopyProgressView: View {
             }
             if worker.alreadyBackedUp != nil {
                 Label("Already backed up — nothing to copy", systemImage: "checkmark.circle.fill")
-                    .foregroundColor(FilmCanTheme.brandGreen)
+                    .foregroundColor(FilmCanTheme.successText)
             } else if let result = result(for: destination) {
                 resultRow(result)
             } else if finished {
                 let fallback = worker.results.first(where: { !$0.success })?.errorMessage
                 Label(fallback ?? "Not completed", systemImage: "xmark.circle.fill")
-                    .foregroundColor(FilmCanTheme.brandRed)
+                    .foregroundColor(FilmCanTheme.dangerText)
             } else {
                 let live = worker.progress.perDestProgress.first { $0.id == destination }
                     ?? DestProgress(id: destination, displayName: name, status: .preparing,
@@ -580,10 +601,11 @@ struct QuickCopyProgressView: View {
     private func resultRow(_ result: TransferResult) -> some View {
         if result.success {
             VStack(alignment: .leading, spacing: 4) {
+                FanOutProgressBar(copyFraction: 1, verifyFraction: 1, status: .complete)
                 let verified = session.form.effectiveVerification != .off
                 Label(verified ? "Copied and verified" : "Copied",
                       systemImage: "checkmark.circle.fill")
-                    .foregroundColor(FilmCanTheme.brandGreen)
+                    .foregroundColor(FilmCanTheme.successText)
                 Text("\(result.filesTransferred) file\(result.filesTransferred == 1 ? "" : "s") copied"
                      + (result.filesSkipped > 0 ? ", \(result.filesSkipped) already present" : ""))
                     .font(FilmCanFont.body(11)).foregroundColor(FilmCanTheme.textSecondary)
@@ -593,7 +615,7 @@ struct QuickCopyProgressView: View {
             }
         } else {
             Label(result.errorMessage ?? "Failed", systemImage: "xmark.circle.fill")
-                .foregroundColor(FilmCanTheme.brandRed)
+                .foregroundColor(FilmCanTheme.dangerText)
         }
     }
 
@@ -606,6 +628,7 @@ struct QuickCopyProgressView: View {
                     .disabled(!fullyFinished)
                 Spacer()
                 Button("Close") { session.window?.performClose(nil) }
+                    .buttonStyle(FCPrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
                     .disabled(!fullyFinished)
             } else {

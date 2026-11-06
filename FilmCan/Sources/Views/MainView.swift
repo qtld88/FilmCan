@@ -275,6 +275,8 @@ struct MainView: View {
             }
         }
         .help("Catalog — where every roll is")
+        .accessibilityLabel("Catalog")
+        .accessibilityValue(MediaCatalog.atRisk(catalogStore.rolls).isEmpty ? "" : "Some rolls are on one drive only")
     }
 
     private var historyButton: some View {
@@ -291,6 +293,7 @@ struct MainView: View {
         .frame(width: 28, height: 28)
         .buttonStyle(.plain)
         .help("Transfer history")
+        .accessibilityLabel(showHistoryPanel ? "Hide history" : "Show history")
         .tourAnchor("historyButton")
     }
 

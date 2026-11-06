@@ -19,3 +19,12 @@ struct DestProgress: Identifiable, Equatable {
     /// Files already backed up and skipped this run (resume skip).
     var filesSkipped: Int = 0
 }
+
+extension DestProgress {
+    var isVerifyOnly: Bool {
+        bytesTotal > 0
+            && bytesCompleted >= bytesTotal
+            && verifyBytesTotal > 0
+            && verifyBytesCompleted < verifyBytesTotal
+    }
+}

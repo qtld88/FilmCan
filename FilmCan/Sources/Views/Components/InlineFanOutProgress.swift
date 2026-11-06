@@ -38,12 +38,7 @@ struct InlineFanOutProgress: View {
 
     /// Copy for this dest is done but verification is still running (no copy to
     /// show alongside — e.g. the final file's verify pass).
-    private var isVerifyOnly: Bool {
-        progress.bytesTotal > 0
-            && progress.bytesCompleted >= progress.bytesTotal
-            && progress.verifyBytesTotal > 0
-            && progress.verifyBytesCompleted < progress.verifyBytesTotal
-    }
+    private var isVerifyOnly: Bool { progress.isVerifyOnly }
 
     // MARK: Formatting (stable: integer units, fixed-width pills)
 
@@ -129,7 +124,7 @@ struct InlineFanOutProgress: View {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.shield")
                             .font(FilmCanFont.label(9))
-                            .foregroundColor(FilmCanTheme.brandGreen)
+                            .foregroundColor(FilmCanTheme.successText)
                         Text("Verifying…")
                             .font(FilmCanFont.label(9))
                             .foregroundColor(FilmCanTheme.textTertiary)
@@ -179,9 +174,9 @@ struct InlineFanOutProgress: View {
         switch progress.status {
         case .complete:
             if isFullyUpToDate {
-                badge(icon: "checkmark.circle", text: "Up to date", color: FilmCanTheme.brandGreen)
+                badge(icon: "checkmark.circle", text: "Up to date", color: FilmCanTheme.successText)
             } else {
-                badge(icon: "checkmark.circle.fill", text: "Complete", color: FilmCanTheme.brandGreen)
+                badge(icon: "checkmark.circle.fill", text: "Complete", color: FilmCanTheme.successText)
             }
         case .pending:
             Text("Waiting…")
@@ -195,7 +190,7 @@ struct InlineFanOutProgress: View {
                     .foregroundColor(FilmCanTheme.textSecondary)
             }
         case .failed(let reason):
-            badge(icon: "exclamationmark.triangle.fill", text: reason.displayMessage, color: FilmCanTheme.brandRed)
+            badge(icon: "exclamationmark.triangle.fill", text: reason.displayMessage, color: FilmCanTheme.dangerText)
         case .active:
             EmptyView()
         }

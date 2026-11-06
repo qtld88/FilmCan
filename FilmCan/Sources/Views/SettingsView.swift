@@ -148,7 +148,7 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section("Appearance") {
-                Picker("Accent color", selection: $accentMode) {
+                Picker("Accent preset", selection: $accentMode) {
                     Text("Kodak").tag("kodak")
                     Text("Fuji").tag("fuji")
                     Text("Sony").tag("sony")
@@ -341,10 +341,10 @@ struct PushSettingsView: View {
                             NotificationService.shared.ensureAuthorized()
                         }
                     }
-                TextField("topic URL address :", text: $ntfyURL)
+                TextField("Topic URL", text: $ntfyURL)
                     .textFieldStyle(.roundedBorder)
                     .disabled(!ntfyEnabled)
-                SecureField("Bearer token :", text: $ntfyBearerToken)
+                SecureField("Bearer token", text: $ntfyBearerToken)
                     .textFieldStyle(.roundedBorder)
                     .disabled(!ntfyEnabled)
 
@@ -797,8 +797,8 @@ struct HotkeysSettingsView: View {
         Form {
             Section("Hotkeys") {
                 HotkeyRow(title: "Start backup (Run Now)", shortcut: "⌘B")
-                HotkeyRow(title: "Add a source", shortcut: "⌘S")
-                HotkeyRow(title: "Add a destination", shortcut: "⌘D")
+                HotkeyRow(title: "Add a source", shortcut: "⇧⌘O")
+                HotkeyRow(title: "Add a destination", shortcut: "⌥⌘O")
                 HotkeyRow(title: "Refresh drives", shortcut: "⌘R")
             }
         }
