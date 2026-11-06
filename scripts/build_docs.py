@@ -36,6 +36,7 @@ PAGES = [
     ("features/index.md", "features"),
     ("features/multi-destination.md", "features"),
     ("features/source-selection.md", "features"),
+    ("features/quick-copy.md", "features"),
     ("features/destination-presets.md", "features"),
     ("features/hash-lists.md", "features"),
     ("features/safe-checks.md", "features"),

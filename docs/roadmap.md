@@ -7,6 +7,7 @@ Where FilmCan is heading. Not a promise of dates, a direction. Order is rough pr
 
 ## Shipped
 
+- **Unreleased**, Quick Copy: copy from the Finder (Services menu or Dock drop) with the FilmCan engine, no main window.
 - **1.4.1**, same-name card disambiguation (two cards named the same no longer merge), smarter resume vs. new-card detection, faster startup cleanup on full drives.
 - **1.4.0**, stable and honest ETA (no more roller-coaster estimates), instant tab switching and options panels.
 - **1.3.0**, Netflix Camera/Sound routing (per-source toggle, sound auto-detect, editable folder templates), ASC MHL vs simple hidden hash list, per-destination resume + full-job progress, live per-destination failure surfacing.
@@ -40,6 +41,7 @@ Vers où se dirige FilmCan. Pas une promesse de dates, une direction. L'ordre es
 
 ## Livré
 
+- **Non publié**, Quick Copy : copie depuis le Finder (menu Services ou dépôt sur le Dock) avec le moteur FilmCan, sans fenêtre principale.
 - **1.4.1**, désambiguation des cartes de même nom (deux cartes du même nom ne fusionnent plus), détection plus intelligente de la reprise par rapport aux nouvelles cartes, nettoyage de démarrage plus rapide sur les disques pleins.
 - **1.4.0**, ETA stable et honnête (pas plus d'estimations en montagnes russes), commutation instantanée des onglets et panneaux d'options.
 - **1.3.0**, routage Netflix Camera/Sound (bascule par source, auto-détection du son, modèles de dossier modifiables), ASC MHL par rapport à la liste de hash masquée simple, reprise par destination et progression du travail complet, surfaçage des pannes en direct par destination.
@@ -73,6 +75,7 @@ Wo FilmCan hingeht. Kein Versprechen von Daten, eine Richtung. Die Reihenfolge i
 
 ## Versand
 
+- **Unveröffentlicht**, Quick Copy: Kopieren aus dem Finder (Dienste-Menü oder Dock) mit der FilmCan-Engine, ohne Hauptfenster.
 - **1.4.1**, Disambiguierung von Karten mit gleichem Namen (zwei Karten mit gleichem Namen werden nicht mehr zusammengeführt), intelligentere Wiederaufnahme- und neue Kartenerkennung, schnellere Bereinigung beim Start auf vollen Laufwerken.
 - **1.4.0**, stabile und ehrliche ETA (keine bergauf-bergab-Schätzungen mehr), sofortiger Registerkartenwechsel und Optionsbedienfelder.
 - **1.3.0**, Netflix Camera/Sound-Routing (pro-Quellen-Schalter, Sound-Autoerkennung, bearbeitbare Ordnervorlagen), ASC MHL versus einfache versteckte Hash-Liste, pro-Ziel-Wiederaufnahme und vollständiger Job-Fortschritt, Live-Pro-Ziel-Fehlerauftritt.
@@ -106,6 +109,7 @@ Hacia dónde se dirige FilmCan. No es una promesa de fechas, es una dirección. 
 
 ## Enviado
 
+- **Sin publicar**, Quick Copy: copia desde el Finder (menú Servicios o arrastrar al Dock) con el motor de FilmCan, sin ventana principal.
 - **1.4.1**, desambiguación de tarjetas con el mismo nombre (dos tarjetas con el mismo nombre ya no se fusionan), detección de reanudación versus tarjeta nueva más inteligente, limpieza de inicio más rápida en unidades llenas.
 - **1.4.0**, ETA estable y honesto (sin más estimaciones de montaña rusa), cambio de pestañas instantáneo y paneles de opciones.
 - **1.3.0**, enrutamiento de Netflix Camera/Sound (alternancia por origen, autodetección de sonido, plantillas de carpeta editables), ASC MHL versus lista de hash oculta simple, reanudación por destino y progreso del trabajo completo, surfaceo de falla en directo por destino.

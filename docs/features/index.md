@@ -8,6 +8,7 @@
 - [Copy Engine](./copy-engines.md), FilmCan Engine: fan-out copy, Off/Fast/Paranoid verify, resume skip, sibling repair
 - [Smart Date](./smart-date.md), custom day boundaries for overnight shoots
 - [Source Selection](./source-selection.md), drives, folders, or individual files
+- [Quick Copy (Finder)](./quick-copy.md), copy from the Finder right-click menu or the Dock, no main window
 - [Multi-Destination](./multi-destination.md), fan-out copy to multiple drives, with one-click sibling repair on failure
 - [Destination Presets](./destination-presets.md), organize by date/source
 - [Netflix Ingest](./netflix-ingest.md), Footage-Ingest folder structure, ASC MHL per roll, Camera/Sound routing
@@ -38,6 +39,7 @@
 - [Moteur de copie](./copy-engines.md), FilmCan Engine : copie en éventail, vérification Off/Fast/Paranoid, reprise avec saut, réparation d'origine
 - [Date intelligente](./smart-date.md), limites de jour personnalisées pour les tournages de nuit
 - [Sélection de source](./source-selection.md), disques, dossiers ou fichiers individuels
+- [Quick Copy (Finder)](./quick-copy.md), copie depuis le clic droit du Finder ou le Dock, sans fenêtre principale
 - [Destinations multiples](./multi-destination.md), copie en éventail vers plusieurs disques, avec réparation d'origine en un clic en cas d'échec
 - [Présets de destination](./destination-presets.md), organiser par date/source
 - [Netflix Ingest](./netflix-ingest.md), structure de dossier Footage-Ingest, ASC MHL par roll, routage caméra/son
@@ -66,6 +68,7 @@
 - [Kopiermotor](./copy-engines.md), FilmCan Engine: Fächerkopie, Off/Fast/Paranoid-Verifizierung, Fortschritt überspringen, Schwesterreparatur
 - [Intelligentes Datum](./smart-date.md), benutzerdefinierte Tagesgrenzen für Übernachtungsaufnahmen
 - [Quellenauswahl](./source-selection.md), Laufwerke, Ordner oder einzelne Dateien
+- [Quick Copy (Finder)](./quick-copy.md), Kopieren per Rechtsklick im Finder oder über das Dock, ohne Hauptfenster
 - [Mehrere Ziele](./multi-destination.md), Fächerkopie auf mehrere Laufwerke, mit One-Click-Schwesterreparatur bei Fehler
 - [Zielvoreinstellungen](./destination-presets.md), organisieren nach Datum/Quelle
 - [Netflix Ingest](./netflix-ingest.md), Footage-Ingest-Ordnerstruktur, ASC MHL pro Roll, Kamera-/Soundrouting
@@ -94,6 +97,7 @@
 - [Motor de copia](./copy-engines.md), FilmCan Engine: copia en abanico, verificación Off/Fast/Paranoid, saltar reanudación, reparación hermana
 - [Fecha inteligente](./smart-date.md), límites de día personalizados para grabaciones nocturnas
 - [Selección de origen](./source-selection.md), unidades, carpetas o archivos individuales
+- [Quick Copy (Finder)](./quick-copy.md), copia desde el clic derecho del Finder o el Dock, sin ventana principal
 - [Destinos múltiples](./multi-destination.md), copia en abanico a múltiples unidades, con reparación hermana de un clic en caso de fallo
 - [Ajustes preestablecidos de destino](./destination-presets.md), organizar por fecha/origen
 - [Netflix Ingest](./netflix-ingest.md), estructura de carpeta Footage-Ingest, ASC MHL por roll, enrutamiento de cámara/sonido

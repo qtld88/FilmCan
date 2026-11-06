@@ -63,6 +63,17 @@ FilmCan stores configuration, presets, and history in the user's **Application S
 8. If the whole backup was already present, no history card is recorded — `TransferViewModel` surfaces an `AlreadyBackedUpSheet` (with a *Verify data* button) instead
 9. If any destination fails, `FailedDestRetryPanel` mounts under the transfer controls (**From source** re-runs the engine for that drive; **From sibling** copies from a verified neighbor's MHL)
 
+### Quick Copy path (Finder)
+
+`Services → FilmCan Copy` / Dock drop → `QuickCopyCoordinator.open(paths:)` → one
+`NSWindow` + `QuickCopySession` per request. `QuickCopyFormModel` (pure) builds a
+temporary `BackupConfiguration` (never stored) and a run-time `OrganizationPreset`;
+the session's own `TransferViewModel(isBackgroundWorker: true)` runs it through the
+normal fan-out pipeline via `startTransfer(config:organizationPresetOverride:)`.
+Quick Copy offers Stop only (no Pause). Loose files: one source per selection.
+When FilmCan was launched only for the quick copy, closing the last window quits it.
+Spec: `docs/superpowers/specs/2026-10-15-quick-copy-design.md`.
+
 ---
 
 ## Safety guarantees (FilmCan Engine)

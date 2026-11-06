@@ -14,6 +14,7 @@ struct FilmCanApp: App {
                 .environmentObject(appState)
                 .environmentObject(appState.storage)
         }
+        .handlesExternalEvents(matching: [])
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(replacing: .appTermination) {
@@ -86,7 +87,26 @@ struct FilmCanApp: App {
 }
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Finder → Services → FilmCan Copy. Refresh the registry at every launch so
+        // the entry appears without a logout.
+        NSApp.servicesProvider = QuickCopyServiceProvider.shared
+        NSUpdateDynamicServices()
+        _ = QuickCopyCoordinator.shared   // instantiate early so its window-key observer is registered
+    }
+
+    /// Dock-icon drop of files/folders.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        QuickCopyCoordinator.shared.open(paths: urls.filter(\.isFileURL).map(\.path))
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag, QuickCopyCoordinator.shared.revealHiddenMainWindowIfNeeded() { return false }
+        return true
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = QuickCopyServiceProvider.shared
         // Ensure app is properly registered as a regular app (in dock)
         NSApp.setActivationPolicy(.regular)
         
@@ -132,8 +152,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let transferViewModel = TransferViewModel.shared
+        let quickCopy = QuickCopyCoordinator.shared
         let progress = transferViewModel.progress
         let isBusy = transferViewModel.hasActiveTransfers()
+            || quickCopy.hasRunningQuickCopy
             || progress.isRunning
             || progress.verificationPhase == .verifying
             || progress.verificationPhase == .generatingHashList
@@ -151,6 +173,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let response = alert.runModal()
         if response == .alertSecondButtonReturn {
             transferViewModel.cancelAll()
+            quickCopy.cancelAllRunning()
             return .terminateNow
         }
         return .terminateCancel
@@ -176,9 +199,16 @@ private struct InitialWindowSizer: ViewModifier {
             }
     }
 
+    /// Quick Copy windows can be key on a service launch; never size or track them.
+    private static func mainWindow() -> NSWindow? {
+        func isQuickCopy(_ w: NSWindow) -> Bool { w.delegate is QuickCopyCoordinator }
+        if let key = NSApp.keyWindow, !isQuickCopy(key) { return key }
+        return NSApp.windows.first { $0.isVisible && !isQuickCopy($0) }
+    }
+
     private func applyInitialSize() {
         guard !didApply else { return }
-        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
+        guard let window = Self.mainWindow() else { return }
         window.tabbingMode = .disallowed
         if !savedFrame.isEmpty {
             let restored = NSRectFromString(savedFrame).standardized
@@ -203,7 +233,7 @@ private struct InitialWindowSizer: ViewModifier {
 
     private func registerWindowObservers() {
         guard observers.isEmpty else { return }
-        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
+        guard let window = Self.mainWindow() else { return }
         let center = NotificationCenter.default
         let save: (Notification) -> Void = { _ in
             savedFrame = NSStringFromRect(window.frame)

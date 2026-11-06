@@ -62,6 +62,14 @@ Want files organized by date or card? Open **Options → Destinations** and set 
 
 ---
 
+## Optional: Copy from the Finder
+
+Select files or folders in the Finder, right-click, then choose **Services → FilmCan Copy**. A small window asks for a preset and destinations, then copies with the FilmCan engine. The main window stays closed.
+
+[Learn more →](./features/quick-copy.md)
+
+---
+
 ## Notes
 
 - FilmCan stores history locally on your Mac.
@@ -136,6 +144,14 @@ Vous voulez un peu plus de contrôle avant de lancer ? Ouvrez **Options → Basi
 Vous voulez que les fichiers soient organisés par date ou par carte ? Ouvrez **Options → Destinations** et définissez un **Folder template** pour cette destination, par exemple `{date}/{source}/`. Aucun préset nécessaire, remplissez simplement le modèle.
 
 [En savoir plus →](./features/destination-presets.md)
+
+---
+
+## Optionnel : Copier depuis le Finder
+
+Sélectionnez des fichiers ou des dossiers dans le Finder, clic droit, puis **Services → FilmCan Copy**. Une petite fenêtre demande un préset et des destinations, puis copie avec le moteur FilmCan. La fenêtre principale reste fermée.
+
+[En savoir plus →](./features/quick-copy.md)
 
 ---
 
@@ -216,6 +232,14 @@ Möchten Sie, dass Dateien nach Datum oder Karte organisiert werden? Öffnen Sie
 
 ---
 
+## Optional: Aus dem Finder kopieren
+
+Wählen Sie im Finder Dateien oder Ordner aus, Rechtsklick, dann **Dienste → FilmCan Copy**. Ein kleines Fenster fragt nach Voreinstellung und Zielen und kopiert dann mit der FilmCan-Engine. Das Hauptfenster bleibt geschlossen.
+
+[Mehr erfahren →](./features/quick-copy.md)
+
+---
+
 ## Notizen
 
 - FilmCan speichert den Verlauf lokal auf Ihrem Mac.
@@ -290,6 +314,14 @@ Los resultados aparecen en **Transfer History** (haga clic en el icono **clock**
 ¿Desea que los archivos se organicen por fecha o tarjeta? Abra **Options → Destinations** y configure una **Folder template** para ese destino, p. ej. `{date}/{source}/`. Sin preajustes necesarios, simplemente complete la plantilla.
 
 [Más información →](./features/destination-presets.md)
+
+---
+
+## Opcional: Copiar desde el Finder
+
+Seleccione archivos o carpetas en el Finder, clic derecho y luego **Servicios → FilmCan Copy**. Una ventana pequeña pide un preajuste y destinos, y copia con el motor de FilmCan. La ventana principal permanece cerrada.
+
+[Más información →](./features/quick-copy.md)
 
 ---
 
