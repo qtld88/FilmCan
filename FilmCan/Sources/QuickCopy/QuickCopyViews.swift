@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Root
 
@@ -45,6 +46,53 @@ private struct QCPanel<Content: View>: View {
         case .settings:
             FCCard(title: title, trailing: trailing, role: .settings, icon: "slider.horizontal.3") { content }
         }
+    }
+}
+
+/// Accepts Finder file/folder drops and hands the paths over in one batch.
+/// Highlights the card with a dashed yellow border while a drag hovers it.
+private struct QCFileDrop: ViewModifier {
+    let onPaths: ([String]) -> Void
+    @State private var isTargeted = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: FCRadius.card)
+                    .strokeBorder(FilmCanTheme.brandYellow, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .opacity(isTargeted ? 1 : 0)
+                    .allowsHitTesting(false)
+            )
+            .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
+                load(providers)
+                return true
+            }
+    }
+
+    private func load(_ providers: [NSItemProvider]) {
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var urls: [Int: URL] = [:]
+        for (index, provider) in providers.enumerated()
+        where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                defer { group.leave() }
+                guard let data = item as? Data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                lock.lock(); urls[index] = url; lock.unlock()
+            }
+        }
+        group.notify(queue: .main) {
+            let paths = urls.sorted { $0.key < $1.key }.map { $0.value.standardizedFileURL.path }
+            if !paths.isEmpty { onPaths(paths) }
+        }
+    }
+}
+
+private extension View {
+    func qcFileDrop(_ onPaths: @escaping ([String]) -> Void) -> some View {
+        modifier(QCFileDrop(onPaths: onPaths))
     }
 }
 
@@ -223,7 +271,9 @@ struct QuickCopySetupView: View {
                 Label("Add source", systemImage: "plus")
             }
             .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+            .help("Or drop files and folders on this card")
         }
+        .qcFileDrop { session.addSources($0) }
     }
 
     // Copy To
@@ -257,6 +307,7 @@ struct QuickCopySetupView: View {
                 Label("Add destination", systemImage: "plus")
             }
             .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+            .help("Or drop folders or drives on this card")
             if sharedTree, let first = session.form.destinations.first {
                 Divider().padding(.vertical, 2)
                 Text("Folders on every drive")
@@ -264,6 +315,7 @@ struct QuickCopySetupView: View {
                 folderTree(for: first, autoEdit: true)
             }
         }
+        .qcFileDrop { session.addDestinations($0) }
     }
 
     /// One tree stands for every destination unless they would differ (a folder that

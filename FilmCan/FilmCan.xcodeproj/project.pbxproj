@@ -232,6 +232,7 @@
 		F95E3FE9B1896E8B4B908381 /* HashListStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0286B22138243BCD956CDCFF /* HashListStyle.swift */; };
 		FA5BA2A86E85CD12D7EFE614 /* UIStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB457DCE07BC5C884750E430 /* UIStrings.swift */; };
 		FB7D70D2B4DDAD1D631A4156 /* BackupConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1C6F7C2490DCDF99CC6645 /* BackupConfiguration.swift */; };
+		FD41AFC3E5C85A758E959C70 /* QuickCopySessionDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662CED5129BF5917D1C9F5B1 /* QuickCopySessionDropTests.swift */; };
 		FEE5C47D2E938A4AFBBC24A2 /* QuickCopyIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB5D633F58BF2F91D803BEF /* QuickCopyIntegrationTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -327,6 +328,7 @@
 		64F8C354DD3ABF76D04AE34A /* ConfigurationStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStorage.swift; sourceTree = "<group>"; };
 		65F32A770E2EDB9345EFF1B1 /* FileChooserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChooserView.swift; sourceTree = "<group>"; };
 		660FFCAF1DAA02D397B9E70C /* MediaKindGuesser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaKindGuesser.swift; sourceTree = "<group>"; };
+		662CED5129BF5917D1C9F5B1 /* QuickCopySessionDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCopySessionDropTests.swift; sourceTree = "<group>"; };
 		6684937CC713EF74824A856C /* FolderTreeBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTreeBuilder.swift; sourceTree = "<group>"; };
 		6794CD2A43286C823FE41E30 /* LogsOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsOptionsView.swift; sourceTree = "<group>"; };
 		68D90641C9B9019E8312A23E /* OrganizationPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationPreset.swift; sourceTree = "<group>"; };
@@ -673,6 +675,7 @@
 				6BC949E75917E6C3C40A2B73 /* QuickCopyFormModelTests.swift */,
 				9BB5D633F58BF2F91D803BEF /* QuickCopyIntegrationTests.swift */,
 				096DBE4252964C56516729EC /* QuickCopyServiceProviderTests.swift */,
+				662CED5129BF5917D1C9F5B1 /* QuickCopySessionDropTests.swift */,
 				F772B2D53DF92EE1BA0929C9 /* RepairFailedDestTests.swift */,
 				80DD344286EE0B943C0F5733 /* RereadProgressTests.swift */,
 				7DC61B02A850124F701EBC8C /* RobustnessTests.swift */,
@@ -1026,6 +1029,7 @@
 				8FDADE840130AECF5F157752 /* QuickCopyFormModelTests.swift in Sources */,
 				FEE5C47D2E938A4AFBBC24A2 /* QuickCopyIntegrationTests.swift in Sources */,
 				361DC2FC5ED21C123E4FAFA7 /* QuickCopyServiceProviderTests.swift in Sources */,
+				FD41AFC3E5C85A758E959C70 /* QuickCopySessionDropTests.swift in Sources */,
 				ADD84C805512EEC84CD93FFA /* RepairFailedDestTests.swift in Sources */,
 				631FB4F10F8D72E1F5C5DA4A /* RereadProgressTests.swift in Sources */,
 				B87287240EDD773DD9A52D7A /* RobustnessTests.swift in Sources */,

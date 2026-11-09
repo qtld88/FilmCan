@@ -87,8 +87,14 @@ final class QuickCopySession: ObservableObject, Identifiable {
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
         guard panel.runModal() == .OK else { return }
-        for url in panel.urls where !form.destinations.contains(url.path) {
-            form.destinations.append(url.path)
+        addDestinations(panel.urls.map(\.path))
+    }
+
+    /// Folders only; dropped files are ignored. Duplicates are skipped.
+    func addDestinations(_ paths: [String]) {
+        guard phase == .setup else { return }
+        for path in paths where !form.destinations.contains(path) && Self.isDirectory(path) {
+            form.destinations.append(path)
         }
         refreshCapacities()
     }
@@ -100,10 +106,23 @@ final class QuickCopySession: ObservableObject, Identifiable {
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
         guard panel.runModal() == .OK else { return }
+        addSources(panel.urls.map(\.path))
+    }
+
+    func addSources(_ paths: [String]) {
+        guard phase == .setup else { return }
         let known = Set(form.items.map(\.path))
-        let added = QuickCopyFormModel.items(for: panel.urls.map(\.path).filter { !known.contains($0) })
+        var seen = Set<String>()
+        let fresh = paths.filter { !known.contains($0) && FileManager.default.fileExists(atPath: $0) && seen.insert($0).inserted }
+        guard !fresh.isEmpty else { return }
+        let added = QuickCopyFormModel.items(for: fresh)
         form.items.append(contentsOf: added)
         loadSizes(for: added)
+    }
+
+    private static func isDirectory(_ path: String) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
     }
 
     func removeSource(_ path: String) {
