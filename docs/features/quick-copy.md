@@ -24,7 +24,7 @@ Each request opens its own window, so two selections run side by side.
 The window is about 900 pt wide and has two columns: **Copy From** and **Settings** on the left, **Save To** on the right.
 
 - **Copy From**: your selection. Each row shows the full name and size, then the path. When folders are organized, each row also has a **Camera / Sound** switch (click either side to flip it), pre-filled from the content (an item is Sound when most of its files are audio), and an **x** to remove the source.
-- **Save To**: one destination to start. Click **Add destination** for more. The source is read once and written to every destination. Each destination shows a capacity bar (used, to copy, free, left to right) with a legend.
+- **Save To**: one destination to start. Click **Add destination** for more, or drop folders or drives on the card. Drop files or folders on **Copy From** to add sources. The source is read once and written to every destination. Each destination shows a capacity bar (used, to copy, free, left to right) with a legend.
 - **Preset** (in **Settings**): pick **None** or one of your saved organization presets. With a preset, the window shows its options as chips (for example *Paranoid check*, *Skip existing files*, *Whole folder* or *Contents only*, *ASC MHL*); hover them for details. A preset set to *Ask each time* runs as *Skip*.
 - With **None**, the basic options are:
   - **Verification**: Fast (default), Paranoid or Off.
@@ -118,7 +118,7 @@ Chaque demande ouvre sa propre fenêtre : deux sélections tournent côte à cô
 La fenêtre fait environ 900 pt de large sur deux colonnes : **Copy From** et **Settings** à gauche, **Save To** à droite.
 
 - **Copy From** : votre sélection. Chaque ligne affiche le nom complet et la taille, puis le chemin. Quand les dossiers sont organisés, chaque ligne a aussi un interrupteur **Camera / Sound** (cliquez sur l'un ou l'autre côté pour le basculer), pré-rempli selon le contenu (un élément est Sound quand la plupart de ses fichiers sont de l'audio), et un **x** pour retirer la source.
-- **Save To** : une destination au départ. **Add destination** en ajoute d'autres. La source est lue une seule fois et écrite sur chaque destination. Chaque destination affiche une barre de capacité (utilisé, à copier, libre, de gauche à droite) avec une légende.
+- **Save To** : une destination au départ. **Add destination** en ajoute d'autres, tout comme un dossier ou un disque glissé sur la carte. Glisser des fichiers ou dossiers sur **Copy From** ajoute des sources. La source est lue une seule fois et écrite sur chaque destination. Chaque destination affiche une barre de capacité (utilisé, à copier, libre, de gauche à droite) avec une légende.
 - **Preset** (dans **Settings**) : choisissez **None** ou l'un de vos présets d'organisation. Avec un préset, la fenêtre affiche ses options sous forme de pastilles (par ex. *Paranoid check*, *Skip existing files*, *Whole folder* ou *Contents only*, *ASC MHL*) ; survolez-les pour le détail. Un préset réglé sur *Ask each time* s'exécute en *Skip*.
 - Avec **None**, les options de base sont :
   - **Verification** : Fast (par défaut), Paranoid ou Off.
@@ -212,7 +212,7 @@ Jede Anfrage öffnet ein eigenes Fenster, zwei Auswahlen laufen also nebeneinand
 Das Fenster ist etwa 900 pt breit und hat zwei Spalten: **Copy From** und **Settings** links, **Save To** rechts.
 
 - **Copy From**: Ihre Auswahl. Jede Zeile zeigt den vollen Namen und die Größe, darunter den Pfad. Bei organisierten Ordnern hat jede Zeile außerdem einen **Camera / Sound**-Schalter (auf eine der beiden Seiten klicken, um umzuschalten), der nach dem Inhalt vorbelegt wird (ein Element ist Sound, wenn die meisten Dateien Audio sind), und ein **x** zum Entfernen der Quelle.
-- **Save To**: zunächst ein Ziel. **Add destination** fügt weitere hinzu. Die Quelle wird einmal gelesen und auf jedes Ziel geschrieben. Jedes Ziel zeigt einen Kapazitätsbalken (belegt, zu kopieren, frei, von links nach rechts) mit Legende.
+- **Save To**: zunächst ein Ziel. **Add destination** fügt weitere hinzu, ebenso ein auf die Karte gezogener Ordner oder ein Laufwerk. Auf **Copy From** gezogene Dateien oder Ordner werden als Quellen hinzugefügt. Die Quelle wird einmal gelesen und auf jedes Ziel geschrieben. Jedes Ziel zeigt einen Kapazitätsbalken (belegt, zu kopieren, frei, von links nach rechts) mit Legende.
 - **Preset** (unter **Settings**): wählen Sie **None** oder eine Ihrer gespeicherten Organisationsvoreinstellungen. Mit einer Voreinstellung zeigt das Fenster deren Optionen als Chips (z. B. *Paranoid check*, *Skip existing files*, *Whole folder* oder *Contents only*, *ASC MHL*); Details im Tooltip. Eine Voreinstellung auf *Ask each time* läuft als *Skip*.
 - Mit **None** gelten die Grundoptionen:
   - **Verification**: Fast (Standard), Paranoid oder Off.
@@ -306,7 +306,7 @@ Cada solicitud abre su propia ventana, así que dos selecciones se ejecutan en p
 La ventana mide unos 900 pt de ancho y tiene dos columnas: **Copy From** y **Settings** a la izquierda, **Save To** a la derecha.
 
 - **Copy From**: su selección. Cada fila muestra el nombre completo y el tamaño, y debajo la ruta. Cuando las carpetas se organizan, cada fila tiene además un interruptor **Camera / Sound** (haga clic en cualquiera de los dos lados para cambiarlo), rellenado según el contenido (un elemento es Sound cuando la mayoría de sus archivos son de audio), y una **x** para quitar el origen.
-- **Save To**: un destino al principio. **Add destination** añade más. El origen se lee una vez y se escribe en cada destino. Cada destino muestra una barra de capacidad (usado, por copiar, libre, de izquierda a derecha) con leyenda.
+- **Save To**: un destino al principio. **Add destination** añade más, igual que una carpeta o un disco arrastrado a la tarjeta. Arrastrar archivos o carpetas a **Copy From** añade orígenes. El origen se lee una vez y se escribe en cada destino. Cada destino muestra una barra de capacidad (usado, por copiar, libre, de izquierda a derecha) con leyenda.
 - **Preset** (en **Settings**): elija **None** o uno de sus ajustes preestablecidos de organización. Con un preajuste, la ventana muestra sus opciones como etiquetas (p. ej. *Paranoid check*, *Skip existing files*, *Whole folder* o *Contents only*, *ASC MHL*); pase el cursor para ver el detalle. Un preajuste en *Ask each time* se ejecuta como *Skip*.
 - Con **None**, las opciones básicas son:
   - **Verification**: Fast (por defecto), Paranoid u Off.
