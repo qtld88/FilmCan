@@ -1201,7 +1201,37 @@ actor FanOutCopier {
             }
         }
 
-        return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
+        let results = config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
+        if !wasCancelled {
+            emitFinalComplete(results: results, bytesTotalByDest: bytesTotalByDest,
+                              filesTotalByDest: filesTotalByDest, skippedByDest: skippedByDest)
+        }
+        return results
+    }
+
+    /// One authoritative `.complete` per successful destination once everything
+    /// (copy, verify, MHL seal) is done. The per-file counters can miss the last
+    /// step (e.g. a file skipped on a duplicate conflict never counts), which left
+    /// the card at 99% with no Complete state.
+    private func emitFinalComplete(results: [DestResult],
+                                   bytesTotalByDest: [String: Int64],
+                                   filesTotalByDest: [String: Int],
+                                   skippedByDest: [String: Int]) {
+        for r in results where r.success {
+            guard let dest = config.destinations.first(where: { $0.destPath == r.destinationPath }) else { continue }
+            let total = bytesTotalByDest[dest.destPath] ?? 0
+            let files = filesTotalByDest[dest.destPath] ?? 0
+            var prog = DestProgress(
+                id: dest.destPath, displayName: dest.displayName,
+                status: .complete, bytesTotal: total, filesTotal: files,
+                verifyMode: dest.verifyMode)
+            prog.bytesCompleted = total
+            prog.filesCompleted = files
+            prog.verifyBytesTotal = dest.verifyMode == .off ? 0 : total
+            prog.verifyBytesCompleted = dest.verifyMode == .off ? 0 : total
+            prog.filesSkipped = skippedByDest[dest.destPath] ?? 0
+            config.progressHandler?(prog)
+        }
     }
 
     /// Single serial verify lane: pulls copied files in order and verifies each,
@@ -1511,7 +1541,9 @@ actor FanOutCopier {
                 let copiedAtDone = await self.recordFinalizedBytes(
                     destPath: destCfg.destPath, adding: sourceSize)
                 let isLastFile = await self.recordFileCompletion(destPath: destCfg.destPath, totalFiles: destFilesTotal)
-                let copyStatus: DestStatus = isLastFile ? .complete : .active
+                // With verify on, the verify lane still re-reads this file — only it
+                // may declare the destination complete.
+                let copyStatus: DestStatus = (isLastFile && destCfg.verifyMode == .off) ? .complete : .active
                 var prog = DestProgress(
                     id: destCfg.destPath, displayName: destCfg.displayName,
                     status: copyStatus, bytesTotal: destBytesTotal,
