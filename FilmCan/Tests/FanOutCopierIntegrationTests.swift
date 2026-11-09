@@ -1140,4 +1140,65 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(second.first?.filesTransferred, 0, "a legacy-size manifest must still resume")
         XCTAssertGreaterThan(second.first?.filesSkipped ?? 0, 0)
     }
+    // MARK: - Final state is Complete at 100%
+
+    private func runAndCaptureEmits(mode: VerifyMode, tag: String) async throws -> [DestProgress] {
+        let src1 = tmpDir.appendingPathComponent("\(tag)-a.bin")
+        let src2 = tmpDir.appendingPathComponent("\(tag)-b.bin")
+        let d1 = Data((0..<200 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let d2 = Data((0..<150 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try d1.write(to: src1); try d2.write(to: src2)
+        let dest = tmpDir.appendingPathComponent("\(tag)-dest")
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let lock = NSLock()
+        var emits: [DestProgress] = []
+        let handler: @Sendable (DestProgress) -> Void = { prog in
+            lock.lock(); emits.append(prog); lock.unlock()
+        }
+        let config = FanOutCopier.Configuration(
+            sources: [src1.path, src2.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: tag,
+                                  verifyMode: mode, requiresFullFsync: false,
+                                  chunkSize: 65536)
+            ],
+            verifyMode: mode, mhlBasePath: nil, dryRun: false,
+            progressHandler: handler)
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results[0].success)
+        lock.lock(); defer { lock.unlock() }
+        return emits
+    }
+
+    func test_lastEmit_isCompleteAtFullBytes_everyVerifyMode() async throws {
+        for mode in VerifyMode.allCases {
+            let emits = try await runAndCaptureEmits(mode: mode, tag: "final-\(mode.rawValue)")
+            let last = try XCTUnwrap(emits.last, "\(mode): no emits")
+            XCTAssertEqual(last.status, .complete, "\(mode): last emit not complete")
+            XCTAssertGreaterThan(last.bytesTotal, 0)
+            XCTAssertEqual(last.bytesCompleted, last.bytesTotal, "\(mode): copy bytes not at 100%")
+            if mode != .off {
+                XCTAssertEqual(last.verifyBytesCompleted, last.verifyBytesTotal, "\(mode): verify bytes not at 100%")
+            }
+        }
+    }
+
+    func test_completeIsNeverEmittedBeforeVerifyFinishes() async throws {
+        for mode in [VerifyMode.fast, .paranoid] {
+            let emits = try await runAndCaptureEmits(mode: mode, tag: "early-\(mode.rawValue)")
+            for e in emits where e.status == .complete {
+                XCTAssertEqual(e.verifyBytesCompleted, e.verifyBytesTotal,
+                               "\(mode): .complete emitted while verify still pending")
+            }
+        }
+    }
+
+    func test_mergedStatus_completeIsStickyAgainstStaleEmits() {
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .complete, incoming: .active), .complete)
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .complete, incoming: .preparing), .complete)
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .complete, incoming: .failed(.verify)), .failed(.verify))
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .active, incoming: .complete), .complete)
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .active, incoming: .active), .active)
+    }
 }

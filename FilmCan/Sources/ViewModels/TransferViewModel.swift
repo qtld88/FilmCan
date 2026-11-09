@@ -900,6 +900,7 @@ class TransferViewModel: ObservableObject {
                                     prog.bytesCompleted = max(prog.bytesCompleted, prev.bytesCompleted)
                                     prog.verifyBytesCompleted = max(prog.verifyBytesCompleted, prev.verifyBytesCompleted)
                                 }
+                                prog.status = Self.mergedStatus(previous: prev.status, incoming: prog.status)
                                 self.progress.perDestProgress[idx] = prog
                             } else {
                                 self.progress.perDestProgress.append(prog)
@@ -947,6 +948,15 @@ class TransferViewModel: ObservableObject {
             results.append(failed)
             return failed
         }
+    }
+
+    /// `.complete` is sticky within a run: progress emits reach the main actor
+    /// through unordered Tasks, so a stale `.active` can land after the final
+    /// `.complete` and leave the card stuck at 99%. Only a failure overrides it.
+    nonisolated static func mergedStatus(previous: DestStatus, incoming: DestStatus) -> DestStatus {
+        guard case .complete = previous else { return incoming }
+        if case .failed = incoming { return incoming }
+        return .complete
     }
 
     private func countVisibleFiles(sources: [String]) async -> Int {
