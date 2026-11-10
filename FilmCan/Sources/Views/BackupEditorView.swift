@@ -227,6 +227,14 @@ struct BackupEditorView: View {
                 viewModel.refreshAutoDetectedSoundSources()
             }
         }
+        .onChange(of: viewModel.soundDayFolderAutoDetect) { _ in
+            if viewModel.soundAutoDetectEnabled {
+                viewModel.refreshAutoDetectedSoundSources()
+            }
+            if viewModel.cardAutoDetectEnabled {
+                viewModel.refreshAutoDetectedCards()
+            }
+        }
         .onChange(of: viewModel.cardAutoDetectEnabled) { enabled in
             if enabled {
                 viewModel.refreshAutoDetectedCards()

@@ -34,6 +34,8 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     /// Auto-tag a source as Sound when its path/volume matches one of these patterns.
     var soundAutoDetectEnabled: Bool = false
     var soundAutoDetectPatterns: [String] = []
+    /// Sound cards are never wiped: copy only the dated folder of the day, not the root.
+    var soundDayFolderAutoDetect: Bool = false
     /// Editable Camera/Sound folder templates for the Netflix preset. Empty ⇒ use
     /// the preset's built-in template.
     var cameraFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
@@ -114,6 +116,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         sourceMediaKinds = try c.decodeIfPresent([String: SourceMediaKind].self, forKey: .sourceMediaKinds) ?? [:]
         soundAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .soundAutoDetectEnabled) ?? false
         soundAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .soundAutoDetectPatterns) ?? []
+        soundDayFolderAutoDetect = try c.decodeIfPresent(Bool.self, forKey: .soundDayFolderAutoDetect) ?? false
         cameraFolderTemplate = try c.decodeIfPresent(String.self, forKey: .cameraFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
         soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Sound_Media"
         rollNumbering = try c.decodeIfPresent(RollNumbering.self, forKey: .rollNumbering) ?? RollNumbering()
@@ -186,6 +189,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(sourceMediaKinds, forKey: .sourceMediaKinds)
         try c.encode(soundAutoDetectEnabled, forKey: .soundAutoDetectEnabled)
         try c.encode(soundAutoDetectPatterns, forKey: .soundAutoDetectPatterns)
+        try c.encode(soundDayFolderAutoDetect, forKey: .soundDayFolderAutoDetect)
         try c.encode(cameraFolderTemplate, forKey: .cameraFolderTemplate)
         try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
         try c.encode(rollNumbering, forKey: .rollNumbering)
@@ -229,7 +233,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case id, name, sourcePaths, destinationPaths, engineOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion, schemaVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
-        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
+        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns, soundDayFolderAutoDetect
         case cameraFolderTemplate, soundFolderTemplate
         case rollNumbering, dayAutoAdvance, cardAutoDetectEnabled
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns

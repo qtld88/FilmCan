@@ -304,6 +304,11 @@ class BackupEditorViewModel: ObservableObject {
         set { config.soundAutoDetectPatterns = newValue; save() }
     }
 
+    var soundDayFolderAutoDetect: Bool {
+        get { config.soundDayFolderAutoDetect }
+        set { config.soundDayFolderAutoDetect = newValue; save() }
+    }
+
     // MARK: - Card recognition and roll numbering
 
     var rollNumbering: RollNumbering {
@@ -407,7 +412,7 @@ class BackupEditorViewModel: ObservableObject {
         for volumeURL in mountedExternalVolumes() {
             let path = volumeURL.path
             if config.destinationPaths.contains(where: { $0 == path || $0.hasPrefix(path + "/") }) { continue }
-            if sources.contains(path) { continue }
+            if sources.contains(path) && !config.soundDayFolderAutoDetect { continue }
             let override = FanOutCopier.sourceVolumeUUID(path).flatMap { CardRoleOverrides.role(forVolumeUUID: $0) }
             if override == .notACard { continue }
             let role: CardRole
@@ -418,9 +423,13 @@ class BackupEditorViewModel: ObservableObject {
             } else {
                 continue
             }
-            sources.append(path)
-            if role == .sound { kinds[path] = .sound }
-            changed = true
+            let added = role == .sound ? soundDayPaths(path) : [path]
+            let updated = keepingOnlyToday(sources + added.filter { !sources.contains($0) },
+                                           volumePath: path, resolved: added)
+            if updated != sources { sources = updated; changed = true }
+            if role == .sound {
+                for day in added where kinds[day] != .sound { kinds[day] = .sound; changed = true }
+            }
         }
         if changed {
             config.sourcePaths = sources
@@ -463,6 +472,7 @@ class BackupEditorViewModel: ObservableObject {
                     for resolved in resolvedMatches where !updated.contains(resolved) {
                         updated.append(resolved)
                     }
+                    updated = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
                 }
             }
         }
@@ -491,10 +501,21 @@ class BackupEditorViewModel: ObservableObject {
             for rule in rules {
                 let (pattern, subpath) = splitRule(rule)
                 guard matches(volumeName, pattern: pattern) else { continue }
-                for resolved in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                var resolvedMatches: [String] = []
+                for match in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                    let days = soundDayPaths(match)
+                    if days != [match], let index = updated.firstIndex(of: match) {
+                        updated.remove(at: index)
+                        changed = true
+                    }
+                    resolvedMatches += days
+                }
+                for resolved in resolvedMatches {
                     if !updated.contains(resolved) { updated.append(resolved); changed = true }
                     if kinds[resolved] != .sound { kinds[resolved] = .sound; changed = true }
                 }
+                let pruned = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
+                if pruned != updated { updated = pruned; changed = true }
             }
         }
 
@@ -562,6 +583,17 @@ class BackupEditorViewModel: ObservableObject {
 
     private func matches(_ name: String, pattern: String) -> Bool {
         FilmDriveDetector.matches(name, pattern: pattern)
+    }
+
+    private func soundDayPaths(_ path: String) -> [String] {
+        guard config.soundDayFolderAutoDetect else { return [path] }
+        let days = DayFolderResolver.findDayFolders(in: path)
+        return days.isEmpty ? [path] : days
+    }
+
+    private func keepingOnlyToday(_ sources: [String], volumePath: String, resolved: [String]) -> [String] {
+        let days = resolved.filter { DayFolderResolver.dayKey(($0 as NSString).lastPathComponent) != nil }
+        return DayFolderResolver.replacingStaleDays(in: sources, volumePath: volumePath, fresh: days)
     }
 
     private func resolveSubpathMatches(rootURL: URL, subpath: String) -> [String] {

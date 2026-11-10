@@ -47,7 +47,8 @@ struct SourceOptionsView: View {
                                 notes: [
                                     "ARRI cards named A001, A002: use `A*`.",
                                     "ARRI folder example: `A*/CLIPS` matches `A001/CLIPS`.",
-                                    "File names like `A001C001_240101_0010.MOV` are matched in file patterns, not here."
+                                    "File names like `A001C001_240101_0010.MOV` are matched in file patterns, not here.",
+                                    "`{jour}` stands for the folder of the day, e.g. `CARD*/{jour}`."
                                 ]
                             )
                         )
@@ -94,7 +95,8 @@ struct SourceOptionsView: View {
                                 description: "A drive name, folder name, or substring. Wildcards (*) supported; matching is case-insensitive.",
                                 notes: [
                                     "Sound recorders: `SOUND`, `MIXPRE*`, `ZOOM*`, `F8*`, `TASCAM*`.",
-                                    "A plain word like `SOUND` matches any volume/folder containing it."
+                                    "A plain word like `SOUND` matches any volume/folder containing it.",
+                                    "`{jour}` stands for the folder of the day: `688*/PROJECT/{jour}` or `688*/*/HAWAII/{jour}`. Recognised names: `26Y11M09`, `20261109`, `2026-11-09`, `261109`. No folder for today ⇒ the latest earlier day."
                                 ]
                             )
                         )
@@ -112,6 +114,28 @@ struct SourceOptionsView: View {
                 .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
                 .padding(.top, 4)
             }
+
+            optionsRow(
+                icon: "calendar",
+                iconColor: FilmCanTheme.textSecondary,
+                title: "Copy only today's folder from sound cards",
+                subtitle: "",
+                isOn: $viewModel.soundDayFolderAutoDetect,
+                textWidth: OptionsLayout.basicTextWidth,
+                info: InfoPopoverContent(
+                    title: "Copy only today's folder from sound cards",
+                    description: "Sound cards are often never wiped and keep each day in a dated folder. When a sound card or sound folder is detected, FilmCan looks up to 3 levels down for a dated folder (26Y11M09, 20261109, 2026-11-09, 261109) and adds the folder of the day instead of the whole card.",
+                    pros: [
+                        "Earlier days are not copied again",
+                        "Works with PROJECT/DATE/... and PROJECT/.../DATE layouts"
+                    ],
+                    cons: [
+                        "No folder dated today ⇒ the latest earlier day is used (night shoots); check it after midnight",
+                        "No dated folder found ⇒ the whole card is added"
+                    ]
+                ),
+                availableWidth: availableWidth
+            )
 
             CardsAndRollsSection(viewModel: viewModel, availableWidth: availableWidth)
 
