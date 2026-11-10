@@ -7,7 +7,7 @@ struct FilmCanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: MainWindowTarget.sceneId) {
             MainView()
                 .frame(minWidth: 500, minHeight: 500)
                 .modifier(InitialWindowSizer())
@@ -29,6 +29,8 @@ struct FilmCanApp: App {
                     _ = appState.createNewConfig()
                 }
                 .keyboardShortcut("n", modifiers: .command)
+
+                NewWindowMenuItems()
             }
             
             CommandGroup(after: .newItem) {
@@ -90,6 +92,24 @@ struct FilmCanApp: App {
     }
 }
 
+/// File › New Window / New Quick Copy Window.
+private struct NewWindowMenuItems: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Divider()
+        Button("New Window") {
+            openWindow(id: MainWindowTarget.sceneId)
+        }
+        .keyboardShortcut("n", modifiers: [.command, .option])
+
+        Button("New Quick Copy Window") {
+            QuickCopyCoordinator.shared.openEmpty()
+        }
+        .keyboardShortcut("n", modifiers: [.command, .shift])
+    }
+}
+
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Finder → Services → FilmCan Copy. Refresh the registry at every launch so
@@ -111,6 +131,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = QuickCopyServiceProvider.shared
+        FinderEjectGuard.start()
         #if DEBUG
         DemoMode.launch()
         #endif

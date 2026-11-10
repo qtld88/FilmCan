@@ -162,6 +162,26 @@ final class QuickCopySession: ObservableObject, Identifiable {
         form.destinations.removeAll { $0 == path }
     }
 
+    /// After an eject the whole drive is gone: drop every source and destination on it.
+    func removeEjectedVolume(containing path: String) {
+        guard let root = VolumesInUse.volumeRoot(for: path) else { return }
+        let onVolume = { (other: String) in VolumesInUse.volumeRoot(for: other) == root }
+        form.items.removeAll { onVolume($0.path) }
+        form.destinations.removeAll(where: onVolume)
+    }
+
+    func showEjectError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn't eject drive"
+        alert.informativeText = message
+        if let window {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
+    }
+
     /// Same form, fresh results. A re-run resumes from the on-disk manifest.
     func backToSetup() {
         guard phase == .finished else { return }
