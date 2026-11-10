@@ -258,11 +258,9 @@ struct QuickCopySetupView: View {
                             if session.form.showsMediaKind {
                                 CameraSoundSwitch(kind: item.kind) { session.form.items[index].kind = $0 }
                             }
-                            if session.form.items.count > 1 {
-                                Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
-                                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
-                                    .help("Remove source")
-                            }
+                            Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
+                                .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
+                                .help("Remove source")
                         }
                     }
                 }

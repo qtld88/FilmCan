@@ -155,7 +155,6 @@ final class QuickCopySession: ObservableObject, Identifiable {
     }
 
     func removeSource(_ path: String) {
-        guard form.items.count > 1 else { return }
         form.items.removeAll { $0.path == path }
     }
 
