@@ -553,89 +553,19 @@ class BackupEditorViewModel: ObservableObject {
     }
 
     private func mountedExternalVolumes() -> [URL] {
-        let volumesURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(at: volumesURL, includingPropertiesForKeys: [.volumeIsInternalKey], options: [.skipsHiddenFiles]) else {
-            return []
-        }
-        return entries.filter { url in
-            let values = try? url.resourceValues(forKeys: [.volumeIsInternalKey])
-            return values?.volumeIsInternal != true
-        }
+        FilmDriveDetector.mountedExternalVolumes()
     }
 
     private func splitRule(_ rule: String) -> (String, String) {
-        guard let separatorIndex = rule.firstIndex(of: "/") else {
-            return (rule, "")
-        }
-        let drive = String(rule[..<separatorIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let folder = String(rule[rule.index(after: separatorIndex)...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return (drive, folder)
+        FilmDriveDetector.splitRule(rule)
     }
 
     private func matches(_ name: String, pattern: String) -> Bool {
-        let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        if trimmed.contains("*") {
-            let escaped = NSRegularExpression.escapedPattern(for: trimmed)
-            let regex = "^" + escaped.replacingOccurrences(of: "\\*", with: ".*") + "$"
-            return name.range(of: regex, options: [.regularExpression, .caseInsensitive]) != nil
-        }
-        return name.compare(trimmed, options: [.caseInsensitive]) == .orderedSame
+        FilmDriveDetector.matches(name, pattern: pattern)
     }
 
     private func resolveSubpathMatches(rootURL: URL, subpath: String) -> [String] {
-        let trimmed = subpath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return [rootURL.path] }
-
-        if !trimmed.contains("*") {
-            let resolvedURL = rootURL.appendingPathComponent(trimmed)
-            var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDirectory),
-               isDirectory.boolValue {
-                return [resolvedURL.path]
-            }
-            return []
-        }
-
-        let components = trimmed
-            .split(separator: "/")
-            .map(String.init)
-            .filter { !$0.isEmpty }
-        guard !components.isEmpty else { return [rootURL.path] }
-
-        var currentURLs: [URL] = [rootURL]
-        let fm = FileManager.default
-
-        for (index, componentPattern) in components.enumerated() {
-            let isLast = index == components.count - 1
-            var nextURLs: [URL] = []
-
-            for baseURL in currentURLs {
-                guard let children = try? fm.contentsOfDirectory(
-                    at: baseURL,
-                    includingPropertiesForKeys: [.isDirectoryKey],
-                    options: [.skipsHiddenFiles]
-                ) else { continue }
-
-                for child in children where matches(child.lastPathComponent, pattern: componentPattern) {
-                    let isDirectory = (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-                    if isLast {
-                        if isDirectory {
-                            nextURLs.append(child)
-                        }
-                    } else if isDirectory {
-                        nextURLs.append(child)
-                    }
-                }
-            }
-
-            currentURLs = nextURLs
-            if currentURLs.isEmpty { break }
-        }
-
-        return currentURLs.map { $0.path }
+        FilmDriveDetector.resolveSubpathMatches(rootURL: rootURL, subpath: subpath)
     }
 
     var organizationPresets: [OrganizationPreset] {

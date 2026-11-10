@@ -39,6 +39,10 @@ struct QuickCopyFormModel {
     /// and the catalog, and loads its preset and shoot fields.
     var savedFilms: [BackupConfiguration] = []
     var selectedFilmId: UUID?
+    /// Sources and destinations the selected movie brought in (not the user's own),
+    /// taken out again when another movie is picked.
+    var filmAddedSources: [String] = []
+    var filmAddedDestinations: [String] = []
     /// nil ⇒ "None": the basic options below drive the run.
     var selectedPresetId: UUID?
     var verification: VerifyMode = .fast
@@ -97,9 +101,23 @@ struct QuickCopyFormModel {
 
     /// Loads the film's preset (when it still exists), project and day. The preset
     /// can still be changed afterwards for this copy only.
-    mutating func selectFilm(_ id: UUID?) {
+    /// `drives`: the movie's mounted cards (kinds already resolved) and destinations,
+    /// added next to what the window was opened with.
+    mutating func selectFilm(_ id: UUID?, drives: (sources: [Item], destinations: [String]) = ([], [])) {
+        items.removeAll { filmAddedSources.contains($0.path) }
+        destinations.removeAll { filmAddedDestinations.contains($0) }
+        filmAddedSources = []
+        filmAddedDestinations = []
         selectedFilmId = id
         guard let film = selectedFilm else { return }
+        for item in drives.sources where !overlapsItem(item.path) {
+            items.append(item)
+            filmAddedSources.append(item.path)
+        }
+        for destination in drives.destinations where !destinations.contains(destination) {
+            destinations.append(destination)
+            filmAddedDestinations.append(destination)
+        }
         if let presetId = film.selectedOrganizationPresetId,
            savedPresets.contains(where: { $0.id == presetId }) {
             selectedPresetId = presetId
@@ -109,6 +127,11 @@ struct QuickCopyFormModel {
         project = film.episode
         day = film.day
         copyFolderContentsOverride = nil
+    }
+
+    /// Same path, or one inside the other (a card and its DCIM folder).
+    private func overlapsItem(_ path: String) -> Bool {
+        items.contains { $0.path == path || $0.path.hasPrefix(path + "/") || path.hasPrefix($0.path + "/") }
     }
 
     /// The film's preset id when it still exists; nil ⇒ the film has none.

@@ -683,4 +683,34 @@ final class QuickCopyFormModelTests: XCTestCase {
         let grouped = MediaCatalogStore.groupingLegacyQuickCopy(rolls)
         XCTAssertEqual(grouped.map(\.projectName), ["Quick Copy", "TLF"])
     }
+
+    // MARK: movie drives
+    func test_selectFilm_addsMovieDrives_besideOpeningCard() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.destinations = ["/Volumes/LAST"]
+        let f = film(preset: nil)
+        form.savedFilms = [f]
+        form.selectFilm(f.id, drives: (sources: [dir("A001"), dir("A001/DCIM"), dir("A002"), dir("ZOOM", .sound)],
+                                       destinations: ["/Volumes/LAST", "/Volumes/RAID"]))
+        XCTAssertEqual(form.items.map(\.name), ["A001", "A002", "ZOOM"])
+        XCTAssertEqual(form.items.last?.kind, .sound)
+        XCTAssertEqual(form.destinations, ["/Volumes/LAST", "/Volumes/RAID"])
+        XCTAssertEqual(form.filmAddedSources, ["/Volumes/CARD/A002", "/Volumes/CARD/ZOOM"])
+        XCTAssertEqual(form.filmAddedDestinations, ["/Volumes/RAID"])
+    }
+
+    func test_changingFilm_dropsPreviousMovieDrives_keepsUsers() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.destinations = ["/Volumes/LAST"]
+        let first = film(name: "One", preset: nil)
+        let second = film(name: "Two", preset: nil)
+        form.savedFilms = [first, second]
+        form.selectFilm(first.id, drives: (sources: [dir("A002")], destinations: ["/Volumes/RAID"]))
+        form.selectFilm(second.id, drives: (sources: [dir("B001")], destinations: []))
+        XCTAssertEqual(form.items.map(\.name), ["A001", "B001"])
+        XCTAssertEqual(form.destinations, ["/Volumes/LAST"])
+        form.selectFilm(nil)
+        XCTAssertEqual(form.items.map(\.name), ["A001"])
+        XCTAssertNil(form.selectedFilmId)
+    }
 }

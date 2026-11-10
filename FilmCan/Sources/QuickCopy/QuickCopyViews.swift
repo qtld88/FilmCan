@@ -333,7 +333,7 @@ struct QuickCopySetupView: View {
             QCSettingRow(label: "Movie") {
                 Picker("", selection: Binding(
                     get: { session.form.selectedFilmId },
-                    set: { session.form.selectFilm($0) })) {
+                    set: { session.selectFilm($0) })) {
                     Text("None").tag(UUID?.none)
                     ForEach(session.form.savedFilms) { Text($0.name).tag(UUID?.some($0.id)) }
                 }
