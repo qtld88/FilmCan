@@ -32,7 +32,7 @@ struct DestinationListView: View {
     /// Checkbox per drive: unchecked drives stay listed, greyed, but get no copy.
     var isIncluded: (String) -> Bool = { _ in true }
     var setIncluded: (([String], Bool) -> Void)? = nil
-    private let previewDate = Date()
+    @ObservedObject private var todayClock = TodayClock.shared
     private var isActiveTransfer: Bool {
         transferViewModel.isTransferActive(for: configId)
     }
@@ -442,7 +442,7 @@ struct DestinationListView: View {
             $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
         } ?? false
         o.copyContents = copyFolderContents
-        o.date = previewDate
+        o.date = todayClock.today
         o.metadata = shootMetadata
         o.mediaIndexPreset = organizationPreset
         return o
@@ -514,7 +514,7 @@ struct DestinationListView: View {
                 sourcePath: sourcePath,
                 destinationRoot: destinationRoot,
                 counter: counter,
-                date: previewDate,
+                date: todayClock.today,
                 metadata: shootMetadata,
                 mediaKind: mediaKind(sourcePath)
             )
