@@ -348,11 +348,25 @@ class TransferViewModel: ObservableObject {
         guard concurrentWorkers[configId] == nil else { return }
 
         let worker = TransferViewModel(isBackgroundWorker: true)
+        registerConcurrentWorker(worker, configId: configId)
+
+        Task { [weak self, worker] in
+            await worker.startTransfer(config: activeConfig)
+            await MainActor.run {
+                self?.finishConcurrentTransfer(configId: configId, worker: worker)
+            }
+        }
+    }
+
+    func registerConcurrentWorker(_ worker: TransferViewModel, configId: UUID) {
         concurrentWorkers[configId] = worker
         activeTransferConfigIds.insert(configId)
         tabProgressByConfig[configId] = 0
 
         var cancellables = Set<AnyCancellable>()
+        worker.duplicates.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
         worker.$progress
             .receive(on: DispatchQueue.main)
             .sink { [weak self] progress in
@@ -371,13 +385,6 @@ class TransferViewModel: ObservableObject {
             .store(in: &cancellables)
 
         concurrentWorkerCancellables[configId] = cancellables
-
-        Task { [weak self, worker] in
-            await worker.startTransfer(config: activeConfig)
-            await MainActor.run {
-                self?.finishConcurrentTransfer(configId: configId, worker: worker)
-            }
-        }
     }
 
     private func finishConcurrentTransfer(configId: UUID, worker: TransferViewModel) {
@@ -512,24 +519,51 @@ class TransferViewModel: ObservableObject {
         )
     }
 
-    var activeDuplicatePrompt: DuplicatePrompt? {
-        get { duplicates.activeDuplicatePrompt }
-        set { duplicates.activeDuplicatePrompt = newValue }
+    // Only the main view model is bound to the sheets, so it also shows the
+    // prompts of concurrent workers: one run's prompts at a time, its own first.
+    private var promptOwner: TransferViewModel {
+        if duplicates.hasActivePrompt { return self }
+        return concurrentWorkers.values.first(where: { $0.duplicates.hasActivePrompt }) ?? self
     }
 
-    var pendingUnreadableFiles: [String] {
-        get { duplicates.pendingUnreadableFiles }
-        set { duplicates.pendingUnreadableFiles = newValue }
+    private var allPromptCoordinators: [DuplicatePromptCoordinator] {
+        [duplicates] + concurrentWorkers.values.map(\.duplicates)
     }
 
-    var activeRollIdentityPrompt: RollIdentityPrompt? {
-        get { duplicates.activeRollIdentityPrompt }
-        set { duplicates.activeRollIdentityPrompt = newValue }
+    var activeDuplicatePrompt: DuplicatePrompt? { promptOwner.duplicates.activeDuplicatePrompt }
+
+    var pendingUnreadableFiles: [String] { promptOwner.duplicates.pendingUnreadableFiles }
+
+    var activeRollIdentityPrompt: RollIdentityPrompt? { promptOwner.duplicates.activeRollIdentityPrompt }
+
+    // Dismiss-by-identity: a stale sheet binding writing nil after its prompt was
+    // already answered must not answer whichever prompt is showing now.
+    func dismissDuplicatePrompt(id: UUID) {
+        allPromptCoordinators.forEach { $0.dismissDuplicatePrompt(id: id) }
+    }
+
+    func dismissRollIdentityPrompt(id: UUID) {
+        allPromptCoordinators.forEach { $0.dismissRollIdentityPrompt(id: id) }
+    }
+
+    func dismissUnreadablePrompt(paths: [String]) {
+        promptOwner.duplicates.dismissUnreadablePrompt(paths: paths)
+    }
+
+    func resolveRollIdentity(prompt: RollIdentityPrompt) async -> Bool {
+        await duplicates.resolveRollIdentity(prompt: prompt)
+    }
+
+    func resolveUnreadable(paths: [String]) async -> Bool {
+        guard !paths.isEmpty else { return true }
+        return await withCheckedContinuation { continuation in
+            duplicates.setUnreadableContinuation(continuation, paths: paths)
+        }
     }
 
     @MainActor
     func submitRollIdentity(isResume: Bool) {
-        duplicates.submitRollIdentity(isResume: isResume)
+        promptOwner.duplicates.submitRollIdentity(isResume: isResume)
     }
 
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
@@ -542,7 +576,7 @@ class TransferViewModel: ObservableObject {
         applyToAll: Bool,
         counterTemplate: String? = nil
     ) {
-        duplicates.submitDuplicateResolution(action: action, applyToAll: applyToAll, counterTemplate: counterTemplate)
+        promptOwner.duplicates.submitDuplicateResolution(action: action, applyToAll: applyToAll, counterTemplate: counterTemplate)
     }
 
     private func resolveOrganizationPreset(for config: BackupConfiguration) -> OrganizationPreset? {
@@ -707,6 +741,11 @@ class TransferViewModel: ObservableObject {
     }
 
     func cancelRunFromDuplicatePrompt() {
+        let owner = promptOwner
+        if owner !== self, let workerId = concurrentWorkers.first(where: { $0.value === owner })?.key {
+            cancelAll(for: workerId)
+            return
+        }
         duplicatePromptCancelled = true
         cancelAll()
         duplicates.submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
@@ -714,7 +753,7 @@ class TransferViewModel: ObservableObject {
 
     @MainActor
     func resolveUnreadable(proceed: Bool) {
-        duplicates.resolveUnreadable(proceed: proceed)
+        promptOwner.duplicates.resolveUnreadable(proceed: proceed)
     }
 
     /// Re-verify an already-backed-up config against its hash lists (the same
@@ -865,12 +904,7 @@ class TransferViewModel: ObservableObject {
                 reVerifyExistingOnResume: config.reVerifyExistingOnResume,
                 unreadableHandler: { [weak self] paths async -> Bool in
                     guard let self else { return false }
-                    return await withCheckedContinuation { continuation in
-                        Task { @MainActor [weak self] in
-                            guard let self else { continuation.resume(returning: false); return }
-                            self.duplicates.setUnreadableContinuation(continuation, paths: paths)
-                        }
-                    }
+                    return await self.resolveUnreadable(paths: paths)
                 },
                 rollIdentityHandler: { [weak self] query async -> Bool in
                     guard let self else { return true }
@@ -881,7 +915,7 @@ class TransferViewModel: ObservableObject {
                         recordedVolumeName: query.recordedVolumeName,
                         recordedLastSeen: query.recordedLastSeen,
                         proposedNewName: query.proposedNewName)
-                    return await self.duplicates.resolveRollIdentity(prompt: prompt)
+                    return await self.resolveRollIdentity(prompt: prompt)
                 },
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
@@ -1069,6 +1103,7 @@ class TransferViewModel: ObservableObject {
         } else {
             currentService?.cancel()
         }
+        duplicates.close()
     }
 
     func cancelAll(for configId: UUID) {

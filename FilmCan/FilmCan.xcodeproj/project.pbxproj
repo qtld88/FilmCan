@@ -170,6 +170,7 @@
 		BAE27C39FB9B565F5EF885AC /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF50C40E7C0C3EE500EFA4C1 /* ColorHex.swift */; };
 		BB139DE65C23A5F6FA8328AC /* ASCMHLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0B02778A43B11B543CE41B /* ASCMHLWriter.swift */; };
 		BF2CAF658EA344C38DFCCED3 /* PreviewInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867AFB25988C222B6A24039C /* PreviewInfo.swift */; };
+		BF867EE59BC724D559FDE9A6 /* PromptRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83DA599C5647A7759624BD9 /* PromptRoutingTests.swift */; };
 		C07E2057A9173CB6E455E864 /* SpaceAndDefaultsRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4300AAEA574C2EA24D846C /* SpaceAndDefaultsRegressionTests.swift */; };
 		C0D41E90912EE8216FC9D01F /* CardSeal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6FC1873384FD0889894E2C /* CardSeal.swift */; };
 		C287BAF47C32F8F94376CA9C /* NotificationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383ACFF923DEBEC571A967AB /* NotificationSettings.swift */; };
@@ -400,6 +401,7 @@
 		A50429EA7795D1152B03EF98 /* MediaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCatalog.swift; sourceTree = "<group>"; };
 		A5EBACAD4FF12342BB0D8F56 /* IOPerfProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOPerfProbeTests.swift; sourceTree = "<group>"; };
 		A6245C9170960E6550C56889 /* CameraCardDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCardDetector.swift; sourceTree = "<group>"; };
+		A83DA599C5647A7759624BD9 /* PromptRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptRoutingTests.swift; sourceTree = "<group>"; };
 		AA669B461FC0CEFB345CB023 /* BackupLogWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupLogWriter.swift; sourceTree = "<group>"; };
 		AAC58BD241ACFF01D05171B8 /* VerifyMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyMode.swift; sourceTree = "<group>"; };
 		AB0DE00B31C198D55826941B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
@@ -678,6 +680,7 @@
 				CF0BFB25C41CDA3D36896F59 /* OrphanCleanerTests.swift */,
 				744CAA8F663737AD61C511BD /* PerfSignpostTests.swift */,
 				1B21AA82915CAC80E339617B /* PresetDivergenceTests.swift */,
+				A83DA599C5647A7759624BD9 /* PromptRoutingTests.swift */,
 				6BC949E75917E6C3C40A2B73 /* QuickCopyFormModelTests.swift */,
 				9BB5D633F58BF2F91D803BEF /* QuickCopyIntegrationTests.swift */,
 				096DBE4252964C56516729EC /* QuickCopyServiceProviderTests.swift */,
@@ -1033,6 +1036,7 @@
 				60328CEF84C73456E58A6D6C /* OrphanCleanerTests.swift in Sources */,
 				9B7A90C434B9D3D530770EA7 /* PerfSignpostTests.swift in Sources */,
 				06B91E2B308C0599E30A56AD /* PresetDivergenceTests.swift in Sources */,
+				BF867EE59BC724D559FDE9A6 /* PromptRoutingTests.swift in Sources */,
 				8FDADE840130AECF5F157752 /* QuickCopyFormModelTests.swift in Sources */,
 				FEE5C47D2E938A4AFBBC24A2 /* QuickCopyIntegrationTests.swift in Sources */,
 				361DC2FC5ED21C123E4FAFA7 /* QuickCopyServiceProviderTests.swift in Sources */,

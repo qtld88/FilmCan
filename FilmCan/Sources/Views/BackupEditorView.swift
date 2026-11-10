@@ -95,6 +95,32 @@ struct BackupEditorView: View {
         viewModel.enforceCustomEngineDefaultsIfNeeded()
     }
 
+    // Each binding captures the prompt it was built for, so a late dismissal write
+    // answers that prompt (never a newer one) and the engine is always resumed.
+    private var duplicatePromptBinding: Binding<DuplicatePrompt?> {
+        let shown = transferViewModel.activeDuplicatePrompt?.id
+        return Binding(
+            get: { transferViewModel.activeDuplicatePrompt },
+            set: { if $0 == nil, let shown { transferViewModel.dismissDuplicatePrompt(id: shown) } }
+        )
+    }
+
+    private var rollIdentityPromptBinding: Binding<RollIdentityPrompt?> {
+        let shown = transferViewModel.activeRollIdentityPrompt?.id
+        return Binding(
+            get: { transferViewModel.activeRollIdentityPrompt },
+            set: { if $0 == nil, let shown { transferViewModel.dismissRollIdentityPrompt(id: shown) } }
+        )
+    }
+
+    private var unreadablePromptBinding: Binding<Bool> {
+        let shown = transferViewModel.pendingUnreadableFiles
+        return Binding(
+            get: { !transferViewModel.pendingUnreadableFiles.isEmpty },
+            set: { if !$0 { transferViewModel.dismissUnreadablePrompt(paths: shown) } }
+        )
+    }
+
     var body: some View {
         GeometryReader { proxy in
             editorContent(proxy: proxy)
@@ -109,7 +135,7 @@ struct BackupEditorView: View {
                 }
             }
         }
-        .sheet(item: $transferViewModel.activeDuplicatePrompt) { prompt in
+        .sheet(item: duplicatePromptBinding) { prompt in
             DuplicatePromptSheet(
                 prompt: prompt,
                 onDecision: { action, applyToAll, counterTemplate in
@@ -124,7 +150,7 @@ struct BackupEditorView: View {
                 }
             )
         }
-        .sheet(item: $transferViewModel.activeRollIdentityPrompt) { prompt in
+        .sheet(item: rollIdentityPromptBinding) { prompt in
             RollIdentitySheet(prompt: prompt) { isResume in
                 transferViewModel.submitRollIdentity(isResume: isResume)
             }
@@ -136,10 +162,7 @@ struct BackupEditorView: View {
                 onDone: { transferViewModel.alreadyBackedUp = nil }
             )
         }
-        .sheet(isPresented: Binding(
-            get: { !transferViewModel.pendingUnreadableFiles.isEmpty },
-            set: { if !$0 { transferViewModel.resolveUnreadable(proceed: false) } }
-        )) {
+        .sheet(isPresented: unreadablePromptBinding) {
             UnreadableFilesSheet(
                 paths: transferViewModel.pendingUnreadableFiles,
                 onContinue: { transferViewModel.resolveUnreadable(proceed: true) },

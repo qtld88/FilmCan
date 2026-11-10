@@ -493,7 +493,7 @@ struct QuickCopyProgressView: View {
             Divider()
             footer
         }
-        .sheet(item: $worker.activeDuplicatePrompt) { prompt in
+        .sheet(item: duplicatePromptBinding) { prompt in
             DuplicatePromptSheet(
                 prompt: prompt,
                 onDecision: { action, applyToAll, counterTemplate in
@@ -509,22 +509,45 @@ struct QuickCopyProgressView: View {
             )
             .interactiveDismissDisabled()
         }
-        .sheet(item: $worker.activeRollIdentityPrompt) { prompt in
+        .sheet(item: rollIdentityPromptBinding) { prompt in
             RollIdentitySheet(prompt: prompt) { isResume in
                 worker.submitRollIdentity(isResume: isResume)
             }
             .interactiveDismissDisabled()
         }
-        .sheet(isPresented: Binding(
-            get: { !worker.pendingUnreadableFiles.isEmpty },
-            set: { if !$0 { worker.resolveUnreadable(proceed: false) } }
-        )) {
+        .sheet(isPresented: unreadablePromptBinding) {
             UnreadableFilesSheet(
                 paths: worker.pendingUnreadableFiles,
                 onContinue: { worker.resolveUnreadable(proceed: true) },
                 onCancel: { worker.resolveUnreadable(proceed: false) }
             )
         }
+    }
+
+    // Each binding captures the prompt it was built for, so a late dismissal write
+    // answers that prompt (never a newer one) and the engine is always resumed.
+    private var duplicatePromptBinding: Binding<DuplicatePrompt?> {
+        let shown = worker.activeDuplicatePrompt?.id
+        return Binding(
+            get: { worker.activeDuplicatePrompt },
+            set: { if $0 == nil, let shown { worker.dismissDuplicatePrompt(id: shown) } }
+        )
+    }
+
+    private var rollIdentityPromptBinding: Binding<RollIdentityPrompt?> {
+        let shown = worker.activeRollIdentityPrompt?.id
+        return Binding(
+            get: { worker.activeRollIdentityPrompt },
+            set: { if $0 == nil, let shown { worker.dismissRollIdentityPrompt(id: shown) } }
+        )
+    }
+
+    private var unreadablePromptBinding: Binding<Bool> {
+        let shown = worker.pendingUnreadableFiles
+        return Binding(
+            get: { !worker.pendingUnreadableFiles.isEmpty },
+            set: { if !$0 { worker.dismissUnreadablePrompt(paths: shown) } }
+        )
     }
 
     private var header: some View {

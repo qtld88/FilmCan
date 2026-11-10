@@ -25,6 +25,7 @@ final class DuplicatePromptCoordinator: ObservableObject {
     private var isShowingDuplicatePrompt = false
     private var unreadableContinuation: CheckedContinuation<Bool, Never>? = nil
     private var rollIdentityContinuation: CheckedContinuation<Bool, Never>? = nil
+    private var isClosed = false
 
     private struct PendingDuplicatePrompt {
         let prompt: DuplicatePrompt
@@ -32,6 +33,9 @@ final class DuplicatePromptCoordinator: ObservableObject {
     }
 
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
+        if isClosed {
+            return DuplicateResolution(action: .skip, applyToAll: false, counterTemplate: nil)
+        }
         if let cached = cachedDuplicateResolution {
             return cached
         }
@@ -88,23 +92,63 @@ final class DuplicatePromptCoordinator: ObservableObject {
         isShowingDuplicatePrompt = true
     }
 
-    func reset() {
+    /// True while any engine-blocking prompt is waiting on the user.
+    var hasActivePrompt: Bool {
+        activeDuplicatePrompt != nil || activeRollIdentityPrompt != nil || !pendingUnreadableFiles.isEmpty
+    }
+
+    /// Unblocks every suspended engine callback with a non-destructive answer
+    /// (skip duplicates, abort on unreadable files, resume the roll). A continuation
+    /// that is dropped instead of resumed hangs its run forever in "Preparing".
+    func resolveAllPending() {
+        let skip = DuplicateResolution(action: .skip, applyToAll: false, counterTemplate: nil)
+        let duplicateContinuations = [activeDuplicateContinuation].compactMap { $0 }
+            + pendingDuplicatePrompts.map(\.continuation)
         activeDuplicatePrompt = nil
-        cachedDuplicateResolution = nil
-        pendingDuplicatePrompts = []
         activeDuplicateContinuation = nil
+        pendingDuplicatePrompts = []
         isShowingDuplicatePrompt = false
-        unreadableContinuation = nil
-        let roll = rollIdentityContinuation
-        rollIdentityContinuation = nil
-        activeRollIdentityPrompt = nil
-        roll?.resume(returning: true)  // unblock any pending run on reset (defaults to resume)
+        duplicateContinuations.forEach { $0.resume(returning: skip) }
+
+        resolveUnreadable(proceed: false)
+        submitRollIdentity(isResume: true)
+    }
+
+    /// Run cancelled: answer everything pending, and auto-answer any prompt the
+    /// engine still raises while it unwinds, since nobody is left to show it.
+    func close() {
+        isClosed = true
+        resolveAllPending()
+    }
+
+    func reset() {
+        resolveAllPending()
+        cachedDuplicateResolution = nil
+        isClosed = false
+    }
+
+    /// The sheet went away without a button press: answer as the sheet's
+    /// safest default so the engine is never left suspended.
+    func dismissDuplicatePrompt(id: UUID) {
+        guard activeDuplicatePrompt?.id == id else { return }
+        submitDuplicateResolution(action: .skip, applyToAll: false)
+    }
+
+    func dismissRollIdentityPrompt(id: UUID) {
+        guard let prompt = activeRollIdentityPrompt, prompt.id == id else { return }
+        submitRollIdentity(isResume: prompt.recommendation != .newCard)
+    }
+
+    func dismissUnreadablePrompt(paths: [String]) {
+        guard !paths.isEmpty, pendingUnreadableFiles == paths else { return }
+        resolveUnreadable(proceed: false)
     }
 
     /// Suspend until the user resolves a roll-identity prompt; returns true to resume
     /// into the existing roll, false to save the source as a fresh "-N" roll.
     func resolveRollIdentity(prompt: RollIdentityPrompt) async -> Bool {
-        await withCheckedContinuation { continuation in
+        if isClosed { return true }
+        return await withCheckedContinuation { continuation in
             rollIdentityContinuation = continuation
             activeRollIdentityPrompt = prompt
         }
@@ -125,6 +169,10 @@ final class DuplicatePromptCoordinator: ObservableObject {
     }
 
     func setUnreadableContinuation(_ continuation: CheckedContinuation<Bool, Never>, paths: [String]) {
+        if isClosed {
+            continuation.resume(returning: false)
+            return
+        }
         unreadableContinuation = continuation
         pendingUnreadableFiles = paths
     }
