@@ -11,6 +11,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     static let lastPresetKey = "quickCopy.lastPresetId"
     static let lastDestinationsKey = "quickCopy.lastDestinations"
+    static let lastFilmKey = "quickCopy.lastFilmId"
 
     let id = UUID()
     @Published var form: QuickCopyFormModel
@@ -52,6 +53,12 @@ final class QuickCopySession: ObservableObject, Identifiable {
         }
         form.destinations = (defaults.stringArray(forKey: Self.lastDestinationsKey) ?? [])
             .filter { FileManager.default.fileExists(atPath: $0) }
+        form.savedFilms = storage.configurations
+        if let raw = defaults.string(forKey: Self.lastFilmKey),
+           let filmId = UUID(uuidString: raw),
+           let film = form.savedFilms.first(where: { $0.id == filmId }) {
+            form.selectFilm(filmId, drives: Self.drives(for: film))
+        }
         self.form = form
 
         workerObserver = worker.objectWillChange.sink { [weak self] _ in
@@ -59,6 +66,28 @@ final class QuickCopySession: ObservableObject, Identifiable {
         }
         loadSizes()
         refreshCapacities()
+    }
+
+    /// Picks a movie and adds its mounted cards and destinations to the form.
+    func selectFilm(_ id: UUID?) {
+        guard phase == .setup else { return }
+        let before = Set(form.items.map(\.path))
+        form.selectFilm(id, drives: Self.drives(for: form.savedFilms.first { $0.id == id }))
+        loadSizes(for: form.items.filter { !before.contains($0.path) })
+        refreshCapacities()
+    }
+
+    /// The movie's mounted sources (kind from the movie, else guessed) and destinations.
+    private static func drives(for film: BackupConfiguration?) -> (sources: [QuickCopyFormModel.Item], destinations: [String]) {
+        guard let film else { return ([], []) }
+        let detected = FilmDriveDetector.detect(film: film)
+        let kinds = Dictionary(detected.sources.map { ($0.path, $0.kind) }, uniquingKeysWith: { first, _ in first })
+        let items = QuickCopyFormModel.items(for: detected.sources.map(\.path)).map { item -> QuickCopyFormModel.Item in
+            var item = item
+            if let kind = kinds[item.path] ?? nil { item.kind = kind }
+            return item
+        }
+        return (items, detected.destinations.filter(isDirectory))
     }
 
     func refreshCapacities() {
@@ -158,13 +187,16 @@ final class QuickCopySession: ObservableObject, Identifiable {
         }
         defaults.set(form.selectedPresetId?.uuidString, forKey: Self.lastPresetKey)
         defaults.set(form.destinations, forKey: Self.lastDestinationsKey)
+        defaults.set(form.selectedFilmId?.uuidString, forKey: Self.lastFilmKey)
 
         let config = form.makeConfiguration()
         let preset = form.runPreset()
+        let recordAs = form.selectedFilm.map { (id: $0.id, name: $0.name) }
         phase = .running
 
         Task { [weak self, worker] in
-            await worker.startTransfer(config: config, organizationPresetOverride: preset)
+            await worker.startTransfer(config: config, organizationPresetOverride: preset,
+                                       recordAs: recordAs)
             self?.finish()
         }
     }

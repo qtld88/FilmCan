@@ -138,7 +138,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         form.project = "Docu Truc"
         form.day = "itw/1"
         let c = form.makeConfiguration()
-        XCTAssertEqual(c.name, "Quick Copy — A001")
+        XCTAssertEqual(c.name, "Docu_Truc")
         XCTAssertEqual(c.sourcePaths, ["/Volumes/CARD/A001", "/Volumes/CARD/ZOOM"])
         XCTAssertEqual(c.destinationPaths, ["/Volumes/SSD1", "/Volumes/SSD2"])
         XCTAssertEqual(c.sourceMediaKinds["/Volumes/CARD/ZOOM"], .sound)
@@ -570,5 +570,147 @@ final class QuickCopyFormModelTests: XCTestCase {
         form.setCopyFolderContents(true)
         XCTAssertTrue(form.copyFolderContents)
         XCTAssertNil(form.copyFolderContentsOverride)
+    }
+
+    // MARK: film
+    private func film(name: String = "TLF", preset: OrganizationPreset?) -> BackupConfiguration {
+        var f = BackupConfiguration()
+        f.name = name
+        f.selectedOrganizationPresetId = preset?.id
+        f.episode = "TLF"
+        f.day = "DAY03"
+        f.unit = "MAIN"
+        f.cameraFormat = "ARRI"
+        f.sourcePaths = ["/Volumes/FILM_OWN_SOURCE"]
+        return f
+    }
+
+    func test_selectFilm_loadsPresetProjectAndDay() {
+        let netflix = OrganizationPreset.netflixIngest()
+        let other = OrganizationPreset()
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.savedPresets = [netflix, other]
+        let f = film(preset: netflix)
+        form.savedFilms = [f]
+        form.selectFilm(f.id)
+        XCTAssertEqual(form.selectedPresetId, netflix.id)
+        XCTAssertEqual(form.project, "TLF")
+        XCTAssertEqual(form.day, "DAY03")
+        XCTAssertEqual(form.filmPresetName, netflix.name)
+        XCTAssertFalse(form.presetDiffersFromFilm)
+
+        form.selectedPresetId = other.id
+        XCTAssertTrue(form.presetDiffersFromFilm)
+        XCTAssertEqual(form.filmPresetName, netflix.name)
+    }
+
+    func test_selectFilm_withDeletedPreset_fallsBackToNone() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.selectedPresetId = UUID()
+        let f = film(preset: OrganizationPreset())
+        form.savedFilms = [f]
+        form.selectFilm(f.id)
+        XCTAssertNil(form.selectedPresetId)
+        XCTAssertEqual(form.filmPresetName, "None")
+        XCTAssertFalse(form.presetDiffersFromFilm)
+    }
+
+    func test_recordName_filmThenProjectThenQuickCopy() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        XCTAssertEqual(form.makeConfiguration().name, "Quick Copy")
+        form.organization = .projectAndDay
+        form.project = "Docu Truc"
+        XCTAssertEqual(form.makeConfiguration().name, "Docu_Truc")
+        let f = film(name: "The Long Film", preset: nil)
+        form.savedFilms = [f]
+        form.selectFilm(f.id)
+        XCTAssertEqual(form.makeConfiguration().name, "The Long Film")
+    }
+
+    func test_film_keepsQuickCopySources_andTemporaryId() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        let f = film(preset: nil)
+        form.savedFilms = [f]
+        form.selectFilm(f.id)
+        let c = form.makeConfiguration()
+        XCTAssertNotEqual(c.id, f.id)
+        XCTAssertEqual(c.sourcePaths, ["/Volumes/CARD/A001"])
+        XCTAssertEqual(c.unit, "MAIN")
+        XCTAssertEqual(c.cameraFormat, "ARRI")
+    }
+
+    func test_film_netflixTemplates_driveRunPresetAndPreview() {
+        let netflix = OrganizationPreset.netflixIngest()
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.savedPresets = [netflix]
+        var f = film(preset: netflix)
+        f.cameraFolderTemplate = "{episode}_{day}_{unit}/CAM/{cameraFormat}"
+        form.savedFilms = [f]
+        form.selectFilm(f.id)
+        XCTAssertEqual(form.runPreset()?.folderTemplate, f.cameraFolderTemplate)
+        let rel = form.relativePaths(for: "/Volumes/SSD").first ?? ""
+        XCTAssertTrue(rel.hasPrefix("TLF_DAY03_MAIN/CAM/ARRI/"), rel)
+
+        form.selectedPresetId = nil
+        XCTAssertNotEqual(form.runPreset()?.folderTemplate, f.cameraFolderTemplate)
+    }
+
+    // MARK: recording
+    func test_recordConfig_filesUnderFilm_keepsRunContent() {
+        var run = BackupConfiguration()
+        run.name = "Quick Copy"
+        run.sourcePaths = ["/Volumes/CARD/A001"]
+        let filmId = UUID()
+        let record = TransferViewModel.recordConfig(run, recordAs: (id: filmId, name: "TLF"))
+        XCTAssertEqual(record.id, filmId)
+        XCTAssertEqual(record.name, "TLF")
+        XCTAssertEqual(record.sourcePaths, run.sourcePaths)
+        XCTAssertEqual(TransferViewModel.recordConfig(run, recordAs: nil).id, run.id)
+    }
+
+    func test_catalog_groupsLegacyQuickCopyProjects() throws {
+        let json = """
+        [{"projectName":"Quick Copy — HAWAII","shootDay":"2026-11-01","rollName":"A001",
+          "mediaKind":"camera","sourcePath":"/Volumes/A001","firstBackedUp":"2026-11-01T10:00:00Z",
+          "files":[],"copies":[],"id":"\(UUID().uuidString)"},
+         {"projectName":"TLF","shootDay":"2026-11-01","rollName":"A002",
+          "mediaKind":"camera","sourcePath":"/Volumes/A002","firstBackedUp":"2026-11-01T10:00:00Z",
+          "files":[],"copies":[],"id":"\(UUID().uuidString)"}]
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let rolls = try decoder.decode([CatalogRoll].self, from: Data(json.utf8))
+        let grouped = MediaCatalogStore.groupingLegacyQuickCopy(rolls)
+        XCTAssertEqual(grouped.map(\.projectName), ["Quick Copy", "TLF"])
+    }
+
+    // MARK: movie drives
+    func test_selectFilm_addsMovieDrives_besideOpeningCard() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.destinations = ["/Volumes/LAST"]
+        let f = film(preset: nil)
+        form.savedFilms = [f]
+        form.selectFilm(f.id, drives: (sources: [dir("A001"), dir("A001/DCIM"), dir("A002"), dir("ZOOM", .sound)],
+                                       destinations: ["/Volumes/LAST", "/Volumes/RAID"]))
+        XCTAssertEqual(form.items.map(\.name), ["A001", "A002", "ZOOM"])
+        XCTAssertEqual(form.items.last?.kind, .sound)
+        XCTAssertEqual(form.destinations, ["/Volumes/LAST", "/Volumes/RAID"])
+        XCTAssertEqual(form.filmAddedSources, ["/Volumes/CARD/A002", "/Volumes/CARD/ZOOM"])
+        XCTAssertEqual(form.filmAddedDestinations, ["/Volumes/RAID"])
+    }
+
+    func test_changingFilm_dropsPreviousMovieDrives_keepsUsers() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        form.destinations = ["/Volumes/LAST"]
+        let first = film(name: "One", preset: nil)
+        let second = film(name: "Two", preset: nil)
+        form.savedFilms = [first, second]
+        form.selectFilm(first.id, drives: (sources: [dir("A002")], destinations: ["/Volumes/RAID"]))
+        form.selectFilm(second.id, drives: (sources: [dir("B001")], destinations: []))
+        XCTAssertEqual(form.items.map(\.name), ["A001", "B001"])
+        XCTAssertEqual(form.destinations, ["/Volumes/LAST"])
+        form.selectFilm(nil)
+        XCTAssertEqual(form.items.map(\.name), ["A001"])
+        XCTAssertNil(form.selectedFilmId)
     }
 }

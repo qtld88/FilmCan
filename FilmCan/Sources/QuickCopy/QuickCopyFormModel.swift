@@ -35,6 +35,14 @@ struct QuickCopyFormModel {
     var items: [Item]
     var destinations: [String] = []
     var savedPresets: [OrganizationPreset] = []
+    /// Saved films (main-window tabs). Picking one files the copy under it in history
+    /// and the catalog, and loads its preset and shoot fields.
+    var savedFilms: [BackupConfiguration] = []
+    var selectedFilmId: UUID?
+    /// Sources and destinations the selected movie brought in (not the user's own),
+    /// taken out again when another movie is picked.
+    var filmAddedSources: [String] = []
+    var filmAddedDestinations: [String] = []
     /// nil ⇒ "None": the basic options below drive the run.
     var selectedPresetId: UUID?
     var verification: VerifyMode = .fast
@@ -84,6 +92,77 @@ struct QuickCopyFormModel {
     }
 
     var sanitizedDay: String { Self.sanitizeName(day) }
+
+    // MARK: Film
+    var selectedFilm: BackupConfiguration? {
+        guard let id = selectedFilmId else { return nil }
+        return savedFilms.first { $0.id == id }
+    }
+
+    /// Loads the film's preset (when it still exists), project and day. The preset
+    /// can still be changed afterwards for this copy only.
+    /// `drives`: the movie's mounted cards (kinds already resolved) and destinations,
+    /// added next to what the window was opened with.
+    mutating func selectFilm(_ id: UUID?, drives: (sources: [Item], destinations: [String]) = ([], [])) {
+        items.removeAll { filmAddedSources.contains($0.path) }
+        destinations.removeAll { filmAddedDestinations.contains($0) }
+        filmAddedSources = []
+        filmAddedDestinations = []
+        selectedFilmId = id
+        guard let film = selectedFilm else { return }
+        for item in drives.sources where !overlapsItem(item.path) {
+            items.append(item)
+            filmAddedSources.append(item.path)
+        }
+        for destination in drives.destinations where !destinations.contains(destination) {
+            destinations.append(destination)
+            filmAddedDestinations.append(destination)
+        }
+        if let presetId = film.selectedOrganizationPresetId,
+           savedPresets.contains(where: { $0.id == presetId }) {
+            selectedPresetId = presetId
+        } else {
+            selectedPresetId = nil
+        }
+        project = film.episode
+        day = film.day
+        copyFolderContentsOverride = nil
+    }
+
+    /// Same path, or one inside the other (a card and its DCIM folder).
+    private func overlapsItem(_ path: String) -> Bool {
+        items.contains { $0.path == path || $0.path.hasPrefix(path + "/") || path.hasPrefix($0.path + "/") }
+    }
+
+    /// The film's preset id when it still exists; nil ⇒ the film has none.
+    private var filmPresetId: UUID? {
+        guard let id = selectedFilm?.selectedOrganizationPresetId,
+              savedPresets.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
+
+    /// Name of the preset the selected film uses ("None" without one); nil without a film.
+    var filmPresetName: String? {
+        guard selectedFilm != nil else { return nil }
+        guard let id = filmPresetId else { return "None" }
+        return savedPresets.first { $0.id == id }?.name
+    }
+
+    var presetDiffersFromFilm: Bool {
+        selectedFilm != nil && selectedPresetId != filmPresetId
+    }
+
+    /// Unit and camera format come from the film (Quick Copy has no field for them).
+    var shootMetadata: ShootMetadata {
+        ShootMetadata(episode: sanitizedProject, day: sanitizedDay,
+                      unit: selectedFilm?.unit ?? "", cameraFormat: selectedFilm?.cameraFormat ?? "")
+    }
+
+    /// Name history and the catalog file this copy under.
+    var recordName: String {
+        if let film = selectedFilm { return film.name }
+        return sanitizedProject.isEmpty ? "Quick Copy" : sanitizedProject
+    }
 
     // MARK: Preset / organization state
     var selectedPreset: OrganizationPreset? {
@@ -273,6 +352,13 @@ struct QuickCopyFormModel {
         var preset: OrganizationPreset
         if let saved = selectedPreset {
             preset = saved
+            // Same as `TransferViewModel.resolveOrganizationPreset`: the film's edited
+            // Camera/Sound templates drive the Netflix preset.
+            if let film = selectedFilm, saved.id == film.selectedOrganizationPresetId,
+               saved.name == OrganizationPreset.netflixIngestName {
+                if !Self.isBlank(film.cameraFolderTemplate) { preset.folderTemplate = film.cameraFolderTemplate }
+                if !Self.isBlank(film.soundFolderTemplate) { preset.soundFolderTemplate = film.soundFolderTemplate }
+            }
         } else {
             switch organization {
             case .none:
@@ -312,12 +398,14 @@ extension QuickCopyFormModel {
     /// organization preset itself travels separately (`runPreset()`).
     func makeConfiguration() -> BackupConfiguration {
         var c = BackupConfiguration()
-        c.name = "Quick Copy — \(items.first?.name ?? "")"
+        c.name = recordName
         c.sourcePaths = items.map(\.path)
         c.destinationPaths = destinations
         c.sourceMediaKinds = Dictionary(items.map { ($0.path, $0.kind) }, uniquingKeysWith: { first, _ in first })
         c.episode = sanitizedProject
         c.day = sanitizedDay
+        c.unit = shootMetadata.unit
+        c.cameraFormat = shootMetadata.cameraFormat
 
         var options = selectedPreset?.engineOptions ?? EngineOptions()
         options.verificationMode = effectiveVerification
@@ -457,7 +545,7 @@ extension QuickCopyFormModel {
         o.organizationActive = organizationActive
         o.copyContents = effectiveCopyFolderContents
         o.date = today
-        o.metadata = ShootMetadata(episode: sanitizedProject, day: sanitizedDay)
+        o.metadata = shootMetadata
         o.lacksMediaFolder = lacksMediaFolder
         o.hasTypedMediaFolder = { mediaFolder(for: $0) != nil }
         o.mediaIndexPreset = organizedPreset()
