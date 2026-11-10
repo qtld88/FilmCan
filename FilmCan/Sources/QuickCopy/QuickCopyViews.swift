@@ -330,6 +330,23 @@ struct QuickCopySetupView: View {
     // Settings
     private var settingsPanel: some View {
         QCPanel(title: "SETTINGS") {
+            QCSettingRow(label: "Film") {
+                Picker("", selection: Binding(
+                    get: { session.form.selectedFilmId },
+                    set: { session.form.selectFilm($0) })) {
+                    Text("None").tag(UUID?.none)
+                    ForEach(session.form.savedFilms) { Text($0.name).tag(UUID?.some($0.id)) }
+                }
+            }
+            .help("History and the catalog file this copy under the film.")
+            if let filmPreset = session.form.filmPresetName {
+                Text(session.form.presetDiffersFromFilm
+                     ? "Preset changed for this copy (film uses \u{201C}\(filmPreset)\u{201D})"
+                     : "Preset of this film: \u{201C}\(filmPreset)\u{201D}")
+                    .font(FCType.meta)
+                    .foregroundColor(session.form.presetDiffersFromFilm
+                                     ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+            }
             QCSettingRow(label: "Preset") {
                 Picker("", selection: $session.form.selectedPresetId) {
                     Text("None").tag(UUID?.none)

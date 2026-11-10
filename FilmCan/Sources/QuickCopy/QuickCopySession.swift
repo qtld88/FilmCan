@@ -11,6 +11,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     static let lastPresetKey = "quickCopy.lastPresetId"
     static let lastDestinationsKey = "quickCopy.lastDestinations"
+    static let lastFilmKey = "quickCopy.lastFilmId"
 
     let id = UUID()
     @Published var form: QuickCopyFormModel
@@ -49,6 +50,12 @@ final class QuickCopySession: ObservableObject, Identifiable {
            let presetId = UUID(uuidString: raw),
            form.savedPresets.contains(where: { $0.id == presetId }) {
             form.selectedPresetId = presetId
+        }
+        form.savedFilms = storage.configurations
+        if let raw = defaults.string(forKey: Self.lastFilmKey),
+           let filmId = UUID(uuidString: raw),
+           form.savedFilms.contains(where: { $0.id == filmId }) {
+            form.selectFilm(filmId)
         }
         form.destinations = (defaults.stringArray(forKey: Self.lastDestinationsKey) ?? [])
             .filter { FileManager.default.fileExists(atPath: $0) }
@@ -158,13 +165,16 @@ final class QuickCopySession: ObservableObject, Identifiable {
         }
         defaults.set(form.selectedPresetId?.uuidString, forKey: Self.lastPresetKey)
         defaults.set(form.destinations, forKey: Self.lastDestinationsKey)
+        defaults.set(form.selectedFilmId?.uuidString, forKey: Self.lastFilmKey)
 
         let config = form.makeConfiguration()
         let preset = form.runPreset()
+        let recordAs = form.selectedFilm.map { (id: $0.id, name: $0.name) }
         phase = .running
 
         Task { [weak self, worker] in
-            await worker.startTransfer(config: config, organizationPresetOverride: preset)
+            await worker.startTransfer(config: config, organizationPresetOverride: preset,
+                                       recordAs: recordAs)
             self?.finish()
         }
     }

@@ -95,8 +95,12 @@ class TransferViewModel: ObservableObject {
     
     /// `organizationPresetOverride`: a fully-built preset for this run (Quick Copy).
     /// When nil the preset is resolved from the config + stored presets as usual.
+    /// `recordAs`: the saved film a Quick Copy run is filed under in history and the
+    /// catalog. Only the records carry it — the run itself keeps the temporary config,
+    /// because a stored id would make the lookup below swap in the film's own sources.
     func startTransfer(config: BackupConfiguration,
-                       organizationPresetOverride: OrganizationPreset? = nil) async {
+                       organizationPresetOverride: OrganizationPreset? = nil,
+                       recordAs: (id: UUID, name: String)? = nil) async {
         if !isBackgroundWorker, isTransferring, activeConfigId != config.id {
             startConcurrentTransfer(config: config)
             return
@@ -239,14 +243,15 @@ class TransferViewModel: ObservableObject {
                     results: &perDestResults,
                     preset: organizationPreset
                 )
+                let recordConfig = Self.recordConfig(activeConfig, recordAs: recordAs)
                 await recordHistory(
-                    config: activeConfig,
+                    config: recordConfig,
                     sources: sources,
                     results: perDestResults,
                     preset: organizationPreset
                 )
                 await MediaCatalogStore.shared.record(
-                    config: activeConfig, sources: sources,
+                    config: recordConfig, sources: sources,
                     results: perDestResults, runDate: transferStartTime ?? Date())
                 await NotificationDispatcher.sendSource(
                     source: sources.first ?? "",
@@ -961,6 +966,17 @@ class TransferViewModel: ObservableObject {
 
     private func countVisibleFiles(sources: [String]) async -> Int {
         await HistoryRecorder.countVisibleFiles(sources: sources)
+    }
+
+    /// The config history and the catalog are written with: the run's own, or the
+    /// film a Quick Copy was filed under (its id and name only).
+    nonisolated static func recordConfig(_ config: BackupConfiguration,
+                                         recordAs: (id: UUID, name: String)?) -> BackupConfiguration {
+        guard let owner = recordAs else { return config }
+        var record = config
+        record.id = owner.id
+        record.name = owner.name
+        return record
     }
 
     private func recordHistory(

@@ -30,7 +30,7 @@ final class MediaCatalogStore: ObservableObject {
             let data = try Data(contentsOf: fileURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            rolls = try decoder.decode([CatalogRoll].self, from: data)
+            rolls = Self.groupingLegacyQuickCopy(try decoder.decode([CatalogRoll].self, from: data))
         } catch {
             let stamp = Int(Date().timeIntervalSince1970)
             let quarantine = fileURL.deletingLastPathComponent()
@@ -38,6 +38,17 @@ final class MediaCatalogStore: ObservableObject {
             try? fm.moveItem(at: fileURL, to: quarantine)
             DebugLog.warn("Catalog unreadable, quarantined to \(quarantine.lastPathComponent): \(error)")
             rolls = []
+        }
+    }
+
+    /// Quick Copy used to file each run as its own project ("Quick Copy — <folder>");
+    /// the typed project was not recorded, so those rolls fold into one "Quick Copy".
+    nonisolated static func groupingLegacyQuickCopy(_ rolls: [CatalogRoll]) -> [CatalogRoll] {
+        rolls.map { roll in
+            guard roll.projectName.hasPrefix("Quick Copy — ") else { return roll }
+            var grouped = roll
+            grouped.projectName = "Quick Copy"
+            return grouped
         }
     }
 
