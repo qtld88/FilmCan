@@ -13,7 +13,12 @@ enum MainWindowTarget {
 
     static var frontmost: NSWindow? {
         NSApp.orderedWindows.first { windows.contains($0) && $0.isVisible }
-            ?? NSApp.orderedWindows.first { windows.contains($0) }
+            ?? NSApp.windows.first { windows.contains($0) }
+    }
+
+    /// Another visible main window than `window`, to cascade a new one from.
+    static func otherVisibleWindow(than window: NSWindow) -> NSWindow? {
+        NSApp.orderedWindows.first { $0 !== window && windows.contains($0) && $0.isVisible }
     }
 
     /// True when `window` should handle a broadcast hotkey. An unknown window

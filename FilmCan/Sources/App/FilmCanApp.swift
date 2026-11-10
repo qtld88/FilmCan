@@ -99,6 +99,7 @@ private struct NewWindowMenuItems: View {
     var body: some View {
         Divider()
         Button("New Window") {
+            QuickCopyCoordinator.shared.userOpenedMainWindow()
             openWindow(id: MainWindowTarget.sceneId)
         }
         .keyboardShortcut("n", modifiers: [.command, .option])
@@ -241,6 +242,13 @@ private struct InitialWindowSizer: ViewModifier {
         guard !didApply else { return }
         guard let window = Self.mainWindow() else { return }
         window.tabbingMode = .disallowed
+        // File › New Window: offset from the existing window instead of covering it.
+        if let other = MainWindowTarget.otherVisibleWindow(than: window) {
+            window.setFrame(other.frame, display: false)
+            window.setFrameTopLeftPoint(NSPoint(x: other.frame.minX + 28, y: other.frame.maxY - 28))
+            didApply = true
+            return
+        }
         if !savedFrame.isEmpty {
             let restored = NSRectFromString(savedFrame).standardized
             if restored.width > 100, restored.height > 100 {
