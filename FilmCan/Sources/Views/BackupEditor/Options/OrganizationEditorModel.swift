@@ -48,6 +48,20 @@ final class OrganizationEditorModel: ObservableObject {
         return organizationPresets.first(where: { $0.id == id })?.name
     }
 
+    var isNetflixPresetSelected: Bool {
+        selectedOrganizationPresetName == OrganizationPreset.netflixIngestName
+    }
+
+    /// True when the active preset's enabled templates contain `token`, so the
+    /// matching shoot-metadata field is worth showing (mirrors Quick Copy).
+    func activeTemplatesContain(_ token: String) -> Bool {
+        guard let p = editingOrganizationPresetBinding?.wrappedValue else { return false }
+        if p.useFolderTemplate, p.folderTemplate.contains(token) || p.soundFolderTemplate.contains(token) {
+            return true
+        }
+        return p.useRenameTemplate && p.renameTemplate.contains(token)
+    }
+
     func binding<Value>(_ keyPath: ReferenceWritableKeyPath<OrganizationEditorModel, Value>) -> Binding<Value> {
         Binding(get: { self[keyPath: keyPath] }, set: { self[keyPath: keyPath] = $0 })
     }
@@ -82,6 +96,10 @@ final class OrganizationEditorModel: ObservableObject {
             ("{destinationDriveName}", "Name of the drive containing the destination."),
             ("{destination}", "Destination folder name."),
             ("{date}", "Today's date (YYYYMMDD)."),
+            ("{episode}", "Project / episode, from Shoot metadata."),
+            ("{day}", "Shoot day, from Shoot metadata."),
+            ("{unit}", "Unit, from Shoot metadata."),
+            ("{cameraFormat}", "Camera format, from Shoot metadata."),
             ("{time}", "Current time (HHmmss)."),
             ("{datetime}", "Date and time (YYYYMMDD-HHmmss)."),
             ("{counter}", "Incrementing counter (001, 002, 003…)."),

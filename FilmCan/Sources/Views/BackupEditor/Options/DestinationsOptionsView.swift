@@ -28,22 +28,37 @@ struct DestinationsOptionsView: View {
 
     @ViewBuilder
     private var netflixMetadataSection: some View {
-        if model.selectedOrganizationPresetName == OrganizationPreset.netflixIngestName {
+        let netflix = model.isNetflixPresetSelected
+        let showEpisode = netflix || model.activeTemplatesContain("{episode}")
+        let showDay = netflix || model.activeTemplatesContain("{day}")
+        let showUnit = netflix || model.activeTemplatesContain("{unit}")
+        let showFormat = netflix || model.activeTemplatesContain("{cameraFormat}")
+        if showEpisode || showDay || showUnit || showFormat {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Shoot metadata")
                     .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
-                netflixMetaField("Episode / Block", placeholder: "EP103 / B01",
-                                 text: model.binding(\.episode))
-                netflixMetaField("Day", placeholder: "Day05 / D05",
-                                 text: model.binding(\.day))
-                netflixMetaField("Unit", placeholder: "MU / 2U",
-                                 text: model.binding(\.unit))
-                netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
-                                 text: model.binding(\.cameraFormat))
+                if showEpisode {
+                    netflixMetaField(netflix ? "Episode / Block" : "Project", placeholder: "EP103 / B01",
+                                     text: model.binding(\.episode))
+                }
+                if showDay {
+                    netflixMetaField("Day", placeholder: "Day05 / D05",
+                                     text: model.binding(\.day))
+                }
+                if showUnit {
+                    netflixMetaField("Unit", placeholder: "MU / 2U",
+                                     text: model.binding(\.unit))
+                }
+                if showFormat {
+                    netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
+                                     text: model.binding(\.cameraFormat))
+                }
 
-                folderTemplatesSection
-                netflixReadinessHint
+                if netflix {
+                    folderTemplatesSection
+                    netflixReadinessHint
+                }
             }
             .padding(.bottom, 8)
         }
