@@ -34,6 +34,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
     private let storage: ConfigurationStorage
     private let defaults: UserDefaults
     private var workerObserver: AnyCancellable?
+    private var dayObserver: AnyCancellable?
     private var stopTask: Task<Void, Never>?
 
     init(paths: [String],
@@ -63,6 +64,10 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
         workerObserver = worker.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
+        }
+        // A window left open past midnight must preview the date the run will use.
+        dayObserver = TodayClock.shared.$today.dropFirst().sink { [weak self] day in
+            self?.form.today = day
         }
         loadSizes()
         refreshCapacities()
@@ -177,6 +182,8 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     func run() {
         guard phase == .setup, form.canRun else { return }
+        TodayClock.shared.refresh()
+        form.today = TodayClock.shared.today
 
         if let preset = form.makeSavedPreset() {
             storage.addPreset(preset)
