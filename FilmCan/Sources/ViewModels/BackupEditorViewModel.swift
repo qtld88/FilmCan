@@ -2,6 +2,14 @@ import Foundation
 import Combine
 import SwiftUI
 
+struct GenericCardWarning: Identifiable, Equatable {
+    /// Card key (volume UUID + relative path).
+    let id: String
+    let path: String
+    let name: String
+    let suggested: String
+}
+
 @MainActor
 class BackupEditorViewModel: ObservableObject {
     @Published var config: BackupConfiguration
@@ -33,6 +41,7 @@ class BackupEditorViewModel: ObservableObject {
             config.excludedSourcePaths.subtract(removed)
             save()
             if !removed.isEmpty { keepReaddedSourcesUnchecked(removed, previous: previous) }
+            refreshGenericCards()
         }
     }
 
@@ -65,6 +74,7 @@ class BackupEditorViewModel: ObservableObject {
         config.sourcePaths.append(path)
         storage.lastSourcePath = path
         save()
+        refreshGenericCards()
     }
     
     func removeSource(at index: Int) {
@@ -87,6 +97,7 @@ class BackupEditorViewModel: ObservableObject {
             config.excludedDestinationPaths.subtract(removed)
             save()
             if !removed.isEmpty { keepReaddedDestinationsUnchecked(removed, previous: previous) }
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -115,6 +126,7 @@ class BackupEditorViewModel: ObservableObject {
             config.destinationPaths.append(path)
             storage.lastDestinationPath = path
             save()
+            refreshGenericCards(recompute: true)
         }
     }
     
@@ -250,7 +262,163 @@ class BackupEditorViewModel: ObservableObject {
         set {
             config.copyFolderContents = newValue
             save()
+            refreshGenericCards(recompute: true)
         }
+    }
+
+    // MARK: - Generic card names (Untitled, DJI ...)
+
+    /// Single guard: with automatic roll numbering on, none of the generic-name handling applies.
+    var genericCardSupportActive: Bool { !config.rollNumbering.enabled }
+
+    @Published var genericCardWarning: GenericCardWarning?
+    private var dismissedGenericCards: Set<String> = []
+    /// Card keys whose name the user typed (or cleared): never auto-written again.
+    private var userEditedGenericCards: Set<String> = []
+    /// Card keys whose name this session suggested: the only ones recomputed.
+    private var autoWrittenGenericCards: Set<String> = []
+
+    func isGenericSource(_ path: String) -> Bool {
+        genericCardSupportActive && Self.isDirectory(path)
+            && GenericCardName.isGeneric((path as NSString).lastPathComponent)
+    }
+
+    private var genericSourcePaths: [String] { config.sourcePaths.filter { isGenericSource($0) } }
+
+    private func effectiveRunPreset() -> OrganizationPreset? {
+        var preset: OrganizationPreset?
+        if let id = config.selectedOrganizationPresetId,
+           let selected = storage.organizationPresets.first(where: { $0.id == id }) {
+            preset = selected
+        } else {
+            let local = localOrganizationPreset
+            let hasTemplate = local.useFolderTemplate
+                && !local.folderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasRename = local.useRenameTemplate
+                && !local.renameTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasPatterns = SourceFilterMatching.hasCustomFilterPatterns(
+                include: local.includePatterns, exclude: local.excludePatterns, copyOnly: local.copyOnlyPatterns)
+            if hasTemplate || hasRename || hasPatterns || local.useCustomDate { preset = local }
+        }
+        guard var result = preset else { return nil }
+        if result.name == OrganizationPreset.netflixIngestName {
+            let cam = config.cameraFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cam.isEmpty { result.folderTemplate = config.cameraFolderTemplate }
+            let snd = config.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !snd.isEmpty { result.soundFolderTemplate = config.soundFolderTemplate }
+        }
+        return result
+    }
+
+    private func existingGenericNames(for path: String) -> [String] {
+        GenericRollNameScanner.existingNames(
+            source: path, destinations: config.destinationPaths,
+            preset: effectiveRunPreset(), date: Date(),
+            metadata: ShootMetadata(episode: config.episode, day: config.day,
+                                    unit: config.unit, cameraFormat: config.cameraFormat),
+            mediaKind: mediaKind(for: path))
+    }
+
+    private func genericNamesOfOtherSources(excluding path: String) -> [String] {
+        let own = RollNumberer.cardKey(forPath: path)
+        return config.sourcePaths.compactMap { other in
+            guard other != path else { return nil }
+            let key = RollNumberer.cardKey(forPath: other)
+            return key == own ? nil : config.genericRollNames[key]
+        }
+    }
+
+    /// Next free numbered name for a generic card, e.g. `Untitled_01`.
+    func suggestedRollName(for path: String) -> String {
+        GenericCardName.nextNumberedName(
+            base: GenericCardName.baseName((path as NSString).lastPathComponent),
+            taken: existingGenericNames(for: path) + genericNamesOfOtherSources(excluding: path))
+    }
+
+    func rollNameOverride(for path: String) -> String? {
+        guard genericCardSupportActive else { return nil }
+        return config.genericRollNames[RollNumberer.cardKey(forPath: path)]
+    }
+
+    func setRollNameOverride(_ name: String, for path: String) {
+        let key = RollNumberer.cardKey(forPath: path)
+        let cleaned = name.replacingOccurrences(of: "/", with: "_")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        userEditedGenericCards.insert(key)
+        autoWrittenGenericCards.remove(key)
+        if cleaned.isEmpty {
+            config.genericRollNames[key] = nil
+            dismissedGenericCards.insert(key)
+        } else {
+            config.genericRollNames[key] = cleaned
+        }
+        save()
+        updateGenericCardWarning()
+    }
+
+    /// Folder mode: gives each generic card without a name its suggestion. `recompute`
+    /// (destinations, preset or copy mode changed) also refreshes the suggestions made this session.
+    func ensureGenericRollNames(recompute: Bool = false) {
+        guard genericCardSupportActive, !config.copyFolderContents else { return }
+        var changed = false
+        if recompute {
+            for path in genericSourcePaths {
+                let key = RollNumberer.cardKey(forPath: path)
+                if autoWrittenGenericCards.contains(key), !userEditedGenericCards.contains(key),
+                   config.genericRollNames.removeValue(forKey: key) != nil {
+                    changed = true
+                }
+            }
+        }
+        for path in genericSourcePaths {
+            let key = RollNumberer.cardKey(forPath: path)
+            guard config.genericRollNames[key] == nil, !userEditedGenericCards.contains(key) else { continue }
+            config.genericRollNames[key] = suggestedRollName(for: path)
+            autoWrittenGenericCards.insert(key)
+            changed = true
+        }
+        if changed { save() }
+    }
+
+    /// Fills missing names (folder mode) and raises the contents-mode warning when needed.
+    func refreshGenericCards(recompute: Bool = false) {
+        ensureGenericRollNames(recompute: recompute)
+        updateGenericCardWarning()
+    }
+
+    private func updateGenericCardWarning() {
+        guard genericCardSupportActive, config.copyFolderContents else {
+            genericCardWarning = nil
+            return
+        }
+        if let current = genericCardWarning,
+           config.sourcePaths.contains(current.path), config.genericRollNames[current.id] == nil,
+           !dismissedGenericCards.contains(current.id) {
+            return
+        }
+        genericCardWarning = nil
+        for path in genericSourcePaths {
+            let key = RollNumberer.cardKey(forPath: path)
+            guard config.genericRollNames[key] == nil, !dismissedGenericCards.contains(key) else { continue }
+            genericCardWarning = GenericCardWarning(
+                id: key, path: path,
+                name: GenericCardName.baseName((path as NSString).lastPathComponent),
+                suggested: suggestedRollName(for: path))
+            return
+        }
+    }
+
+    func acceptGenericCardWarning() {
+        guard let warning = genericCardWarning else { return }
+        genericCardWarning = nil
+        setRollNameOverride(warning.suggested, for: warning.path)
+    }
+
+    func dismissGenericCardWarning() {
+        guard let warning = genericCardWarning else { return }
+        dismissedGenericCards.insert(warning.id)
+        genericCardWarning = nil
+        updateGenericCardWarning()
     }
 
     var sourceAutoDetectEnabled: Bool {
@@ -455,6 +623,7 @@ class BackupEditorViewModel: ObservableObject {
             config.sourcePaths = sources
             config.sourceMediaKinds = kinds
             save()
+            refreshGenericCards()
         }
     }
 
@@ -500,6 +669,7 @@ class BackupEditorViewModel: ObservableObject {
         if updated != config.sourcePaths {
             config.sourcePaths = updated
             save()
+            refreshGenericCards()
         }
     }
 
@@ -543,6 +713,7 @@ class BackupEditorViewModel: ObservableObject {
             config.sourcePaths = updated
             config.sourceMediaKinds = kinds
             save()
+            refreshGenericCards()
         }
     }
 
@@ -574,6 +745,7 @@ class BackupEditorViewModel: ObservableObject {
                 storage.lastDestinationPath = first
             }
             save()
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -634,6 +806,7 @@ class BackupEditorViewModel: ObservableObject {
         set {
             config.selectedOrganizationPresetId = newValue
             save()
+            refreshGenericCards(recompute: true)
         }
     }
 

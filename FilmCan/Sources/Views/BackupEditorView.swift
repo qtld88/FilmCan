@@ -93,6 +93,7 @@ struct BackupEditorView: View {
         viewModel.refreshAutoDetectedSoundSources()
         viewModel.refreshAutoDetectedCards()
         viewModel.refreshAutoDetectedDestinations()
+        viewModel.refreshGenericCards()
         viewModel.enforceCustomEngineDefaultsIfNeeded()
     }
 

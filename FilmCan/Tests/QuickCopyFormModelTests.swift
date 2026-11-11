@@ -713,4 +713,106 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(form.items.map(\.name), ["A001"])
         XCTAssertNil(form.selectedFilmId)
     }
+
+    // MARK: generic card names
+    private func genericForm(_ names: [String], existing: [String] = []) -> QuickCopyFormModel {
+        var form = QuickCopyFormModel(items: names.map { dir($0) })
+        form.existingRollNames = { _ in existing }
+        return form
+    }
+
+    func test_genericItem_folderMode_getsNumberedOverride_andRunRollNames() {
+        var form = genericForm(["Untitled"])
+        form.refreshGenericRollNames()
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled"], "Untitled_01")
+        XCTAssertEqual(form.makeConfiguration().runRollNames, ["/Volumes/CARD/Untitled": "Untitled_01"])
+    }
+
+    func test_nonGenericItem_getsNoOverride() {
+        var form = genericForm(["A001R2EC"])
+        form.refreshGenericRollNames()
+        XCTAssertTrue(form.rollNameOverrides.isEmpty)
+        XCTAssertTrue(form.makeConfiguration().runRollNames.isEmpty)
+    }
+
+    func test_secondGenericItem_continuesTheNumbering() {
+        var form = genericForm(["Untitled", "Untitled 1"])
+        form.refreshGenericRollNames()
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled"], "Untitled_01")
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled 1"], "Untitled_02")
+    }
+
+    func test_existingFoldersOnDestination_areSkipped() {
+        var form = genericForm(["Untitled"], existing: ["Untitled_01", "Untitled_02"])
+        form.refreshGenericRollNames()
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled"], "Untitled_03")
+    }
+
+    func test_editedValue_survivesRefresh() {
+        var form = genericForm(["Untitled"])
+        form.refreshGenericRollNames()
+        form.setRollNameOverride("Day1_CamA", for: "/Volumes/CARD/Untitled")
+        form.refreshGenericRollNames()
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled"], "Day1_CamA")
+    }
+
+    func test_clearedValue_meansOriginalName_andStaysCleared() {
+        var form = genericForm(["Untitled"])
+        form.refreshGenericRollNames()
+        form.setRollNameOverride("", for: "/Volumes/CARD/Untitled")
+        form.refreshGenericRollNames()
+        XCTAssertNil(form.rollNameOverrides["/Volumes/CARD/Untitled"])
+        XCTAssertTrue(form.makeConfiguration().runRollNames.isEmpty)
+    }
+
+    func test_suggestionFollowsDestinationChanges() {
+        var form = genericForm(["Untitled"])
+        form.refreshGenericRollNames()
+        form.existingRollNames = { _ in ["Untitled_01"] }
+        form.refreshGenericRollNames()
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled"], "Untitled_02")
+    }
+
+    func test_contentsMode_raisesWarning_dismissStaysDismissed() {
+        var form = genericForm(["Untitled"])
+        form.copyFolderContents = true
+        XCTAssertEqual(form.pendingGenericWarning?.name, "Untitled")
+        form.dismissGenericWarning()
+        XCTAssertNil(form.pendingGenericWarning)
+        form.refreshGenericRollNames()
+        XCTAssertNil(form.pendingGenericWarning)
+        XCTAssertTrue(form.rollNameOverrides.isEmpty)
+    }
+
+    func test_contentsMode_accept_setsOverride() {
+        var form = genericForm(["Untitled"])
+        form.copyFolderContents = true
+        form.acceptGenericWarning()
+        XCTAssertEqual(form.rollNameOverrides["/Volumes/CARD/Untitled"], "Untitled_01")
+        XCTAssertNil(form.pendingGenericWarning)
+        XCTAssertEqual(form.rollFolderFieldValue(for: form.items[0]), "Untitled_01")
+    }
+
+    func test_togglingContentsOn_withGenericItemAndNoOverride_raisesWarning() {
+        var form = genericForm(["Untitled"])
+        XCTAssertNil(form.pendingGenericWarning)
+        form.setCopyFolderContents(true)
+        XCTAssertNotNil(form.pendingGenericWarning)
+    }
+
+    func test_contentsMode_doesNotWriteSuggestions() {
+        var form = genericForm(["Untitled"])
+        form.copyFolderContents = true
+        form.refreshGenericRollNames()
+        XCTAssertTrue(form.rollNameOverrides.isEmpty)
+        XCTAssertNil(form.rollFolderFieldValue(for: form.items[0]))
+    }
+
+    func test_removedItem_dropsItsOverride() {
+        var form = genericForm(["Untitled", "Untitled 1"])
+        form.refreshGenericRollNames()
+        form.items.removeAll { $0.name == "Untitled" }
+        form.refreshGenericRollNames()
+        XCTAssertEqual(form.rollNameOverrides, ["/Volumes/CARD/Untitled 1": "Untitled_01"])
+    }
 }

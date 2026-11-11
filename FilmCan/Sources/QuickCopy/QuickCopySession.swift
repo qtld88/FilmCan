@@ -14,7 +14,9 @@ final class QuickCopySession: ObservableObject, Identifiable {
     static let lastFilmKey = "quickCopy.lastFilmId"
 
     let id = UUID()
-    @Published var form: QuickCopyFormModel
+    @Published var form: QuickCopyFormModel {
+        didSet { refreshGenericRollNames() }
+    }
     @Published private(set) var phase: Phase = .setup
     /// Set when the user asked to stop; drives the "Stopping…" button state.
     @Published private(set) var stopRequested = false
@@ -61,6 +63,8 @@ final class QuickCopySession: ObservableObject, Identifiable {
             form.selectFilm(filmId, drives: Self.drives(for: film))
         }
         self.form = form
+        self.form.existingRollNames = { [weak self] path in self?.existingRollNames(for: path) ?? [] }
+        refreshGenericRollNames()
 
         workerObserver = worker.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -80,6 +84,22 @@ final class QuickCopySession: ObservableObject, Identifiable {
         form.selectFilm(id, drives: Self.drives(for: form.savedFilms.first { $0.id == id }))
         loadSizes(for: form.items.filter { !before.contains($0.path) })
         refreshCapacities()
+    }
+
+    private func existingRollNames(for path: String) -> [String] {
+        GenericRollNameScanner.existingNames(
+            source: path, destinations: form.destinations, preset: form.runPreset(),
+            date: form.today, metadata: form.shootMetadata,
+            mediaKind: form.items.first { $0.path == path }?.kind ?? .camera)
+    }
+
+    private func refreshGenericRollNames() {
+        guard phase == .setup else { return }
+        var updated = form
+        updated.refreshGenericRollNames()
+        if updated.rollNameOverrides != form.rollNameOverrides {
+            form.rollNameOverrides = updated.rollNameOverrides
+        }
     }
 
     /// The movie's mounted sources (kind from the movie, else guessed) and destinations.
@@ -202,6 +222,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     func run() {
         guard phase == .setup, form.canRun else { return }
+        form.editedRollNames.formUnion(form.rollNameOverrides.keys)
         TodayClock.shared.refresh()
         form.today = TodayClock.shared.today
 

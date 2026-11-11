@@ -21,6 +21,12 @@ struct SourceListView: View {
     /// When provided, each source row shows a Camera/Sound toggle (Netflix routing).
     var mediaKind: ((String) -> SourceMediaKind)? = nil
     var setMediaKind: ((String, SourceMediaKind) -> Void)? = nil
+    /// Roll folder field of a generic-named card: nil ⇒ no field for that source.
+    var genericRollName: ((String) -> String?)? = nil
+    var setGenericRollName: ((String, String) -> Void)? = nil
+    /// Contents-mode warning for a generic-named card; `true` accepts the suggestion.
+    var genericCardWarning: GenericCardWarning? = nil
+    var resolveGenericCardWarning: ((Bool) -> Void)? = nil
     /// Camera/sound card recognition badge, roll-name preview and per-drive correction.
     var cardSignature: ((String) -> CardSignature?)? = nil
     var rollNamePreview: ((String) -> String?)? = nil
@@ -29,7 +35,7 @@ struct SourceListView: View {
     var isIncluded: (String) -> Bool = { _ in true }
     var setIncluded: (([String], Bool) -> Void)? = nil
     var isSelectionLocked: Bool = false
-    
+
     var body: some View {
         let _ = refreshToken
         VStack(alignment: .leading, spacing: 8) {
@@ -77,6 +83,19 @@ struct SourceListView: View {
             .shadow(color: isTourHighlighted ? FilmCanTheme.brandYellow.opacity(0.35) : .clear, radius: 10)
             .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDrop(providers: providers)
+            }
+            .alert(
+                "\"\(genericCardWarning?.name ?? "")\" is a generic card name",
+                isPresented: Binding(
+                    get: { genericCardWarning != nil },
+                    set: { _ in }
+                ),
+                presenting: genericCardWarning
+            ) { warning in
+                Button("Copy into \"\(warning.suggested)\"") { resolveGenericCardWarning?(true) }
+                Button("Continue anyway", role: .cancel) { resolveGenericCardWarning?(false) }
+            } message: { _ in
+                Text("Copying the contents puts every card's files in the same folder. If you copy several cards, their files will mix (C0001.MP4 exists on each card).")
             }
             .alert("Couldn't eject drive", isPresented: Binding(
                 get: { ejectErrorMessage != nil },
@@ -279,6 +298,11 @@ struct SourceListView: View {
                     .lineLimit(1)
 
                 cardBadgeRow(path: source.path, isDirectory: metadata.isDirectory)
+
+                if metadata.isDirectory, let genericRollName, let setGenericRollName,
+                   let rollName = genericRollName(source.path) {
+                    RollFolderField(value: rollName) { setGenericRollName(source.path, $0) }
+                }
 
                 HStack(spacing: 8) {
                     if let size = metadata.formattedSize {

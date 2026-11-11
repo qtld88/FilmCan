@@ -1201,4 +1201,31 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         XCTAssertEqual(TransferViewModel.mergedStatus(previous: .active, incoming: .complete), .complete)
         XCTAssertEqual(TransferViewModel.mergedStatus(previous: .active, incoming: .active), .active)
     }
+
+    func test_twoUntitledCards_contentsMode_withRollNames_stayInSeparateFolders() async throws {
+        let fm = FileManager.default
+        var cards: [String] = []
+        for parent in ["cardA", "cardB"] {
+            let card = tmpDir.appendingPathComponent(parent).appendingPathComponent("Untitled")
+            try fm.createDirectory(at: card, withIntermediateDirectories: true)
+            try Data(parent.utf8).write(to: card.appendingPathComponent("C0001.MP4"))
+            cards.append(card.path)
+        }
+        let dest = tmpDir.appendingPathComponent("dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let config = FanOutCopier.Configuration(
+            sources: cards,
+            destinations: [DestWriter.Config(destPath: dest.path, displayName: "D", verifyMode: .fast,
+                                             requiresFullFsync: false, chunkSize: 32768)],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil,
+            copyFolderContents: true,
+            rollNames: [cards[0]: "Untitled_01", cards[1]: "Untitled_02"])
+        let results = try await FanOutCopier(config: config).run()
+
+        XCTAssertTrue(results.allSatisfy { $0.success })
+        XCTAssertEqual(try String(contentsOf: dest.appendingPathComponent("Untitled_01/C0001.MP4")), "cardA")
+        XCTAssertEqual(try String(contentsOf: dest.appendingPathComponent("Untitled_02/C0001.MP4")), "cardB")
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("C0001.MP4").path))
+    }
 }

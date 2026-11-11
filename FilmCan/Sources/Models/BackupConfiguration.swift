@@ -42,6 +42,9 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     var soundFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Sound_Media"
     /// Automatic roll names (A001/S001...). Off by default.
     var rollNumbering: RollNumbering = RollNumbering()
+    /// Roll folder given to a generic-named card (Untitled, DJI...), keyed by card
+    /// identity (`RollNumberer.cardKey`), never by path: every Sony card mounts at the same path.
+    var genericRollNames: [String: String] = [:]
     /// Advance `day` by one on the first backup of each new calendar day.
     var dayAutoAdvance: Bool = false
     /// Recognise camera/sound cards from their folder layout and add them as sources.
@@ -120,6 +123,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         cameraFolderTemplate = try c.decodeIfPresent(String.self, forKey: .cameraFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
         soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Sound_Media"
         rollNumbering = try c.decodeIfPresent(RollNumbering.self, forKey: .rollNumbering) ?? RollNumbering()
+        genericRollNames = try c.decodeIfPresent([String: String].self, forKey: .genericRollNames) ?? [:]
         dayAutoAdvance = try c.decodeIfPresent(Bool.self, forKey: .dayAutoAdvance) ?? false
         cardAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .cardAutoDetectEnabled) ?? false
         destinationAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .destinationAutoDetectEnabled) ?? false
@@ -193,6 +197,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(cameraFolderTemplate, forKey: .cameraFolderTemplate)
         try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
         try c.encode(rollNumbering, forKey: .rollNumbering)
+        try c.encode(genericRollNames, forKey: .genericRollNames)
         try c.encode(dayAutoAdvance, forKey: .dayAutoAdvance)
         try c.encode(cardAutoDetectEnabled, forKey: .cardAutoDetectEnabled)
         try c.encode(excludedSourcePaths.sorted(), forKey: .excludedSourcePaths)
@@ -235,7 +240,7 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
         case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns, soundDayFolderAutoDetect
         case cameraFolderTemplate, soundFolderTemplate
-        case rollNumbering, dayAutoAdvance, cardAutoDetectEnabled
+        case rollNumbering, genericRollNames, dayAutoAdvance, cardAutoDetectEnabled
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case excludedSourcePaths, excludedDestinationPaths
         case logFileNameTemplate, reportEnabled
@@ -263,6 +268,18 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         copy.destinationPaths = includedDestinationPaths
         copy.excludedSourcePaths = []
         copy.excludedDestinationPaths = []
+        return copy
+    }
+
+    /// Copy where each source without a run roll name takes the one saved for its card.
+    func withGenericRollNames(keyFor: (String) -> String) -> BackupConfiguration {
+        guard !rollNumbering.enabled, !genericRollNames.isEmpty else { return self }
+        var copy = self
+        for path in sourcePaths where copy.runRollNames[path] == nil {
+            if let name = genericRollNames[keyFor(path)], !name.isEmpty {
+                copy.runRollNames[path] = name
+            }
+        }
         return copy
     }
 

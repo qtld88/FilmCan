@@ -34,6 +34,16 @@ extension BackupEditorView {
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
                 setMediaKind: { viewModel.setMediaKind($1, for: $0) },
+                genericRollName: { path in
+                    guard viewModel.isGenericSource(path) else { return nil }
+                    let override = viewModel.rollNameOverride(for: path)
+                    return viewModel.copyFolderContents && override == nil ? nil : (override ?? "")
+                },
+                setGenericRollName: { viewModel.setRollNameOverride($1, for: $0) },
+                genericCardWarning: viewModel.genericCardWarning,
+                resolveGenericCardWarning: { accept in
+                    if accept { viewModel.acceptGenericCardWarning() } else { viewModel.dismissGenericCardWarning() }
+                },
                 cardSignature: { viewModel.detectedCard(for: $0) },
                 rollNamePreview: { viewModel.rollNamePreview(for: $0) },
                 setCardRole: { viewModel.setCardRole($1, for: $0) },
@@ -70,6 +80,7 @@ extension BackupEditorView {
                 organizationPreset: previewOrganizationPreset,
                 sourcePaths: viewModel.includedSourcePaths,
                 mediaKind: { viewModel.mediaKind(for: $0) },
+                rollName: { viewModel.rollNameOverride(for: $0) },
                 shootMetadata: previewShootMetadata,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
@@ -127,6 +138,16 @@ extension BackupEditorView {
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
                 setMediaKind: { viewModel.setMediaKind($1, for: $0) },
+                genericRollName: { path in
+                    guard viewModel.isGenericSource(path) else { return nil }
+                    let override = viewModel.rollNameOverride(for: path)
+                    return viewModel.copyFolderContents && override == nil ? nil : (override ?? "")
+                },
+                setGenericRollName: { viewModel.setRollNameOverride($1, for: $0) },
+                genericCardWarning: viewModel.genericCardWarning,
+                resolveGenericCardWarning: { accept in
+                    if accept { viewModel.acceptGenericCardWarning() } else { viewModel.dismissGenericCardWarning() }
+                },
                 cardSignature: { viewModel.detectedCard(for: $0) },
                 rollNamePreview: { viewModel.rollNamePreview(for: $0) },
                 setCardRole: { viewModel.setCardRole($1, for: $0) },
@@ -165,6 +186,7 @@ extension BackupEditorView {
                 organizationPreset: previewOrganizationPreset,
                 sourcePaths: viewModel.includedSourcePaths,
                 mediaKind: { viewModel.mediaKind(for: $0) },
+                rollName: { viewModel.rollNameOverride(for: $0) },
                 shootMetadata: previewShootMetadata,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
