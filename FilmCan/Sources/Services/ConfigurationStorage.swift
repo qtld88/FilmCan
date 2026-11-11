@@ -105,6 +105,9 @@ class ConfigurationStorage: ObservableObject {
         let configurations: [BackupConfiguration]
         let transferHistory: [TransferHistoryEntry]
         let lastUsedConfigId: UUID?
+        /// Each exported movie's own settings (absent in exports made before movies
+        /// owned their settings).
+        var filmPresets: [OrganizationPreset]? = nil
     }
     
     private init() {
@@ -422,7 +425,8 @@ class ConfigurationStorage: ObservableObject {
         let payload = MoviesHistoryExport(
             configurations: filteredConfigs,
             transferHistory: filteredHistory,
-            lastUsedConfigId: filteredLastUsed
+            lastUsedConfigId: filteredLastUsed,
+            filmPresets: organizationPresets.filter { $0.ownerFilmId.map(configIds.contains) ?? false }
         )
         return try encoder.encode(payload)
     }
@@ -461,7 +465,8 @@ class ConfigurationStorage: ObservableObject {
         let filteredPayload = MoviesHistoryExport(
             configurations: filteredConfigs,
             transferHistory: filteredHistory,
-            lastUsedConfigId: filteredLastUsed
+            lastUsedConfigId: filteredLastUsed,
+            filmPresets: payload.filmPresets?.filter { $0.ownerFilmId.map(selectedConfigIds.contains) ?? false }
         )
         applyMoviesHistoryImport(filteredPayload, retentionLimit: retentionLimit)
     }
@@ -486,6 +491,18 @@ class ConfigurationStorage: ObservableObject {
             }
         }
         configurations = updatedConfigs
+
+        // The movies' own settings come with them.
+        let importedIds = Set(payload.configurations.map(\.id))
+        var updatedPresets = organizationPresets
+        for preset in payload.filmPresets ?? [] where preset.ownerFilmId.map(importedIds.contains) ?? false {
+            if let index = updatedPresets.firstIndex(where: { $0.id == preset.id }) {
+                updatedPresets[index] = preset
+            } else {
+                updatedPresets.append(preset)
+            }
+        }
+        organizationPresets = updatedPresets
 
         var updatedHistory = transferHistory
         for entry in payload.transferHistory {

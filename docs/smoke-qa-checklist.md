@@ -107,7 +107,7 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | S4 | Preset menu in a movie. | Lists "Off", "Netflix Ingest (built-in)", the shared presets once each (no duplicates), "Save as new preset", "Delete preset". | ☐ |
 | S5 | Choose a preset in movie A, edit a folder, then choose the same preset in movie B. | B gets the preset as saved, not A's edit. | ☐ |
 | S6 | "Save as new preset" in movie A. | A new preset appears in the menu of every movie; A keeps its settings. | ☐ |
-| S7 | Trash button next to the preset name. | The movie goes back to "Off"; the shared preset is still in the menu. | ☐ |
+| S7 | Choose "Off", open the menu again, choose "This movie's settings (…)". Then press the trash button next to the preset name. | Off then back: the movie's own folders return unchanged. Trash: the movie goes to "Off" for good; the shared preset is still in the menu. | ☐ |
 | S8 | "Delete preset" › a preset. | It leaves the menu; movies that started from it keep their folders. | ☐ |
 | S9 | Small arrow next to "+" in the tab bar › "Like <movie>". | A new movie with the same options, no cards, no drives, empty shoot day. File › New Movie Like shows the same list. | ☐ |
 | S10 | Movie "Citizen K" with template `CITIZENK/{day}`; create a movie like it and rename it "Citizen L". | The new movie's template starts with `{movie}`; the preview shows `Citizen L/…`. The old movie still writes to `CITIZENK/…`. | ☐ |
@@ -115,6 +115,7 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | S12 | Delete a movie, quit, open `presets.json`. | No record with that movie's `ownerFilmId` remains. | ☐ |
 | S13 | Quick Copy: pick a movie, look at the Preset picker; pick another movie. | The picker shows the shared presets plus the picked movie's own settings, never another movie's. | ☐ |
 | S14 | Settings › Import & Export › Presets › Export. | The file holds the shared presets only. | ☐ |
+| S15 | Export a movie, delete it, import it back. | Same preset name, same folder preview as before the export. | ☐ |
 
 ## Post-run sanity checks
 

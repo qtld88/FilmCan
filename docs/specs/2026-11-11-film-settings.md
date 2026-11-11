@@ -17,7 +17,9 @@ A preset record gains an optional owner, `ownerFilmId`. A preset with an owner i
 - The film keeps pointing at a preset by id (`selectedOrganizationPresetId`), now always its own copy. Every existing reader (run, resume context, editor bindings, Quick Copy's "pick a movie") keeps working unchanged, because nothing about the lookup changes.
 - Choosing a preset in a film ("Netflix Ingest (built-in)", a saved preset) copies its values into the film's own copy. The shared preset is never touched afterwards.
 - "Save as new preset" (was "Create new preset") saves the film's current settings as a new shared preset, sound folders included. The film keeps its own copy.
-- "Off" and the trash button remove the film's own copy only. A shared preset is deleted from the Preset menu ("Delete preset"). The pencil renames the film's own copy.
+- "Off" keeps the film's own copy aside (the menu then offers "This movie's settings" to switch back); the trash button deletes it. Neither touches a shared preset.
+- A film's copy keeps its record id for life: choosing another preset rewrites its values in place, so history entries that refer to it still resolve.
+- A movie export carries the movies' own copies; importing it restores them. A shared preset is deleted from the Preset menu ("Delete preset"). The pencil renames the film's own copy.
 - Every path that selects a preset goes through the same copy step, including the plain id setter; nothing ever falls back to "the first preset in the list".
 - Lookups by name (built-in Netflix preset, "new movie from history") search shared presets only.
 - Lists that offer presets to start from (the Preset menu, Quick Copy's picker, preset export) show shared presets only. Quick Copy also shows the picked film's own copy, since that is what that film runs with.
@@ -52,6 +54,11 @@ When a film is created "like" another, a leading folder in its templates that sp
 - Quick Copy's own behaviour.
 
 ## Edge cases
+
+- Renaming a film whose folders use `{movie}` changes where the next backup goes, like editing any other token value; earlier backups stay under the old name and are not found by resume.
+- Repair from history resolves folders without shoot metadata (already true for `{day}` and `{episode}`); `{movie}` is empty there too.
+- A template that already contained the literal text `{movie}` used to produce a folder named `_movie_`; it now produces the film's name. None of the shipped presets or fixtures contains it.
+- Alternating between this build and an older one turns own copies into ordinary presets, and the next launch of this build copies them again: duplicates in the preset list, no data loss.
 
 - Going back to an older app version: own copies appear as ordinary presets with duplicate names. Harmless; nothing is lost.
 - Preset export writes shared presets only; an imported preset is always shared. An imported movie pointing at a shared preset gets its copy right after the import.

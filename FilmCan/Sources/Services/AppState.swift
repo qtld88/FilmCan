@@ -76,7 +76,10 @@ class AppState: ObservableObject {
     func createNewConfig(fromPreset preset: OrganizationPreset) -> BackupConfiguration {
         var config = BackupConfiguration.newFilm(name: "Movie \(storage.configurations.count + 1)")
         config.takeSettings(from: preset)
-        let copy = FilmPresetOwnership.ownCopy(of: preset, for: config.id)
+        var copy = FilmPresetOwnership.ownCopy(of: preset, for: config.id)
+        // Same log folder in the copy as in the film (Netflix pre-fills "Reports").
+        copy.logLocation = config.logLocation
+        copy.customLogPath = config.customLogPath
         storage.organizationPresets.append(copy)
         config.selectedOrganizationPresetId = copy.id
         storage.add(config)

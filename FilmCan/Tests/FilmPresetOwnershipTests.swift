@@ -197,6 +197,44 @@ final class FilmPresetOwnershipTests: XCTestCase {
         XCTAssertNil(storage.organizationPresets.first { $0.id == incoming.id }?.ownerFilmId)
     }
 
+    func test_settingOwnCopy_keepsTheRecordId_andLeavesOneCopy() {
+        let filmId = UUID()
+        let first = FilmPresetOwnership.settingOwnCopy(of: sharedPreset("One"), for: filmId, in: [])
+        let stray = FilmPresetOwnership.ownCopy(of: sharedPreset("Stray"), for: filmId)
+        let second = FilmPresetOwnership.settingOwnCopy(
+            of: sharedPreset("Two"), for: filmId, in: first.presets + [stray])
+        XCTAssertEqual(second.copy.id, first.copy.id)
+        XCTAssertEqual(second.presets.map(\.name), ["Two"])
+        XCTAssertEqual(second.presets.first?.ownerFilmId, filmId)
+    }
+
+    func test_movieExport_carriesTheMoviesOwnSettings() throws {
+        let preset = sharedPreset()
+        try writeLegacyFiles(configs: [film("A", preset: preset.id)], presets: [preset])
+        let source = ConfigurationStorage(baseDirectory: dir)
+        let filmA = source.configurations[0]
+        let copyId = try XCTUnwrap(filmA.selectedOrganizationPresetId)
+        let exported = try source.exportMoviesHistoryData(for: [filmA.id])
+
+        let otherDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: otherDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: otherDir) }
+        let target = ConfigurationStorage(baseDirectory: otherDir)
+        try target.importMoviesHistory(from: exported, retentionLimit: 0)
+
+        let imported = try XCTUnwrap(target.configurations.first { $0.id == filmA.id })
+        XCTAssertEqual(imported.selectedOrganizationPresetId, copyId)
+        let copy = try XCTUnwrap(target.organizationPresets.first { $0.id == copyId })
+        XCTAssertEqual(copy.ownerFilmId, filmA.id)
+        XCTAssertEqual(values(copy), values(preset), "the movie resolves the same folders on the other Mac")
+    }
+
+    func test_movieExportFromBeforeOwnership_stillImports() throws {
+        let json = #"{"configurations":[],"transferHistory":[]}"#
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        XCTAssertNoThrow(try storage.importMoviesHistory(from: Data(json.utf8), retentionLimit: 0))
+    }
+
     // MARK: Editing one film never reaches another
 
     func test_editingOneFilm_leavesTheOtherFilmAndTheSharedPresetUnchanged() throws {
@@ -232,13 +270,29 @@ final class FilmPresetOwnershipTests: XCTestCase {
         XCTAssertEqual(storage.organizationPresets.first { $0.id == idB }, copyBBefore)
         XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.folderTemplate, "CHANGED/{day}")
 
-        // Choosing another preset replaces the copy instead of piling them up.
+        // Choosing a preset again refreshes the copy in place: one copy, same record id
+        // (history entries refer to it).
         editorA.applyPreset(preset)
-        XCTAssertEqual(storage.organizationPresets.filter { $0.ownerFilmId == a.id }.count, 1)
-        // Off removes it.
+        XCTAssertEqual(storage.organizationPresets.filter { $0.ownerFilmId == a.id }.map(\.id), [idA])
+        XCTAssertEqual(editorA.config.selectedOrganizationPresetId, idA)
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.folderTemplate, "CITIZENK/{day}")
+        // Off keeps the film's settings aside; switching back finds them.
+        presets = editorA.organizationPresets
+        let indexA = try XCTUnwrap(presets.firstIndex { $0.id == idA })
+        presets[indexA].soundFolderTemplate = "TAILORED/Sound"
+        editorA.organizationPresets = presets
         editorA.applyOffOrganizationSettings()
         XCTAssertNil(editorA.config.selectedOrganizationPresetId)
+        XCTAssertEqual(editorA.parkedOwnCopy?.id, idA)
+        editorA.useParkedOwnCopy()
+        XCTAssertEqual(editorA.config.selectedOrganizationPresetId, idA)
+        XCTAssertNil(editorA.parkedOwnCopy)
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.soundFolderTemplate, "TAILORED/Sound")
+        // The trash button deletes them and never falls back to another record.
+        editorA.deleteOrganizationPreset(id: idA)
+        XCTAssertNil(editorA.config.selectedOrganizationPresetId)
         XCTAssertTrue(storage.organizationPresets.filter { $0.ownerFilmId == a.id }.isEmpty)
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == idB }, copyBBefore)
         // Saving as a preset adds a shared one and keeps film B on its own copy.
         let sharedBefore = FilmPresetOwnership.shared(storage.organizationPresets).count
         editorB.saveCurrentSettingsAsPreset()

@@ -39,8 +39,9 @@ enum FilmPresetOwnership {
             guard let id = configs[index].selectedOrganizationPresetId,
                   let preset = all.first(where: { $0.id == id }),
                   !isOwnCopy(preset, of: configs[index].id) else { continue }
-            let copy = ownCopy(of: preset, for: configs[index].id)
-            all.append(copy)
+            let placed = settingOwnCopy(of: preset, for: configs[index].id, in: all)
+            all = placed.presets
+            let copy = placed.copy
             configs[index].selectedOrganizationPresetId = copy.id
             // The film's saved working copy may be older than the preset another film
             // edited meanwhile. Align it, so the film's first save cannot write stale
@@ -49,6 +50,26 @@ enum FilmPresetOwnership {
             changed = true
         }
         return Adoption(configurations: configs, presets: all, changed: changed)
+    }
+
+    /// Makes the film's own copy a copy of `preset`. A film that already has one keeps
+    /// its record id (history entries refer to it) and only its values change; a film
+    /// never ends up with two copies.
+    static func settingOwnCopy(of preset: OrganizationPreset, for filmId: UUID,
+                               in presets: [OrganizationPreset])
+        -> (presets: [OrganizationPreset], copy: OrganizationPreset) {
+        var copy = ownCopy(of: preset, for: filmId)
+        var out = presets
+        if let index = out.firstIndex(where: { $0.ownerFilmId == filmId }) {
+            copy.id = out[index].id
+            out[index] = copy
+            out = out.enumerated()
+                .filter { $0.offset == index || $0.element.ownerFilmId != filmId }
+                .map(\.element)
+        } else {
+            out.append(copy)
+        }
+        return (out, copy)
     }
 
     /// "Preset 3": numbered among the shared presets, skipping names already taken.

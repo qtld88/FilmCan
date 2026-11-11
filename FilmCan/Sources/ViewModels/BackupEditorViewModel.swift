@@ -819,20 +819,32 @@ class BackupEditorViewModel: ObservableObject {
         return FilmPresetOwnership.isOwnCopy(preset, of: config.id)
     }
 
-    /// Replaces the film's own copy by a copy of `preset` (nil: no copy) and returns
-    /// the new copy's id. The shared preset itself is never linked to the film.
-    @discardableResult
-    private func replaceOwnCopy(with preset: OrganizationPreset?) -> UUID? {
+    /// Makes the film's own copy a copy of `preset` and returns its id (stable once the
+    /// film has a copy). The shared preset itself is never linked to the film.
+    private func replaceOwnCopy(with preset: OrganizationPreset) -> UUID {
         objectWillChange.send()
-        var presets = FilmPresetOwnership.removingCopies(ownedBy: config.id, from: storage.organizationPresets)
-        var newId: UUID?
-        if let preset {
-            let copy = FilmPresetOwnership.ownCopy(of: preset, for: config.id)
-            presets.append(copy)
-            newId = copy.id
-        }
-        storage.organizationPresets = presets
-        return newId
+        let placed = FilmPresetOwnership.settingOwnCopy(
+            of: preset, for: config.id, in: storage.organizationPresets)
+        storage.organizationPresets = placed.presets
+        return placed.copy.id
+    }
+
+    /// The film's own settings while the film is switched to "Off": kept, so switching
+    /// back does not lose them.
+    var parkedOwnCopy: OrganizationPreset? {
+        guard config.selectedOrganizationPresetId == nil else { return nil }
+        return storage.organizationPresets.first { $0.ownerFilmId == config.id }
+    }
+
+    /// Back from "Off" to the film's own settings.
+    func useParkedOwnCopy() {
+        guard let parked = parkedOwnCopy else { return }
+        isSyncingFromPreset = true
+        config.mirrorOrganization(from: parked)
+        config.selectedOrganizationPresetId = parked.id
+        save()
+        isSyncingFromPreset = false
+        refreshGenericCards(recompute: true)
     }
 
     var selectedOrganizationPresetId: UUID? {
@@ -847,7 +859,6 @@ class BackupEditorViewModel: ObservableObject {
                 config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
                 isSyncingFromPreset = false
             } else {
-                if newValue == nil { replaceOwnCopy(with: nil) }
                 config.selectedOrganizationPresetId = newValue
             }
             save()
@@ -898,8 +909,9 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    /// "Off": the film stops using its folder and file settings. Its own copy is kept
+    /// aside (see `parkedOwnCopy`); only the trash button deletes it.
     func applyOffOrganizationSettings() {
-        replaceOwnCopy(with: nil)
         config.selectedOrganizationPresetId = nil
         config.organizationFolderTemplate = config.offOrganizationFolderTemplate
         config.organizationRenameTemplate = config.offOrganizationRenameTemplate

@@ -75,13 +75,15 @@ final class OrganizationEditorModel: ObservableObject {
 
     private var selectedPresetBinding: Binding<OrganizationPreset>? {
         guard let id = viewModel.selectedOrganizationPresetId,
-              let index = viewModel.organizationPresets.firstIndex(where: { $0.id == id }) else { return nil }
+              let current = viewModel.organizationPresets.first(where: { $0.id == id }) else { return nil }
+        // Looked up by id on every read and write: the list is shared by every movie,
+        // so a position can move under an open editor.
         return Binding(
-            get: { self.viewModel.organizationPresets[index] },
+            get: { self.viewModel.organizationPresets.first(where: { $0.id == id }) ?? current },
             set: { newValue in
                 self.objectWillChange.send()
                 var presets = self.viewModel.organizationPresets
-                if index < presets.count {
+                if let index = presets.firstIndex(where: { $0.id == id }) {
                     presets[index] = newValue
                     self.viewModel.organizationPresets = presets
                 }
