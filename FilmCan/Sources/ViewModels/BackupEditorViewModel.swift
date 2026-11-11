@@ -611,6 +611,7 @@ class BackupEditorViewModel: ObservableObject {
             } else {
                 continue
             }
+            if role != .sound && FolderPick.hasDeeperPick(under: path, in: sources) { continue }
             let added = role == .sound ? soundDayPaths(path) : [path]
             let updated = keepingOnlyToday(sources + added.filter { !sources.contains($0) },
                                            volumePath: path, resolved: added)
@@ -658,7 +659,8 @@ class BackupEditorViewModel: ObservableObject {
                 let (pattern, subpath) = splitRule(rule)
                 if matches(volumeName, pattern: pattern) {
                     let resolvedMatches = resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
-                    for resolved in resolvedMatches where !updated.contains(resolved) {
+                    for resolved in resolvedMatches
+                    where !updated.contains(resolved) && !FolderPick.hasDeeperPick(under: resolved, in: updated) {
                         updated.append(resolved)
                     }
                     updated = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
@@ -732,7 +734,8 @@ class BackupEditorViewModel: ObservableObject {
                 let (pattern, subpath) = splitRule(rule)
                 if matches(volumeName, pattern: pattern) {
                     let resolvedMatches = resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
-                    for resolved in resolvedMatches where !updated.contains(resolved) {
+                    for resolved in resolvedMatches
+                    where !updated.contains(resolved) && !FolderPick.hasDeeperPick(under: resolved, in: updated) {
                         updated.append(resolved)
                     }
                 }

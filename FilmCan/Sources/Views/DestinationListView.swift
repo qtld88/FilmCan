@@ -399,6 +399,11 @@ struct DestinationListView: View {
         }
         .contentShape(Rectangle())
         .contextMenu {
+            Button("Choose a Folder on This Drive…") {
+                chooseFolder(replacing: destination.path)
+            }
+            .disabled(isActiveTransfer)
+            Divider()
             Button("Remove destination from this backup") {
                 removeDestination(destination.path)
             }
@@ -1184,19 +1189,12 @@ struct DestinationListView: View {
         DriveUtilities.driveId(for: path)
     }
 
-    private func selectDestination(at index: Int) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            if index < destinations.count {
-                destinations[index] = url.path
-            }
-        }
+    private func chooseFolder(replacing path: String) {
+        guard let picked = FolderPick.chooseFolder(
+            startingAt: path, message: "Choose the folder to save to") else { return }
+        destinations = FolderPick.replacing(path, with: picked, in: destinations)
     }
-    
+
     private func addDestination() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
