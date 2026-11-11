@@ -49,6 +49,19 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### Report copies gate (run when `ReportArchive` or the report flow changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Settings › History. | A "Reports" section: switch on, path `~/Documents/FilmCan Reports`. | ☐ |
+| R2 | A movie with "PDF report with thumbnails" on, shoot day set (e.g. Day02), two drives. Run a backup. Wait for the report (a few seconds after the end). | `~/Documents/FilmCan Reports/<movie>/Day02/<drive A>/` and `/<drive B>/` each hold the PDF and one `.mhl` per roll. macOS may ask once for access to Documents. | ☐ |
+| R3 | Eject both drives. Open the PDF from that folder. | It opens, with thumbnails. | ☐ |
+| R4 | A movie with no shoot day. Run a backup. | The day folder is today's date (`2026-11-11`). | ☐ |
+| R5 | A movie with the PDF report off. Run a backup. | Nothing new in `FilmCan Reports`. | ☐ |
+| R6 | "Choose…" another folder, run a backup. Then "Reset". | Copies go to the chosen folder; after Reset the path is back to Documents. | ☐ |
+| R7 | Switch "Keep a copy of every report on this Mac" off, run a backup. | No copy is made; the report on the drive is still written. | ☐ |
+| R8 | Compare the destination drive before and after this build for the same backup. | Same folders and files on the drive. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
