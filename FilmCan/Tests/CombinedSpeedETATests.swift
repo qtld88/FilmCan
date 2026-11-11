@@ -72,18 +72,55 @@ final class CombinedSpeedETATests: XCTestCase {
             combinedDone: 0, combinedTotal: 100, copyTotal: 100, throughput: 100).eta)
     }
 
-    func test_combinedWork_fastMode_excludesVerify() {
+    func test_combinedWork_fastMode_includesVerifyBoth() {
+        // Fast re-reads every destination too: the verify pass is real work, so
+        // the ETA must count it (it used to drop to "Estimating…" at copy end).
         let w = FanOutCopier.combinedWork(
-            copyDone: 50, copyTotal: 100, verifyDone: 30, paranoid: false)
-        XCTAssertEqual(w.done, 50, "fast: done is copy only")
-        XCTAssertEqual(w.total, 100, "fast: total is copy only")
+            copyDone: 50, copyTotal: 100, verifyDone: 30, verifyMode: .fast)
+        XCTAssertEqual(w.done, 80)
+        XCTAssertEqual(w.total, 200)
     }
 
     func test_combinedWork_paranoid_includesVerifyBoth() {
         let w = FanOutCopier.combinedWork(
-            copyDone: 50, copyTotal: 100, verifyDone: 30, paranoid: true)
+            copyDone: 50, copyTotal: 100, verifyDone: 30, verifyMode: .paranoid)
         XCTAssertEqual(w.done, 80, "paranoid: done = copy + verify")
         XCTAssertEqual(w.total, 200, "paranoid: total = copy + verify total")
+    }
+
+    func test_combinedWork_off_isCopyOnly() {
+        let w = FanOutCopier.combinedWork(
+            copyDone: 50, copyTotal: 100, verifyDone: 30, verifyMode: .off)
+        XCTAssertEqual(w.done, 50)
+        XCTAssertEqual(w.total, 100)
+    }
+
+    func test_fastMode_verifyOnlyTail_hasETA() {
+        // Copy done, half the verify pass left: an estimate must exist.
+        let w = FanOutCopier.combinedWork(
+            copyDone: 100, copyTotal: 100, verifyDone: 50, verifyMode: .fast)
+        let r = FanOutCopier.computeCombinedSpeedETA(
+            combinedDone: w.done, combinedTotal: w.total, copyTotal: 100, throughput: 10)
+        XCTAssertEqual(r.eta ?? 0, 5, accuracy: 0.001)
+    }
+
+    func test_paranoidVerifyInFlight_sourcePassFillsFirstHalf() {
+        XCTAssertEqual(FanOutCopier.paranoidVerifyInFlight(
+            pass: .sourceReread, bytesRead: 0, fileSize: 100), 0)
+        XCTAssertEqual(FanOutCopier.paranoidVerifyInFlight(
+            pass: .sourceReread, bytesRead: 100, fileSize: 100), 50)
+    }
+
+    func test_paranoidVerifyInFlight_destPassFillsSecondHalf() {
+        XCTAssertEqual(FanOutCopier.paranoidVerifyInFlight(
+            pass: .destReread, bytesRead: 0, fileSize: 100), 50)
+        XCTAssertEqual(FanOutCopier.paranoidVerifyInFlight(
+            pass: .destReread, bytesRead: 100, fileSize: 100), 100)
+    }
+
+    func test_paranoidVerifyInFlight_oddSize_reachesFileSize() {
+        XCTAssertEqual(FanOutCopier.paranoidVerifyInFlight(
+            pass: .destReread, bytesRead: 101, fileSize: 101), 101)
     }
 
     func test_emaThroughput_seedsWithFirstSample() {

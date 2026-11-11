@@ -17,15 +17,15 @@ struct InlineFanOutProgress: View {
         return Double(progress.verifyBytesCompleted) / Double(progress.verifyBytesTotal)
     }
 
-    /// Headline percent. Tracks the COPY bytes — the same basis as the "X / Y GB"
-    /// pill — so the number always matches the bytes shown (two destinations at the
-    /// same GB read the same %). Verification progress is shown by the green bar
-    /// overlay, not folded into this number. Caps at 99% until the destination is
-    /// fully done (copied AND, in paranoid, verified) to avoid showing 100% early.
-    private var combinedPercent: Int {
+    /// Headline percent over copy AND verify work, so it keeps climbing through a
+    /// long verify tail instead of sitting at 99% (a 43 GB file reads ~50% when its
+    /// copy ends). Capped at 99% until the destination reports complete.
+    static func percent(for progress: DestProgress) -> Int {
         if case .complete = progress.status { return 100 }
-        guard progress.bytesTotal > 0 else { return 0 }
-        let pct = Double(progress.bytesCompleted) / Double(progress.bytesTotal) * 100
+        let total = progress.bytesTotal + progress.verifyBytesTotal
+        guard total > 0 else { return 0 }
+        let done = progress.bytesCompleted + min(progress.verifyBytesCompleted, progress.verifyBytesTotal)
+        let pct = Double(done) / Double(total) * 100
         return min(99, Int(pct.rounded(.towardZero)))
     }
 
@@ -33,7 +33,7 @@ struct InlineFanOutProgress: View {
     /// would read as stalled).
     private var percentText: String {
         if case .preparing = progress.status { return "—" }
-        return "\(combinedPercent)%"
+        return "\(Self.percent(for: progress))%"
     }
 
     /// Copy for this dest is done but verification is still running (no copy to
@@ -43,12 +43,15 @@ struct InlineFanOutProgress: View {
     // MARK: Formatting (stable: integer units, fixed-width pills)
 
     /// Whole GB only (decimal GB, matching Finder). No sub-GB churn.
-    private func wholeGB(_ bytes: Int64) -> Int {
+    private static func wholeGB(_ bytes: Int64) -> Int {
         Int((Double(max(bytes, 0)) / 1_000_000_000).rounded(.towardZero))
     }
 
-    private var bytesText: String {
-        "\(wholeGB(progress.bytesCompleted)) / \(wholeGB(progress.bytesTotal)) GB"
+    /// Once the copy is done the pill counts verified GB, so the verify tail
+    /// visibly ticks forward every GB instead of sitting at "43 / 43 GB".
+    static func bytesText(for progress: DestProgress) -> String {
+        let done = progress.isVerifyOnly ? progress.verifyBytesCompleted : progress.bytesCompleted
+        return "\(wholeGB(done)) / \(wholeGB(progress.bytesTotal)) GB"
     }
 
     private var speedText: String {
@@ -149,7 +152,8 @@ struct InlineFanOutProgress: View {
     /// which throttles speed/ETA changes to ~once every 5s.
     private var pillsRow: some View {
         HStack(spacing: 8) {
-            pill(icon: "externaldrive", text: bytesText, width: 104)
+            pill(icon: isVerifyOnly ? "checkmark.shield" : "externaldrive",
+                 text: Self.bytesText(for: progress), width: 104)
             pill(icon: "speedometer", text: speedText, width: 84)
             pill(icon: "clock", text: etaText, width: 96)
         }

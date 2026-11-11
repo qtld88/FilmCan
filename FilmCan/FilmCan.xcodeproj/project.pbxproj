@@ -239,6 +239,7 @@
 		FD41AFC3E5C85A758E959C70 /* QuickCopySessionDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662CED5129BF5917D1C9F5B1 /* QuickCopySessionDropTests.swift */; };
 		FEA7B0F181386FE844FD98B3 /* TodayClockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FDD6B9621C1F795EFCF1D2E /* TodayClockTests.swift */; };
 		FEE5C47D2E938A4AFBBC24A2 /* QuickCopyIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB5D633F58BF2F91D803BEF /* QuickCopyIntegrationTests.swift */; };
+		FF031A62DECB81FC4D6E415D /* InlineFanOutPercentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D11D60D37DBC3561C6725C /* InlineFanOutPercentTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -286,6 +287,7 @@
 		25785302A4FCE3EF859B358F /* DryRunSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DryRunSheet.swift; sourceTree = "<group>"; };
 		26B11F28CFE5DF0FB03C3D73 /* NotificationSummaryBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSummaryBuilder.swift; sourceTree = "<group>"; };
 		26C3E1A402B5BFE3BF3C5B98 /* RootDisambiguationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootDisambiguationTests.swift; sourceTree = "<group>"; };
+		26D11D60D37DBC3561C6725C /* InlineFanOutPercentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineFanOutPercentTests.swift; sourceTree = "<group>"; };
 		28B96018630A1BE87D3AE467 /* FanOutCopierIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanOutCopierIntegrationTests.swift; sourceTree = "<group>"; };
 		297A6705D2E34EA8E454FB3B /* TransferProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferProgress.swift; sourceTree = "<group>"; };
 		2A6DC9FACD5035B47A5E3C96 /* DataIntegrityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataIntegrityTests.swift; sourceTree = "<group>"; };
@@ -667,6 +669,7 @@
 				0475343A79E1885E65D2710F /* HashListVerifierTests.swift */,
 				E47CF7DDB3A7E4B996579E0F /* Info.plist */,
 				9206A217BBA196D61CF9854B /* InlineFanOutETALabelTests.swift */,
+				26D11D60D37DBC3561C6725C /* InlineFanOutPercentTests.swift */,
 				A5EBACAD4FF12342BB0D8F56 /* IOPerfProbeTests.swift */,
 				EE85CF10556574825D5BBA50 /* LegacyCleanupTests.swift */,
 				E6B27306257A56E2C8B8AF2B /* LogItemizeParserTests.swift */,
@@ -1025,6 +1028,7 @@
 				B8153C2B42E65FE1F04E86D9 /* HashListVerifierTests.swift in Sources */,
 				ACC26B4EE93658AA4877B554 /* IOPerfProbeTests.swift in Sources */,
 				DF00E721769C210498AACBED /* InlineFanOutETALabelTests.swift in Sources */,
+				FF031A62DECB81FC4D6E415D /* InlineFanOutPercentTests.swift in Sources */,
 				138FE41894080BDF18228786 /* LegacyCleanupTests.swift in Sources */,
 				DA54C6EDDF200DBCBDCE5DC8 /* LogItemizeParserTests.swift in Sources */,
 				B040EBA5373475073E32D8B1 /* MHLAppendFailureTests.swift in Sources */,
