@@ -104,6 +104,7 @@
 		7191245AD630701955CB29ED /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1146F690162AC3EE569EFBB /* SourceListView.swift */; };
 		72ADFBC154DB1F6E8A40FE00 /* SourceFilterMatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93B221BAE2102BEB26E8FFE7 /* SourceFilterMatchingTests.swift */; };
 		73DA82CDD34327AFDB1104C4 /* MHLWriting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43ECD597CD6811D8A3476FF1 /* MHLWriting.swift */; };
+		758D9B61FF4D7D2957C91D48 /* FolderPickTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73ADE475D714D7F1D3C0550D /* FolderPickTests.swift */; };
 		76FFAC074FCE73E27D1D935B /* MediaCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C12EAE285D77C1BCB10BD3E /* MediaCatalogTests.swift */; };
 		7802B6BFE8D3301E9B5A90AB /* GenericRollNameScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65C074242FE3C149F988D2F /* GenericRollNameScannerTests.swift */; };
 		787DD0894D87EF93B4C3D695 /* MainThreadWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 461775DA159F8BCD137BF26C /* MainThreadWatchdogTests.swift */; };
@@ -122,6 +123,7 @@
 		85B89550BA97C96DCC304796 /* SpotlightIndexingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC812F2EC72F2A09FD510F13 /* SpotlightIndexingTests.swift */; };
 		87FD9E40BC279469632DE390 /* GenericCardNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B19CC893B23F6AB4E542CC /* GenericCardNameTests.swift */; };
 		8873768E9A7222941E5033D0 /* HashAlgorithm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */; };
+		8B0B53E37E2AF56D04AF89EE /* FolderPick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793D37A72328F9C0C3FED702 /* FolderPick.swift */; };
 		8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209A0A98482A692929BD2180 /* FastVerifyTests.swift */; };
 		8B75E9B563FD46A02743285B /* NetflixNameValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB4ECAB82F6FD8EF5BA03D69 /* NetflixNameValidator.swift */; };
 		8BAD0ED4F50C701A46C4CAB8 /* TransferViewModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1238000C84EF3FD8AEEF2625 /* TransferViewModel+Presentation.swift */; };
@@ -361,6 +363,7 @@
 		6C58BD6BBAE45AB2BED7FDAA /* DestStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestStatus.swift; sourceTree = "<group>"; };
 		6D1A5B5BDD573D20E4EF6A03 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		709936C14A2DB3749DE2CAF7 /* DemoModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoModeTests.swift; sourceTree = "<group>"; };
+		73ADE475D714D7F1D3C0550D /* FolderPickTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPickTests.swift; sourceTree = "<group>"; };
 		73C4305DE01CFC043DF8C21A /* TransferResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferResult.swift; sourceTree = "<group>"; };
 		73FEB3CAF6CFC59BD86A7923 /* ConstantsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstantsTests.swift; sourceTree = "<group>"; };
 		744CAA8F663737AD61C511BD /* PerfSignpostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfSignpostTests.swift; sourceTree = "<group>"; };
@@ -369,6 +372,7 @@
 		76EDF10844CC898228982672 /* DuplicatePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatePrompt.swift; sourceTree = "<group>"; };
 		776FCDE369C644189E0138A5 /* ManifestDedupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManifestDedupTests.swift; sourceTree = "<group>"; };
 		78005A3446E332B11C82A0C3 /* OrganizationTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizationTemplate.swift; sourceTree = "<group>"; };
+		793D37A72328F9C0C3FED702 /* FolderPick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPick.swift; sourceTree = "<group>"; };
 		79A15F599AC73BDCEE3A041F /* GenericRollNameScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericRollNameScanner.swift; sourceTree = "<group>"; };
 		79B19CC893B23F6AB4E542CC /* GenericCardNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericCardNameTests.swift; sourceTree = "<group>"; };
 		7A85B74290F6644A739120F6 /* RollIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollIdentityTests.swift; sourceTree = "<group>"; };
@@ -549,6 +553,7 @@
 				AB0DE00B31C198D55826941B /* Extensions.swift */,
 				5E84E2F5E2941DED39DB6EDD /* FileEnumerator.swift */,
 				0580A6484DAEF6D9624AA63A /* FilmDriveDetector.swift */,
+				793D37A72328F9C0C3FED702 /* FolderPick.swift */,
 				B42F5ED160716CCB39D07D04 /* HashAlgorithm.swift */,
 				43A1BB108A96290E666D66D7 /* Hashing.swift */,
 				3D2147830DD49FC39B828D61 /* HashListBuilder.swift */,
@@ -690,6 +695,7 @@
 				3066C90EFA131CD742855EB5 /* FanOutCopierTests.swift */,
 				209A0A98482A692929BD2180 /* FastVerifyTests.swift */,
 				AEBF5D581B51FBE18526D507 /* FilmDriveDetectorTests.swift */,
+				73ADE475D714D7F1D3C0550D /* FolderPickTests.swift */,
 				C92A938408F62AE47647930E /* FolderTreeBuilderTests.swift */,
 				79B19CC893B23F6AB4E542CC /* GenericCardNameTests.swift */,
 				D65C074242FE3C149F988D2F /* GenericRollNameScannerTests.swift */,
@@ -1055,6 +1061,7 @@
 				A6588DD8301CC2D89C181486 /* FanOutCopierTests.swift in Sources */,
 				8B3DAB004CDB661F8C13980E /* FastVerifyTests.swift in Sources */,
 				B0504D63096C8BB194A56E2A /* FilmDriveDetectorTests.swift in Sources */,
+				758D9B61FF4D7D2957C91D48 /* FolderPickTests.swift in Sources */,
 				02522FF78051450B737CF6B1 /* FolderTreeBuilderTests.swift in Sources */,
 				87FD9E40BC279469632DE390 /* GenericCardNameTests.swift in Sources */,
 				7802B6BFE8D3301E9B5A90AB /* GenericRollNameScannerTests.swift in Sources */,
@@ -1179,6 +1186,7 @@
 				539707B5A95FBD91D26F1E41 /* FilmCanTheme.swift in Sources */,
 				0C32F537032E595894C7A847 /* FilmDriveDetector.swift in Sources */,
 				818A3B2F83A72582CF1CB60D /* FlowLinkView.swift in Sources */,
+				8B0B53E37E2AF56D04AF89EE /* FolderPick.swift in Sources */,
 				E19CFCE13B1A1F1155F2AF57 /* FolderPickerSheet.swift in Sources */,
 				1B1E33D88835AA60975D0F51 /* FolderTreeBuilder.swift in Sources */,
 				09767D2D59FB2C6C45274332 /* FolderTreePreview.swift in Sources */,

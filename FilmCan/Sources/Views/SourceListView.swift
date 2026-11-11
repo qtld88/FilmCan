@@ -359,6 +359,11 @@ struct SourceListView: View {
                 Button("Reset recognition") { setCardRole(source.path, nil) }
                 Divider()
             }
+            Button("Choose a Folder on This Drive…") {
+                chooseFolder(replacing: source.path)
+            }
+            .disabled(isSelectionLocked)
+            Divider()
             Button("Remove source from this backup") {
                 removeSource(source.path)
             }
@@ -526,6 +531,14 @@ struct SourceListView: View {
         func dropExited(info: DropInfo) {
             // no-op
         }
+    }
+
+    private func chooseFolder(replacing path: String) {
+        guard let picked = FolderPick.chooseFolder(
+            startingAt: path, message: "Choose the folder to copy from") else { return }
+        let kind = mediaKind?(path)
+        sources = FolderPick.replacing(path, with: picked, in: sources)
+        if let kind, let setMediaKind { setMediaKind(picked, kind) }
     }
 
     private func removeSource(_ path: String) {
