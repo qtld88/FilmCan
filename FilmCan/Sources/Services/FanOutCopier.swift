@@ -2019,9 +2019,11 @@ actor FanOutCopier {
             raw: Double(db) / dt, alphaUp: emaAlphaUp, alphaDown: emaAlphaDown)
         etaSmoothedThroughputByDest[destPath] = smoothed
 
+        let inVerifyTail = verifyMode != .off && copyDone >= copyTotal
         let result = Self.computeCombinedSpeedETA(
             combinedDone: combinedDone, combinedTotal: combinedTotal,
-            copyTotal: copyTotal, throughput: smoothed)
+            copyTotal: copyTotal, throughput: smoothed,
+            verifyTailReadPasses: inVerifyTail ? (verifyMode == .paranoid ? 2 : 1) : nil)
         etaEmitByDest[destPath] = (now, result.speed, result.eta)
         return result
     }
@@ -2075,13 +2077,16 @@ actor FanOutCopier {
     /// `throughput` is the measured combined (copy+verify) bytes/sec. Speed =
     /// throughput ÷ verify factor (effective copy rate, predicts the verify
     /// slowdown). ETA = remaining combined work ÷ throughput (counts the verify
-    /// pass from the start).
+    /// pass from the start). Once copy is done (`verifyTailReadPasses` non-nil)
+    /// the effective copy rate means nothing, so speed is the raw read rate:
+    /// Paranoid reads each verified byte twice (source + dest passes).
     static func computeCombinedSpeedETA(
-        combinedDone: Int64, combinedTotal: Int64, copyTotal: Int64, throughput: Double
+        combinedDone: Int64, combinedTotal: Int64, copyTotal: Int64, throughput: Double,
+        verifyTailReadPasses: Int? = nil
     ) -> (speed: Double, eta: TimeInterval?) {
         guard throughput > 0, combinedDone > 0, copyTotal > 0 else { return (0, nil) }
         let verifyFactor = Double(combinedTotal) / Double(copyTotal)
-        let speed = throughput / verifyFactor
+        let speed = verifyTailReadPasses.map { throughput * Double($0) } ?? throughput / verifyFactor
         let remaining = combinedTotal - combinedDone
         let eta = remaining > 0 ? Double(remaining) / throughput : nil
         return (speed, eta)

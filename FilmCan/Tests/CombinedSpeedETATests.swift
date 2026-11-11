@@ -27,9 +27,7 @@ final class CombinedSpeedETATests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(r.eta), copyOnly * 1.8)
     }
 
-    /// Fast mode: combinedTotal == copyTotal (factor 1) — speed equals the
-    /// measured throughput and the ETA covers copy only.
-    func test_fast_factorOne() {
+    func test_verifyOff_factorOne() {
         let copyTotal = 100 * GB
         let r = FanOutCopier.computeCombinedSpeedETA(
             combinedDone: 50 * GB, combinedTotal: copyTotal,
@@ -63,6 +61,21 @@ final class CombinedSpeedETATests: XCTestCase {
         let b = FanOutCopier.computeCombinedSpeedETA(
             combinedDone: 90 * GB, combinedTotal: total, copyTotal: copyTotal, throughput: 3_000_000_000)
         XCTAssertEqual(try XCTUnwrap(a.eta), try XCTUnwrap(b.eta), accuracy: 0.001)
+    }
+
+    func test_verifyTail_fast_showsRawReadSpeed() {
+        let r = FanOutCopier.computeCombinedSpeedETA(
+            combinedDone: 150 * GB, combinedTotal: 200 * GB, copyTotal: 100 * GB,
+            throughput: 200_000_000, verifyTailReadPasses: 1)
+        XCTAssertEqual(r.speed, 200_000_000, accuracy: 1_000_000)
+        XCTAssertEqual(try XCTUnwrap(r.eta), 250, accuracy: 1)
+    }
+
+    func test_verifyTail_paranoid_showsRawReadSpeed() {
+        let r = FanOutCopier.computeCombinedSpeedETA(
+            combinedDone: 150 * GB, combinedTotal: 200 * GB, copyTotal: 100 * GB,
+            throughput: 200_000_000, verifyTailReadPasses: 2)
+        XCTAssertEqual(r.speed, 400_000_000, accuracy: 1_000_000)
     }
 
     func test_guards_returnNoneOnZeroThroughput() {
