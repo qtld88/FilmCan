@@ -361,9 +361,29 @@ class BackupEditorViewModel: ObservableObject {
         return "Next camera roll: \(cam) · next sound roll: \(snd)"
     }
 
-    /// Shoot day the next run will use when auto-advance is on.
+    /// Shoot day a run started now would use — same computation as
+    /// `TransferViewModel.applyRollNumberingAndDay`, so the folder preview matches the copy.
+    func effectiveShootDay(now: Date = Date()) -> String {
+        guard config.dayAutoAdvance else { return config.day }
+        let state = RollNumberingStore.shared.state(for: config.id)
+        return ShootDayCounter.advance(
+            day: state.currentDay ?? config.day, lastRun: state.lastRunDate,
+            now: now, calendar: .current)
+    }
+
+    /// Today's shoot day when auto-advance is on. Setting it overrides the counter for
+    /// today; tomorrow's first run advances from the edited value.
     var shootDayToday: String {
-        RollNumberingStore.shared.state(for: config.id).currentDay ?? config.day
+        get { effectiveShootDay() }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return }
+            var state = RollNumberingStore.shared.state(for: config.id)
+            state.currentDay = trimmed
+            state.lastRunDate = Date()
+            RollNumberingStore.shared.update(state, for: config.id)
+            objectWillChange.send()
+        }
     }
 
     func resetRollNumbering() {

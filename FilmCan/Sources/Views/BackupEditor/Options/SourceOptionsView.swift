@@ -292,6 +292,16 @@ private struct CardsAndRollsSection: View {
     @ObservedObject var viewModel: BackupEditorViewModel
     let availableWidth: CGFloat
     @State private var showResetAlert = false
+    @State private var todayDraft = ""
+    @FocusState private var todayFocused: Bool
+
+    private func commitTodayDraft() {
+        let trimmed = todayDraft.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty, trimmed != viewModel.shootDayToday {
+            viewModel.shootDayToday = trimmed
+        }
+        todayDraft = viewModel.shootDayToday
+    }
 
     private var indent: CGFloat { OptionsLayout.iconWidth + OptionsLayout.spacing }
 
@@ -390,10 +400,20 @@ private struct CardsAndRollsSection: View {
             )
 
             if viewModel.dayAutoAdvance {
-                Text("Today: \(viewModel.shootDayToday.isEmpty ? "Day01" : viewModel.shootDayToday)")
-                    .font(FCType.meta)
-                    .foregroundColor(FilmCanTheme.textSecondary)
-                    .padding(.leading, indent)
+                HStack(spacing: 6) {
+                    Text("Today:").foregroundColor(FilmCanTheme.textSecondary)
+                    TextField("Day01", text: $todayDraft)
+                        .frame(width: 80)
+                        .focused($todayFocused)
+                        .onSubmit(commitTodayDraft)
+                        .help("Shoot day used by backups made today. Tomorrow's first backup goes up by one from this value.")
+                }
+                .font(FCType.meta)
+                .padding(.leading, indent)
+                .onAppear { todayDraft = viewModel.shootDayToday }
+                .onChange(of: todayFocused) { focused in
+                    if !focused { commitTodayDraft() }
+                }
             }
         }
     }

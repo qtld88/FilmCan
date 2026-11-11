@@ -36,7 +36,7 @@ extension BackupEditorView {
     }
 
     var previewShootMetadata: ShootMetadata {
-        ShootMetadata(episode: viewModel.episode, day: viewModel.day,
+        ShootMetadata(episode: viewModel.episode, day: viewModel.effectiveShootDay(),
                       unit: viewModel.unit, cameraFormat: viewModel.cameraFormat)
     }
 
