@@ -51,10 +51,17 @@ extension BackupEditorView {
     /// Summary line + Run subtitle, resolved in one pass per render so the sources and
     /// their destination paths are looked up once (the folder preview already stats them).
     func mainScreenFacts() -> (summary: BackupSummary?, runSubtitle: String) {
+        let isRunning = transferViewModel.isTransferActive(for: viewModel.config.id)
+        // A running copy re-renders this view on every progress tick: keep the line
+        // resolved before the run instead of touching the disks again each time.
+        if isRunning, let frozen = summaryFreeze.summary {
+            return (frozen, RunSubtitle.text(sourceCount: 1, driveCount: 1,
+                                             newFolderCount: 0, isRunning: true))
+        }
         let sources = summarySources
         let destinations = summaryDestinations
-        let isRunning = transferViewModel.isTransferActive(for: viewModel.config.id)
         guard !sources.isEmpty else {
+            summaryFreeze.summary = nil
             return (nil, RunSubtitle.text(sourceCount: 0, driveCount: destinations.count,
                                           newFolderCount: 0, isRunning: isRunning))
         }
@@ -68,6 +75,7 @@ extension BackupEditorView {
             itemCount: counts.count == sources.count ? counts.reduce(0, +) : nil,
             driveCount: destinations.count,
             isLoading: previewInfo.isLoading)
+        summaryFreeze.summary = summary
         // Nothing to count while a copy runs: the subtitle then only says so.
         let newFolders = isRunning ? 0 : destinations.reduce(0) { total, destination in
             total + RunSubtitle.newFolderCount(

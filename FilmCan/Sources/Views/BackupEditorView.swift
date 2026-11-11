@@ -15,6 +15,8 @@ struct BackupEditorView: View {
     @State var showFolderPicker = false
     @State var folderPickerMode: FolderPickerMode = .destination
     @State var previewInfo = PreviewInfo()
+    /// Last summary line resolved while idle; reused untouched while a copy runs.
+    @State var summaryFreeze = SummaryFreeze()
     @State var isEditingName = false
     @FocusState var isNameFocused: Bool
     @State var optionsAvailableWidth: CGFloat = 0

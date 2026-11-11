@@ -11,6 +11,8 @@ final class MainScreenSummaryTests: XCTestCase {
         XCTAssertEqual(ShootDayStepper.step("D9", by: 1), "D10")
         XCTAssertEqual(ShootDayStepper.step("Day099", by: 1), "Day100")
         XCTAssertEqual(ShootDayStepper.step("Day100", by: -1), "Day099")
+        // A number at the Int limit is left alone instead of trapping.
+        XCTAssertEqual(ShootDayStepper.step("D9223372036854775807", by: 1), "D9223372036854775807")
         XCTAssertEqual(ShootDayStepper.step("7", by: 1), "8")
         XCTAssertEqual(ShootDayStepper.step("J 04", by: 1), "J 05")
     }

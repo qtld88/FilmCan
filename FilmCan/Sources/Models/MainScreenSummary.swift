@@ -15,7 +15,9 @@ enum ShootDayStepper {
         let digits = String(trimmed.reversed().prefix { $0.isASCII && $0.isNumber }.reversed())
         guard !digits.isEmpty, let value = Int(digits) else { return day }
         let prefix = String(trimmed.dropLast(digits.count))
-        let next = String(max(1, value + delta))
+        let (sum, overflow) = value.addingReportingOverflow(delta)
+        guard !overflow else { return day }
+        let next = String(max(1, sum))
         let padded = String(repeating: "0", count: max(0, digits.count - next.count)) + next
         return prefix + padded
     }
@@ -117,4 +119,10 @@ enum MainScreenChrome {
     static func treeStartsCollapsed(_ lines: [FolderTreeLine]) -> Bool {
         !lines.isEmpty && !lines.contains { $0.isNew }
     }
+}
+
+/// Holds the summary line resolved before a run. A class on purpose: the view writes it
+/// while rendering, which must not trigger another render.
+final class SummaryFreeze {
+    var summary: BackupSummary?
 }
