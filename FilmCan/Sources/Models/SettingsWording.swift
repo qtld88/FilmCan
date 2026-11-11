@@ -30,7 +30,7 @@ enum SettingsWording {
 
 /// Pages of the Settings window, listed in its sidebar.
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case appearance, notifications, push, history, drives, hotkeys, about
+    case appearance, notifications, push, history, drives, recognition, hotkeys, about
 
     var id: String { rawValue }
 
@@ -41,6 +41,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .push: return "Phone & webhooks"
         case .history: return "History"
         case .drives: return "Drives"
+        case .recognition: return "Recognition"
         case .hotkeys: return "Shortcuts"
         case .about: return "About"
         }
@@ -53,6 +54,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .push: return "paperplane"
         case .history: return "clock"
         case .drives: return "externaldrive"
+        case .recognition: return "sdcard"
         case .hotkeys: return "keyboard"
         case .about: return "info.circle"
         }

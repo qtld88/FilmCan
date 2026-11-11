@@ -19,7 +19,7 @@ final class SettingsWordingTests: XCTestCase {
 
     func test_settingsPages_keepEveryFormerTab() {
         XCTAssertEqual(SettingsPage.allCases.map(\.rawValue),
-                       ["appearance", "notifications", "push", "history", "drives", "hotkeys", "about"])
+                       ["appearance", "notifications", "push", "history", "drives", "recognition", "hotkeys", "about"])
         XCTAssertEqual(Set(SettingsPage.allCases.map(\.title)).count, SettingsPage.allCases.count)
     }
 

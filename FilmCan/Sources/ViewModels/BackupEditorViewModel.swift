@@ -580,7 +580,7 @@ class BackupEditorViewModel: ObservableObject {
     /// Correct the detector for one drive and remember it (by volume UUID).
     func setCardRole(_ role: CardRole?, for path: String) {
         if let uuid = volumeUUID(for: path) {
-            CardRoleOverrides.set(role, forVolumeUUID: uuid)
+            CardRoleOverrides.set(role, forVolumeUUID: uuid, driveName: FanOutCopier.sourceVolumeName(path))
         }
         if role == .sound { setMediaKind(.sound, for: path) }
         else if role == .camera { setMediaKind(.camera, for: path) }

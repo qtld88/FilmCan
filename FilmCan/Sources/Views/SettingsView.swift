@@ -73,6 +73,8 @@ struct SettingsView: View {
                 DriveSettingsView(
                     disableSpotlightIndexing: $disableSpotlightIndexing
                 )
+        case .recognition:
+                RecognitionSettingsView()
         case .hotkeys:
                 HotkeysSettingsView()
         case .about:
