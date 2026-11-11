@@ -373,7 +373,7 @@ struct QuickCopySetupView: View {
             QCSettingRow(label: "Preset") {
                 Picker("", selection: $session.form.selectedPresetId) {
                     Text("None").tag(UUID?.none)
-                    ForEach(session.form.savedPresets) { Text($0.name).tag(UUID?.some($0.id)) }
+                    ForEach(session.form.pickerPresets) { Text($0.name).tag(UUID?.some($0.id)) }
                 }
             }
             if let chips = session.form.presetChips {

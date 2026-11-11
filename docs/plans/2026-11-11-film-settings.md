@@ -13,4 +13,6 @@ Spec: `docs/specs/2026-11-11-film-settings.md`
 | 7 | "+" split control and File menu entries | `BackupListView.swift`, `FilmCanApp.swift` | view only; manual gate |
 | 8 | Manual gate | `docs/smoke-qa-checklist.md` | — |
 
+Cold review outcome (folded into the spec): name lookups restricted to shared presets, no "first preset" fallback, id setter routed through the copy step, export/import rules, Quick Copy keeps the full list for lookups, working-copy alignment at migration, editor storage injectable so tests never touch the app's real files.
+
 After merge: run `xcodegen generate` (new files).

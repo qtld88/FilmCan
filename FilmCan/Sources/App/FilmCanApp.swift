@@ -30,6 +30,10 @@ struct FilmCanApp: App {
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
+                Menu("New Movie Like") {
+                    NewMovieMenuItems(appState: appState, storage: appState.storage)
+                }
+
                 NewWindowMenuItems()
             }
             

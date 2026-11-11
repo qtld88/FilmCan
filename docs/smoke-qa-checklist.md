@@ -95,6 +95,27 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
 | 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
 
+### Movie settings gate (run when presets or movie creation changed)
+
+Before the first launch of this build, keep a copy of `configs.json` and `presets.json` (Application Support › FilmCan).
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| S1 | Launch on existing data where two movies use the same preset. | Both movies show the same preset name, same folder preview as before. No "(modified)" mark. | ☐ |
+| S2 | Run a backup of an existing movie with an existing card. | Same folders and files as with the previous build (resume finds everything). | ☐ |
+| S3 | In movie A, change the folder template. Open movie B. | B's template and folder preview are unchanged. | ☐ |
+| S4 | Preset menu in a movie. | Lists "Off", "Netflix Ingest (built-in)", the shared presets once each (no duplicates), "Save as new preset", "Delete preset". | ☐ |
+| S5 | Choose a preset in movie A, edit a folder, then choose the same preset in movie B. | B gets the preset as saved, not A's edit. | ☐ |
+| S6 | "Save as new preset" in movie A. | A new preset appears in the menu of every movie; A keeps its settings. | ☐ |
+| S7 | Trash button next to the preset name. | The movie goes back to "Off"; the shared preset is still in the menu. | ☐ |
+| S8 | "Delete preset" › a preset. | It leaves the menu; movies that started from it keep their folders. | ☐ |
+| S9 | Small arrow next to "+" in the tab bar › "Like <movie>". | A new movie with the same options, no cards, no drives, empty shoot day. File › New Movie Like shows the same list. | ☐ |
+| S10 | Movie "Citizen K" with template `CITIZENK/{day}`; create a movie like it and rename it "Citizen L". | The new movie's template starts with `{movie}`; the preview shows `Citizen L/…`. The old movie still writes to `CITIZENK/…`. | ☐ |
+| S11 | Type `{movie}` in a folder template (it is in the token list). | The preview shows the movie's name. | ☐ |
+| S12 | Delete a movie, quit, open `presets.json`. | No record with that movie's `ownerFilmId` remains. | ☐ |
+| S13 | Quick Copy: pick a movie, look at the Preset picker; pick another movie. | The picker shows the shared presets plus the picked movie's own settings, never another movie's. | ☐ |
+| S14 | Settings › Import & Export › Presets › Export. | The file holds the shared presets only. | ☐ |
+
 ## Post-run sanity checks
 
 - `find /Volumes/<dest> -name ".filmcan-*"` returns nothing after a clean job.

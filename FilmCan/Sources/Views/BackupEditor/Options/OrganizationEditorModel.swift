@@ -96,6 +96,7 @@ final class OrganizationEditorModel: ObservableObject {
             ("{destinationDriveName}", "Name of the drive containing the destination."),
             ("{destination}", "Destination folder name."),
             ("{date}", "Today's date (YYYYMMDD)."),
+            ("{movie}", "This movie's name."),
             ("{episode}", "Project / episode, from Shoot metadata."),
             ("{day}", "Shoot day, from Shoot metadata."),
             ("{unit}", "Unit, from Shoot metadata."),

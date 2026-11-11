@@ -1217,12 +1217,15 @@ struct TransferHistoryView: View {
         config.engineOptions = engineOpts
 
         if let presetName = entry.options.organizationPresetName {
-            if let preset = appState.storage.organizationPresets.first(where: { $0.name == presetName }) {
+            // A shared preset by that name; the new movie gets its own copy just below.
+            if let preset = FilmPresetOwnership.shared(appState.storage.organizationPresets)
+                .first(where: { $0.name == presetName }) {
                 config.selectedOrganizationPresetId = preset.id
             }
         }
 
         appState.storage.add(config)
+        if appState.storage.adoptPresetCopies() { appState.storage.save() }
         appState.selectConfig(config)
     }
     

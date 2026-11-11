@@ -12,7 +12,8 @@ extension BackupEditorView {
     }
 
     private var selectedPresetDifferences: [PresetDifference] {
-        guard let preset = selectedOrganizationPreset else { return [] }
+        // A film's own copy has nothing to diverge from.
+        guard let preset = selectedOrganizationPreset, !viewModel.selectedPresetIsOwnCopy else { return [] }
         return viewModel.config.differences(from: preset)
     }
 
@@ -37,7 +38,8 @@ extension BackupEditorView {
 
     var previewShootMetadata: ShootMetadata {
         ShootMetadata(episode: viewModel.episode, day: viewModel.effectiveShootDay(),
-                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat)
+                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat,
+                      movie: viewModel.config.name)
     }
 
     var effectiveOrganizationPreset: OrganizationPreset? {
@@ -309,16 +311,25 @@ extension BackupEditorView {
                     viewModel.applyNetflixIngestPreset()
                     expandOptionsIfNeeded()
                 }
-                ForEach(viewModel.organizationPresets) { preset in
+                ForEach(viewModel.sharedOrganizationPresets) { preset in
                     Button(preset.name) {
                         viewModel.applyPreset(preset)
                         expandOptionsIfNeeded()
                     }
                 }
                 Divider()
-                Button("Create new preset") {
+                Button("Save as new preset") {
                     viewModel.saveCurrentSettingsAsPreset()
                     expandOptionsIfNeeded()
+                }
+                if !viewModel.sharedOrganizationPresets.isEmpty {
+                    Menu("Delete preset") {
+                        ForEach(viewModel.sharedOrganizationPresets) { preset in
+                            Button(preset.name, role: .destructive) {
+                                viewModel.deleteSharedPreset(id: preset.id)
+                            }
+                        }
+                    }
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -362,10 +373,10 @@ extension BackupEditorView {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
-                .help("Delete preset")
+                .help("Remove this movie's folder and file settings (back to Off)")
             }
         }
-        .help("Presets auto-update when you make any change.")
+        .help("These settings belong to this movie. Choosing a preset copies it; changes here never alter the preset or another movie.")
     }
 
     private func expandOptionsIfNeeded() {
