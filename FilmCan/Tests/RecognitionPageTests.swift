@@ -199,4 +199,3 @@ final class RollMemoryForgetTests: XCTestCase {
         XCTAssertTrue(store.state(for: film).assignments.isEmpty)
     }
 }
-}
