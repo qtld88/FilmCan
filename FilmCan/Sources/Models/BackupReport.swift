@@ -53,28 +53,37 @@ struct BackupReport: Equatable {
         var notListed: Int
         /// Nil: the files were not re-read.
         var recheck: Recheck?
+        /// Checksum lists on the drive that could not be read.
+        var unreadableLists: Int = 0
 
         var hasProblems: Bool {
-            !missingFiles.isEmpty || sizeChanged > 0 || (recheck?.mismatched ?? 0) > 0
+            !missingFiles.isEmpty || sizeChanged > 0 || (recheck?.mismatched ?? 0) > 0 || unreadableLists > 0
+        }
+
+        /// Every file on the drive was re-read and matches the list, and nothing is unaccounted for.
+        var isFullyRechecked: Bool {
+            hasChecksumList && recheck != nil && !hasProblems && notListed == 0
         }
 
         /// The status line. Never says "verified": only a backup's own check does.
         var statusText: String {
+            var notes: [String] = []
+            if !missingFiles.isEmpty { notes.append("\(missingFiles.count) missing") }
+            if sizeChanged > 0 { notes.append("\(sizeChanged) changed size") }
+            if let recheck, recheck.mismatched > 0 { notes.append("\(recheck.mismatched) do not match") }
+            if notListed > 0 { notes.append("\(notListed) not in the list") }
+            if unreadableLists > 0 { notes.append("\(unreadableLists) checksum list\(unreadableLists == 1 ? "" : "s") could not be read") }
             guard hasChecksumList else {
-                return "No checksum list on this drive: files listed without checksums"
+                return (["No ASC MHL checksum list on this drive: files listed without checksums, nothing re-read"]
+                        + notes.filter { $0.contains("could not be read") }).joined(separator: ". ")
             }
-            var problems: [String] = []
-            if !missingFiles.isEmpty { problems.append("\(missingFiles.count) missing") }
-            if sizeChanged > 0 { problems.append("\(sizeChanged) changed size") }
+            let lead: String
             if let recheck {
-                if recheck.mismatched > 0 { problems.append("\(recheck.mismatched) do not match") }
-                return problems.isEmpty
-                    ? "Re-checked: \(recheck.checked) files match the checksum list"
-                    : "Re-checked: " + problems.joined(separator: ", ")
+                lead = "Re-checked: \(recheck.checked - recheck.mismatched) of \(recheck.checked) listed files match the checksum list"
+            } else {
+                lead = "Checksums from the backup's list. Files were not re-read"
             }
-            return problems.isEmpty
-                ? "Checksums from the backup's list. Files were not re-read"
-                : "Checksums from the backup's list. " + problems.joined(separator: ", ")
+            return notes.isEmpty ? lead : lead + ". " + notes.joined(separator: ", ")
         }
     }
 

@@ -8,14 +8,15 @@ enum ReportRecreation {
 
     struct Listed: Equatable {
         var hash: String
-        /// Nil when the list does not record sizes.
-        var size: Int64?
+        var size: Int64
     }
 
     struct Checksums: Equatable {
         /// Keyed by path relative to the roll folder.
         var byRelPath: [String: Listed] = [:]
-        /// A checksum list was found on the drive (even an empty one counts as not found).
+        /// Checksum lists in the roll's `ascmhl` folder that could not be read.
+        var unreadableLists = 0
+        /// A usable checksum list was found on the drive.
         var found: Bool { !byRelPath.isEmpty }
     }
 
@@ -52,8 +53,10 @@ enum ReportRecreation {
     // MARK: - Checksum list on the drive
 
     /// Every ASC MHL generation in the roll's `ascmhl/` folder, oldest first (a later
-    /// generation wins for the same file). Without any, the simple hidden list
-    /// (`<folder above>/.filmcan/hashlists/<roll>.mhl`).
+    /// generation wins for the same file). Only entries that can be stood behind are
+    /// kept: an xxh128 checksum with a recorded size. The simple hidden list is not
+    /// used: it records no size and is shared by rolls of the same name, so it cannot
+    /// prove which file a checksum belongs to.
     static func checksums(rollFolder: String) -> Checksums {
         var out = Checksums()
         let ascDir = FanOutCopier.ascMHLDir(rollFolder: rollFolder)
@@ -63,34 +66,18 @@ enum ReportRecreation {
         let generations = ASCMHLChain.manifestFilesOnDisk(ascmhlDir: ascDir)
             .sorted { $0.seq != $1.seq ? $0.seq < $1.seq : mtime($0.url) < mtime($1.url) }
         for generation in generations {
-            guard let entries = try? ASCMHLReader.read(url: generation.url) else { continue }
+            guard let entries = try? ASCMHLReader.read(url: generation.url) else {
+                out.unreadableLists += 1
+                continue
+            }
             for entry in entries {
-                out.byRelPath[entry.relPath] = Listed(hash: entry.hash, size: entry.size)
-            }
-        }
-        if out.found { return out }
-
-        // Simple list: its paths are relative to the folder that holds `.filmcan/`.
-        let roll = URL(fileURLWithPath: rollFolder).standardizedFileURL
-        let rollPrefix = roll.path + "/"
-        var dir = roll.deletingLastPathComponent()
-        for _ in 0..<12 {
-            let list = dir.appendingPathComponent(FilmCanPaths.hidden)
-                .appendingPathComponent("hashlists")
-                .appendingPathComponent(roll.lastPathComponent + ".mhl")
-            if let entries = try? SimpleMHLReader.read(url: list), !entries.isEmpty {
-                for entry in entries {
-                    let absolute = entry.relPath.hasPrefix("/")
-                        ? entry.relPath
-                        : dir.appendingPathComponent(entry.relPath).standardizedFileURL.path
-                    guard absolute.hasPrefix(rollPrefix) else { continue }
-                    out.byRelPath[String(absolute.dropFirst(rollPrefix.count))] =
-                        Listed(hash: entry.hash, size: entry.size > 0 ? entry.size : nil)
+                guard entry.algorithm == "xxh128", let size = entry.size else {
+                    // A later entry we cannot use still replaces an earlier one for that file.
+                    out.byRelPath.removeValue(forKey: entry.relPath)
+                    continue
                 }
-                if out.found { return out }
+                out.byRelPath[entry.relPath] = Listed(hash: entry.hash, size: size)
             }
-            if dir.path == "/" { break }
-            dir = dir.deletingLastPathComponent()
         }
         return out
     }
@@ -103,9 +90,12 @@ enum ReportRecreation {
 
     /// `rechecked`: for a re-check, the checksum read back from each file (relative
     /// path → checksum, nil when the file could not be read). Nil: no re-check.
+    /// `existsOnDrive`: for a listed path that is not in `filesOnDisk` (which leaves
+    /// hidden files out), whether it is on the drive after all.
     static func build(roll: CatalogRoll, copy: CatalogCopy, rollFolder: String,
                       filesOnDisk: [CatalogFile], checksums: Checksums,
                       rechecked: [String: String?]? = nil,
+                      existsOnDrive: (String) -> Bool = { _ in false },
                       now: Date, appVersion: String) -> BackupReport {
         var clips: [BackupReport.Clip] = []
         var sizeChanged = 0, notListed = 0, checked = 0, mismatched = 0
@@ -120,7 +110,7 @@ enum ReportRecreation {
                 isVideo: BackupReport.videoExtensions.contains(ext),
                 isAudio: BackupReport.audioExtensions.contains(ext))
             if let listed = checksums.byRelPath[file.relPath] {
-                if let size = listed.size, size != file.size {
+                if listed.size != file.size {
                     sizeChanged += 1
                     clip.note = noteSizeChanged
                 } else if let rechecked {
@@ -142,11 +132,13 @@ enum ReportRecreation {
             clips.append(clip)
         }
 
-        let missing = checksums.byRelPath.keys.filter { !onDisk.contains($0) }.sorted()
+        let missing = checksums.byRelPath.keys
+            .filter { !onDisk.contains($0) && !existsOnDrive($0) }.sorted()
         let recreated = BackupReport.Recreated(
             createdAt: now, hasChecksumList: checksums.found, missingFiles: missing,
             sizeChanged: sizeChanged, notListed: notListed,
-            recheck: rechecked == nil ? nil : .init(checked: checked, mismatched: mismatched))
+            recheck: rechecked == nil ? nil : .init(checked: checked, mismatched: mismatched),
+            unreadableLists: checksums.unreadableLists)
 
         return BackupReport(
             projectName: roll.projectName, episode: "", day: roll.shootDay, unit: "",
@@ -166,8 +158,7 @@ enum ReportRecreation {
     static func recheck(rollFolder: String, filesOnDisk: [CatalogFile], checksums: Checksums) -> [String: String?] {
         var out: [String: String?] = [:]
         for file in filesOnDisk {
-            guard let listed = checksums.byRelPath[file.relPath] else { continue }
-            if let size = listed.size, size != file.size { continue }
+            guard let listed = checksums.byRelPath[file.relPath], listed.size == file.size else { continue }
             let url = URL(fileURLWithPath: rollFolder).appendingPathComponent(file.relPath)
             out[file.relPath] = .some(Hashing.hash(for: url, algorithm: .xxh128))
         }

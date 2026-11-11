@@ -103,13 +103,13 @@ final class ReportRecreationTests: XCTestCase {
         XCTAssertTrue(report.rolls[0].clips.allSatisfy { $0.checksum == nil && $0.note == nil })
         XCTAssertEqual(report.recreated?.hasChecksumList, false)
         XCTAssertEqual(report.recreated?.hasProblems, false)
-        XCTAssertTrue(report.recreated?.statusText.contains("No checksum list") == true)
+        XCTAssertTrue(report.recreated?.statusText.contains("No ASC MHL checksum list") == true)
     }
 
     func test_build_recheck_keepsOnlyChecksumsThatMatch() {
         var sums = ReportRecreation.Checksums()
         sums.byRelPath = ["a.mov": .init(hash: "AAAA", size: 100), "b.mov": .init(hash: "bbbb", size: 250),
-                          "extra.txt": .init(hash: "eeee", size: nil)]
+                          "extra.txt": .init(hash: "eeee", size: 5)]
         let report = ReportRecreation.build(
             roll: roll(), copy: copy(path: "/d/A001"), rollFolder: "/d/A001",
             filesOnDisk: files, checksums: sums,
@@ -124,28 +124,53 @@ final class ReportRecreationTests: XCTestCase {
         XCTAssertEqual(report.recreated?.hasProblems, true)
     }
 
-    func test_statusText_neverSaysVerified() {
+    func test_statusText_neverSaysVerified_andNeverOverstates() {
         typealias R = BackupReport.Recreated
-        let cases: [R] = [
-            R(createdAt: Date(), hasChecksumList: false, missingFiles: [], sizeChanged: 0, notListed: 0, recheck: nil),
-            R(createdAt: Date(), hasChecksumList: true, missingFiles: [], sizeChanged: 0, notListed: 0, recheck: nil),
-            R(createdAt: Date(), hasChecksumList: true, missingFiles: ["x"], sizeChanged: 2, notListed: 1, recheck: nil),
-            R(createdAt: Date(), hasChecksumList: true, missingFiles: [], sizeChanged: 0, notListed: 0,
-              recheck: .init(checked: 4, mismatched: 0)),
-            R(createdAt: Date(), hasChecksumList: true, missingFiles: ["x"], sizeChanged: 0, notListed: 0,
-              recheck: .init(checked: 4, mismatched: 1))
-        ]
-        for item in cases {
+        let noList = R(createdAt: Date(), hasChecksumList: false, missingFiles: [], sizeChanged: 0, notListed: 0, recheck: nil)
+        let plain = R(createdAt: Date(), hasChecksumList: true, missingFiles: [], sizeChanged: 0, notListed: 0, recheck: nil)
+        let damaged = R(createdAt: Date(), hasChecksumList: true, missingFiles: ["x"], sizeChanged: 2, notListed: 1, recheck: nil)
+        let rechecked = R(createdAt: Date(), hasChecksumList: true, missingFiles: [], sizeChanged: 0, notListed: 0,
+                          recheck: .init(checked: 4, mismatched: 0))
+        let recheckedWithExtras = R(createdAt: Date(), hasChecksumList: true, missingFiles: [], sizeChanged: 0,
+                                    notListed: 3, recheck: .init(checked: 4, mismatched: 0))
+        let recheckedBad = R(createdAt: Date(), hasChecksumList: true, missingFiles: ["x"], sizeChanged: 0, notListed: 0,
+                             recheck: .init(checked: 4, mismatched: 1))
+        let unreadable = R(createdAt: Date(), hasChecksumList: true, missingFiles: [], sizeChanged: 0, notListed: 0,
+                           recheck: .init(checked: 4, mismatched: 0), unreadableLists: 1)
+        for item in [noList, plain, damaged, rechecked, recheckedWithExtras, recheckedBad, unreadable] {
             XCTAssertFalse(item.statusText.lowercased().contains("verified"), item.statusText)
             XCTAssertFalse(item.statusText.isEmpty)
         }
-        XCTAssertTrue(cases[1].statusText.contains("not re-read"))
-        XCTAssertTrue(cases[2].statusText.contains("1 missing"))
-        XCTAssertTrue(cases[2].statusText.contains("2 changed size"))
-        XCTAssertEqual(cases[3].statusText, "Re-checked: 4 files match the checksum list")
-        XCTAssertTrue(cases[4].statusText.contains("1 do not match"))
-        XCTAssertFalse(cases[1].hasProblems)
-        XCTAssertFalse(cases[3].hasProblems)
+        XCTAssertTrue(plain.statusText.contains("not re-read"))
+        XCTAssertFalse(plain.hasProblems)
+        XCTAssertFalse(plain.isFullyRechecked, "nothing was re-read")
+        XCTAssertTrue(damaged.statusText.contains("1 missing"))
+        XCTAssertTrue(damaged.statusText.contains("2 changed size"))
+        XCTAssertTrue(damaged.statusText.contains("1 not in the list"))
+        XCTAssertEqual(rechecked.statusText, "Re-checked: 4 of 4 listed files match the checksum list")
+        XCTAssertTrue(rechecked.isFullyRechecked)
+        // Files outside the list: said in the status, and not shown as all clear.
+        XCTAssertTrue(recheckedWithExtras.statusText.contains("3 not in the list"))
+        XCTAssertFalse(recheckedWithExtras.isFullyRechecked)
+        XCTAssertTrue(recheckedBad.statusText.contains("3 of 4"))
+        XCTAssertTrue(recheckedBad.statusText.contains("1 do not match"))
+        XCTAssertTrue(recheckedBad.hasProblems)
+        XCTAssertTrue(unreadable.hasProblems)
+        XCTAssertTrue(unreadable.statusText.contains("1 checksum list could not be read"))
+        XCTAssertFalse(unreadable.isFullyRechecked)
+        XCTAssertFalse(noList.isFullyRechecked)
+    }
+
+    /// A listed file that the file listing leaves out (hidden) but that is on the drive is not "missing".
+    func test_build_hiddenListedFile_isNotReportedMissing() {
+        var sums = ReportRecreation.Checksums()
+        sums.byRelPath = ["a.mov": .init(hash: "aaaa", size: 100), ".hidden": .init(hash: "hhhh", size: 1),
+                          "gone.mov": .init(hash: "cccc", size: 10)]
+        let report = ReportRecreation.build(
+            roll: roll(), copy: copy(path: "/d/A001"), rollFolder: "/d/A001",
+            filesOnDisk: [CatalogFile(relPath: "a.mov", size: 100)], checksums: sums,
+            existsOnDrive: { $0 == ".hidden" }, now: Date(), appVersion: "1.0")
+        XCTAssertEqual(report.recreated?.missingFiles, ["gone.mov"])
     }
 
     func test_outputURL_isInTheReportsFolder_byFilmDayDrive() {
@@ -199,15 +224,51 @@ final class ReportRecreationTests: XCTestCase {
         XCTAssertEqual(report.recreated?.recheck, .init(checked: 2, mismatched: 1))
     }
 
-    func test_checksums_simpleHiddenList() throws {
+    /// The simple hidden list records no size and is shared by rolls of the same name:
+    /// it is not taken as proof for this roll's files.
+    func test_checksums_simpleHiddenList_isNotUsed() throws {
         let dest = tmp.appendingPathComponent("dest2")
-        let folder = dest.appendingPathComponent("RUSHES").appendingPathComponent("A001")
+        let folder = dest.appendingPathComponent("A001")
         _ = try write("a.bin", Data(repeating: 7, count: 16), in: folder)
-        let list = "<hashlist><file name=\"RUSHES/A001/a.bin\"><hash>abcd</hash></file>"
-            + "<file name=\"RUSHES/OTHER/x.bin\"><hash>ffff</hash></file></hashlist>"
+        let list = "<hashlist>\n<file name=\"a.bin\"><hash>abcd</hash></file>\n</hashlist>\n"
         _ = try write(".filmcan/hashlists/A001.mhl", Data(list.utf8), in: dest)
+        XCTAssertFalse(ReportRecreation.checksums(rollFolder: folder.path).found)
+    }
+
+    private func manifest(_ body: String) -> Data {
+        Data("""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <hashlist version="2.0" xmlns="urn:ASC:MHL:v2.0">
+          <hashes>
+        \(body)
+          </hashes>
+        </hashlist>
+        """.utf8)
+    }
+
+    /// Only an xxh128 checksum with a recorded size is kept; a later generation wins,
+    /// including when what it holds cannot be used; an unreadable list is counted.
+    func test_checksums_keepOnlyWhatCanBeStoodBehind_laterGenerationWins() throws {
+        let folder = tmp.appendingPathComponent("gen").appendingPathComponent("A001")
+        let hex = String(repeating: "ab", count: 16)
+        let newer = String(repeating: "cd", count: 16)
+        _ = try write("ascmhl/0001_A001_2026-01-01_000000Z.mhl", manifest("""
+            <hash><path size="10">a.mov</path><xxh128 action="original">\(hex)</xxh128></hash>
+            <hash><path size="20">b.mov</path><xxh128 action="original">\(hex)</xxh128></hash>
+            <hash><path size="30">c.mov</path><xxh128 action="original">\(hex)</xxh128></hash>
+            <hash><path size="40">d.mov</path><md5 action="original">\(hex)</md5></hash>
+            <hash><path>e.mov</path><xxh128 action="original">\(hex)</xxh128></hash>
+        """), in: folder)
+        _ = try write("ascmhl/0002_A001_2026-01-02_000000Z.mhl", manifest("""
+            <hash><path size="21">b.mov</path><xxh128 action="original">\(newer)</xxh128></hash>
+            <hash><path size="30">c.mov</path><md5 action="original">\(newer)</md5></hash>
+        """), in: folder)
+        _ = try write("ascmhl/0003_A001_2026-01-03_000000Z.mhl", Data("not xml <".utf8), in: folder)
+
         let sums = ReportRecreation.checksums(rollFolder: folder.path)
-        XCTAssertEqual(sums.byRelPath, ["a.bin": .init(hash: "abcd", size: nil)])
+        XCTAssertEqual(sums.byRelPath, ["a.mov": .init(hash: hex, size: 10),
+                                        "b.mov": .init(hash: newer, size: 21)])
+        XCTAssertEqual(sums.unreadableLists, 1)
     }
 
     func test_checksums_noList() throws {

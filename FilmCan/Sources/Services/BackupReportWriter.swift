@@ -182,8 +182,7 @@ enum BackupReportWriter {
             y = page.text("Report created after the backup, on \(df.string(from: recreated.createdAt)), from what is on the drive.",
                           x: margin, y: y, w: contentW, size: 10)
             status = (recreated.statusText,
-                      recreated.hasProblems ? red
-                        : (recreated.recheck != nil && recreated.hasChecksumList) ? green : .darkGray)
+                      recreated.hasProblems ? red : recreated.isFullyRechecked ? green : .darkGray)
         } else {
             y = page.text("\(df.string(from: report.startedAt)) → \(df.string(from: report.endedAt))  (\(formatClock(secs)))",
                           x: margin, y: y, w: contentW, size: 10)
@@ -293,7 +292,9 @@ enum BackupReportWriter {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let report = ReportRecreation.build(
             roll: roll, copy: copy, rollFolder: rollFolder, filesOnDisk: files,
-            checksums: checksums, rechecked: rechecked, now: now, appVersion: version)
+            checksums: checksums, rechecked: rechecked,
+            existsOnDrive: { FileManager.default.fileExists(atPath: (rollFolder as NSString).appendingPathComponent($0)) },
+            now: now, appVersion: version)
         let target = ReportRecreation.outputURL(roll: roll, copy: copy, base: base)
         do {
             try FileManager.default.createDirectory(at: target.deletingLastPathComponent(),
