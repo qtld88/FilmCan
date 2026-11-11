@@ -311,17 +311,39 @@ struct PushSettingsView: View {
 
     @State private var ntfyTesting = false
     @State private var ntfyTestResult: NtfyOutcome?
+    @AppStorage(PhonePush.DefaultsKey.topic) private var phoneTopic: String = ""
+    /// Own server / own topic instead of the QR code. Loaded in `onAppear` because an
+    /// absent preference has a meaning (`PhonePush.mode`).
+    @State private var useCustomServer = false
+    @State private var advancedOpen = false
+
+    private var ntfyTarget: PhonePush.Target? {
+        PhonePush.target(
+            mode: useCustomServer ? .custom : .simple, topic: phoneTopic, customURL: ntfyURL)
+    }
+
+    private var useCustomServerBinding: Binding<Bool> {
+        Binding(
+            get: { useCustomServer },
+            set: { newValue in
+                useCustomServer = newValue
+                UserDefaults.standard.set(newValue, forKey: PhonePush.DefaultsKey.useCustomServer)
+                ntfyTestResult = nil
+                if !newValue, ntfyEnabled { PhonePush.ensureTopic() }
+            })
+    }
 
     /// Exercises the real ntfy path with what is currently in the fields, so a bad
     /// token or topic surfaces here instead of silently failing after a backup.
     private func sendNtfyTest() {
+        guard let target = ntfyTarget else { return }
         ntfyTesting = true
         ntfyTestResult = nil
         WebhookService.sendNtfy(
-            urlString: ntfyURL,
-            bearerToken: ntfyBearerToken,
+            urlString: target.url,
+            bearerToken: target.sendsToken ? ntfyBearerToken : nil,
             title: "FilmCan test",
-            message: "If you can read this, ntfy push is configured correctly.",
+            message: "If you can read this, FilmCan can reach your phone.",
             fields: [:]
         ) { outcome in
             DispatchQueue.main.async {
@@ -333,35 +355,24 @@ struct PushSettingsView: View {
 
     var body: some View {
         Form {
-            Section("NTFY") {
-                Toggle("Send ntfy push notifications", isOn: $ntfyEnabled)
+            Section("Phone") {
+                Toggle("Send notifications to my phone", isOn: $ntfyEnabled)
                     .tint(FilmCanTheme.toggleTint)
                     .onChange(of: ntfyEnabled) { enabled in
                         if enabled {
                             NotificationService.shared.ensureAuthorized()
+                            if !useCustomServer { PhonePush.ensureTopic() }
                         }
                     }
-                TextField("Topic URL", text: $ntfyURL)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!ntfyEnabled)
-                SecureField("Bearer token", text: $ntfyBearerToken)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!ntfyEnabled)
-
-                // The field is secure, so a bad paste is invisible. Say so.
-                if !WebhookService.looksLikeNtfyToken(ntfyBearerToken) {
-                    Label(
-                        "This does not look like an ntfy access token. They start with "
-                        + "tk_ and contain no spaces.",
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .font(FCType.meta)
-                    .foregroundColor(.orange)
+                if ntfyEnabled, !useCustomServer, PhonePush.isValidTopic(phoneTopic) {
+                    PhonePushQRBlock(topic: phoneTopic) {
+                        PhonePush.renewTopic()
+                        ntfyTestResult = nil
+                    }
                 }
-
                 HStack(spacing: 10) {
-                    Button(ntfyTesting ? "Sending…" : "Send test push") { sendNtfyTest() }
-                        .disabled(!ntfyEnabled || ntfyTesting || ntfyURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(ntfyTesting ? "Sending…" : "Send a test") { sendNtfyTest() }
+                        .disabled(!ntfyEnabled || ntfyTesting || ntfyTarget == nil)
                     if let outcome = ntfyTestResult {
                         Label(
                             outcome.userMessage,
@@ -371,6 +382,35 @@ struct PushSettingsView: View {
                         .foregroundColor(outcome.isSuccess ? .green : .red)
                         .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+                Text(useCustomServer
+                     ? "FilmCan sends a message to your own ntfy address (see Advanced) when a backup finishes or fails."
+                     : "FilmCan sends a message to your phone when a backup finishes or fails. No account needed: it uses the free ntfy app and a private channel name that only this Mac and your phone know.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section {
+              DisclosureGroup("Advanced", isExpanded: $advancedOpen) {
+                Toggle("Use my own ntfy server or topic", isOn: useCustomServerBinding)
+                    .tint(FilmCanTheme.toggleTint)
+                TextField("Topic URL", text: $ntfyURL)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!ntfyEnabled || !useCustomServer)
+                SecureField("Bearer token", text: $ntfyBearerToken)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!ntfyEnabled || !useCustomServer)
+
+                // The field is secure, so a bad paste is invisible. Say so.
+                if useCustomServer, !WebhookService.looksLikeNtfyToken(ntfyBearerToken) {
+                    Label(
+                        "This does not look like an ntfy access token. They start with "
+                        + "tk_ and contain no spaces.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(FCType.meta)
+                    .foregroundColor(.orange)
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Custom notification title")
@@ -415,6 +455,7 @@ struct PushSettingsView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
+                    Text("To use your own topic or a self-hosted server:")
                     Text("• Create a free account at https://ntfy.sh (or self-hosted version).")
                     Text("• Click “Subscribe to topic”.")
                     Text("• Choose a unique topic name (avoid common names so others can’t read your notifications if you're on the free plan).")
@@ -423,6 +464,7 @@ struct PushSettingsView: View {
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
+              }
             }
 
             Section("Webhook") {
@@ -462,6 +504,9 @@ struct PushSettingsView: View {
         .padding(.top, 30)
         .onAppear {
             migrateLegacyWebhookSecretIfNeeded()
+            useCustomServer = PhonePush.mode() == .custom
+            advancedOpen = useCustomServer
+            if ntfyEnabled, !useCustomServer { PhonePush.ensureTopic() }
         }
     }
 
