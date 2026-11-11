@@ -136,7 +136,7 @@ extension BackupEditorView {
             // (info(for:) only auto-fetches on a miss, never on a hit).
             DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
             if includePreview {
-                refreshPreview()
+                refreshPreview(bypassCache: force)
             }
             viewModel.refreshAutoDetectedSources()
             viewModel.refreshAutoDetectedSoundSources()
