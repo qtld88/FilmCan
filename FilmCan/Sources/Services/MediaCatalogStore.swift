@@ -75,6 +75,13 @@ final class MediaCatalogStore: ObservableObject {
         save()
     }
 
+    /// Removes every roll recorded for one movie (used when the demo is stopped).
+    func forget(configId: UUID) {
+        guard rolls.contains(where: { $0.configId == configId }) else { return }
+        rolls.removeAll { $0.configId == configId }
+        save()
+    }
+
     /// Replace the in-memory catalog and persist (used by tests and by `record`).
     func merge(_ roll: CatalogRoll) {
         rolls = MediaCatalog.merge(roll, into: rolls)

@@ -263,7 +263,7 @@ class TransferViewModel: ObservableObject {
                     source: sources.first ?? "",
                     config: activeConfig,
                     results: perDestResults,
-                    settings: makeNotificationSettings(),
+                    settings: makeNotificationSettings(for: activeConfig.id),
                     summaryFor: { [self] result in
                         await self.destinationNotificationSummary(
                             source: sources.first ?? "",
@@ -735,6 +735,12 @@ class TransferViewModel: ObservableObject {
             totalBytes: totalBytes,
             settings: makeNotificationSettings()
         )
+    }
+
+    /// The demo movie never sends a phone or webhook message.
+    private func makeNotificationSettings(for configId: UUID) -> NotificationSettings {
+        let settings = makeNotificationSettings()
+        return DemoSession.isDemo(configId) ? DemoSession.muted(settings) : settings
     }
 
     private func makeNotificationSettings() -> NotificationSettings {

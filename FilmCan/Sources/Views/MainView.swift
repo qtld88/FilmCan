@@ -14,6 +14,7 @@ struct MainView: View {
     @ObservedObject private var storage = ConfigurationStorage.shared
     @ObservedObject private var catalogStore = MediaCatalogStore.shared
     @State private var rightPane: RightPane = .history
+    @State private var demoError: String?
     @State private var catalogDragStartWidth: Double?
     @AppStorage("catalogPaneWidth") private var catalogPaneWidth: Double = 380
     @State private var showQuickTour: Bool = false
@@ -214,14 +215,19 @@ struct MainView: View {
     private var editorPanel: some View {
         if let configId = appState.selectedConfigId,
            let config = appState.storage.configurations.first(where: { $0.id == configId }) {
-            BackupEditorView(
-                config: config,
-                transferViewModel: transferViewModel,
-                isHistoryVisible: rightPane != .none,
-                rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
-                onToggleHistory: { togglePane(.history) }
-            )
-            .id(config.id)
+            VStack(spacing: 0) {
+                if DemoSession.isDemo(config.id) {
+                    DemoBanner(canStop: !transferViewModel.isTransferring, onStop: stopDemo)
+                }
+                BackupEditorView(
+                    config: config,
+                    transferViewModel: transferViewModel,
+                    isHistoryVisible: rightPane != .none,
+                    rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
+                    onToggleHistory: { togglePane(.history) }
+                )
+                .id(config.id)
+            }
         } else {
             emptyStateView
         }
@@ -307,12 +313,51 @@ struct MainView: View {
             .buttonStyle(.borderedProminent)
             .tint(FilmCanTheme.brandYellow)
             .controlSize(.large)
+
+            if !DemoSession.isRunning(storage: appState.storage) {
+                VStack(spacing: 6) {
+                    Button("Try with made-up cards", action: startDemo)
+                        .controlSize(.large)
+                    Text("Creates a demo movie with two made-up cards and two made-up drives, as folders on this Mac. The copy is real. \u{201C}Stop the demo\u{201D} removes everything.")
+                        .font(FCType.meta)
+                        .foregroundColor(FilmCanTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
+                }
+            }
             
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
         .background(FilmCanTheme.backgroundGradient)
+        .alert("The demo could not be prepared", isPresented: Binding(
+            get: { demoError != nil }, set: { if !$0 { demoError = nil } })
+        ) {
+            Button("OK", role: .cancel) { demoError = nil }
+        } message: {
+            Text(demoError ?? "")
+        }
+    }
+
+    private func startDemo() {
+        do {
+            let config = try DemoSession.start(storage: appState.storage, catalog: MediaCatalogStore.shared,
+                                               rollStore: RollNumberingStore.shared)
+            appState.selectedConfigId = config.id
+        } catch {
+            demoError = error.localizedDescription
+        }
+    }
+
+    private func stopDemo() {
+        guard !transferViewModel.isTransferring else { return }
+        let demoId = DemoSession.demoConfigId()
+        DemoSession.stop(storage: appState.storage, catalog: MediaCatalogStore.shared,
+                         rollStore: RollNumberingStore.shared)
+        if appState.selectedConfigId == demoId {
+            appState.selectedConfigId = appState.storage.configurations.first?.id
+        }
     }
 
     private func registerDriveObservers() {
