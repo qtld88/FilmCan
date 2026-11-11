@@ -14,7 +14,12 @@ enum PreviewCalculator {
     private static let cacheLock = NSLock()
     private static let cacheVersion = 2
 
-    static func calculateTotalsAndSizes(for sources: [String]) -> (Int64, Int, Int, [String: Int64], [String: Int]) {
+    /// The cache is keyed on the source's own mtime, which does not change when
+    /// files deeper in the tree are deleted — `bypassCache` forces a rescan.
+    static func calculateTotalsAndSizes(
+        for sources: [String],
+        bypassCache: Bool = false
+    ) -> (Int64, Int, Int, [String: Int64], [String: Int]) {
         var totalBytes: Int64 = 0
         var totalFiles = 0
         var totalFolders = 0
@@ -27,7 +32,7 @@ enum PreviewCalculator {
             guard fm.fileExists(atPath: path, isDirectory: &isDir) else { continue }
 
             let modDate = (try? fm.attributesOfItem(atPath: path)[.modificationDate]) as? Date
-            if let cached = cachedEntry(for: path, modified: modDate) {
+            if !bypassCache, let cached = cachedEntry(for: path, modified: modDate) {
                 totalBytes += cached.size
                 totalFiles += cached.files
                 totalFolders += cached.folders

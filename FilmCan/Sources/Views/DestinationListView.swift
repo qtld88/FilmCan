@@ -24,6 +24,8 @@ struct DestinationListView: View {
     /// Camera/Sound tag per source path, so the preview shows the Camera_Media /
     /// Sound_Media path the source will actually land in.
     var mediaKind: (String) -> SourceMediaKind = { _ in .camera }
+    /// Roll folder given to a generic-named card (Untitled_01), shown in the folder tree.
+    var rollName: (String) -> String? = { _ in nil }
     var shootMetadata: ShootMetadata = .empty
     var copyFolderContents: Bool = true
     var configId: UUID
@@ -183,6 +185,9 @@ struct DestinationListView: View {
                                 .foregroundColor(FilmCanTheme.textPrimary)
                                 .lineLimit(1)
                             Spacer()
+                            if summary.isConnected, let first = summary.paths.first?.path {
+                                EjectButton(path: first, onError: { ejectErrorMessage = $0 })
+                            }
                         }
                         .contentShape(Rectangle())
                         .contextMenu {
@@ -394,6 +399,11 @@ struct DestinationListView: View {
         }
         .contentShape(Rectangle())
         .contextMenu {
+            Button("Choose a Folder on This Drive…") {
+                chooseFolder(replacing: destination.path)
+            }
+            .disabled(isActiveTransfer)
+            Divider()
             Button("Remove destination from this backup") {
                 removeDestination(destination.path)
             }
@@ -431,7 +441,8 @@ struct DestinationListView: View {
         sourcePaths.map { path in
             var isDir: ObjCBool = false
             FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path))
+            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path),
+                                       rollName: isDir.boolValue ? rollName(path) : nil)
         }
     }
 
@@ -1000,7 +1011,7 @@ struct DestinationListView: View {
     }
 
     private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot) -> (isConnected: Bool, message: String) {
-        if volumeRootPath(for: path) != nil {
+        if VolumesInUse.volumeRoot(for: path) != nil {
             if cached.rootExists {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
@@ -1018,12 +1029,6 @@ struct DestinationListView: View {
             return (true, "")
         }
         return (false, "Destination path not found")
-    }
-
-    private func volumeRootPath(for path: String) -> String? {
-        let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
-        guard components.count >= 3, components[1] == "Volumes" else { return nil }
-        return "/Volumes/\(components[2])"
     }
 
     private func removeDestination(_ path: String) {
@@ -1056,18 +1061,11 @@ struct DestinationListView: View {
     }
 
     private func ejectVolume(for path: String, onSuccess: (() -> Void)? = nil) {
-        guard let root = volumeRootPath(for: path) else {
-            ejectErrorMessage = "This destination isn't on an ejectable volume."
-            return
-        }
-        let url = URL(fileURLWithPath: root)
         Task { @MainActor in
-            switch await DriveEjector.eject(volumeURL: url) {
-            case .success:
-                onSuccess?()
-            case .failure(let error):
-                ejectErrorMessage = error.errorDescription
-                DebugLog.warn("Eject failed for \(root): \(error)")
+            switch await VolumeEjectFlow.eject(path: path, warnIfUnsealed: false) {
+            case .ejected: onSuccess?()
+            case .cancelled: break
+            case .failed(let message): ejectErrorMessage = message
             }
         }
     }
@@ -1191,19 +1189,12 @@ struct DestinationListView: View {
         DriveUtilities.driveId(for: path)
     }
 
-    private func selectDestination(at index: Int) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            if index < destinations.count {
-                destinations[index] = url.path
-            }
-        }
+    private func chooseFolder(replacing path: String) {
+        guard let picked = FolderPick.chooseFolder(
+            startingAt: path, message: "Choose the folder to save to") else { return }
+        destinations = FolderPick.replacing(path, with: picked, in: destinations)
     }
-    
+
     private func addDestination() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false

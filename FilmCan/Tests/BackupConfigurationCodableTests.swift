@@ -100,4 +100,35 @@ extension BackupConfigurationCodableTests {
         XCTAssertEqual(run.destinationPaths, ["/Volumes/S1"])
         XCTAssertEqual(back.sourcePaths.count, 3, "the stored list keeps unchecked drives")
     }
+
+    func testGenericRollNamesRoundTrip() throws {
+        var cfg = BackupConfiguration()
+        cfg.genericRollNames = ["uuid-1|": "Untitled_01", "uuid-2|": "Untitled_02"]
+        let back = try JSONDecoder().decode(BackupConfiguration.self, from: JSONEncoder().encode(cfg))
+        XCTAssertEqual(back.genericRollNames, cfg.genericRollNames)
+    }
+
+    func testLegacyConfigWithoutGenericRollNamesDecodesEmpty() throws {
+        let json = #"{"id":"\#(UUID().uuidString)","name":"Old"}"#.data(using: .utf8)!
+        let cfg = try JSONDecoder().decode(BackupConfiguration.self, from: json)
+        XCTAssertEqual(cfg.genericRollNames, [:])
+    }
+
+    func testWithGenericRollNamesFillsOnlyMissingPaths() {
+        var cfg = BackupConfiguration()
+        cfg.sourcePaths = ["/Volumes/Untitled", "/Volumes/Untitled 1", "/Volumes/Other"]
+        cfg.genericRollNames = ["k-a": "Untitled_01", "k-b": "Untitled_02", "k-x": ""]
+        cfg.runRollNames = ["/Volumes/Untitled 1": "Kept"]
+        let keys = ["/Volumes/Untitled": "k-a", "/Volumes/Untitled 1": "k-b", "/Volumes/Other": "k-x"]
+        let run = cfg.withGenericRollNames(keyFor: { keys[$0] ?? "" })
+        XCTAssertEqual(run.runRollNames, ["/Volumes/Untitled": "Untitled_01", "/Volumes/Untitled 1": "Kept"])
+    }
+
+    func testWithGenericRollNamesDoesNothingWhenRollNumberingIsOn() {
+        var cfg = BackupConfiguration()
+        cfg.sourcePaths = ["/Volumes/Untitled"]
+        cfg.genericRollNames = ["k-a": "Untitled_01"]
+        cfg.rollNumbering.enabled = true
+        XCTAssertEqual(cfg.withGenericRollNames(keyFor: { _ in "k-a" }).runRollNames, [:])
+    }
 }

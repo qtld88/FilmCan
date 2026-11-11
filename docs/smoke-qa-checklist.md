@@ -44,6 +44,10 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q12 | Close the main window, click the Dock icon (no quick copy involved). | Exactly one main window reopens, as before this feature. | ☐ |
 | Q13 | Quick Copy window → "Edit in FilmCan…" with the main window closed/hidden. | Main window appears; closing the quick copy afterwards does NOT quit FilmCan. | ☐ |
 | Q14 | Netflix Ingest preset, source folder named with a prohibited character (e.g. `A001 (copy)`). | Run disabled with a message naming the characters. | ☐ |
+| Q15 | File › New Window (⌥⌘N), then ⌘B in the front window. | A second main window opens; only ONE backup starts (front window's film). | ☐ |
+| Q16 | File › New Quick Copy Window (⇧⌘N) right after launching FilmCan normally. | Empty Quick Copy window; main window stays visible; closing it does NOT quit FilmCan. | ☐ |
+| Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
+| Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
 ## Setup
 

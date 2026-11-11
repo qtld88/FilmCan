@@ -14,7 +14,9 @@ final class QuickCopySession: ObservableObject, Identifiable {
     static let lastFilmKey = "quickCopy.lastFilmId"
 
     let id = UUID()
-    @Published var form: QuickCopyFormModel
+    @Published var form: QuickCopyFormModel {
+        didSet { refreshGenericRollNames() }
+    }
     @Published private(set) var phase: Phase = .setup
     /// Set when the user asked to stop; drives the "Stopping…" button state.
     @Published private(set) var stopRequested = false
@@ -61,6 +63,8 @@ final class QuickCopySession: ObservableObject, Identifiable {
             form.selectFilm(filmId, drives: Self.drives(for: film))
         }
         self.form = form
+        self.form.existingRollNames = { [weak self] path in self?.existingRollNames(for: path) ?? [] }
+        refreshGenericRollNames()
 
         workerObserver = worker.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -80,6 +84,22 @@ final class QuickCopySession: ObservableObject, Identifiable {
         form.selectFilm(id, drives: Self.drives(for: form.savedFilms.first { $0.id == id }))
         loadSizes(for: form.items.filter { !before.contains($0.path) })
         refreshCapacities()
+    }
+
+    private func existingRollNames(for path: String) -> [String] {
+        GenericRollNameScanner.existingNames(
+            source: path, destinations: form.destinations, preset: form.runPreset(),
+            date: form.today, metadata: form.shootMetadata,
+            mediaKind: form.items.first { $0.path == path }?.kind ?? .camera)
+    }
+
+    private func refreshGenericRollNames() {
+        guard phase == .setup else { return }
+        var updated = form
+        updated.refreshGenericRollNames()
+        if updated.rollNameOverrides != form.rollNameOverrides {
+            form.rollNameOverrides = updated.rollNameOverrides
+        }
     }
 
     /// The movie's mounted sources (kind from the movie, else guessed) and destinations.
@@ -167,6 +187,26 @@ final class QuickCopySession: ObservableObject, Identifiable {
         form.destinations.removeAll { $0 == path }
     }
 
+    /// After an eject the whole drive is gone: drop every source and destination on it.
+    func removeEjectedVolume(containing path: String) {
+        guard let root = VolumesInUse.volumeRoot(for: path) else { return }
+        let onVolume = { (other: String) in VolumesInUse.volumeRoot(for: other) == root }
+        form.items.removeAll { onVolume($0.path) }
+        form.destinations.removeAll(where: onVolume)
+    }
+
+    func showEjectError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn't eject drive"
+        alert.informativeText = message
+        if let window {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
+    }
+
     /// Same form, fresh results. A re-run resumes from the on-disk manifest.
     func backToSetup() {
         guard phase == .finished else { return }
@@ -182,6 +222,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     func run() {
         guard phase == .setup, form.canRun else { return }
+        form.editedRollNames.formUnion(form.rollNameOverrides.keys)
         TodayClock.shared.refresh()
         form.today = TodayClock.shared.today
 

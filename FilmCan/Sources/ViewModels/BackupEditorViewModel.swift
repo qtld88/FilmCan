@@ -2,6 +2,14 @@ import Foundation
 import Combine
 import SwiftUI
 
+struct GenericCardWarning: Identifiable, Equatable {
+    /// Card key (volume UUID + relative path).
+    let id: String
+    let path: String
+    let name: String
+    let suggested: String
+}
+
 @MainActor
 class BackupEditorViewModel: ObservableObject {
     @Published var config: BackupConfiguration
@@ -33,6 +41,7 @@ class BackupEditorViewModel: ObservableObject {
             config.excludedSourcePaths.subtract(removed)
             save()
             if !removed.isEmpty { keepReaddedSourcesUnchecked(removed, previous: previous) }
+            refreshGenericCards()
         }
     }
 
@@ -65,6 +74,7 @@ class BackupEditorViewModel: ObservableObject {
         config.sourcePaths.append(path)
         storage.lastSourcePath = path
         save()
+        refreshGenericCards()
     }
     
     func removeSource(at index: Int) {
@@ -87,6 +97,7 @@ class BackupEditorViewModel: ObservableObject {
             config.excludedDestinationPaths.subtract(removed)
             save()
             if !removed.isEmpty { keepReaddedDestinationsUnchecked(removed, previous: previous) }
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -115,6 +126,7 @@ class BackupEditorViewModel: ObservableObject {
             config.destinationPaths.append(path)
             storage.lastDestinationPath = path
             save()
+            refreshGenericCards(recompute: true)
         }
     }
     
@@ -250,7 +262,163 @@ class BackupEditorViewModel: ObservableObject {
         set {
             config.copyFolderContents = newValue
             save()
+            refreshGenericCards(recompute: true)
         }
+    }
+
+    // MARK: - Generic card names (Untitled, DJI ...)
+
+    /// Single guard: with automatic roll numbering on, none of the generic-name handling applies.
+    var genericCardSupportActive: Bool { !config.rollNumbering.enabled }
+
+    @Published var genericCardWarning: GenericCardWarning?
+    private var dismissedGenericCards: Set<String> = []
+    /// Card keys whose name the user typed (or cleared): never auto-written again.
+    private var userEditedGenericCards: Set<String> = []
+    /// Card keys whose name this session suggested: the only ones recomputed.
+    private var autoWrittenGenericCards: Set<String> = []
+
+    func isGenericSource(_ path: String) -> Bool {
+        genericCardSupportActive && Self.isDirectory(path)
+            && GenericCardName.isGeneric((path as NSString).lastPathComponent)
+    }
+
+    private var genericSourcePaths: [String] { config.sourcePaths.filter { isGenericSource($0) } }
+
+    private func effectiveRunPreset() -> OrganizationPreset? {
+        var preset: OrganizationPreset?
+        if let id = config.selectedOrganizationPresetId,
+           let selected = storage.organizationPresets.first(where: { $0.id == id }) {
+            preset = selected
+        } else {
+            let local = localOrganizationPreset
+            let hasTemplate = local.useFolderTemplate
+                && !local.folderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasRename = local.useRenameTemplate
+                && !local.renameTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasPatterns = SourceFilterMatching.hasCustomFilterPatterns(
+                include: local.includePatterns, exclude: local.excludePatterns, copyOnly: local.copyOnlyPatterns)
+            if hasTemplate || hasRename || hasPatterns || local.useCustomDate { preset = local }
+        }
+        guard var result = preset else { return nil }
+        if result.name == OrganizationPreset.netflixIngestName {
+            let cam = config.cameraFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cam.isEmpty { result.folderTemplate = config.cameraFolderTemplate }
+            let snd = config.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !snd.isEmpty { result.soundFolderTemplate = config.soundFolderTemplate }
+        }
+        return result
+    }
+
+    private func existingGenericNames(for path: String) -> [String] {
+        GenericRollNameScanner.existingNames(
+            source: path, destinations: config.destinationPaths,
+            preset: effectiveRunPreset(), date: Date(),
+            metadata: ShootMetadata(episode: config.episode, day: config.day,
+                                    unit: config.unit, cameraFormat: config.cameraFormat),
+            mediaKind: mediaKind(for: path))
+    }
+
+    private func genericNamesOfOtherSources(excluding path: String) -> [String] {
+        let own = RollNumberer.cardKey(forPath: path)
+        return config.sourcePaths.compactMap { other in
+            guard other != path else { return nil }
+            let key = RollNumberer.cardKey(forPath: other)
+            return key == own ? nil : config.genericRollNames[key]
+        }
+    }
+
+    /// Next free numbered name for a generic card, e.g. `Untitled_01`.
+    func suggestedRollName(for path: String) -> String {
+        GenericCardName.nextNumberedName(
+            base: GenericCardName.baseName((path as NSString).lastPathComponent),
+            taken: existingGenericNames(for: path) + genericNamesOfOtherSources(excluding: path))
+    }
+
+    func rollNameOverride(for path: String) -> String? {
+        guard genericCardSupportActive else { return nil }
+        return config.genericRollNames[RollNumberer.cardKey(forPath: path)]
+    }
+
+    func setRollNameOverride(_ name: String, for path: String) {
+        let key = RollNumberer.cardKey(forPath: path)
+        let cleaned = name.replacingOccurrences(of: "/", with: "_")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        userEditedGenericCards.insert(key)
+        autoWrittenGenericCards.remove(key)
+        if cleaned.isEmpty {
+            config.genericRollNames[key] = nil
+            dismissedGenericCards.insert(key)
+        } else {
+            config.genericRollNames[key] = cleaned
+        }
+        save()
+        updateGenericCardWarning()
+    }
+
+    /// Folder mode: gives each generic card without a name its suggestion. `recompute`
+    /// (destinations, preset or copy mode changed) also refreshes the suggestions made this session.
+    func ensureGenericRollNames(recompute: Bool = false) {
+        guard genericCardSupportActive, !config.copyFolderContents else { return }
+        var changed = false
+        if recompute {
+            for path in genericSourcePaths {
+                let key = RollNumberer.cardKey(forPath: path)
+                if autoWrittenGenericCards.contains(key), !userEditedGenericCards.contains(key),
+                   config.genericRollNames.removeValue(forKey: key) != nil {
+                    changed = true
+                }
+            }
+        }
+        for path in genericSourcePaths {
+            let key = RollNumberer.cardKey(forPath: path)
+            guard config.genericRollNames[key] == nil, !userEditedGenericCards.contains(key) else { continue }
+            config.genericRollNames[key] = suggestedRollName(for: path)
+            autoWrittenGenericCards.insert(key)
+            changed = true
+        }
+        if changed { save() }
+    }
+
+    /// Fills missing names (folder mode) and raises the contents-mode warning when needed.
+    func refreshGenericCards(recompute: Bool = false) {
+        ensureGenericRollNames(recompute: recompute)
+        updateGenericCardWarning()
+    }
+
+    private func updateGenericCardWarning() {
+        guard genericCardSupportActive, config.copyFolderContents else {
+            genericCardWarning = nil
+            return
+        }
+        if let current = genericCardWarning,
+           config.sourcePaths.contains(current.path), config.genericRollNames[current.id] == nil,
+           !dismissedGenericCards.contains(current.id) {
+            return
+        }
+        genericCardWarning = nil
+        for path in genericSourcePaths {
+            let key = RollNumberer.cardKey(forPath: path)
+            guard config.genericRollNames[key] == nil, !dismissedGenericCards.contains(key) else { continue }
+            genericCardWarning = GenericCardWarning(
+                id: key, path: path,
+                name: GenericCardName.baseName((path as NSString).lastPathComponent),
+                suggested: suggestedRollName(for: path))
+            return
+        }
+    }
+
+    func acceptGenericCardWarning() {
+        guard let warning = genericCardWarning else { return }
+        genericCardWarning = nil
+        setRollNameOverride(warning.suggested, for: warning.path)
+    }
+
+    func dismissGenericCardWarning() {
+        guard let warning = genericCardWarning else { return }
+        dismissedGenericCards.insert(warning.id)
+        genericCardWarning = nil
+        updateGenericCardWarning()
     }
 
     var sourceAutoDetectEnabled: Bool {
@@ -302,6 +470,11 @@ class BackupEditorViewModel: ObservableObject {
     var soundAutoDetectPatterns: [String] {
         get { config.soundAutoDetectPatterns }
         set { config.soundAutoDetectPatterns = newValue; save() }
+    }
+
+    var soundDayFolderAutoDetect: Bool {
+        get { config.soundDayFolderAutoDetect }
+        set { config.soundDayFolderAutoDetect = newValue; save() }
     }
 
     // MARK: - Card recognition and roll numbering
@@ -361,9 +534,29 @@ class BackupEditorViewModel: ObservableObject {
         return "Next camera roll: \(cam) · next sound roll: \(snd)"
     }
 
-    /// Shoot day the next run will use when auto-advance is on.
+    /// Shoot day a run started now would use — same computation as
+    /// `TransferViewModel.applyRollNumberingAndDay`, so the folder preview matches the copy.
+    func effectiveShootDay(now: Date = Date()) -> String {
+        guard config.dayAutoAdvance else { return config.day }
+        let state = RollNumberingStore.shared.state(for: config.id)
+        return ShootDayCounter.advance(
+            day: state.currentDay ?? config.day, lastRun: state.lastRunDate,
+            now: now, calendar: .current)
+    }
+
+    /// Today's shoot day when auto-advance is on. Setting it overrides the counter for
+    /// today; tomorrow's first run advances from the edited value.
     var shootDayToday: String {
-        RollNumberingStore.shared.state(for: config.id).currentDay ?? config.day
+        get { effectiveShootDay() }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return }
+            var state = RollNumberingStore.shared.state(for: config.id)
+            state.currentDay = trimmed
+            state.lastRunDate = Date()
+            RollNumberingStore.shared.update(state, for: config.id)
+            objectWillChange.send()
+        }
     }
 
     func resetRollNumbering() {
@@ -407,7 +600,7 @@ class BackupEditorViewModel: ObservableObject {
         for volumeURL in mountedExternalVolumes() {
             let path = volumeURL.path
             if config.destinationPaths.contains(where: { $0 == path || $0.hasPrefix(path + "/") }) { continue }
-            if sources.contains(path) { continue }
+            if sources.contains(path) && !config.soundDayFolderAutoDetect { continue }
             let override = FanOutCopier.sourceVolumeUUID(path).flatMap { CardRoleOverrides.role(forVolumeUUID: $0) }
             if override == .notACard { continue }
             let role: CardRole
@@ -418,14 +611,20 @@ class BackupEditorViewModel: ObservableObject {
             } else {
                 continue
             }
-            sources.append(path)
-            if role == .sound { kinds[path] = .sound }
-            changed = true
+            if role != .sound && FolderPick.hasDeeperPick(under: path, in: sources) { continue }
+            let added = role == .sound ? soundDayPaths(path) : [path]
+            let updated = keepingOnlyToday(sources + added.filter { !sources.contains($0) },
+                                           volumePath: path, resolved: added)
+            if updated != sources { sources = updated; changed = true }
+            if role == .sound {
+                for day in added where kinds[day] != .sound { kinds[day] = .sound; changed = true }
+            }
         }
         if changed {
             config.sourcePaths = sources
             config.sourceMediaKinds = kinds
             save()
+            refreshGenericCards()
         }
     }
 
@@ -460,9 +659,11 @@ class BackupEditorViewModel: ObservableObject {
                 let (pattern, subpath) = splitRule(rule)
                 if matches(volumeName, pattern: pattern) {
                     let resolvedMatches = resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
-                    for resolved in resolvedMatches where !updated.contains(resolved) {
+                    for resolved in resolvedMatches
+                    where !updated.contains(resolved) && !FolderPick.hasDeeperPick(under: resolved, in: updated) {
                         updated.append(resolved)
                     }
+                    updated = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
                 }
             }
         }
@@ -470,6 +671,7 @@ class BackupEditorViewModel: ObservableObject {
         if updated != config.sourcePaths {
             config.sourcePaths = updated
             save()
+            refreshGenericCards()
         }
     }
 
@@ -491,10 +693,21 @@ class BackupEditorViewModel: ObservableObject {
             for rule in rules {
                 let (pattern, subpath) = splitRule(rule)
                 guard matches(volumeName, pattern: pattern) else { continue }
-                for resolved in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                var resolvedMatches: [String] = []
+                for match in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                    let days = soundDayPaths(match)
+                    if days != [match], let index = updated.firstIndex(of: match) {
+                        updated.remove(at: index)
+                        changed = true
+                    }
+                    resolvedMatches += days
+                }
+                for resolved in resolvedMatches {
                     if !updated.contains(resolved) { updated.append(resolved); changed = true }
                     if kinds[resolved] != .sound { kinds[resolved] = .sound; changed = true }
                 }
+                let pruned = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
+                if pruned != updated { updated = pruned; changed = true }
             }
         }
 
@@ -502,6 +715,7 @@ class BackupEditorViewModel: ObservableObject {
             config.sourcePaths = updated
             config.sourceMediaKinds = kinds
             save()
+            refreshGenericCards()
         }
     }
 
@@ -520,7 +734,8 @@ class BackupEditorViewModel: ObservableObject {
                 let (pattern, subpath) = splitRule(rule)
                 if matches(volumeName, pattern: pattern) {
                     let resolvedMatches = resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
-                    for resolved in resolvedMatches where !updated.contains(resolved) {
+                    for resolved in resolvedMatches
+                    where !updated.contains(resolved) && !FolderPick.hasDeeperPick(under: resolved, in: updated) {
                         updated.append(resolved)
                     }
                 }
@@ -533,6 +748,7 @@ class BackupEditorViewModel: ObservableObject {
                 storage.lastDestinationPath = first
             }
             save()
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -564,6 +780,17 @@ class BackupEditorViewModel: ObservableObject {
         FilmDriveDetector.matches(name, pattern: pattern)
     }
 
+    private func soundDayPaths(_ path: String) -> [String] {
+        guard config.soundDayFolderAutoDetect else { return [path] }
+        let days = DayFolderResolver.findDayFolders(in: path)
+        return days.isEmpty ? [path] : days
+    }
+
+    private func keepingOnlyToday(_ sources: [String], volumePath: String, resolved: [String]) -> [String] {
+        let days = resolved.filter { DayFolderResolver.dayKey(($0 as NSString).lastPathComponent) != nil }
+        return DayFolderResolver.replacingStaleDays(in: sources, volumePath: volumePath, fresh: days)
+    }
+
     private func resolveSubpathMatches(rootURL: URL, subpath: String) -> [String] {
         FilmDriveDetector.resolveSubpathMatches(rootURL: rootURL, subpath: subpath)
     }
@@ -582,6 +809,7 @@ class BackupEditorViewModel: ObservableObject {
         set {
             config.selectedOrganizationPresetId = newValue
             save()
+            refreshGenericCards(recompute: true)
         }
     }
 

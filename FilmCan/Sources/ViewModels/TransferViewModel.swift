@@ -113,8 +113,14 @@ class TransferViewModel: ObservableObject {
         // Roll numbers and the shoot day are fixed before anything else reads the config,
         // and saved before the copy starts, so a cancelled run resumes into the same roll.
         let activeConfig = applyRollNumberingAndDay(to: storedConfig.restrictedToIncluded())
+            .withGenericRollNames(keyFor: { RollNumberer.cardKey(forPath: $0) })
         self.config = activeConfig
         activeConfigId = activeConfig.id
+        // Every run (main, concurrent worker, Quick Copy) passes here: hold its drives
+        // so neither the app nor Finder can eject them until the run has fully ended.
+        let volumeLease = VolumesInUse.shared.acquire(
+            paths: activeConfig.sourcePaths + activeConfig.destinationPaths)
+        defer { VolumesInUse.shared.release(volumeLease) }
         if !isBackgroundWorker {
             activeTransferConfigIds.insert(activeConfig.id)
             tabProgressByConfig[activeConfig.id] = 0

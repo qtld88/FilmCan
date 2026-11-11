@@ -258,9 +258,17 @@ struct QuickCopySetupView: View {
                             if session.form.showsMediaKind {
                                 CameraSoundSwitch(kind: item.kind) { session.form.items[index].kind = $0 }
                             }
+                            EjectButton(path: item.path, warnIfUnsealed: true,
+                                        onEjected: { session.removeEjectedVolume(containing: item.path) },
+                                        onError: session.showEjectError)
                             Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
                                 .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                                 .help("Remove source")
+                        }
+                        if let rollName = session.form.rollFolderFieldValue(for: item) {
+                            RollFolderField(value: rollName) {
+                                session.form.setRollNameOverride($0, for: item.path)
+                            }
                         }
                     }
                 }
@@ -272,6 +280,20 @@ struct QuickCopySetupView: View {
             .help("Or drop files and folders on this card")
         }
         .qcFileDrop { session.addSources($0) }
+        .alert(
+            "\"\(session.form.pendingGenericWarning.map { GenericCardName.baseName($0.name) } ?? "")\" is a generic card name",
+            isPresented: Binding(
+                get: { session.form.pendingGenericWarning != nil },
+                set: { _ in }),
+            presenting: session.form.pendingGenericWarning
+        ) { item in
+            Button("Copy into \"\(session.form.suggestedRollName(for: item))\"") {
+                session.form.acceptGenericWarning()
+            }
+            Button("Continue anyway", role: .cancel) { session.form.dismissGenericWarning() }
+        } message: { _ in
+            Text("Copying the contents puts every card's files in the same folder. If you copy several cards, their files will mix (C0001.MP4 exists on each card).")
+        }
     }
 
     // Copy To
@@ -295,6 +317,9 @@ struct QuickCopySetupView: View {
                         }
                     }
                     Spacer()
+                    EjectButton(path: path,
+                                onEjected: { session.removeEjectedVolume(containing: path) },
+                                onError: session.showEjectError)
                     Button { session.removeDestination(path) } label: { Image(systemName: "xmark") }
                         .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                         .help("Remove destination")

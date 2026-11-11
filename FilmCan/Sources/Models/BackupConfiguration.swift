@@ -34,12 +34,17 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     /// Auto-tag a source as Sound when its path/volume matches one of these patterns.
     var soundAutoDetectEnabled: Bool = false
     var soundAutoDetectPatterns: [String] = []
+    /// Sound cards are never wiped: copy only the dated folder of the day, not the root.
+    var soundDayFolderAutoDetect: Bool = false
     /// Editable Camera/Sound folder templates for the Netflix preset. Empty ⇒ use
     /// the preset's built-in template.
     var cameraFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
     var soundFolderTemplate: String = "{date}_{episode}_{day}_{unit}/Sound_Media"
     /// Automatic roll names (A001/S001...). Off by default.
     var rollNumbering: RollNumbering = RollNumbering()
+    /// Roll folder given to a generic-named card (Untitled, DJI...), keyed by card
+    /// identity (`RollNumberer.cardKey`), never by path: every Sony card mounts at the same path.
+    var genericRollNames: [String: String] = [:]
     /// Advance `day` by one on the first backup of each new calendar day.
     var dayAutoAdvance: Bool = false
     /// Recognise camera/sound cards from their folder layout and add them as sources.
@@ -114,9 +119,11 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         sourceMediaKinds = try c.decodeIfPresent([String: SourceMediaKind].self, forKey: .sourceMediaKinds) ?? [:]
         soundAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .soundAutoDetectEnabled) ?? false
         soundAutoDetectPatterns = try c.decodeIfPresent([String].self, forKey: .soundAutoDetectPatterns) ?? []
+        soundDayFolderAutoDetect = try c.decodeIfPresent(Bool.self, forKey: .soundDayFolderAutoDetect) ?? false
         cameraFolderTemplate = try c.decodeIfPresent(String.self, forKey: .cameraFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}"
         soundFolderTemplate = try c.decodeIfPresent(String.self, forKey: .soundFolderTemplate) ?? "{date}_{episode}_{day}_{unit}/Sound_Media"
         rollNumbering = try c.decodeIfPresent(RollNumbering.self, forKey: .rollNumbering) ?? RollNumbering()
+        genericRollNames = try c.decodeIfPresent([String: String].self, forKey: .genericRollNames) ?? [:]
         dayAutoAdvance = try c.decodeIfPresent(Bool.self, forKey: .dayAutoAdvance) ?? false
         cardAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .cardAutoDetectEnabled) ?? false
         destinationAutoDetectEnabled = try c.decodeIfPresent(Bool.self, forKey: .destinationAutoDetectEnabled) ?? false
@@ -186,9 +193,11 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         try c.encode(sourceMediaKinds, forKey: .sourceMediaKinds)
         try c.encode(soundAutoDetectEnabled, forKey: .soundAutoDetectEnabled)
         try c.encode(soundAutoDetectPatterns, forKey: .soundAutoDetectPatterns)
+        try c.encode(soundDayFolderAutoDetect, forKey: .soundDayFolderAutoDetect)
         try c.encode(cameraFolderTemplate, forKey: .cameraFolderTemplate)
         try c.encode(soundFolderTemplate, forKey: .soundFolderTemplate)
         try c.encode(rollNumbering, forKey: .rollNumbering)
+        try c.encode(genericRollNames, forKey: .genericRollNames)
         try c.encode(dayAutoAdvance, forKey: .dayAutoAdvance)
         try c.encode(cardAutoDetectEnabled, forKey: .cardAutoDetectEnabled)
         try c.encode(excludedSourcePaths.sorted(), forKey: .excludedSourcePaths)
@@ -229,9 +238,9 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         case id, name, sourcePaths, destinationPaths, engineOptions
         case logEnabled, logLocation, customLogPath, runInParallel, destinationCopyMode, createdAt, lastUsedAt, webhookTemplateFormatVersion, schemaVersion
         case sourceAutoDetectEnabled, sourceAutoDetectPatterns
-        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns
+        case sourceMediaKinds, soundAutoDetectEnabled, soundAutoDetectPatterns, soundDayFolderAutoDetect
         case cameraFolderTemplate, soundFolderTemplate
-        case rollNumbering, dayAutoAdvance, cardAutoDetectEnabled
+        case rollNumbering, genericRollNames, dayAutoAdvance, cardAutoDetectEnabled
         case destinationAutoDetectEnabled, destinationAutoDetectPatterns
         case excludedSourcePaths, excludedDestinationPaths
         case logFileNameTemplate, reportEnabled
@@ -259,6 +268,18 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         copy.destinationPaths = includedDestinationPaths
         copy.excludedSourcePaths = []
         copy.excludedDestinationPaths = []
+        return copy
+    }
+
+    /// Copy where each source without a run roll name takes the one saved for its card.
+    func withGenericRollNames(keyFor: (String) -> String) -> BackupConfiguration {
+        guard !rollNumbering.enabled, !genericRollNames.isEmpty else { return self }
+        var copy = self
+        for path in sourcePaths where copy.runRollNames[path] == nil {
+            if let name = genericRollNames[keyFor(path)], !name.isEmpty {
+                copy.runRollNames[path] = name
+            }
+        }
         return copy
     }
 
