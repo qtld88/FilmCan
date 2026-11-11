@@ -493,7 +493,14 @@ extension BackupEditorView {
                 }
             }
             .tourAnchor("backupName")
-            
+
+            if ShootDayStepper.usesShootDay(previewOrganizationPreset) {
+                ShootDayStepperView(day: viewModel.effectiveShootDay()) { newDay in
+                    viewModel.setShootDayFromHeader(newDay)
+                }
+                .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
+            }
+
             Spacer()
 
             if let customDateStatusText {
@@ -520,7 +527,15 @@ extension BackupEditorView {
             .cornerRadius(8)
             .help("Refresh drives")
 
-            Button("Run Now") { startTransfer() }
+            Button(action: { startTransfer() }) {
+                VStack(spacing: 1) {
+                    Text("Run Now")
+                    Text(runSubtitle)
+                        .font(FilmCanFont.body(10))
+                        .opacity(0.75)
+                        .lineLimit(1)
+                }
+            }
             .buttonStyle(FCPrimaryButtonStyle())
             .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
         }

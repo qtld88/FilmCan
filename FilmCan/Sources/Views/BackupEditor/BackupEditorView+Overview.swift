@@ -5,13 +5,73 @@ extension BackupEditorView {
     func overviewSection(isWide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             nameRow
-            
+
+            if let summary = backupSummary {
+                BackupSummaryRow(summary: summary)
+            }
+
             if isWide {
                 overviewRowLayout
             } else {
                 overviewColumnLayout
             }
         }
+    }
+
+    // MARK: - Summary line and Run subtitle (logic in `MainScreenSummary.swift`)
+
+    private var summarySources: [FolderTreeBuilder.Source] {
+        viewModel.includedSourcePaths.map { path in
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+            return FolderTreeBuilder.Source(
+                path: path, isDirectory: isDir.boolValue, kind: viewModel.mediaKind(for: path),
+                rollName: isDir.boolValue ? viewModel.rollNameOverride(for: path) : nil)
+        }
+    }
+
+    /// Same options as the Save To folder preview, so the summary names the same folders.
+    private var summaryOptions: FolderTreeBuilder.Options {
+        var o = FolderTreeBuilder.Options()
+        let preset = previewOrganizationPreset
+        o.preset = preset
+        o.organizationActive = preset.map {
+            $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
+        } ?? false
+        o.copyContents = viewModel.copyFolderContents
+        o.date = TodayClock.shared.today
+        o.metadata = previewShootMetadata
+        o.mediaIndexPreset = preset
+        return o
+    }
+
+    private var summaryDestinations: [String] { viewModel.config.includedDestinationPaths }
+
+    var backupSummary: BackupSummary? {
+        let sources = summarySources
+        guard !sources.isEmpty else { return nil }
+        // Without a drive yet, resolve against a placeholder root: the folders are the same.
+        let root = summaryDestinations.first ?? "/Volumes/Drive"
+        let counts = sources.compactMap { previewInfo.sourceItemCounts[$0.path] }
+        return BackupSummary.make(
+            relativePaths: FolderTreeBuilder.relativePaths(for: root, sources: sources, options: summaryOptions),
+            totalBytes: previewInfo.totalBytes,
+            itemCount: counts.count == sources.count ? counts.reduce(0, +) : nil,
+            driveCount: summaryDestinations.count,
+            isLoading: previewInfo.isLoading)
+    }
+
+    var runSubtitle: String {
+        let sources = summarySources
+        let options = summaryOptions
+        let newFolders = sources.isEmpty ? 0 : summaryDestinations.reduce(0) { total, destination in
+            total + RunSubtitle.newFolderCount(
+                in: FolderTreeBuilder.lines(for: destination, sources: sources, options: options))
+        }
+        return RunSubtitle.text(
+            sourceCount: sources.count, driveCount: summaryDestinations.count,
+            newFolderCount: newFolders,
+            isRunning: transferViewModel.isTransferActive(for: viewModel.config.id))
     }
 
     private var overviewRowLayout: some View {
