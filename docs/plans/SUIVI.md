@@ -2,16 +2,16 @@
 
 Living status file for the autonomous lot-by-lot work on `next`. One lot = one `qt1/<name>` branch = one draft PR to `next`. This branch (`qt1/suivi`) only carries this file.
 
-**Session active since 2026-11-11 13:36 UTC** (refreshed every 30–60 min while a session is working; a newer session that reads a timestamp younger than 90 minutes must stop without changing anything).
+**Session active since 2026-11-11 18:11 UTC** (refreshed every 30–60 min while a session is working; a newer session that reads a timestamp younger than 90 minutes must stop without changing anything).
 
 | # | Lot | Branch | PR | State | Next action |
 |---|-----|--------|----|-------|-------------|
 | 0 | First-launch defaults: volume-access dialog text, card auto-detect on for new films, PDF report on for new films | `qt1/first-launch-defaults` | #2 | done (green: run 43027920645) | owner: real-app checks F1–F7 |
 | 1 | Phone notifications by QR code (simple mode) + static site page | `qt1/phone-qr` | #3 | done (green: run 43029005147) | owner: real-app + phone checks P1–P11; page live only once `website/phone/` is on `main` |
 | 2 | More camera families: generic DCIM, Insta360, AVCHD, P2 | `qt1/more-cameras` | #4 | done (green: run 43029293252) | owner: real-card checks C1–C7 |
-| 3 | Copy of every report on the Mac | `qt1/reports-on-mac` | — | task 4 of 4 (pushed, cold review done, waiting for CI) | open PR once green |
-| 4 | Calmer main screen: shoot day in header, summary line, less chrome, history as list | `qt1/calm-main-screen` | — | task 6 of 6 (pushed, waiting for CI + cold review) | fix findings, open PR once green |
-| 5 | Film owns its settings, "start from a previous film", settings side panel | `qt1/film-settings` | — | spec | write spec and plan |
+| 3 | Copy of every report on the Mac | `qt1/reports-on-mac` | #5 | done (green: run 43029763749) | owner: real-app checks |
+| 4 | Calmer main screen: shoot day in header, summary line, less chrome, history as list | `qt1/calm-main-screen` | — | task 6 of 6 (green: run 43030695581; cold review pending) | cold review, then open PR |
+| 5 | Film owns its settings, "start from a previous film", settings side panel | `qt1/film-settings` | — | plan (spec + plan pushed) | cold review, then task 1 |
 | 6 | Visual folder-structure editor ("new" badges first) | `qt1/folder-tree-editor` (stacked on 5) | — | to do | spec |
 | 7a | Recognition settings page | `qt1/recognition-page` (stacked on 5) | — | to do | spec |
 | 7b | Re-create a report after the fact | `qt1/recreate-report` | — | to do | spec |
