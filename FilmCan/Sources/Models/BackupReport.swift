@@ -9,6 +9,8 @@ struct BackupReport: Equatable {
         var checksumAlgorithm: String?
         var isVideo: Bool
         var isAudio: Bool
+        /// Why this file shows no checksum (report created after the fact only).
+        var note: String? = nil
 
         var name: String { (relPath as NSString).lastPathComponent }
     }
@@ -34,6 +36,47 @@ struct BackupReport: Equatable {
     var warning: String?
     var rolls: [Roll]
     var appVersion: String
+    /// Set when the report was created after the backup, from what is on the drive.
+    var recreated: Recreated? = nil
+
+    /// What a report created after the fact must say about itself.
+    struct Recreated: Equatable {
+        struct Recheck: Equatable {
+            var checked: Int
+            var mismatched: Int
+        }
+        var createdAt: Date
+        var hasChecksumList: Bool
+        /// In the checksum list, no longer on the drive.
+        var missingFiles: [String]
+        var sizeChanged: Int
+        var notListed: Int
+        /// Nil: the files were not re-read.
+        var recheck: Recheck?
+
+        var hasProblems: Bool {
+            !missingFiles.isEmpty || sizeChanged > 0 || (recheck?.mismatched ?? 0) > 0
+        }
+
+        /// The status line. Never says "verified": only a backup's own check does.
+        var statusText: String {
+            guard hasChecksumList else {
+                return "No checksum list on this drive: files listed without checksums"
+            }
+            var problems: [String] = []
+            if !missingFiles.isEmpty { problems.append("\(missingFiles.count) missing") }
+            if sizeChanged > 0 { problems.append("\(sizeChanged) changed size") }
+            if let recheck {
+                if recheck.mismatched > 0 { problems.append("\(recheck.mismatched) do not match") }
+                return problems.isEmpty
+                    ? "Re-checked: \(recheck.checked) files match the checksum list"
+                    : "Re-checked: " + problems.joined(separator: ", ")
+            }
+            return problems.isEmpty
+                ? "Checksums from the backup's list. Files were not re-read"
+                : "Checksums from the backup's list. " + problems.joined(separator: ", ")
+        }
+    }
 
     static let videoExtensions: Set<String> = ["mov", "mp4", "m4v", "mxf", "avi", "mts", "m2ts", "braw", "r3d", "crm", "ari", "insv", "lrv"]
     static let audioExtensions: Set<String> = ["wav", "bwf", "aif", "aiff", "mp3", "m4a"]

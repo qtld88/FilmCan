@@ -96,6 +96,19 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
 | 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
 
+### Report-after-the-fact gate (run when report creation from the Catalog changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| G1 | Back up a card with the PDF report switched off. Open the Catalog, right-click the roll. | "Create report from <drive>" and the same with "re-reading every file (slow)", one pair per connected drive. | ☐ |
+| G2 | Choose "Create report from <drive>". | A line "Creating the report for…" shows, then Finder opens on `<roll>_report_recreated.pdf` in the reports folder on the Mac. | ☐ |
+| G3 | Open the PDF. | Thumbnails, sizes, checksums. Under the title: backed-up date, "Report created after the backup, on …". Status reads "Checksums from the backup's list. Files were not re-read". No "Verified". | ☐ |
+| G4 | On the drive, delete one clip and add a text file to the roll; create the report again. | The deleted clip is under "missing from the drive"; the text file reads "Not in the checksum list"; status is red. | ☐ |
+| G5 | Choose the "re-reading every file (slow)" entry on an intact roll. | Status: "Re-checked: N files match the checksum list" in green. Slower. | ☐ |
+| G6 | Eject the drive, right-click the roll. | One greyed entry asking to connect a drive that holds the roll. | ☐ |
+| G7 | Rename the drive in Finder, right-click the roll, create the report. | Works: the drive is found although its name changed. | ☐ |
+| G8 | Look at the roll folder on the drive after G2–G5. | Nothing added on the drive. | ☐ |
+
 ## Post-run sanity checks
 
 - `find /Volumes/<dest> -name ".filmcan-*"` returns nothing after a clean job.

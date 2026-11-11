@@ -6,6 +6,9 @@ struct CatalogView: View {
     @State private var query = ""
     @State private var mounted: Set<String> = []
     @State private var rollToForget: CatalogRoll?
+    /// "A001 on SSD_1" while a report is being created; one at a time.
+    @State private var reportInProgress: String?
+    @State private var reportFailure: String?
 
     /// Set when hosted in the main window's right pane; nil in the standalone window.
     var paneWidth: CGFloat? = nil
@@ -24,6 +27,17 @@ struct CatalogView: View {
         VStack(spacing: 0) {
             searchField
             Divider().background(FilmCanTheme.cardStroke)
+            if let reportInProgress {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Creating the report for \(reportInProgress)…")
+                        .font(FCType.metaStrong)
+                        .foregroundColor(FilmCanTheme.textSecondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
             if trimmedQuery.isEmpty {
                 coverageList
             } else {
@@ -50,6 +64,14 @@ struct CatalogView: View {
             Button("Cancel", role: .cancel) { rollToForget = nil }
         } message: {
             Text("The roll is removed from the catalog only. No file is deleted.")
+        }
+        .alert("The report could not be created", isPresented: Binding(
+            get: { reportFailure != nil },
+            set: { if !$0 { reportFailure = nil } })
+        ) {
+            Button("OK", role: .cancel) { reportFailure = nil }
+        } message: {
+            Text(reportFailure ?? "")
         }
     }
 
@@ -143,6 +165,8 @@ struct CatalogView: View {
         .contextMenu {
             revealMenu(roll.copies, relPath: nil)
             Divider()
+            reportMenu(roll)
+            Divider()
             Button("Forget this roll") { rollToForget = roll }
         }
     }
@@ -167,6 +191,42 @@ struct CatalogView: View {
             } else {
                 Button("Reveal on \(copy.destVolumeName) (not connected)") {}
                     .disabled(true)
+            }
+        }
+    }
+
+    /// One pair of entries per connected drive that holds the roll.
+    @ViewBuilder
+    private func reportMenu(_ roll: CatalogRoll) -> some View {
+        let connected = distinctDrives(roll.copies).filter { isMounted($0) }
+        if connected.isEmpty {
+            Button("Create report (connect a drive that holds this roll)") {}
+                .disabled(true)
+        }
+        ForEach(connected, id: \.driveKey) { copy in
+            Button("Create report from \(copy.destVolumeName)") {
+                createReport(roll, copy, recheck: false)
+            }
+            .disabled(reportInProgress != nil)
+            Button("Create report from \(copy.destVolumeName), re-reading every file (slow)") {
+                createReport(roll, copy, recheck: true)
+            }
+            .disabled(reportInProgress != nil)
+        }
+    }
+
+    private func createReport(_ roll: CatalogRoll, _ copy: CatalogCopy, recheck: Bool) {
+        guard reportInProgress == nil else { return }
+        reportInProgress = "\(roll.rollName) on \(copy.destVolumeName)"
+        Task.detached(priority: .userInitiated) {
+            let path = await BackupReportWriter.recreate(roll: roll, copy: copy, recheck: recheck)
+            await MainActor.run {
+                reportInProgress = nil
+                if let path {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                } else {
+                    reportFailure = "\(roll.rollName) was not found on \(copy.destVolumeName), or the PDF could not be written to the reports folder."
+                }
             }
         }
     }
