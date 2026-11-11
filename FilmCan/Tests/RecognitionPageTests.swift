@@ -21,7 +21,8 @@ final class RecognitionGuideTests: XCTestCase {
     func test_signals_arePlainSentences() {
         XCTAssertFalse(RecognitionGuide.signals.isEmpty)
         XCTAssertEqual(Set(RecognitionGuide.signals).count, RecognitionGuide.signals.count)
-        for sentence in RecognitionGuide.signals + [RecognitionGuide.whereToSwitch] {
+        for sentence in RecognitionGuide.signals
+            + [RecognitionGuide.whereToSwitch, RecognitionGuide.forgetCorrectionHelp, RecognitionGuide.forgetRollHelp] {
             XCTAssertTrue(sentence.hasSuffix("."), sentence)
             XCTAssertFalse(sentence.contains("{"), sentence)
         }
@@ -56,6 +57,8 @@ final class CardRoleOverridesTests: XCTestCase {
         XCTAssertEqual(CardRoleOverrides.all(defaults: defaults), ["U1": .sound])
         XCTAssertEqual(CardRoleOverrides.details(defaults: defaults)["U1"],
                        CardRoleOverrides.Detail(name: "ZOOM_F8", date: when))
+        // The correction itself keeps the format earlier versions read: [drive id: role].
+        XCTAssertEqual(defaults.dictionary(forKey: "filmcan.cardRoleOverrides") as? [String: String], ["U1": "sound"])
     }
 
     func test_forget_removesRoleAndDetail() {
@@ -148,19 +151,52 @@ final class RollMemoryForgetTests: XCTestCase {
         store.update(state, for: film)
         store.update(state, for: other)
 
-        store.forgetAssignment(cardKey: "U1|", configId: film.uuidString)
-        store.forgetAssignment(cardKey: "missing|", configId: film.uuidString)
-        store.forgetAssignment(cardKey: "U1|", configId: UUID().uuidString)
+        store.forgetAssignment(cardKey: "U1|", rollName: "A001", configId: film.uuidString)
+        store.forgetAssignment(cardKey: "missing|", rollName: "A001", configId: film.uuidString)
+        store.forgetAssignment(cardKey: "U1|", rollName: "A001", configId: UUID().uuidString)
+        // The page showed an old name for this card: nothing is forgotten.
+        store.forgetAssignment(cardKey: "U2|", rollName: "A009", configId: film.uuidString)
 
         let reloaded = RollNumberingStore(fileURL: file)
-        XCTAssertEqual(reloaded.state(for: film).assignments, ["U2|": "A002"])
+        let kept = reloaded.state(for: film).assignments
+        XCTAssertNil(kept["U1|"])
+        XCTAssertEqual(kept["U2|"], "A002")
         XCTAssertEqual(reloaded.state(for: film).currentDay, "Day03")
         XCTAssertEqual(reloaded.state(for: other).assignments, ["U1|": "A001", "U2|": "A002"])
         XCTAssertEqual(reloaded.allStates.count, 2)
 
-        // The forgotten card takes the next free number, never a name still in use.
-        let next = RollNumberer.nextName(kind: .camera, settings: RollNumbering(),
-                                         assigned: Array(reloaded.state(for: film).assignments.values))
+        // The forgotten name stays taken: neither the forgotten card nor a new one gets it.
+        let next = RollNumberer.nextName(kind: .camera, settings: RollNumbering(), assigned: Array(kept.values))
         XCTAssertEqual(next, "A003")
     }
+
+    /// Forgetting the highest name must not hand it to the next card: a roll folder
+    /// of that name may be on a drive.
+    func test_forgetHighestName_isNotReused_andIsNotListedAsACard() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("filmcan-roll-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = RollNumberingStore(fileURL: dir.appendingPathComponent("roll-numbering.json"))
+        let film = UUID()
+        var state = RollNumberingStore.ConfigState()
+        state.assignments = ["U1|": "A001", "U2|": "A002", "U3|": "A003"]
+        store.update(state, for: film)
+
+        store.forgetAssignment(cardKey: "U3|", rollName: "A003", configId: film.uuidString)
+
+        let existing = store.state(for: film).assignments
+        let assigned = RollNumberer.assign(
+            sources: ["/v/new", "/v/old"], isDirectory: { _ in true }, kinds: [:], settings: RollNumbering(),
+            existing: existing, keyFor: { $0 == "/v/old" ? "U3|" : "U4|" }, signatureFor: { _ in nil })
+        XCTAssertEqual(assigned.names["/v/new"], "A004")
+        XCTAssertEqual(assigned.names["/v/old"], "A005")
+
+        let listed = RecognitionMemory.rolls(states: store.allStates, movies: [(id: film, name: "Citizen K")],
+                                             mountedNames: [:])
+        XCTAssertEqual(listed.first?.rolls.map(\.rollName), ["A001", "A002"])
+
+        // Starting the numbering over clears the names kept aside too.
+        store.resetNumbering(for: film)
+        XCTAssertTrue(store.state(for: film).assignments.isEmpty)
+    }
+}
 }

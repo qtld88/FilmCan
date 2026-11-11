@@ -155,7 +155,7 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | R4 | Click Forget on that line. Go back to the main window. | The line is gone; the card is proposed again in Copy From (detection on). | ☐ |
 | R5 | Eject a corrected drive, reopen the page. | The drive keeps its name and reads "not connected". | ☐ |
 | R6 | With roll numbering on, run a backup, open the page. | The movie is listed with its card count and last backup date; opening it shows the roll name and the drive. | ☐ |
-| R7 | Forget one roll name, plug the same card again in that movie. | The card gets the next free roll name; other cards keep theirs. | ☐ |
+| R7 | Forget one roll name, plug the same card again in that movie. | The card gets a new roll name, higher than every name used so far (its old name is not reused); other cards keep theirs. | ☐ |
 | R8 | A correction made before this version (if you have one). | Listed as "Drive not connected (…)" until the drive is plugged, then by its name. | ☐ |
 
 ## Post-run sanity checks

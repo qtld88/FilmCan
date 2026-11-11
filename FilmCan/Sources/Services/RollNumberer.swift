@@ -112,14 +112,22 @@ final class RollNumberingStore {
     var allStates: [String: ConfigState] { states }
 
     /// Forgets one card of one film: the card gets a new roll name the next time it
-    /// is used with that film. `configId` is the stored key, so a film that no longer
-    /// exists can be cleaned too.
-    func forgetAssignment(cardKey: String, configId: String) {
-        guard var state = states[configId], state.assignments[cardKey] != nil else { return }
+    /// is used with that film. The old name stays taken (kept under a key that is not
+    /// a card), so it is never given to another card while a roll folder of that name
+    /// may be on a drive. Nothing happens if the card no longer holds `rollName`.
+    /// `configId` is the stored key, so a film that no longer exists can be cleaned too.
+    func forgetAssignment(cardKey: String, rollName: String, configId: String) {
+        guard !Self.isForgottenKey(cardKey),
+              var state = states[configId], state.assignments[cardKey] == rollName else { return }
         state.assignments.removeValue(forKey: cardKey)
+        state.assignments[Self.forgottenKeyPrefix + rollName] = rollName
         states[configId] = state
         save()
     }
+
+    /// A card key starts with a volume id or "nouuid", never with this.
+    static let forgottenKeyPrefix = "forgotten|"
+    static func isForgottenKey(_ key: String) -> Bool { key.hasPrefix(forgottenKeyPrefix) }
 
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }

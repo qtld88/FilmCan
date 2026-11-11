@@ -22,7 +22,9 @@ The page reads; it has no switch. Detection itself is unchanged.
 - **Corrections made before this version** have no stored name or date: listed as "Drive not connected (first 8 characters of its id)" until the drive is mounted, then by its current name.
 - A stored role this version does not know is ignored (not listed, not applied — as today).
 - A card stored without a volume id (`nouuid|…`): listed by roll name and folder only.
-- Forgetting a roll name never frees a number still in use: the next name is computed from the remaining ones.
+- Forgetting a roll name never frees that name: it stays taken for the movie (kept in `roll-numbering.json` under a key that is not a card), because a roll folder of that name may be on a drive. The forgotten card gets the next free name and is copied again in full under it. "Reset numbering" clears the names kept aside too.
+- Forget does nothing if the card's roll name changed since the page was drawn.
+- Forgetting a correction does not change movies: a card already listed in a movie, or tagged Sound there, stays as it is.
 - The lists refresh when the page appears and when the app becomes active (a drive plugged meanwhile).
 
 ## What does not change

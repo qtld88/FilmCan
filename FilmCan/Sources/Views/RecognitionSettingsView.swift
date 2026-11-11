@@ -38,6 +38,11 @@ struct RecognitionSettingsView: View {
                     Text("None yet. Right-click a card in Copy From to say what it is.")
                         .foregroundColor(.secondary)
                 }
+                if !corrections.isEmpty {
+                    Text(RecognitionGuide.forgetCorrectionHelp)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 ForEach(corrections) { item in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -58,7 +63,7 @@ struct RecognitionSettingsView: View {
                     Text("None yet. A card gets a roll name when roll numbering is on for the movie.")
                         .foregroundColor(.secondary)
                 } else {
-                    Text("A forgotten card gets a new roll name the next time it is used with that movie.")
+                    Text(RecognitionGuide.forgetRollHelp)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -70,7 +75,8 @@ struct RecognitionSettingsView: View {
                                 Text(detail(for: roll)).font(.caption).foregroundColor(.secondary)
                                 Spacer()
                                 Button("Forget") {
-                                    RollNumberingStore.shared.forgetAssignment(cardKey: roll.cardKey, configId: roll.configId)
+                                    RollNumberingStore.shared.forgetAssignment(
+                                        cardKey: roll.cardKey, rollName: roll.rollName, configId: roll.configId)
                                     reload()
                                 }
                             }
@@ -94,9 +100,14 @@ struct RecognitionSettingsView: View {
 
     private func reload() {
         var mounted: [String: String] = [:]
-        for volume in FilmDriveDetector.mountedExternalVolumes() {
-            if let uuid = FanOutCopier.sourceVolumeUUID(volume.path) {
-                mounted[uuid] = FanOutCopier.sourceVolumeName(volume.path)
+        // Every mounted volume, the startup disk included: a correction can be about a folder on it.
+        let volumes = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: [.volumeUUIDStringKey, .volumeNameKey],
+            options: [.skipHiddenVolumes]) ?? []
+        for volume in volumes {
+            let values = try? volume.resourceValues(forKeys: [.volumeUUIDStringKey, .volumeNameKey])
+            if let uuid = values?.volumeUUIDString {
+                mounted[uuid] = values?.volumeName ?? volume.lastPathComponent
             }
         }
         corrections = RecognitionMemory.corrections(

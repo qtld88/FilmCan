@@ -8,14 +8,16 @@ enum RecognitionGuide {
     /// One sentence per thing FilmCan looks at.
     static let signals: [String] = [
         "FilmCan reads the names of the folders and files a camera writes on its card. It never opens the clips.",
-        "It looks at external drives only, three folder levels deep, and skips hidden files.",
+        "It looks at external drives only, in the first folder levels of each drive, and skips hidden files.",
         "A drive with WAV files and no video is taken for a sound recorder.",
-        "A recognised card is added to Copy From. Nothing is copied until you start the backup.",
+        "When card detection is on for a movie, a recognised card is added to its Copy From. Nothing is copied until you start the backup.",
         "When you correct a card (right-click it in Copy From), FilmCan remembers your answer for that drive.",
-        "Backup drives are not guessed. They come from the drive-name rules of each movie."
+        "Backup drives are never guessed: you choose them, or the movie's drive-name rules do."
     ]
 
     static let whereToSwitch = "Card detection is switched on or off for each movie: Movie settings › Source."
+    static let forgetCorrectionHelp = "Forgetting a correction lets FilmCan guess again the next time the drive is looked at. Movies keep the cards they already list."
+    static let forgetRollHelp = "A forgotten card gets a new roll name the next time it is used with that movie, and is copied again in full under that name. Its old name is not given to another card."
 
     struct Family: Identifiable, Equatable {
         let id: String
@@ -104,8 +106,11 @@ enum RecognitionMemory {
                       movies: [(id: UUID, name: String)],
                       mountedNames: [String: String]) -> [MovieRolls] {
         func group(_ id: String, name: String?) -> MovieRolls? {
-            guard let state = states[id], !state.assignments.isEmpty else { return nil }
-            let rolls = state.assignments.map { key, rollName -> Roll in
+            // Names kept aside after a Forget are not cards.
+            let cards = (states[id]?.assignments ?? [:])
+                .filter { !RollNumberingStore.isForgottenKey($0.key) }
+            guard let state = states[id], !cards.isEmpty else { return nil }
+            let rolls = cards.map { key, rollName -> Roll in
                 let parts = splitCardKey(key)
                 return Roll(configId: id, cardKey: key, rollName: rollName,
                             driveName: parts.uuid.flatMap { mountedNames[$0] }, folder: parts.folder)
