@@ -69,7 +69,7 @@ enum NotificationDispatcher {
             NotificationService.shared.notify(title: title, body: body)
         }
         if settings.ntfyEnabled, !settings.ntfyURL.isEmpty {
-            let ntfyToken = KeychainStore().get("ntfyBearerToken")
+            let ntfyToken = settings.ntfySendsToken ? KeychainStore().get("ntfyBearerToken") : nil
             WebhookService.sendNtfy(
                 urlString: settings.ntfyURL,
                 bearerToken: ntfyToken,
@@ -121,7 +121,7 @@ enum NotificationDispatcher {
         _ summary: NotificationSummaryBuilder.DestinationNotificationSummary,
         _ settings: NotificationSettings
     ) {
-        let ntfyToken = KeychainStore().get("ntfyBearerToken")
+        let ntfyToken = settings.ntfySendsToken ? KeychainStore().get("ntfyBearerToken") : nil
         WebhookService.sendNtfy(
             urlString: settings.ntfyURL,
             bearerToken: ntfyToken,

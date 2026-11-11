@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>FilmCan on your phone</title>
+<link rel="icon" href="/assets/favicon.png">
+<!--
+  Static page, no third-party script, no analytics, no web font.
+  The channel name arrives in the URL fragment (after #). Browsers never send the
+  fragment to a server, so this site never receives it. The script below only reads
+  it locally to build the subscription links.
+-->
+<style>
+:root{--bg:#1B1B1B;--card:#2A2A2A;--text:#F4F2EE;--yellow:#FFC900;--green:#3B9953;--stroke:rgba(244,242,238,.18);--dim:rgba(244,242,238,.65)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+main{max-width:560px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-bottom:22px}
+header img{width:30px;height:30px;border-radius:8px}
+.langs{margin-left:auto;display:flex;gap:4px;font-size:13px;font-weight:600}
+.langs button{background:none;border:0;color:var(--text);opacity:.55;padding:6px 6px;font:inherit;cursor:pointer}
+.langs button[aria-pressed="true"]{opacity:1;color:var(--yellow)}
+h1{font-size:26px;line-height:1.15;letter-spacing:-.3px;margin-bottom:8px}
+.lead{color:var(--dim);margin-bottom:22px}
+.step{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:18px;margin-bottom:14px}
+.step h2{font-size:17px;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.n{flex:none;width:28px;height:28px;border-radius:8px;background:var(--yellow);color:#1B1B1B;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.step p{color:var(--dim);font-size:15px;margin-bottom:12px}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+.btn{background:var(--yellow);color:#1B1B1B;font-weight:600;border:0;border-radius:10px;padding:12px 16px;font-size:15px;text-decoration:none;display:inline-block;font-family:inherit;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid rgba(244,242,238,.3)}
+.topic{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;background:#1B1B1B;border:1px solid var(--stroke);border-radius:8px;padding:10px 12px;word-break:break-all;margin-bottom:12px;user-select:all;-webkit-user-select:all}
+.note{font-size:13px;color:var(--dim);margin-top:12px}
+.warn{background:rgba(228,81,65,.12);border:1px solid rgba(228,81,65,.45);border-radius:14px;padding:18px;margin-bottom:14px}
+.warn p{color:var(--text)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="/assets/icon.png" alt="">
+    <span>FilmCan</span>
+    <div class="langs" role="group" aria-label="Language">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="fr">FR</button>
+      <button type="button" data-lang="de">DE</button>
+      <button type="button" data-lang="es">ES</button>
+    </div>
+  </header>
+
+  <h1 data-t="title"></h1>
+  <p class="lead" data-t="lead"></p>
+
+  <div class="warn" id="missing" hidden>
+    <p data-t="missing"></p>
+  </div>
+
+  <div id="steps" hidden>
+    <section class="step">
+      <h2><span class="n">1</span><span data-t="s1_title"></span></h2>
+      <p data-t="s1_text"></p>
+      <div class="btns">
+        <a class="btn" id="store-ios" rel="noreferrer noopener" href="https://apps.apple.com/app/ntfy/id1625396347">iPhone · App Store</a>
+        <a class="btn" id="store-android" rel="noreferrer noopener" href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">Android · Google Play</a>
+        <a class="btn ghost" id="store-fdroid" rel="noreferrer noopener" href="https://f-droid.org/packages/io.heckel.ntfy/">F-Droid</a>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2><span class="n">2</span><span data-t="s2_title"></span></h2>
+      <p data-t="s2_text"></p>
+      <div class="topic" id="topic"></div>
+      <div class="btns">
+        <button class="btn" type="button" id="copy" data-t="copy"></button>
+        <a class="btn ghost" id="open-app" rel="noreferrer noopener" data-t="open_app"></a>
+      </div>
+      <p class="note" data-t="s2_note"></p>
+    </section>
+
+    <section class="step">
+      <h2><span class="n" style="background:var(--green);color:#fff">✓</span><span data-t="s3_title"></span></h2>
+      <p data-t="s3_text" style="margin-bottom:0"></p>
+    </section>
+
+    <p class="note" data-t="privacy"></p>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var T = {
+    en: {
+      title: "FilmCan on your phone",
+      lead: "Get a message when a backup finishes or fails. Two steps, no account.",
+      missing: "This page needs the code shown in FilmCan. On your Mac, open FilmCan, Settings, Push, and scan the QR code again.",
+      s1_title: "Install the ntfy app",
+      s1_text: "ntfy is a free notification app. FilmCan uses it to reach your phone.",
+      s2_title: "Subscribe to your channel",
+      s2_text: "In ntfy, tap + (Subscribe to topic) and paste this channel name:",
+      copy: "Copy the name",
+      copied: "Copied",
+      open_app: "Open in ntfy",
+      s2_note: "\"Open in ntfy\" works when the app is installed and your phone supports ntfy links. If nothing happens, copy the name and paste it in the app.",
+      s3_title: "Check it works",
+      s3_text: "Back in FilmCan, click \"Send a test\". Your phone should buzz within a few seconds.",
+      privacy: "Your channel name stays on this phone: it is read from the part of the address after #, which is never sent to this website. Anyone who knows the name can read your notifications, so do not share it. To change it, click \"New code\" in FilmCan."
+    },
+    fr: {
+      title: "FilmCan sur votre téléphone",
+      lead: "Recevez un message quand une sauvegarde se termine ou échoue. Deux étapes, sans compte.",
+      missing: "Cette page a besoin du code affiché dans FilmCan. Sur votre Mac, ouvrez FilmCan, Settings, Push, puis scannez de nouveau le QR code.",
+      s1_title: "Installez l'application ntfy",
+      s1_text: "ntfy est une application de notifications gratuite. FilmCan s'en sert pour joindre votre téléphone.",
+      s2_title: "Abonnez-vous à votre canal",
+      s2_text: "Dans ntfy, touchez + (Subscribe to topic) et collez ce nom de canal :",
+      copy: "Copier le nom",
+      copied: "Copié",
+      open_app: "Ouvrir dans ntfy",
+      s2_note: "« Ouvrir dans ntfy » fonctionne quand l'application est installée et que votre téléphone accepte les liens ntfy. S'il ne se passe rien, copiez le nom et collez-le dans l'application.",
+      s3_title: "Vérifiez que ça marche",
+      s3_text: "De retour dans FilmCan, cliquez sur « Send a test ». Votre téléphone doit vibrer en quelques secondes.",
+      privacy: "Le nom de votre canal reste sur ce téléphone : il est lu dans la partie de l'adresse située après #, qui n'est jamais envoyée à ce site. Toute personne qui connaît ce nom peut lire vos notifications, ne le partagez donc pas. Pour le changer, cliquez sur « New code » dans FilmCan."
+    },
+    de: {
+      title: "FilmCan auf Ihrem Telefon",
+      lead: "Erhalten Sie eine Nachricht, wenn ein Backup fertig ist oder fehlschlägt. Zwei Schritte, kein Konto.",
+      missing: "Diese Seite braucht den Code, den FilmCan anzeigt. Öffnen Sie auf Ihrem Mac FilmCan, Settings, Push und scannen Sie den QR-Code erneut.",
+      s1_title: "Installieren Sie die ntfy-App",
+      s1_text: "ntfy ist eine kostenlose Benachrichtigungs-App. FilmCan erreicht damit Ihr Telefon.",
+      s2_title: "Abonnieren Sie Ihren Kanal",
+      s2_text: "Tippen Sie in ntfy auf + (Subscribe to topic) und fügen Sie diesen Kanalnamen ein:",
+      copy: "Namen kopieren",
+      copied: "Kopiert",
+      open_app: "In ntfy öffnen",
+      s2_note: "„In ntfy öffnen“ funktioniert, wenn die App installiert ist und Ihr Telefon ntfy-Links unterstützt. Passiert nichts, kopieren Sie den Namen und fügen Sie ihn in der App ein.",
+      s3_title: "Prüfen Sie, ob es funktioniert",
+      s3_text: "Klicken Sie in FilmCan auf „Send a test“. Ihr Telefon sollte nach wenigen Sekunden vibrieren.",
+      privacy: "Ihr Kanalname bleibt auf diesem Telefon: Er wird aus dem Teil der Adresse nach # gelesen, der nie an diese Website gesendet wird. Wer den Namen kennt, kann Ihre Benachrichtigungen lesen, geben Sie ihn also nicht weiter. Zum Ändern klicken Sie in FilmCan auf „New code“."
+    },
+    es: {
+      title: "FilmCan en su teléfono",
+      lead: "Reciba un mensaje cuando una copia termine o falle. Dos pasos, sin cuenta.",
+      missing: "Esta página necesita el código que muestra FilmCan. En su Mac, abra FilmCan, Settings, Push y escanee de nuevo el código QR.",
+      s1_title: "Instale la aplicación ntfy",
+      s1_text: "ntfy es una aplicación de notificaciones gratuita. FilmCan la usa para llegar a su teléfono.",
+      s2_title: "Suscríbase a su canal",
+      s2_text: "En ntfy, toque + (Subscribe to topic) y pegue este nombre de canal:",
+      copy: "Copiar el nombre",
+      copied: "Copiado",
+      open_app: "Abrir en ntfy",
+      s2_note: "«Abrir en ntfy» funciona cuando la aplicación está instalada y su teléfono admite enlaces ntfy. Si no pasa nada, copie el nombre y péguelo en la aplicación.",
+      s3_title: "Compruebe que funciona",
+      s3_text: "De vuelta en FilmCan, haga clic en «Send a test». Su teléfono debería vibrar en unos segundos.",
+      privacy: "El nombre de su canal se queda en este teléfono: se lee de la parte de la dirección que va después de #, que nunca se envía a este sitio web. Cualquiera que conozca el nombre puede leer sus notificaciones, así que no lo comparta. Para cambiarlo, haga clic en «New code» en FilmCan."
+    }
+  };
+
+  var lang = "en";
+  function pickLang() {
+    var saved = null;
+    try { saved = window.sessionStorage.getItem("lang"); } catch (e) {}
+    if (saved && T[saved]) { return saved; }
+    var list = navigator.languages || [navigator.language || "en"];
+    for (var i = 0; i < list.length; i++) {
+      var short = String(list[i]).slice(0, 2).toLowerCase();
+      if (T[short]) { return short; }
+    }
+    return "en";
+  }
+  function render() {
+    document.documentElement.lang = lang;
+    document.title = T[lang].title;
+    var nodes = document.querySelectorAll("[data-t]");
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].textContent = T[lang][nodes[i].getAttribute("data-t")];
+    }
+    var buttons = document.querySelectorAll(".langs button");
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].setAttribute("aria-pressed", buttons[j].getAttribute("data-lang") === lang ? "true" : "false");
+    }
+  }
+
+  // The channel name: only letters, digits, "-" and "_", 1 to 64 characters.
+  // Anything else is rejected, so the fragment can never inject markup or another address.
+  function readTopic() {
+    var raw = window.location.hash.replace(/^#/, "");
+    return /^[A-Za-z0-9_-]{1,64}$/.test(raw) ? raw : null;
+  }
+  function show() {
+    var topic = readTopic();
+    document.getElementById("missing").hidden = !!topic;
+    document.getElementById("steps").hidden = !topic;
+    if (!topic) { return; }
+    document.getElementById("topic").textContent = topic;
+    document.getElementById("open-app").setAttribute("href", "ntfy://ntfy.sh/" + topic);
+    var ua = navigator.userAgent || "";
+    var isApple = /iPhone|iPad|iPod/.test(ua);
+    var isAndroid = /Android/.test(ua);
+    document.getElementById("store-ios").hidden = isAndroid;
+    document.getElementById("store-android").hidden = isApple;
+    document.getElementById("store-fdroid").hidden = isApple;
+  }
+
+  document.getElementById("copy").addEventListener("click", function () {
+    var topic = readTopic();
+    if (!topic) { return; }
+    var button = this;
+    function done() {
+      button.textContent = T[lang].copied;
+      window.setTimeout(function () { button.textContent = T[lang].copy; }, 2000);
+    }
+    function fallback() {
+      var range = document.createRange();
+      range.selectNodeContents(document.getElementById("topic"));
+      var selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      try { if (document.execCommand("copy")) { done(); } } catch (e) {}
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(topic).then(done, fallback);
+    } else {
+      fallback();
+    }
+  });
+  var langButtons = document.querySelectorAll(".langs button");
+  for (var k = 0; k < langButtons.length; k++) {
+    langButtons[k].addEventListener("click", function () {
+      lang = this.getAttribute("data-lang");
+      try { window.sessionStorage.setItem("lang", lang); } catch (e) {}
+      render();
+    });
+  }
+  window.addEventListener("hashchange", show);
+
+  lang = pickLang();
+  render();
+  show();
+})();
+</script>
+<noscript><main><p>This page needs JavaScript to read the code from FilmCan. Without it: install the ntfy app, tap +, and type the channel name shown in FilmCan under Settings, Push.</p></main></noscript>
+</body>
+</html>

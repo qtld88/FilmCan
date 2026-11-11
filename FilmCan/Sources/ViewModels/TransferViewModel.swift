@@ -738,12 +738,15 @@ class TransferViewModel: ObservableObject {
     }
 
     private func makeNotificationSettings() -> NotificationSettings {
-        NotificationSettings(
+        // Generated phone topic or the user's own topic URL: see `PhonePush`.
+        let ntfyTarget = PhonePush.target()
+        return NotificationSettings(
             notifyOnComplete: notifyOnComplete, notifyOnError: notifyOnError,
-            ntfyEnabled: ntfyEnabled, ntfyURL: ntfyURL,
+            ntfyEnabled: ntfyEnabled, ntfyURL: ntfyTarget?.url ?? "",
             ntfyTitleTemplate: ntfyTitleTemplate, ntfyMessageTemplate: ntfyMessageTemplate,
             webhookEnabled: webhookEnabled, webhookURL: webhookURL,
-            webhookIncludeFullPaths: webhookIncludeFullPaths)
+            webhookIncludeFullPaths: webhookIncludeFullPaths,
+            ntfySendsToken: ntfyTarget?.sendsToken ?? true)
     }
 
     func cancelRunFromDuplicatePrompt() {
