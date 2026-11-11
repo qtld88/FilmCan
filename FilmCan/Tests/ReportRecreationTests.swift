@@ -110,10 +110,12 @@ final class ReportRecreationTests: XCTestCase {
         var sums = ReportRecreation.Checksums()
         sums.byRelPath = ["a.mov": .init(hash: "AAAA", size: 100), "b.mov": .init(hash: "bbbb", size: 250),
                           "extra.txt": .init(hash: "eeee", size: 5)]
+        // extra.txt could not be read back.
+        let reread: [String: String?] = ["a.mov": "aaaa", "b.mov": "ffff", "extra.txt": nil]
         let report = ReportRecreation.build(
             roll: roll(), copy: copy(path: "/d/A001"), rollFolder: "/d/A001",
             filesOnDisk: files, checksums: sums,
-            rechecked: ["a.mov": "aaaa", "b.mov": "ffff", "extra.txt": .some(nil)],
+            rechecked: reread,
             now: Date(), appVersion: "1.0")
         let clips = report.rolls[0].clips
         XCTAssertEqual(clips[0].checksum, "AAAA")
