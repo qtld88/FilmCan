@@ -49,6 +49,18 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### Card families gate (run when `CameraCardDetector` changed; needs real cards or copies of their folder layout)
+
+| # | Check (real .app, "Detect camera and sound cards automatically" on) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| C1 | Plug a photo camera, drone or phone card with a `DCIM` folder holding video. | Added to Copy From, badge "Camera card", tagged Camera. | ☐ |
+| C2 | Plug a `DCIM` card holding photos only. | Not added, no badge. | ☐ |
+| C3 | Plug an Insta360 card. | Badge "Insta360 card". | ☐ |
+| C4 | Plug an AVCHD camcorder card (`PRIVATE/AVCHD` or `AVCHD` at the root). | Badge "AVCHD card". A Panasonic card with `PANA_GRP` still says "Panasonic card"; a Sony card with `M4ROOT` still says "Sony card". | ☐ |
+| C5 | Plug a Panasonic P2 card. | Badge "Panasonic card". | ☐ |
+| C6 | Plug ARRI, RED, Sony, Canon, Blackmagic, GoPro, DJI and sound recorder cards you have. | Same badge as before this build. | ☐ |
+| C7 | Plug a backup drive that happens to have a `DCIM` folder with video at its root. | It is proposed as a camera card (expected). Right-click › "Not a camera card": it leaves and does not come back. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
