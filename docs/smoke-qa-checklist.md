@@ -49,6 +49,23 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### Phone notifications gate (run when Settings › Push or the `/phone/` site page changed)
+
+The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once `website/phone/index.html` has reached `main`.
+
+| # | Check (real .app, one iPhone, one Android phone if available) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| P1 | Fresh preferences (`defaults delete com.filmcan.app ntfyURL; defaults delete com.filmcan.app ntfyUseCustomServer; defaults delete com.filmcan.app phonePushTopic`). Settings › Push. | One switch "Send notifications to my phone", off. "Advanced" is folded. No QR code yet. | ☐ |
+| P2 | Turn the switch on. | A QR code and a channel name starting with `filmcan-` appear. | ☐ |
+| P3 | Scan the code with a phone that does not have ntfy. | The FilmCan page opens in the phone's language, shows the same channel name, and offers the right store. | ☐ |
+| P4 | Install ntfy, subscribe (button "Open in ntfy", else copy and paste the name). Click "Send a test" in FilmCan. | The phone receives "FilmCan test". From P2 to here: under 2 minutes. Note whether "Open in ntfy" worked on iPhone and on Android. | ☐ |
+| P5 | Run a small backup. | The phone receives the end-of-backup message. | ☐ |
+| P6 | Click "New code…", confirm. Send a test. | The code and the name change; the phone no longer receives until it scans again. | ☐ |
+| P7 | Quit and relaunch FilmCan (and, when possible, install an update over it). | Same code, notifications still arrive, nothing to redo. | ☐ |
+| P8 | A Mac where a Topic URL (and token) was already configured before this build. Open Settings › Push. | "Advanced" is open, "Use my own ntfy server or topic" is on, the URL and token are intact, no QR code. A backup notifies the same topic as before. | ☐ |
+| P9 | In Advanced, switch "Use my own ntfy server or topic" off, then on again. | Off: the QR code appears. On: the own URL is used again, still filled in. | ☐ |
+| P10 | Open `https://www.filmcan.eu/phone/` without anything after `#`. | The page asks to scan the code again; no error. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
