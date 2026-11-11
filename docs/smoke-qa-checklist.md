@@ -61,6 +61,18 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
 | F7 | Finder › right-click a folder › Services › FilmCan Copy, run it. | No PDF report is written (Quick Copy is unchanged). | ☐ |
 
+### Card families gate (run when `CameraCardDetector` changed; needs real cards or copies of their folder layout)
+
+| # | Check (real .app, "Detect camera and sound cards automatically" on) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| C1 | Plug a photo camera, drone or phone card with a `DCIM` folder holding video. | Added to Copy From, badge "Camera card", tagged Camera. | ☐ |
+| C2 | Plug a `DCIM` card holding photos only. | Not added, no badge. | ☐ |
+| C3 | Plug an Insta360 card. | Badge "Insta360 card". | ☐ |
+| C4 | Plug an AVCHD camcorder card (`PRIVATE/AVCHD` or `AVCHD` at the root). | Badge "AVCHD card". A Panasonic card with `PANA_GRP` still says "Panasonic card"; a Sony card with `M4ROOT` still says "Sony card". | ☐ |
+| C5 | Plug a Panasonic P2 card. | Badge "Panasonic card". | ☐ |
+| C6 | Plug ARRI, RED, Sony, Canon, Blackmagic, GoPro, DJI and sound recorder cards you have. | Same badge as before this build. | ☐ |
+| C7 | Plug a backup drive that happens to have a `DCIM` folder with video at its root. | It is proposed as a camera card (expected). Right-click › "Not a camera card": it leaves and does not come back. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
