@@ -62,6 +62,41 @@ final class OrganizationEditorModel: ObservableObject {
         return p.useRenameTemplate && p.renameTemplate.contains(token)
     }
 
+    // MARK: Folder layout as a tree
+
+    /// The film's folder layout for the visual editor; nil when the tree cannot show it
+    /// (the text field then stays the only editor). A layout that is switched off
+    /// reads as empty.
+    var folderStructure: FolderStructure? {
+        guard let preset = editingOrganizationPresetBinding?.wrappedValue else { return nil }
+        guard preset.useFolderTemplate else { return FolderStructure() }
+        let layout = FolderLayoutSource.templates(
+            preset: preset, isNetflix: isNetflixPresetSelected,
+            cameraOverride: cameraFolderTemplate, soundOverride: soundFolderTemplate)
+        return FolderStructure.parse(camera: layout.camera, sound: layout.sound)
+    }
+
+    /// Writes the tree back to the same strings the engine reads.
+    func setFolderStructure(_ structure: FolderStructure) {
+        objectWillChange.send()
+        // A separate sound folder needs the film's own settings record.
+        viewModel.ensureOwnSettingsCopy()
+        guard let binding = editingOrganizationPresetBinding else { return }
+        var preset = binding.wrappedValue
+        preset.folderTemplate = structure.cameraTemplate
+        preset.soundFolderTemplate = structure.soundTemplate
+        preset.useFolderTemplate = !structure.cameraTemplate.isEmpty
+        binding.wrappedValue = preset
+        // Align the film's working copy at once, so its next save cannot write the
+        // previous layout back.
+        viewModel.syncFromSelectedPresetIfNeeded()
+        if isNetflixPresetSelected {
+            // The Netflix preset reads the film's two editable fields first.
+            viewModel.cameraFolderTemplate = structure.cameraTemplate
+            viewModel.soundFolderTemplate = structure.soundTemplate
+        }
+    }
+
     func binding<Value>(_ keyPath: ReferenceWritableKeyPath<OrganizationEditorModel, Value>) -> Binding<Value> {
         Binding(get: { self[keyPath: keyPath] }, set: { self[keyPath: keyPath] = $0 })
     }
