@@ -34,6 +34,8 @@ final class FilmPresetOwnershipTests: XCTestCase {
         var v = p
         v.id = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
         v.ownerFilmId = nil
+        // Saved dates keep whole seconds only.
+        v.customDate = Date(timeIntervalSince1970: v.customDate.timeIntervalSince1970.rounded(.down))
         return v
     }
 
