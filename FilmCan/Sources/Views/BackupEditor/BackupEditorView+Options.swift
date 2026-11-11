@@ -468,7 +468,7 @@ extension BackupEditorView {
         return min(base, maxForMenu)
     }
 
-    var nameRow: some View {
+    func nameRow(runSubtitle: String) -> some View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 if isEditingName {
