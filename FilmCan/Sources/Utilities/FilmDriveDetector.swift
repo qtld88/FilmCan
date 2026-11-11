@@ -20,12 +20,13 @@ enum FilmDriveDetector {
     static func detect(film: BackupConfiguration,
                        volumes: [URL] = mountedExternalVolumes(),
                        pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
-                       cardRole: (String) -> CardRole? = detectedCardRole) -> Detected {
+                       cardRole: (String) -> CardRole? = detectedCardRole,
+                       today: Date = Date()) -> Detected {
         var result = Detected()
 
         var destinations = film.includedDestinationPaths.filter(pathExists)
         if film.destinationAutoDetectEnabled {
-            for path in matchingPaths(rules: film.destinationAutoDetectPatterns, volumes: volumes)
+            for path in matchingPaths(rules: film.destinationAutoDetectPatterns, volumes: volumes, today: today)
             where !destinations.contains(path) {
                 destinations.append(path)
             }
@@ -50,19 +51,28 @@ enum FilmDriveDetector {
             add(path, film.sourceMediaKinds[path])
         }
         if film.sourceAutoDetectEnabled {
-            for path in matchingPaths(rules: film.sourceAutoDetectPatterns, volumes: volumes) {
+            for path in matchingPaths(rules: film.sourceAutoDetectPatterns, volumes: volumes, today: today) {
                 add(path, film.sourceMediaKinds[path])
             }
         }
+        func soundPaths(_ path: String) -> [String] {
+            guard film.soundDayFolderAutoDetect else { return [path] }
+            let days = DayFolderResolver.findDayFolders(in: path, today: today)
+            return days.isEmpty ? [path] : days
+        }
         if film.soundAutoDetectEnabled {
-            for path in matchingPaths(rules: film.soundAutoDetectPatterns, volumes: volumes) {
-                add(path, .sound)
+            for path in matchingPaths(rules: film.soundAutoDetectPatterns, volumes: volumes, today: today) {
+                for day in soundPaths(path) { add(day, .sound) }
             }
         }
         if film.cardAutoDetectEnabled {
             for volume in volumes {
                 guard let role = cardRole(volume.path), role != .notACard else { continue }
-                add(volume.path, role == .sound ? .sound : .camera)
+                if role == .sound {
+                    for day in soundPaths(volume.path) { add(day, .sound) }
+                } else {
+                    add(volume.path, .camera)
+                }
             }
         }
         return result
@@ -79,7 +89,7 @@ enum FilmDriveDetector {
 
     // MARK: Rules
 
-    static func matchingPaths(rules: [String], volumes: [URL]) -> [String] {
+    static func matchingPaths(rules: [String], volumes: [URL], today: Date = Date()) -> [String] {
         let rules = rules
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -88,7 +98,7 @@ enum FilmDriveDetector {
             for rule in rules {
                 let (pattern, subpath) = splitRule(rule)
                 guard matches(volumeURL.lastPathComponent, pattern: pattern) else { continue }
-                for resolved in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
+                for resolved in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath, today: today)
                 where !paths.contains(resolved) {
                     paths.append(resolved)
                 }
@@ -130,11 +140,11 @@ enum FilmDriveDetector {
         return name.compare(trimmed, options: [.caseInsensitive]) == .orderedSame
     }
 
-    static func resolveSubpathMatches(rootURL: URL, subpath: String) -> [String] {
+    static func resolveSubpathMatches(rootURL: URL, subpath: String, today: Date = Date()) -> [String] {
         let trimmed = subpath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [rootURL.path] }
 
-        if !trimmed.contains("*") {
+        if !trimmed.contains("*"), !trimmed.contains("{") {
             let resolvedURL = rootURL.appendingPathComponent(trimmed)
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDirectory),
@@ -154,6 +164,11 @@ enum FilmDriveDetector {
         let fm = FileManager.default
 
         for componentPattern in components {
+            if DayFolderResolver.isRuleToken(componentPattern) {
+                currentURLs = DayFolderResolver.dayFolders(inAnyOf: currentURLs, today: today)
+                if currentURLs.isEmpty { break }
+                continue
+            }
             var nextURLs: [URL] = []
             for baseURL in currentURLs {
                 guard let children = try? fm.contentsOfDirectory(
