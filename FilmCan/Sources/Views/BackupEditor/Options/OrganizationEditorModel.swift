@@ -64,20 +64,24 @@ final class OrganizationEditorModel: ObservableObject {
 
     // MARK: Folder layout as a tree
 
-    /// The film's folder layout for the visual editor; nil when the tree cannot show it
-    /// (the text field then stays the only editor). A layout that is switched off
-    /// reads as empty.
-    var folderStructure: FolderStructure? {
-        guard let preset = editingOrganizationPresetBinding?.wrappedValue else { return nil }
-        guard preset.useFolderTemplate else { return FolderStructure() }
+    /// What the visual editor shows: the film's layout as a tree, or the reason the
+    /// text field stays the only editor. Nothing is written by reading it.
+    var folderTreeState: FolderLayoutSource.TreeState {
+        guard let preset = editingOrganizationPresetBinding?.wrappedValue else { return .notShowable }
         let layout = FolderLayoutSource.templates(
             preset: preset, isNetflix: isNetflixPresetSelected,
             cameraOverride: cameraFolderTemplate, soundOverride: soundFolderTemplate)
-        return FolderStructure.parse(camera: layout.camera, sound: layout.sound)
+        return FolderLayoutSource.treeState(
+            useFolderTemplate: preset.useFolderTemplate, camera: layout.camera, sound: layout.sound,
+            hasSettingsSetAside: viewModel.parkedOwnCopy != nil)
     }
+
+    var folderStructure: FolderStructure? { folderTreeState.structure }
 
     /// Writes the tree back to the same strings the engine reads.
     func setFolderStructure(_ structure: FolderStructure) {
+        // Never over a layout the tree is not showing (switched off, set aside, not showable).
+        guard folderTreeState.structure != nil else { return }
         objectWillChange.send()
         // A separate sound folder needs the film's own settings record.
         viewModel.ensureOwnSettingsCopy()

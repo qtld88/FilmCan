@@ -829,11 +829,12 @@ class BackupEditorViewModel: ObservableObject {
         return placed.copy.id
     }
 
-    /// Makes sure the film has its own settings record (a film on "Off" has none yet),
-    /// carrying exactly what it runs with today. Needed before saving anything the
+    /// Makes sure the film has its own settings record (a film on "Off" that never had
+    /// one), carrying exactly what it runs with today. Needed before saving anything the
     /// plain "Off" fields cannot hold, such as a separate sound folder.
     func ensureOwnSettingsCopy() {
-        guard config.selectedOrganizationPresetId == nil else { return }
+        // Settings kept aside while the film is on "Off" are never replaced from here.
+        guard config.selectedOrganizationPresetId == nil, parkedOwnCopy == nil else { return }
         var preset = localOrganizationPreset
         preset.copyFolderContents = config.copyFolderContents
         preset.runInParallel = config.runInParallel

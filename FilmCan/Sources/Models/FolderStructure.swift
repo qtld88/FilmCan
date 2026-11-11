@@ -51,11 +51,17 @@ struct FolderStructure: Equatable {
     }
 
     /// A folder name the tree can show: not empty, and every `{…}` in it is a known word.
+    /// The folder must also be one a run writes exactly as shown: a name the run would
+    /// alter (accents, "&", doubled or leading underscores, "." or "..") is not showable.
     static func isShowable(_ segment: String) -> Bool {
         guard !segment.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        // Each automatic word becomes a stand-in letter, in one pass: what is left of
+        // a brace afterwards is not a known word.
         var rest = segment
-        for known in knownTokens { rest = rest.replacingOccurrences(of: known.token, with: "") }
-        return !rest.contains("{") && !rest.contains("}")
+        for known in knownTokens { rest = rest.replacingOccurrences(of: known.token, with: "\u{1}") }
+        guard !rest.contains("{"), !rest.contains("}") else { return false }
+        let plain = rest.replacingOccurrences(of: "\u{1}", with: "X")
+        return OrganizationTemplate.folderNameAsWritten(plain) == plain
     }
 
     var cameraTemplate: String { camera.joined(separator: "/") }
@@ -131,7 +137,8 @@ struct FolderStructure: Equatable {
         var out = name.filter { !"/\\:{}".contains($0) }
         out = out.trimmingCharacters(in: .whitespacesAndNewlines)
         while out.hasPrefix(".") { out.removeFirst() }
-        return out
+        // Keep the name as a run would write it, so the tree never shows another folder.
+        return OrganizationTemplate.folderNameAsWritten(out) ?? ""
     }
 
     private func touchesCamera(_ row: Row) -> Bool { row.branch != .sound }
@@ -241,6 +248,45 @@ struct FolderStructure: Equatable {
 /// own editable fields win over the preset's when they are filled (same rule as the
 /// run: `TransferViewModel.resolveOrganizationPreset`).
 enum FolderLayoutSource {
+    /// What the visual editor shows for a film.
+    enum TreeState: Equatable {
+        case editable(FolderStructure)
+        /// The layout is switched off but its text is kept: editing the tree would
+        /// replace it, so the tree waits until the layout is switched on.
+        case switchedOff
+        /// The film is on "Off" and its own settings are kept aside: a tree edit would
+        /// replace them.
+        case setAside
+        /// The text uses something the tree cannot show.
+        case notShowable
+
+        var structure: FolderStructure? {
+            if case .editable(let structure) = self { return structure }
+            return nil
+        }
+
+        /// The sentence shown in place of the tree.
+        var explanation: String? {
+            switch self {
+            case .editable: return nil
+            case .switchedOff: return "The folder layout is switched off. Switch it on to edit it here."
+            case .setAside: return "This movie's own settings are set aside. Choose them again in the Preset menu to edit the folder layout here."
+            case .notShowable: return "This layout uses names the visual editor cannot show. Edit it as text below."
+            }
+        }
+    }
+
+    static func treeState(useFolderTemplate: Bool, camera: String, sound: String,
+                          hasSettingsSetAside: Bool) -> TreeState {
+        if hasSettingsSetAside { return .setAside }
+        guard useFolderTemplate else {
+            let kept = !(camera + sound).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return kept ? .switchedOff : .editable(FolderStructure())
+        }
+        guard let structure = FolderStructure.parse(camera: camera, sound: sound) else { return .notShowable }
+        return .editable(structure)
+    }
+
     static func templates(preset: OrganizationPreset, isNetflix: Bool,
                           cameraOverride: String, soundOverride: String) -> (camera: String, sound: String) {
         var camera = preset.folderTemplate

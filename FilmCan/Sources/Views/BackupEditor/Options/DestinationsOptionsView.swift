@@ -153,10 +153,11 @@ struct DestinationsOptionsView: View {
                     }
 
                     Group {
-                        if let structure = model.folderStructure {
+                        let treeState = model.folderTreeState
+                        if let structure = treeState.structure {
                             FolderStructureEditor(structure: structure) { model.setFolderStructure($0) }
                         } else {
-                            Text("This layout uses names the visual editor cannot show. Edit it as text below.")
+                            Text(treeState.explanation ?? "")
                                 .font(FCType.meta)
                                 .foregroundColor(FilmCanTheme.textSecondary)
                         }
