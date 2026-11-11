@@ -8,13 +8,13 @@ Card recognition knows cinema cameras well but misses what a newcomer is most li
 
 ## Expected behaviour
 
-`CameraCardDetector.detect` keeps its order (first match wins) and gains four rules, all after the existing named families and before the sound rule.
+`CameraCardDetector.detect` keeps its order (first match wins) and gains four rules. The new families are tested after the existing named ones and before the sound rule; P2 extends the Panasonic rule in place.
 
 | Family | Rule | Brand |
 |---|---|---|
 | Panasonic P2 | `CONTENTS/CLIP` and `CONTENTS/VIDEO` both exist | `.panasonic` (existing brand) |
 | Insta360 | a `.insv` / `.insp` file within the scan, or a `DCIM/CameraNN` folder | `.insta360` (new) |
-| AVCHD | `PRIVATE/AVCHD` or `AVCHD/BDMV` | `.avchd` (new) |
+| AVCHD | `PRIVATE/AVCHD` (tested where it always was, right after the Panasonic markers) or `AVCHD/BDMV` at the root (tested after every named family) | `.avchd` (new) |
 | Generic DCIM | `DCIM/` holds at least one video file, directly or one folder down | `.genericDCIM` (new), shown as "Camera card" |
 
 Rules for generic DCIM:

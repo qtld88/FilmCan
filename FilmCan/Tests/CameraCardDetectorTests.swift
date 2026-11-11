@@ -135,6 +135,11 @@ final class CameraCardDetectorTests: XCTestCase {
         XCTAssertEqual(try detect(["PRIVATE/AVCHD/BDMV/STREAM/00000.MTS", "PRIVATE/M4ROOT/CLIP/C0001.MP4"])?.brand, .sony)
     }
 
+    /// `PRIVATE/AVCHD` keeps the precedence it had inside the Panasonic rule.
+    func test_avchd_privateFolder_stillWinsOverLaterFamilies() throws {
+        XCTAssertEqual(try detect(["PRIVATE/AVCHD/BDMV/x", "DCIM/100GOPRO/GOPR0001.MP4"])?.brand, .avchd)
+    }
+
     // MARK: - Generic DCIM
 
     func test_genericDCIM_withVideo() throws {

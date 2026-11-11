@@ -127,6 +127,11 @@ enum CameraCardDetector {
             || (exists("CONTENTS/CLIP") && exists("CONTENTS/VIDEO")) {
             return CardSignature(brand: .panasonic, reelName: nil)
         }
+        // AVCHD without a Panasonic marker. Kept at this position (it used to be part of
+        // the Panasonic rule) so it still wins over the families tested below.
+        if exists("PRIVATE/AVCHD") {
+            return CardSignature(brand: .avchd, reelName: nil)
+        }
 
         // 6. Blackmagic
         if entries.contains(where: { !$0.isDirectory && $0.depth <= 2 && $0.name.lowercased().hasSuffix(".braw") }) {
@@ -157,8 +162,8 @@ enum CameraCardDetector {
             return CardSignature(brand: .insta360, reelName: nil)
         }
 
-        // 10. AVCHD camcorders (any maker). Comes after every named family.
-        if exists("PRIVATE/AVCHD") || exists("AVCHD/BDMV") {
+        // 10. AVCHD at the root of the card (some camcorders). After every named family.
+        if exists("AVCHD/BDMV") {
             return CardSignature(brand: .avchd, reelName: nil)
         }
 
