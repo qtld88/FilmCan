@@ -93,6 +93,8 @@ struct BackupEditorView: View {
     }
     
     private func editorDidAppear() {
+        // The panel was left open: it wins over the history pane a new window starts with.
+        if wantsMovieSettings && isHistoryVisible { onCloseRightPane() }
         DispatchQueue.main.async { optionsReady = true }
         refreshPreview()
         DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
@@ -303,26 +305,30 @@ struct BackupEditorView: View {
         let isOverviewWide = contentWidth >= 750
         let contentPadding: CGFloat = contentWidth < 520 ? 12 : 24
 
+        let sideBySide = MovieSettingsPanel.isSideBySide(editorWidth: proxy.size.width)
         HStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    overviewSection(isWide: isOverviewWide)
-                    movieSettingsLine
+            // In a window too narrow for both, the panel takes the editor's place.
+            if !showsSettings || sideBySide {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        overviewSection(isWide: isOverviewWide)
+                        movieSettingsLine
+                    }
+                    .padding(contentPadding)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(contentPadding)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .onTapGesture {
-                if isEditingName {
-                    confirmEditingName()
+                .onTapGesture {
+                    if isEditingName {
+                        confirmEditingName()
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // The settings sit beside the cards and drives, so the folder preview stays
             // in view and follows every change.
             if showsSettings {
-                Divider()
+                if sideBySide { Divider() }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         movieSettingsPanelHeader

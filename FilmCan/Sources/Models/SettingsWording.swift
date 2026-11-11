@@ -71,9 +71,20 @@ enum MovieSettingsPanel {
         wantsOpen && !otherPaneOpen
     }
 
-    /// Width given to the panel inside an editor of `editorWidth`: wide enough for the
-    /// settings rows, never more than half the editor.
+    /// The settings rows need this much to show their switch or menu unclipped.
+    static let minimumWidth: CGFloat = 480
+
+    /// Below this editor width there is no room for the cards next to the panel:
+    /// the panel then takes the whole editor.
+    static let sideBySideEditorWidth: CGFloat = 840
+
+    static func isSideBySide(editorWidth: CGFloat) -> Bool {
+        editorWidth >= sideBySideEditorWidth
+    }
+
+    /// Width given to the panel inside an editor of `editorWidth`.
     static func width(editorWidth: CGFloat) -> CGFloat {
-        min(460, max(340, editorWidth * 0.5))
+        guard isSideBySide(editorWidth: editorWidth) else { return editorWidth }
+        return min(540, max(minimumWidth, editorWidth * 0.42))
     }
 }

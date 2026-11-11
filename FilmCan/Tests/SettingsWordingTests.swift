@@ -35,8 +35,11 @@ final class SettingsWordingTests: XCTestCase {
     }
 
     func test_panelWidth_staysBetweenItsBounds() {
-        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 1280), 460)
-        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 800), 400)
-        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 500), 340)
+        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 2000), 540)
+        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 1200), 504)
+        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 840), MovieSettingsPanel.minimumWidth)
+        // Too narrow for both: the panel takes the whole editor.
+        XCTAssertFalse(MovieSettingsPanel.isSideBySide(editorWidth: 839))
+        XCTAssertEqual(MovieSettingsPanel.width(editorWidth: 600), 600)
     }
 }

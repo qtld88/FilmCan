@@ -15,7 +15,6 @@ Every setting has one home, and its scope shows where it lives: app-wide setting
 - The panel holds the same four groups as before (Basic, Source, Destinations, Logs) and the Preset menu, laid out in their existing narrow form. Nothing is removed or moved between groups.
 - One side pane at a time: opening the panel closes History / Catalog; opening History or Catalog closes the panel.
 - The panel's open state is one app preference: it stays open when switching movies and across launches.
-- Choosing a preset from the menu opens the panel if it was closed (as it used to expand the card).
 - The quick tour step that pointed at the tab bar now points at the line.
 
 ### 2. Settings window
@@ -44,7 +43,9 @@ Only what is shown changes. Stored values, log lines, history entries and notifi
 
 ## Edge cases
 
-- Window too narrow for both: the panel takes at most half the editor (340 to 460 pt) and the cards stack, as they already do in a narrow window.
+- The panel is 480 to 540 pt wide (the settings rows need 480 to show their switch or menu). In an editor narrower than 840 pt there is no room for both: the panel takes the whole editor until it is closed. Next to the panel, the cards stack as they already do in a narrow window.
+- At launch, a panel left open wins over the history pane a new window starts with.
+- The wide form of the tab bar and the collapse state of the old card are no longer reached; they are left in place, unused, to keep this change small.
 - A movie switched while the panel is open: the panel shows the new movie's settings.
 - The phone/webhook form still names its technical fields (address, access key): it is reorganised by the phone-notifications lot, not here.
 
