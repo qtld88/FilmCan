@@ -1,0 +1,55 @@
+name: macOS tests
+
+on:
+  push:
+    branches: ['next', 'qt1/**']
+    paths-ignore: ['website/**', 'website-src/**', 'assets/**', '**/*.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The "Embed rsync" build phase harvests libxxhash from Homebrew rsync;
+      # XXHash.swift dlopens it, so the xxh128 tests need it in the bundle.
+      - name: Install build tools
+        run: brew install xcodegen rsync
+
+      # Reference CLI for ASCMHLConformanceTests; those tests skip when it is absent.
+      - name: Install ascmhl reference tool
+        continue-on-error: true
+        run: pipx install ascmhl
+
+      # The committed .xcodeproj can lag behind new source files; project.yml is the source of truth.
+      - name: Generate Xcode project
+        working-directory: FilmCan
+        run: xcodegen generate
+
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project FilmCan/FilmCan.xcodeproj \
+            -scheme FilmCan \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/ci \
+            2>&1 | tee xcodebuild.log | grep -E "error:|warning: Missing|Test Suite '.*' (passed|failed)|Test Case .* failed|Executed [0-9]+ tests|\*\* TEST" || true
+          grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log
+
+      - name: Upload full log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          retention-days: 7

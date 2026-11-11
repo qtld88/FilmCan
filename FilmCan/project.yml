@@ -31,6 +31,9 @@ targets:
       - Sources
     dependencies:
       - package: Sparkle
+    scheme:
+      testTargets:
+        - FilmCanTests
     preBuildScripts:
       - name: Embed rsync
         script: |
