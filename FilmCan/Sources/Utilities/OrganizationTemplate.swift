@@ -6,6 +6,8 @@ struct ShootMetadata: Equatable {
     var day: String = ""
     var unit: String = ""
     var cameraFormat: String = ""
+    /// The film's name, for the `{movie}` token.
+    var movie: String = ""
     static let empty = ShootMetadata()
 }
 
@@ -159,8 +161,18 @@ enum OrganizationTemplate {
             "{episode}": metadata.episode,
             "{day}": metadata.day,
             "{unit}": metadata.unit,
-            "{cameraFormat}": metadata.cameraFormat
+            "{cameraFormat}": metadata.cameraFormat,
+            "{movie}": movieFolderName(metadata.movie)
         ]
+    }
+
+    /// A film name as one folder name: a "/" or ":" in the name must not open a subfolder.
+    static func movieFolderName(_ name: String) -> String {
+        var out = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        for separator in ["/", "\\", ":"] {
+            out = out.replacingOccurrences(of: separator, with: "-")
+        }
+        return out
     }
 
     private static func fileDateString(for path: String, attribute: FileAttributeKey) -> String {
@@ -241,6 +253,15 @@ enum OrganizationTemplate {
             out.append(ch)
         }
         return out.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    }
+
+    /// One folder name as a run writes it (same steps as a folder layout's components);
+    /// nil when the run would drop it. Lets an editor refuse a name it could not show
+    /// faithfully.
+    static func folderNameAsWritten(_ name: String) -> String? {
+        guard let clean = sanitizePathComponent(name) else { return nil }
+        let collapsed = collapseUnderscores(clean)
+        return collapsed.isEmpty ? nil : collapsed
     }
 
     private static func sanitizePathComponent(_ name: String) -> String? {

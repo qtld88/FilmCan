@@ -14,13 +14,13 @@ struct BasicOptionsView: View {
                 title: "Verification",
                 description: "How thoroughly FilmCan confirms each file landed correctly.",
                 options: [
-                    .init("Paranoid",
+                    .init(SettingsWording.verification(.paranoid),
                           good: ["Re-reads every file from disk and compares",
                                  "Catches write errors and in-memory corruption"],
                           bad: ["Roughly doubles disk I/O (the re-read pass)"]),
-                    .init("Fast",
+                    .init(SettingsWording.verification(.fast),
                           good: ["Verifies against the hash computed during the copy",
-                                 "No re-read — about twice as fast as Paranoid"],
+                                 "No re-read: about twice as fast as the full check"],
                           bad: ["Doesn't catch a bad write that the OS reported as OK",
                                 "Trusts the data already in memory wasn't corrupted"]),
                     .init("Off",
@@ -28,8 +28,8 @@ struct BasicOptionsView: View {
                           bad: ["A write error or corruption goes undetected",
                                 "No hash list — the transfer log can't list individual files (status + counts only)"])
                 ],
-                notes: ["Paranoid is recommended for safety-critical backups.",
-                        "The transfer log's per-file list is derived from the hash list, so it needs Fast or Paranoid."]
+                notes: ["The full check is recommended for safety-critical backups.",
+                        "The transfer log's per-file list comes from the checksum list, so it needs the fast or the full check."]
             )
 
             HStack(spacing: OptionsLayout.spacing) {
@@ -50,7 +50,7 @@ struct BasicOptionsView: View {
                     ForEach(VerifyMode.allCases) { mode in
                         Button(action: { viewModel.verificationMode = mode }) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(mode.displayName)
+                                Text(SettingsWording.verification(mode))
                                 Text(mode.description)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -59,7 +59,7 @@ struct BasicOptionsView: View {
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(viewModel.verificationMode.displayName)
+                        Text(SettingsWording.verification(viewModel.verificationMode))
                         Image(systemName: "chevron.down").font(.caption)
                     }
                     .padding(.vertical, 6)
@@ -127,12 +127,12 @@ struct BasicOptionsView: View {
                     .frame(width: OptionsLayout.iconWidth)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("Duplicate policy")
+                        Text(SettingsWording.ifFileExists)
                             .font(FCType.itemTitle)
                             .foregroundColor(FilmCanTheme.textPrimary)
                         InfoPopoverButton(
                             content: InfoPopoverContent(
-                                title: "Duplicate policy",
+                                title: SettingsWording.ifFileExists,
                                 description: "What FilmCan does with a file or folder that already exists at the destination.",
                                 options: [
                                     .init("Skip",
@@ -331,7 +331,7 @@ struct BasicOptionsView: View {
     @ViewBuilder
     private var hashListStyleRow: some View {
         let info = InfoPopoverContent(
-            title: "Hash list style",
+            title: SettingsWording.checksumListFormat,
             description: "Which checksum manifest FilmCan writes next to each backed-up roll.",
             options: [
                 .init("ASC MHL (Netflix-ready)",
@@ -354,7 +354,7 @@ struct BasicOptionsView: View {
                 .frame(width: OptionsLayout.iconWidth)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text("Hash list style")
+                    Text(SettingsWording.checksumListFormat)
                         .font(FCType.itemTitle)
                         .foregroundColor(FilmCanTheme.textPrimary)
                     InfoPopoverButton(content: info)

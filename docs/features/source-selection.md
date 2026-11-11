@@ -42,7 +42,7 @@ and sound folders (e.g. **Netflix Ingest**).
 
 ## Card recognition
 
-Options › Source › **Detect camera and sound cards automatically** (off by default).
+Options › Source › **Detect camera and sound cards automatically** (on for a new movie; movies you already had keep their setting).
 FilmCan recognises a card from the folders the camera writes: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. A drive holding only WAV/BWF files is a sound card and is
 tagged Sound. Recognised cards get a badge ("Sony card") on their source row and are added to
@@ -142,7 +142,7 @@ caméra et son séparés (par exemple **Netflix Ingest**).
 
 ## Reconnaissance des cartes
 
-Options › Source › **Detect camera and sound cards automatically** (désactivé par défaut).
+Options › Source › **Detect camera and sound cards automatically** (activé sur un nouveau film ; les films déjà créés gardent leur réglage).
 FilmCan reconnaît une carte d'après les dossiers écrits par la caméra : ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. Un disque ne contenant que des fichiers WAV/BWF est une carte son et est
 marqué Sound. Les cartes reconnues reçoivent un badge (« Sony card ») sur leur ligne de source et sont ajoutées aux
@@ -242,7 +242,7 @@ und Sound-Ordnern (z. B. **Netflix Ingest**).
 
 ## Kartenerkennung
 
-Options › Source › **Detect camera and sound cards automatically** (standardmäßig aus).
+Options › Source › **Detect camera and sound cards automatically** (bei einem neuen Film an; bereits vorhandene Filme behalten ihre Einstellung).
 FilmCan erkennt eine Karte an den Ordnern, die die Kamera schreibt: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. Ein Laufwerk mit nur WAV/BWF-Dateien ist eine Soundkarte und wird
 als Sound markiert. Erkannte Karten erhalten ein Badge („Sony card“) in ihrer Quellzeile und werden den
@@ -342,7 +342,7 @@ y carpetas de sonido (por ejemplo, **Netflix Ingest**).
 
 ## Reconocimiento de tarjetas
 
-Options › Source › **Detect camera and sound cards automatically** (desactivado por defecto).
+Options › Source › **Detect camera and sound cards automatically** (activado en una película nueva; las películas que ya tenía conservan su ajuste).
 FilmCan reconoce una tarjeta por las carpetas que escribe la cámara: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. Una unidad que solo contiene archivos WAV/BWF es una tarjeta de sonido y se
 marca como Sound. Las tarjetas reconocidas reciben una insignia («Sony card») en su fila de origen y se añaden a los

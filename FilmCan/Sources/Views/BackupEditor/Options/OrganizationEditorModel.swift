@@ -62,6 +62,45 @@ final class OrganizationEditorModel: ObservableObject {
         return p.useRenameTemplate && p.renameTemplate.contains(token)
     }
 
+    // MARK: Folder layout as a tree
+
+    /// What the visual editor shows: the film's layout as a tree, or the reason the
+    /// text field stays the only editor. Nothing is written by reading it.
+    var folderTreeState: FolderLayoutSource.TreeState {
+        guard let preset = editingOrganizationPresetBinding?.wrappedValue else { return .notShowable }
+        let layout = FolderLayoutSource.templates(
+            preset: preset, isNetflix: isNetflixPresetSelected,
+            cameraOverride: cameraFolderTemplate, soundOverride: soundFolderTemplate)
+        return FolderLayoutSource.treeState(
+            useFolderTemplate: preset.useFolderTemplate, camera: layout.camera, sound: layout.sound,
+            hasSettingsSetAside: viewModel.parkedOwnCopy != nil)
+    }
+
+    var folderStructure: FolderStructure? { folderTreeState.structure }
+
+    /// Writes the tree back to the same strings the engine reads.
+    func setFolderStructure(_ structure: FolderStructure) {
+        // Never over a layout the tree is not showing (switched off, set aside, not showable).
+        guard folderTreeState.structure != nil else { return }
+        objectWillChange.send()
+        // A separate sound folder needs the film's own settings record.
+        viewModel.ensureOwnSettingsCopy()
+        guard let binding = editingOrganizationPresetBinding else { return }
+        var preset = binding.wrappedValue
+        preset.folderTemplate = structure.cameraTemplate
+        preset.soundFolderTemplate = structure.soundTemplate
+        preset.useFolderTemplate = !structure.cameraTemplate.isEmpty
+        binding.wrappedValue = preset
+        // Align the film's working copy at once, so its next save cannot write the
+        // previous layout back.
+        viewModel.syncFromSelectedPresetIfNeeded()
+        if isNetflixPresetSelected {
+            // The Netflix preset reads the film's two editable fields first.
+            viewModel.cameraFolderTemplate = structure.cameraTemplate
+            viewModel.soundFolderTemplate = structure.soundTemplate
+        }
+    }
+
     func binding<Value>(_ keyPath: ReferenceWritableKeyPath<OrganizationEditorModel, Value>) -> Binding<Value> {
         Binding(get: { self[keyPath: keyPath] }, set: { self[keyPath: keyPath] = $0 })
     }
@@ -75,13 +114,15 @@ final class OrganizationEditorModel: ObservableObject {
 
     private var selectedPresetBinding: Binding<OrganizationPreset>? {
         guard let id = viewModel.selectedOrganizationPresetId,
-              let index = viewModel.organizationPresets.firstIndex(where: { $0.id == id }) else { return nil }
+              let current = viewModel.organizationPresets.first(where: { $0.id == id }) else { return nil }
+        // Looked up by id on every read and write: the list is shared by every movie,
+        // so a position can move under an open editor.
         return Binding(
-            get: { self.viewModel.organizationPresets[index] },
+            get: { self.viewModel.organizationPresets.first(where: { $0.id == id }) ?? current },
             set: { newValue in
                 self.objectWillChange.send()
                 var presets = self.viewModel.organizationPresets
-                if index < presets.count {
+                if let index = presets.firstIndex(where: { $0.id == id }) {
                     presets[index] = newValue
                     self.viewModel.organizationPresets = presets
                 }
@@ -96,6 +137,7 @@ final class OrganizationEditorModel: ObservableObject {
             ("{destinationDriveName}", "Name of the drive containing the destination."),
             ("{destination}", "Destination folder name."),
             ("{date}", "Today's date (YYYYMMDD)."),
+            ("{movie}", "This movie's name."),
             ("{episode}", "Project / episode, from Shoot metadata."),
             ("{day}", "Shoot day, from Shoot metadata."),
             ("{unit}", "Unit, from Shoot metadata."),

@@ -82,11 +82,11 @@ struct DestinationsOptionsView: View {
     private var folderTemplatesSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text("Folder templates")
+                Text(SettingsWording.folderLayout)
                     .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 InfoPopoverButton(content: InfoPopoverContent(
-                    title: "Folder templates",
+                    title: SettingsWording.folderLayout,
                     description: "Where each source lands at the destination, by media type. The roll folder is appended automatically.",
                     notes: ["Camera sources use the Camera folder; Sound-tagged sources use the Sound folder.",
                             "Tokens: {date} {episode} {day} {unit} {cameraFormat}.",
@@ -127,12 +127,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("Folder template")
+                                Text(SettingsWording.folderLayout)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "Folder template",
+                                        title: SettingsWording.folderLayout,
                                         description: "Creates the folder structure inside the destination.",
                                         notes: [
                                             "Use \"/\" for subfolders.",
@@ -152,7 +152,23 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.toggleWidth, alignment: .leading)
                     }
 
+                    Group {
+                        let treeState = model.folderTreeState
+                        if let structure = treeState.structure {
+                            FolderStructureEditor(structure: structure) { model.setFolderStructure($0) }
+                        } else {
+                            Text(treeState.explanation ?? "")
+                                .font(FCType.meta)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                        }
+                    }
+                    .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
+
                     if presetBinding.useFolderTemplate.wrappedValue {
+                        Text("The same layout as text")
+                            .font(FCType.meta)
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                            .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
                         TextField("RUSHES/DAY_{counter}_{date}/CARD_{source}", text: presetBinding.folderTemplate)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.body, design: .monospaced))
@@ -181,12 +197,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("File Rename Template")
+                                Text(SettingsWording.renameFiles)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "File Rename Template",
+                                        title: SettingsWording.renameFiles,
                                         description: "Renames each copied item before it is placed in the destination.",
                                         notes: [
                                             "Use tokens like `{filename}` and `{counter}`.",
@@ -262,12 +278,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("Custom date for tokens")
+                                Text(SettingsWording.customDateInNames)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "Custom date for tokens",
+                                        title: SettingsWording.customDateInNames,
                                         description: "Use a specific date for {date}, {time}, and {datetime}.",
                                         pros: [
                                             "Keeps folder names aligned with shoot day",

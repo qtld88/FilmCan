@@ -16,11 +16,13 @@ class BackupEditorViewModel: ObservableObject {
     @Published var showValidationError: Bool = false
     @Published var validationMessage: String = ""
     
-    private let storage = AppState.shared.storage
+    private let storage: ConfigurationStorage
     private var isSyncingFromPreset = false
     
-    init(config: BackupConfiguration) {
+    /// `storage`: the app's storage unless a test passes its own (a temp directory).
+    init(config: BackupConfiguration, storage: ConfigurationStorage? = nil) {
         self.config = config
+        self.storage = storage ?? AppState.shared.storage
     }
 
     func syncFromStorage(_ updated: BackupConfiguration) {
@@ -315,7 +317,8 @@ class BackupEditorViewModel: ObservableObject {
             source: path, destinations: config.destinationPaths,
             preset: effectiveRunPreset(), date: Date(),
             metadata: ShootMetadata(episode: config.episode, day: config.day,
-                                    unit: config.unit, cameraFormat: config.cameraFormat),
+                                    unit: config.unit, cameraFormat: config.cameraFormat,
+                                    movie: config.name),
             mediaKind: mediaKind(for: path))
     }
 
@@ -804,10 +807,83 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    /// Shared presets: what this film can start from. Its own copy is not listed.
+    var sharedOrganizationPresets: [OrganizationPreset] {
+        FilmPresetOwnership.shared(storage.organizationPresets)
+    }
+
+    /// True when the film's settings are its own copy (always, once adopted).
+    var selectedPresetIsOwnCopy: Bool {
+        guard let id = config.selectedOrganizationPresetId,
+              let preset = storage.organizationPresets.first(where: { $0.id == id }) else { return false }
+        return FilmPresetOwnership.isOwnCopy(preset, of: config.id)
+    }
+
+    /// Makes the film's own copy a copy of `preset` and returns its id (stable once the
+    /// film has a copy). The shared preset itself is never linked to the film.
+    private func replaceOwnCopy(with preset: OrganizationPreset) -> UUID {
+        objectWillChange.send()
+        let placed = FilmPresetOwnership.settingOwnCopy(
+            of: preset, for: config.id, in: storage.organizationPresets)
+        storage.organizationPresets = placed.presets
+        return placed.copy.id
+    }
+
+    /// Makes sure the film has its own settings record (a film on "Off" that never had
+    /// one), carrying exactly what it runs with today. Needed before saving anything the
+    /// plain "Off" fields cannot hold, such as a separate sound folder.
+    func ensureOwnSettingsCopy() {
+        // Settings kept aside while the film is on "Off" are never replaced from here.
+        guard config.selectedOrganizationPresetId == nil, parkedOwnCopy == nil else { return }
+        var preset = localOrganizationPreset
+        preset.copyFolderContents = config.copyFolderContents
+        preset.runInParallel = config.runInParallel
+        preset.engineOptions = config.engineOptions
+        preset.logEnabled = config.logEnabled
+        preset.logLocation = config.logLocation
+        preset.customLogPath = config.customLogPath
+        preset.logFileNameTemplate = config.logFileNameTemplate
+        preset.duplicatePolicy = config.duplicatePolicy
+        preset.duplicateCounterTemplate = config.duplicateCounterTemplate
+        isSyncingFromPreset = true
+        config.mirrorOrganization(from: preset)
+        config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
+        save()
+        isSyncingFromPreset = false
+    }
+
+    /// The film's own settings while the film is switched to "Off": kept, so switching
+    /// back does not lose them.
+    var parkedOwnCopy: OrganizationPreset? {
+        guard config.selectedOrganizationPresetId == nil else { return nil }
+        return storage.organizationPresets.first { $0.ownerFilmId == config.id }
+    }
+
+    /// Back from "Off" to the film's own settings.
+    func useParkedOwnCopy() {
+        guard let parked = parkedOwnCopy else { return }
+        isSyncingFromPreset = true
+        config.mirrorOrganization(from: parked)
+        config.selectedOrganizationPresetId = parked.id
+        save()
+        isSyncingFromPreset = false
+        refreshGenericCards(recompute: true)
+    }
+
     var selectedOrganizationPresetId: UUID? {
         get { config.selectedOrganizationPresetId }
         set {
-            config.selectedOrganizationPresetId = newValue
+            if let id = newValue,
+               let preset = storage.organizationPresets.first(where: { $0.id == id }),
+               !FilmPresetOwnership.isOwnCopy(preset, of: config.id) {
+                // Picking a preset copies it: the film never edits a shared preset.
+                isSyncingFromPreset = true
+                config.mirrorOrganization(from: preset)
+                config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
+                isSyncingFromPreset = false
+            } else {
+                config.selectedOrganizationPresetId = newValue
+            }
             save()
             refreshGenericCards(recompute: true)
         }
@@ -856,6 +932,8 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    /// "Off": the film stops using its folder and file settings. Its own copy is kept
+    /// aside (see `parkedOwnCopy`); only the trash button deletes it.
     func applyOffOrganizationSettings() {
         config.selectedOrganizationPresetId = nil
         config.organizationFolderTemplate = config.offOrganizationFolderTemplate
@@ -871,24 +949,14 @@ class BackupEditorViewModel: ObservableObject {
         save()
     }
 
+    /// Starts the film from `preset`: takes its values and keeps a private copy.
+    /// Later edits stay in the film; the shared preset is not touched.
     func applyPreset(_ preset: OrganizationPreset) {
-        config.copyFolderContents = preset.copyFolderContents
-        config.runInParallel = preset.runInParallel
-        config.engineOptions = preset.engineOptions
-        config.logEnabled = preset.logEnabled
-        config.logLocation = preset.logLocation
-        config.customLogPath = preset.customLogPath
-        config.logFileNameTemplate = preset.logFileNameTemplate
-        config.duplicatePolicy = preset.duplicatePolicy
-        config.duplicateCounterTemplate = preset.duplicateCounterTemplate
-        applyPresetOrganizationSettings(preset)
-        config.selectedOrganizationPresetId = preset.id
-        // Netflix's approved layout puts per-roll reports in a Reports/ folder at the
-        // shoot-day root. Pre-fill that as a changeable default (don't clobber a path
-        // the user already chose).
-        if preset.name == OrganizationPreset.netflixIngestName, config.customLogPath.isEmpty {
-            config.logLocation = .custom
-            config.customLogPath = "Reports"
+        config.takeSettings(from: preset)
+        if FilmPresetOwnership.isOwnCopy(preset, of: config.id) {
+            config.selectedOrganizationPresetId = preset.id
+        } else {
+            config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
         }
         save()
     }
@@ -898,7 +966,7 @@ class BackupEditorViewModel: ObservableObject {
     func applyNetflixIngestPreset() {
         objectWillChange.send()
         let preset: OrganizationPreset
-        if let existing = storage.organizationPresets.first(where: { $0.name == OrganizationPreset.netflixIngestName }) {
+        if let existing = sharedOrganizationPresets.first(where: { $0.name == OrganizationPreset.netflixIngestName }) {
             preset = existing
         } else {
             let p = OrganizationPreset.netflixIngest()
@@ -912,22 +980,9 @@ class BackupEditorViewModel: ObservableObject {
         guard let selectedId = config.selectedOrganizationPresetId,
               let preset = storage.organizationPresets.first(where: { $0.id == selectedId }) else { return }
         isSyncingFromPreset = true
-        applyPresetOrganizationSettings(preset)
+        config.mirrorOrganization(from: preset)
         save()
         isSyncingFromPreset = false
-    }
-
-    private func applyPresetOrganizationSettings(_ preset: OrganizationPreset) {
-        config.organizationFolderTemplate = preset.folderTemplate
-        config.organizationRenameTemplate = preset.renameTemplate
-        config.organizationUseFolderTemplate = preset.useFolderTemplate
-        config.organizationUseRenameTemplate = preset.useRenameTemplate
-        config.organizationRenameOnlyPatterns = preset.renameOnlyPatterns
-        config.organizationIncludePatterns = preset.includePatterns
-        config.organizationExcludePatterns = preset.excludePatterns
-        config.organizationCopyOnlyPatterns = preset.copyOnlyPatterns
-        config.organizationUseCustomDate = preset.useCustomDate
-        config.organizationCustomDate = preset.customDate
     }
 
     func updateSelectedPresetFromCurrent() {
@@ -957,22 +1012,30 @@ class BackupEditorViewModel: ObservableObject {
         storage.save()
     }
 
+    /// Saves the film's current settings as a new shared preset. The film keeps its
+    /// own copy; a film that had no folder settings of its own starts using them.
     func saveCurrentSettingsAsPreset() {
         objectWillChange.send()
-        var preset = OrganizationPreset()
-        preset.name = "Preset \(storage.organizationPresets.count + 1)"
-
-        preset.folderTemplate = config.organizationFolderTemplate
-        preset.renameTemplate = config.organizationRenameTemplate
-        preset.useFolderTemplate = config.organizationUseFolderTemplate
-        preset.useRenameTemplate = config.organizationUseRenameTemplate
-        preset.renameOnlyPatterns = config.organizationRenameOnlyPatterns
-        preset.includePatterns = config.organizationIncludePatterns
-        preset.excludePatterns = config.organizationExcludePatterns
-        preset.copyOnlyPatterns = config.organizationCopyOnlyPatterns
-        preset.useCustomDate = config.organizationUseCustomDate
-        preset.customDate = config.organizationCustomDate
-
+        var preset: OrganizationPreset
+        if let id = config.selectedOrganizationPresetId,
+           let own = storage.organizationPresets.first(where: { $0.id == id }) {
+            // The film's copy already carries everything, sound folders included.
+            preset = own
+            preset.id = UUID()
+            preset.ownerFilmId = nil
+        } else {
+            preset = OrganizationPreset()
+            preset.folderTemplate = config.organizationFolderTemplate
+            preset.renameTemplate = config.organizationRenameTemplate
+            preset.useFolderTemplate = config.organizationUseFolderTemplate
+            preset.useRenameTemplate = config.organizationUseRenameTemplate
+            preset.renameOnlyPatterns = config.organizationRenameOnlyPatterns
+            preset.includePatterns = config.organizationIncludePatterns
+            preset.excludePatterns = config.organizationExcludePatterns
+            preset.copyOnlyPatterns = config.organizationCopyOnlyPatterns
+            preset.useCustomDate = config.organizationUseCustomDate
+            preset.customDate = config.organizationCustomDate
+        }
         preset.copyFolderContents = config.copyFolderContents
         preset.runInParallel = config.runInParallel
         preset.engineOptions = config.engineOptions
@@ -983,32 +1046,48 @@ class BackupEditorViewModel: ObservableObject {
         preset.duplicatePolicy = config.duplicatePolicy
         preset.duplicateCounterTemplate = config.duplicateCounterTemplate
 
+        let sharedNames = Set(sharedOrganizationPresets.map(\.name))
+        if config.selectedOrganizationPresetId == nil || sharedNames.contains(preset.name) {
+            preset.name = FilmPresetOwnership.nextSharedName(in: storage.organizationPresets)
+        }
         storage.organizationPresets.append(preset)
-        config.selectedOrganizationPresetId = preset.id
+        if config.selectedOrganizationPresetId == nil {
+            config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
+        }
         storage.save()
         save()
+    }
+
+    /// Deletes a shared preset. Films that started from it keep their own copy.
+    func deleteSharedPreset(id: UUID) {
+        objectWillChange.send()
+        storage.organizationPresets.removeAll { $0.id == id && $0.ownerFilmId == nil }
+        storage.save()
     }
 
     func addOrganizationPreset() {
         objectWillChange.send()
         var preset = OrganizationPreset()
-        preset.name = "Preset \(storage.organizationPresets.count + 1)"
+        preset.name = FilmPresetOwnership.nextSharedName(in: storage.organizationPresets)
         preset.folderTemplate = ""
         preset.renameTemplate = ""
         preset.useFolderTemplate = false
         preset.useRenameTemplate = false
         preset.renameOnlyPatterns = []
         storage.organizationPresets.append(preset)
-        config.selectedOrganizationPresetId = preset.id
+        config.mirrorOrganization(from: preset)
+        config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
         storage.save()
         save()
     }
     
     func deleteOrganizationPreset(id: UUID) {
         objectWillChange.send()
+        let wasSelected = config.selectedOrganizationPresetId == id
         storage.organizationPresets.removeAll { $0.id == id }
-        if config.selectedOrganizationPresetId == id {
-            config.selectedOrganizationPresetId = storage.organizationPresets.first?.id
+        if wasSelected {
+            // Never fall back to another record: it could be another film's copy.
+            applyOffOrganizationSettings()
         }
         storage.save()
         save()
