@@ -68,21 +68,23 @@ enum ReportArchive {
 
     /// The checksum list of each roll this destination result wrote: the latest ASC MHL
     /// generation on disk, else the simple hidden list. Sorted by roll name.
-    static func hashLists(for result: TransferResult) -> [(roll: String, url: URL)] {
+    /// `style` is the film's current style: it decides which list is looked for first, so an
+    /// old list of the other style left in the roll is not picked over the current one.
+    static func hashLists(for result: TransferResult,
+                          style: HashListStyle = .ascMHL) -> [(roll: String, url: URL)] {
         guard let dest = result.destinationResults.first else { return [] }
         var out: [(roll: String, url: URL)] = []
         for (rootPath, rollFolder) in dest.rollFolders {
             let roll = (rootPath as NSString).lastPathComponent
             let ascDir = FanOutCopier.ascMHLDir(rollFolder: rollFolder)
-            if let name = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir) {
-                out.append((roll, ascDir.appendingPathComponent(name)))
-                continue
-            }
-            let simple = URL(fileURLWithPath: dest.destinationPath)
+            let asc = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir)
+                .map { ascDir.appendingPathComponent($0) }
+            let simpleURL = URL(fileURLWithPath: dest.destinationPath)
                 .appendingPathComponent(".filmcan").appendingPathComponent("hashlists")
                 .appendingPathComponent("\(roll).mhl")
-            if FileManager.default.fileExists(atPath: simple.path) {
-                out.append((roll, simple))
+            let simple = FileManager.default.fileExists(atPath: simpleURL.path) ? simpleURL : nil
+            if let url = (style == .ascMHL ? (asc ?? simple) : (simple ?? asc)) {
+                out.append((roll, url))
             }
         }
         return out.sorted { $0.roll < $1.roll }
@@ -145,6 +147,6 @@ enum ReportArchive {
         let target = folder(
             base: baseURL(defaults: defaults), film: config.name, day: config.day,
             date: result.startTime, drive: driveName(for: result))
-        return copy(pdfPath: pdfPath, hashLists: hashLists(for: result), into: target)
+        return copy(pdfPath: pdfPath, hashLists: hashLists(for: result, style: config.hashListStyle), into: target)
     }
 }

@@ -130,6 +130,16 @@ final class ReportArchiveTests: XCTestCase {
         XCTAssertEqual(lists[1].url.lastPathComponent, "S001.mhl")
     }
 
+    /// A roll holding both kinds: the film's current style decides.
+    func testHashListsFollowTheFilmStyleWhenBothExist() throws {
+        let (result, _) = try makeResult()
+        try write("simpleA", to: tmp.appendingPathComponent("SSD-A/.filmcan/hashlists/A001.mhl"))
+        XCTAssertEqual(ReportArchive.hashLists(for: result, style: .ascMHL)[0].url.lastPathComponent,
+                       "0002_A001_2026-11-11_100000Z.mhl")
+        XCTAssertEqual(ReportArchive.hashLists(for: result, style: .simpleHidden)[0].url.lastPathComponent,
+                       "A001.mhl")
+    }
+
     func testHashListsEmptyWithoutDestinationResult() {
         let result = TransferResult(configurationName: "P", destination: "/nowhere", startTime: Date())
         XCTAssertTrue(ReportArchive.hashLists(for: result).isEmpty)
