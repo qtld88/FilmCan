@@ -1,7 +1,11 @@
 import Foundation
 
 enum CameraBrand: String, Codable, CaseIterable {
-    case arri, red, sony, canon, panasonic, blackmagic, dji, gopro, soundRecorder
+    case arri, red, sony, canon, panasonic, blackmagic, dji, gopro
+    case insta360, avchd
+    /// Any other card laid out the standard `DCIM/` way (photo cameras, drones, phones).
+    case genericDCIM
+    case soundRecorder
 
     var displayName: String {
         switch self {
@@ -13,11 +17,32 @@ enum CameraBrand: String, Codable, CaseIterable {
         case .blackmagic: return "Blackmagic"
         case .dji: return "DJI"
         case .gopro: return "GoPro"
+        case .insta360: return "Insta360"
+        case .avchd: return "AVCHD"
+        case .genericDCIM: return "Camera"
         case .soundRecorder: return "Sound recorder"
         }
     }
 
     var isSound: Bool { self == .soundRecorder }
+
+    /// One plain sentence: what on the card makes FilmCan recognise this family.
+    var recognisedBy: String {
+        switch self {
+        case .arri: return "ARRIRAW or ARRI-named MXF clips"
+        case .red: return "an .RDM reel folder"
+        case .sony: return "the M4ROOT or XDROOT folder"
+        case .canon: return "CONTENTS/CLIPS folders, or a CANON folder in DCIM"
+        case .panasonic: return "the PANA_GRP folder, a _PANA folder in DCIM, or a P2 CONTENTS folder"
+        case .blackmagic: return "Blackmagic RAW clips"
+        case .dji: return "DJI folders or DJI-named files in DCIM"
+        case .gopro: return "a GOPRO folder in DCIM"
+        case .insta360: return "Insta360 clips (.insv) or a Camera01 folder in DCIM"
+        case .avchd: return "the AVCHD folder written by many camcorders"
+        case .genericDCIM: return "a DCIM folder that holds at least one video file"
+        case .soundRecorder: return "WAV files and no video"
+        }
+    }
 }
 
 struct CardSignature: Equatable {
@@ -29,6 +54,10 @@ enum CameraCardDetector {
     private static let maxDepth = 3
     private static let maxEntries = 2000
     private static let videoExtensions: Set<String> = ["mov", "mp4", "mxf", "braw", "r3d", "crm", "ari", "mts"]
+    /// Video files that make a plain `DCIM/` volume a camera card. Wider than
+    /// `videoExtensions` (which decides "sound only"), so that rule is untouched.
+    private static let dcimVideoExtensions: Set<String> = videoExtensions.union(["m4v", "avi", "3gp", "m2ts", "insv", "lrv", "360"])
+    private static let maxDCIMFolders = 64
 
     private struct Entry {
         let name: String
@@ -93,8 +122,9 @@ enum CameraCardDetector {
             return CardSignature(brand: .canon, reelName: nil)
         }
 
-        // 5. Panasonic
-        if exists("PRIVATE/PANA_GRP") || exists("PRIVATE/AVCHD") || dcim.contains(where: { $0.uppercased().hasSuffix("_PANA") }) {
+        // 5. Panasonic (own folders, or a P2 card: CONTENTS/ with CLIP + VIDEO)
+        if exists("PRIVATE/PANA_GRP") || dcim.contains(where: { $0.uppercased().hasSuffix("_PANA") })
+            || (exists("CONTENTS/CLIP") && exists("CONTENTS/VIDEO")) {
             return CardSignature(brand: .panasonic, reelName: nil)
         }
 
@@ -117,7 +147,27 @@ enum CameraCardDetector {
             return CardSignature(brand: .dji, reelName: nil)
         }
 
-        // 9. Sound
+        // 9. Insta360
+        let hasInstaClip = entries.contains { e in
+            guard !e.isDirectory else { return false }
+            let ext = (e.name as NSString).pathExtension.lowercased()
+            return ext == "insv" || ext == "insp"
+        }
+        if hasInstaClip || dcim.contains(where: { $0.range(of: #"^Camera\d{2}$"#, options: .regularExpression) != nil }) {
+            return CardSignature(brand: .insta360, reelName: nil)
+        }
+
+        // 10. AVCHD camcorders (any maker). Comes after every named family.
+        if exists("PRIVATE/AVCHD") || exists("AVCHD/BDMV") {
+            return CardSignature(brand: .avchd, reelName: nil)
+        }
+
+        // 11. Generic DCIM: only when it holds video. A photo-only card is not proposed.
+        if !dcim.isEmpty, dcimHoldsVideo(rootPath: rootPath, children: dcim) {
+            return CardSignature(brand: .genericDCIM, reelName: nil)
+        }
+
+        // 12. Sound
         let hasAudio = entries.contains { e in
             guard !e.isDirectory, e.depth <= 2 else { return false }
             let ext = (e.name as NSString).pathExtension.lowercased()
@@ -130,6 +180,23 @@ enum CameraCardDetector {
             if !hasVideo { return CardSignature(brand: .soundRecorder, reelName: nil) }
         }
         return nil
+    }
+
+    /// Looks for one video file in `DCIM/` or its direct subfolders (`DCIM/100XXXXX/`).
+    /// Separate from `scan` so a card full of photos cannot hide its clips behind the entry cap.
+    private static func dcimHoldsVideo(rootPath: String, children: [String]) -> Bool {
+        let fm = FileManager.default
+        let dcimPath = (rootPath as NSString).appendingPathComponent("DCIM")
+        func isVideo(_ name: String) -> Bool {
+            !name.hasPrefix(".") && dcimVideoExtensions.contains((name as NSString).pathExtension.lowercased())
+        }
+        if children.contains(where: isVideo) { return true }
+        for child in children.sorted().prefix(maxDCIMFolders) {
+            let path = (dcimPath as NSString).appendingPathComponent(child)
+            guard let names = try? fm.contentsOfDirectory(atPath: path) else { continue }
+            if names.contains(where: isVideo) { return true }
+        }
+        return false
     }
 
     /// Breadth-first scan, depth 1 = direct children of the root.

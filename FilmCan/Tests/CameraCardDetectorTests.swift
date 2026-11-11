@@ -97,6 +97,106 @@ final class CameraCardDetectorTests: XCTestCase {
         XCTAssertEqual(try detect(["DCIM/100MEDIA/DJI_0001.MP4"])?.brand, .dji)
     }
 
+    // MARK: - Panasonic P2
+
+    func test_panasonic_p2() throws {
+        XCTAssertEqual(try detect(["CONTENTS/CLIP/0001AB.XML", "CONTENTS/VIDEO/0001AB.MXF", "CONTENTS/AUDIO/0001AB00.MXF", "LASTCLIP.TXT"])?.brand, .panasonic)
+    }
+
+    func test_canonXF_isStillCanon_notP2() throws {
+        XCTAssertEqual(try detect(["CONTENTS/CLIPS001/AA0001/AA000101.MXF"])?.brand, .canon)
+    }
+
+    // MARK: - Insta360
+
+    func test_insta360_insvClip() throws {
+        XCTAssertEqual(try detect(["DCIM/Camera01/VID_20260101_120000_00_001.insv"])?.brand, .insta360)
+    }
+
+    func test_insta360_cameraFolderWithMP4() throws {
+        XCTAssertEqual(try detect(["DCIM/Camera01/VID_20260101_120000_001.mp4"])?.brand, .insta360)
+    }
+
+    // MARK: - AVCHD
+
+    func test_avchd_privateFolder() throws {
+        XCTAssertEqual(try detect(["PRIVATE/AVCHD/BDMV/STREAM/00000.MTS"])?.brand, .avchd)
+    }
+
+    func test_avchd_rootFolder() throws {
+        XCTAssertEqual(try detect(["AVCHD/BDMV/STREAM/00000.MTS"])?.brand, .avchd)
+    }
+
+    func test_avchd_withPanasonicGroup_isPanasonic() throws {
+        XCTAssertEqual(try detect(["PRIVATE/AVCHD/BDMV/STREAM/00000.MTS", "PRIVATE/PANA_GRP/001YAAAA/x"])?.brand, .panasonic)
+    }
+
+    func test_avchd_withSonyRoot_isSony() throws {
+        XCTAssertEqual(try detect(["PRIVATE/AVCHD/BDMV/STREAM/00000.MTS", "PRIVATE/M4ROOT/CLIP/C0001.MP4"])?.brand, .sony)
+    }
+
+    // MARK: - Generic DCIM
+
+    func test_genericDCIM_withVideo() throws {
+        XCTAssertEqual(try detect(["DCIM/100MSDCF/DSC00001.JPG", "DCIM/100MSDCF/C0001.MP4"])?.brand, .genericDCIM)
+    }
+
+    func test_genericDCIM_videoDirectlyInDCIM() throws {
+        XCTAssertEqual(try detect(["DCIM/MOVIE001.MOV"])?.brand, .genericDCIM)
+    }
+
+    func test_genericDCIM_photosOnly_isNotACard() throws {
+        XCTAssertNil(try detect(["DCIM/100NIKON/DSC_0001.JPG", "DCIM/100NIKON/DSC_0002.NEF"]))
+    }
+
+    func test_genericDCIM_emptyFolder_isNotACard() throws {
+        XCTAssertNil(try detect(["DCIM/"]))
+    }
+
+    func test_genericDCIM_hiddenVideoIgnored() throws {
+        XCTAssertNil(try detect(["DCIM/100ABCDE/._C0001.MP4", "DCIM/100ABCDE/IMG_0001.JPG"]))
+    }
+
+    /// A clip behind thousands of photos is still found (the general scan stops at 2 000 entries).
+    func test_genericDCIM_videoBeyondTheScanCap() throws {
+        var rels = (0..<2100).map { String(format: "DCIM/100ABCDE/IMG_%04d.JPG", $0) }
+        rels.append("DCIM/101ABCDE/ZZZ_0001.MP4")
+        XCTAssertEqual(try detect(rels)?.brand, .genericDCIM)
+    }
+
+    /// A named family always wins over generic DCIM.
+    func test_namedFamiliesWinOverGenericDCIM() throws {
+        XCTAssertEqual(try detect(["DCIM/100CANON/MVI_0001.MOV"])?.brand, .canon)
+    }
+
+    func test_goproWinsOverGenericDCIM() throws {
+        XCTAssertEqual(try detect(["DCIM/100GOPRO/GX010001.MP4"])?.brand, .gopro)
+    }
+
+    func test_djiWinsOverGenericDCIM() throws {
+        XCTAssertEqual(try detect(["DCIM/100MEDIA/DJI_0001.MP4"])?.brand, .dji)
+    }
+
+    func test_genericDCIM_withSeparateWav_isCamera_notSound() throws {
+        let signature = try detect(["DCIM/100ABCDE/C0001.MP4", "DCIM/100ABCDE/C0001.WAV"])
+        XCTAssertEqual(signature?.brand, .genericDCIM)
+        XCTAssertEqual(signature?.brand.isSound, false)
+    }
+
+    func test_newFamiliesCarryNoReelName() throws {
+        XCTAssertNil(try detect(["DCIM/100ABCDE/C0001.MP4"])?.reelName)
+    }
+
+    // MARK: - Every family is described
+
+    func test_everyBrandHasANameAndAReason() {
+        for brand in CameraBrand.allCases {
+            XCTAssertFalse(brand.displayName.isEmpty, "\(brand)")
+            XCTAssertFalse(brand.recognisedBy.isEmpty, "\(brand)")
+        }
+        XCTAssertEqual(CameraBrand.allCases.filter(\.isSound), [.soundRecorder])
+    }
+
     func test_sound_wavOnly() throws {
         let sig = try detect(["REC/TR001.WAV", "REC/TR002.wav"])
         XCTAssertEqual(sig?.brand, .soundRecorder)
