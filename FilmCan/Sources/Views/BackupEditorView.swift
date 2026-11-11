@@ -28,6 +28,7 @@ struct BackupEditorView: View {
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
     @State var isOptionsCollapsed = true
+    @State var hostWindow: NSWindow?
     @State var didLoadDestinations = false
     // Defer the options card mount one runloop after the editor appears so a
     // Film-tab switch (.id(config.id) rebuilds the whole editor) paints the
@@ -125,6 +126,7 @@ struct BackupEditorView: View {
         GeometryReader { proxy in
             editorContent(proxy: proxy)
         }
+        .background(MainWindowReader(window: $hostWindow))
         .sheet(isPresented: $showFolderPicker) {
             FolderPickerSheet(mode: folderPickerMode) { path in
                 switch folderPickerMode {
@@ -264,13 +266,16 @@ struct BackupEditorView: View {
             organizationModel.objectWillChange.send()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyRunNow)) { _ in
+            guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
             guard !transferViewModel.isTransferActive(for: viewModel.config.id) else { return }
             startTransfer()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyAddSource)) { _ in
+            guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
             presentAddSourcePanel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyAddDestination)) { _ in
+            guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
             presentAddDestinationPanel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyRefreshDrives)) { _ in

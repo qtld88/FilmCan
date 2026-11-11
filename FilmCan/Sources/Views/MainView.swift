@@ -25,6 +25,7 @@ struct MainView: View {
     @State private var donationPromptTransferCount: Int = 0
     @State private var pendingDonationPromptCheck: Bool = false
     @State private var workspaceObservers: [NSObjectProtocol] = []
+    @State private var hostWindow: NSWindow?
     @AppStorage("didShowQuickTour") private var didShowQuickTour: Bool = false
     @AppStorage("donationPromptSuppressed") private var donationPromptSuppressed: Bool = false
     @AppStorage("donationLastPromptCount") private var donationLastPromptCount: Int = 0
@@ -38,6 +39,7 @@ struct MainView: View {
     
     var body: some View {
         decoratedContent
+            .background(MainWindowReader(window: $hostWindow))
             .onAppear {
                 if !didShowQuickTour {
                     startTour()
@@ -77,10 +79,11 @@ struct MainView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanShowCatalogPane)) { _ in
-                guard rightPane != .catalog else { return }
+                guard MainWindowTarget.shouldHandle(in: hostWindow), rightPane != .catalog else { return }
                 withAnimation(.easeInOut(duration: 0.2)) { rightPane = .catalog }
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanRestartTour)) { _ in
+                guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
                 didShowQuickTour = false
                 startTour()
             }

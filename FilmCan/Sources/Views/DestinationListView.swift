@@ -183,6 +183,9 @@ struct DestinationListView: View {
                                 .foregroundColor(FilmCanTheme.textPrimary)
                                 .lineLimit(1)
                             Spacer()
+                            if summary.isConnected, let first = summary.paths.first?.path {
+                                EjectButton(path: first, onError: { ejectErrorMessage = $0 })
+                            }
                         }
                         .contentShape(Rectangle())
                         .contextMenu {
@@ -1000,7 +1003,7 @@ struct DestinationListView: View {
     }
 
     private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot) -> (isConnected: Bool, message: String) {
-        if volumeRootPath(for: path) != nil {
+        if VolumesInUse.volumeRoot(for: path) != nil {
             if cached.rootExists {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
@@ -1018,12 +1021,6 @@ struct DestinationListView: View {
             return (true, "")
         }
         return (false, "Destination path not found")
-    }
-
-    private func volumeRootPath(for path: String) -> String? {
-        let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
-        guard components.count >= 3, components[1] == "Volumes" else { return nil }
-        return "/Volumes/\(components[2])"
     }
 
     private func removeDestination(_ path: String) {
@@ -1056,18 +1053,11 @@ struct DestinationListView: View {
     }
 
     private func ejectVolume(for path: String, onSuccess: (() -> Void)? = nil) {
-        guard let root = volumeRootPath(for: path) else {
-            ejectErrorMessage = "This destination isn't on an ejectable volume."
-            return
-        }
-        let url = URL(fileURLWithPath: root)
         Task { @MainActor in
-            switch await DriveEjector.eject(volumeURL: url) {
-            case .success:
-                onSuccess?()
-            case .failure(let error):
-                ejectErrorMessage = error.errorDescription
-                DebugLog.warn("Eject failed for \(root): \(error)")
+            switch await VolumeEjectFlow.eject(path: path, warnIfUnsealed: false) {
+            case .ejected: onSuccess?()
+            case .cancelled: break
+            case .failed(let message): ejectErrorMessage = message
             }
         }
     }

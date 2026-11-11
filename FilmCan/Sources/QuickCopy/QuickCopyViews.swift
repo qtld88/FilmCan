@@ -258,6 +258,9 @@ struct QuickCopySetupView: View {
                             if session.form.showsMediaKind {
                                 CameraSoundSwitch(kind: item.kind) { session.form.items[index].kind = $0 }
                             }
+                            EjectButton(path: item.path, warnIfUnsealed: true,
+                                        onEjected: { session.removeEjectedVolume(containing: item.path) },
+                                        onError: session.showEjectError)
                             Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
                                 .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                                 .help("Remove source")
@@ -295,6 +298,9 @@ struct QuickCopySetupView: View {
                         }
                     }
                     Spacer()
+                    EjectButton(path: path,
+                                onEjected: { session.removeEjectedVolume(containing: path) },
+                                onError: session.showEjectError)
                     Button { session.removeDestination(path) } label: { Image(systemName: "xmark") }
                         .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                         .help("Remove destination")

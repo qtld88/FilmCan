@@ -149,6 +149,10 @@ struct SourceListView: View {
                                     .foregroundColor(FilmCanTheme.textTertiary)
                             }
                             Spacer()
+                            if summary.isConnected, let first = summary.paths.first?.path {
+                                EjectButton(path: first, warnIfUnsealed: true,
+                                            onError: { ejectErrorMessage = $0 })
+                            }
                         }
                         .contentShape(Rectangle())
                         .contextMenu {
@@ -167,7 +171,8 @@ struct SourceListView: View {
                         if summary.isConnected {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { source in
-                                    sourceRow(source: source, isExternal: summary.isExternal)
+                                    sourceRow(source: source, isExternal: summary.isExternal,
+                                              showsEject: isWholeDrive && driveIncluded)
                                 }
                             }
                             .padding(.leading, isWholeDrive && driveIncluded ? 0 : 26)
@@ -251,7 +256,7 @@ struct SourceListView: View {
         }
     }
 
-    private func sourceRow(source: SourcePath, isExternal: Bool) -> some View {
+    private func sourceRow(source: SourcePath, isExternal: Bool, showsEject: Bool = false) -> some View {
         let metadata = getFileMetadata(source.path)
         let iconName = DriveUtilities.iconName(
             isExternal: isExternal,
@@ -315,6 +320,10 @@ struct SourceListView: View {
 
             if let mediaKind, let setMediaKind {
                 mediaKindToggle(path: source.path, kind: mediaKind(source.path), set: setMediaKind)
+            }
+            if showsEject {
+                EjectButton(path: source.path, warnIfUnsealed: true,
+                            onError: { ejectErrorMessage = $0 })
             }
         }
         .contentShape(Rectangle())
@@ -435,7 +444,7 @@ struct SourceListView: View {
     }
 
     private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot) -> (isConnected: Bool, message: String) {
-        if volumeRootPath(for: path) != nil {
+        if VolumesInUse.volumeRoot(for: path) != nil {
             if cached.rootExists {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
@@ -525,36 +534,13 @@ struct SourceListView: View {
     }
 
     private func ejectVolume(for path: String, onSuccess: (() -> Void)? = nil) {
-        guard let root = volumeRootPath(for: path) else {
-            ejectErrorMessage = "This source isn't on an ejectable volume."
-            return
-        }
-        let url = URL(fileURLWithPath: root)
         Task { @MainActor in
-            let state = await CardSealService.evaluate(source: URL(fileURLWithPath: path))
-            if state != .sealed {
-                let alert = NSAlert()
-                alert.alertStyle = .warning
-                alert.messageText = "This card isn't sealed as backed-up"
-                alert.informativeText = "FilmCan hasn't verified a complete backup of this card, or its contents changed since the last backup. Eject anyway?"
-                alert.addButton(withTitle: "Eject Anyway")
-                alert.addButton(withTitle: "Cancel")
-                guard alert.runModal() == .alertFirstButtonReturn else { return }
-            }
-            switch await DriveEjector.eject(volumeURL: url) {
-            case .success:
-                onSuccess?()
-            case .failure(let error):
-                ejectErrorMessage = error.errorDescription
-                DebugLog.warn("Eject failed for \(root): \(error)")
+            switch await VolumeEjectFlow.eject(path: path, warnIfUnsealed: true) {
+            case .ejected: onSuccess?()
+            case .cancelled: break
+            case .failed(let message): ejectErrorMessage = message
             }
         }
-    }
-
-    private func volumeRootPath(for path: String) -> String? {
-        let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
-        guard components.count >= 3, components[1] == "Volumes" else { return nil }
-        return "/Volumes/\(components[2])"
     }
 
     private struct PathDropDelegate: DropDelegate {

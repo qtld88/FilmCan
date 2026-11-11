@@ -115,6 +115,11 @@ class TransferViewModel: ObservableObject {
         let activeConfig = applyRollNumberingAndDay(to: storedConfig.restrictedToIncluded())
         self.config = activeConfig
         activeConfigId = activeConfig.id
+        // Every run (main, concurrent worker, Quick Copy) passes here: hold its drives
+        // so neither the app nor Finder can eject them until the run has fully ended.
+        let volumeLease = VolumesInUse.shared.acquire(
+            paths: activeConfig.sourcePaths + activeConfig.destinationPaths)
+        defer { VolumesInUse.shared.release(volumeLease) }
         if !isBackgroundWorker {
             activeTransferConfigIds.insert(activeConfig.id)
             tabProgressByConfig[activeConfig.id] = 0
