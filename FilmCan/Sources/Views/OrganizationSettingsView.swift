@@ -87,7 +87,7 @@ struct OrganizationSettingsView: View {
                                 .foregroundColor(.secondary)
                                 .frame(width: rowIconWidth)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Folder template")
+                                Text(SettingsWording.folderLayout)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 Text("Creates the folder structure inside the destination. Use \"/\" for subfolders.")
@@ -144,7 +144,7 @@ struct OrganizationSettingsView: View {
                                 .foregroundColor(.secondary)
                                 .frame(width: rowIconWidth)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("File name template")
+                                Text(SettingsWording.renameFiles)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 Text("Renames each copied item before it is placed in the destination.")
@@ -188,7 +188,7 @@ struct OrganizationSettingsView: View {
                                 .foregroundColor(.secondary)
                                 .frame(width: rowIconWidth)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Custom date for tokens")
+                                Text(SettingsWording.customDateInNames)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 Text("Use a specific date for {date}, {time}, {datetime}.")

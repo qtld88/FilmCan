@@ -117,6 +117,23 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | S14 | Settings › Import & Export › Presets › Export. | The file holds the shared presets only. | ☐ |
 | S15 | Export a movie, delete it, import it back. | Same preset name, same folder preview as before the export. | ☐ |
 
+### Settings layout gate (run when the settings panel or the Settings window changed)
+
+| # | Check (real .app, window at 1280 × 800) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| L1 | Look under Copy From / Save To. | One line: gear, "Movie settings", a short summary. No tab bar, no Options card. | ☐ |
+| L2 | Click the line. | A panel opens on the right with Basic / Source / Destinations / Logs and the Preset menu. Copy From and Save To are still visible and readable. | ☐ |
+| L3 | In the panel, change the folder layout. | The folder preview in Save To follows at once. | ☐ |
+| L4 | Go through the four groups. | Every setting that was in the Options card is there; nothing is clipped or overlapping at the panel's width. | ☐ |
+| L5 | With the panel open, open History, then Catalog. Then click the line again. | The panel closes when History or Catalog opens; clicking the line closes that pane and opens the panel. | ☐ |
+| L6 | Panel open, switch movie tab; quit and relaunch. | The panel stays open and shows the current movie's settings. | ☐ |
+| L7 | Panel closed, choose a preset from… (open the panel, close it, use File or the menu as before). | Choosing a preset opens the panel. | ☐ |
+| L8 | Narrow the window to its minimum. | Cards stack, the panel keeps a usable width, nothing overlaps. | ☐ |
+| L9 | Run the quick tour. | The former "Options Tabs" step highlights the "Movie settings" line. | ☐ |
+| L10 | Open Settings (Cmd+,). | A sidebar with Appearance, Notifications, Phone & webhooks, History, Drives, Shortcuts, About; each page shows what its tab showed. Reopen Settings: the last page is selected. | ☐ |
+| L11 | Read the labels in Basic and Destinations. | "Full check (re-reads every file)", "If a file already exists", "Checksum list format", "Folder layout", "Rename files", "Custom date in names". | ☐ |
+| L12 | Run a backup; open its log and history entry. | Same wording as before in logs and history (only the settings labels changed). | ☐ |
+
 ## Post-run sanity checks
 
 - `find /Volumes/<dest> -name ".filmcan-*"` returns nothing after a clean job.
