@@ -205,13 +205,13 @@ extension BackupEditorView {
     private var includedRequiredBytes: Int64 { previewInfo.totalBytes }
 
     /// Per-card sizes cover every listed source; the totals only the checked ones.
-    func refreshPreview() {
+    func refreshPreview(bypassCache: Bool = false) {
         let sources = viewModel.sourcePaths
         let included = viewModel.includedSourcePaths
         previewInfo.isLoading = true
 
         Task.detached(priority: .utility) {
-            var (bytes, files, folders, sizes, itemCounts) = PreviewCalculator.calculateTotalsAndSizes(for: sources)
+            var (bytes, files, folders, sizes, itemCounts) = PreviewCalculator.calculateTotalsAndSizes(for: sources, bypassCache: bypassCache)
             if included.count != sources.count {
                 (bytes, files, folders, _, _) = PreviewCalculator.calculateTotalsAndSizes(for: included)
             }
