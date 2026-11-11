@@ -62,6 +62,12 @@ struct QuickCopyFormModel {
     var savePresetName = ""
     var today = Date()
     var pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    /// Roll folder per generic-named card (Untitled -> Untitled_01), keyed by path:
+    /// one window is one run, so no card identity is needed here.
+    var rollNameOverrides: [String: String] = [:]
+    var editedRollNames: Set<String> = []
+    var dismissedGenericCards: Set<String> = []
+    var existingRollNames: (String) -> [String] = { _ in [] }
 
     // MARK: Building items
     static func items(for paths: [String], fileManager: FileManager = .default) -> [Item] {
@@ -73,6 +79,66 @@ struct QuickCopyFormModel {
             return Item(path: path, isDirectory: isDir.boolValue,
                         kind: MediaKindGuesser.guess(path: path, fileManager: fileManager))
         }
+    }
+
+    // MARK: Generic card names (Untitled, DJI ...)
+    private func isGenericItem(_ item: Item) -> Bool {
+        item.isDirectory && GenericCardName.isGeneric(item.name)
+    }
+
+    private func otherRollNames(except path: String) -> [String] {
+        rollNameOverrides.filter { $0.key != path }.map(\.value)
+    }
+
+    func suggestedRollName(for item: Item) -> String {
+        GenericCardName.nextNumberedName(
+            base: GenericCardName.baseName(item.name),
+            taken: existingRollNames(item.path) + otherRollNames(except: item.path))
+    }
+
+    mutating func refreshGenericRollNames() {
+        let paths = Set(items.map(\.path))
+        rollNameOverrides = rollNameOverrides.filter { paths.contains($0.key) }
+        guard !effectiveCopyFolderContents else { return }
+        let candidates = items.filter { isGenericItem($0) && !editedRollNames.contains($0.path) }
+        for item in candidates { rollNameOverrides[item.path] = nil }
+        for item in candidates {
+            rollNameOverrides[item.path] = suggestedRollName(for: item)
+        }
+    }
+
+    mutating func setRollNameOverride(_ raw: String, for path: String) {
+        editedRollNames.insert(path)
+        let name = Self.sanitizeName(raw).filter { $0 != "{" && $0 != "}" }
+        if name.isEmpty {
+            rollNameOverrides[path] = nil
+            dismissedGenericCards.insert(path)
+        } else {
+            rollNameOverrides[path] = name
+        }
+    }
+
+    var pendingGenericWarning: Item? {
+        guard effectiveCopyFolderContents else { return nil }
+        return items.first {
+            isGenericItem($0) && rollNameOverrides[$0.path] == nil && !dismissedGenericCards.contains($0.path)
+        }
+    }
+
+    func rollFolderFieldValue(for item: Item) -> String? {
+        guard isGenericItem(item) else { return nil }
+        let override = rollNameOverrides[item.path]
+        return effectiveCopyFolderContents && override == nil ? nil : (override ?? "")
+    }
+
+    mutating func acceptGenericWarning() {
+        guard let item = pendingGenericWarning else { return }
+        setRollNameOverride(suggestedRollName(for: item), for: item.path)
+    }
+
+    mutating func dismissGenericWarning() {
+        guard let item = pendingGenericWarning else { return }
+        dismissedGenericCards.insert(item.path)
     }
 
     // MARK: Sanitizing
@@ -423,6 +489,8 @@ extension QuickCopyFormModel {
             c.runInParallel = p.runInParallel
         }
         c.selectedOrganizationPresetId = selectedPresetId
+        let paths = Set(items.map(\.path))
+        c.runRollNames = rollNameOverrides.filter { paths.contains($0.key) && !$0.value.isEmpty }
         return c
     }
 
@@ -461,7 +529,7 @@ extension QuickCopyFormModel {
         if showsProjectField, sanitizedProject.isEmpty, rootFolderOverride == nil { return .missingProject }
         if let kind = missingMediaFolderKind { return .missingMediaFolder(kind) }
         if selectedPreset?.name == OrganizationPreset.netflixIngestName {
-            for issue in NetflixNameValidator.validate(rollNames: items.map(\.name)) {
+            for issue in NetflixNameValidator.validate(rollNames: items.map { rollNameOverrides[$0.path] ?? $0.name }) {
                 if case .prohibitedChars(let name, _) = issue { return .invalidRollName(name) }
             }
         }
@@ -536,7 +604,10 @@ extension QuickCopyFormModel {
     typealias TreeLine = FolderTreeLine
 
     private var treeSources: [FolderTreeBuilder.Source] {
-        items.map { FolderTreeBuilder.Source(path: $0.path, isDirectory: $0.isDirectory, kind: $0.kind) }
+        items.map {
+            FolderTreeBuilder.Source(path: $0.path, isDirectory: $0.isDirectory, kind: $0.kind,
+                                     rollName: $0.isDirectory ? rollNameOverrides[$0.path] : nil)
+        }
     }
 
     private var treeOptions: FolderTreeBuilder.Options {

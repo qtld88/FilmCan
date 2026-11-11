@@ -24,6 +24,8 @@ struct DestinationListView: View {
     /// Camera/Sound tag per source path, so the preview shows the Camera_Media /
     /// Sound_Media path the source will actually land in.
     var mediaKind: (String) -> SourceMediaKind = { _ in .camera }
+    /// Roll folder given to a generic-named card (Untitled_01), shown in the folder tree.
+    var rollName: (String) -> String? = { _ in nil }
     var shootMetadata: ShootMetadata = .empty
     var copyFolderContents: Bool = true
     var configId: UUID
@@ -431,7 +433,8 @@ struct DestinationListView: View {
         sourcePaths.map { path in
             var isDir: ObjCBool = false
             FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path))
+            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path),
+                                       rollName: isDir.boolValue ? rollName(path) : nil)
         }
     }
 
