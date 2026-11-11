@@ -49,6 +49,18 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### First-launch defaults gate (run when new-film defaults or Info.plist usage texts changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| F1 | In Terminal: `tccutil reset All com.filmcan.app`. Launch FilmCan, add a camera card as a source. | The macOS dialog "FilmCan would like to access files on a removable volume" shows a sentence explaining why. | ☐ |
+| F2 | Same reset, then pick a folder inside Documents, then Desktop, then Downloads. | Each macOS dialog shows its own explaining sentence. | ☐ |
+| F3 | Plug a camera card. Click "+" to create a new movie. | The card appears in Copy From by itself, tagged Camera (a sound recorder card: Sound). | ☐ |
+| F4 | In the new movie: Options › Source and Options › Logs. | "Detect camera and sound cards automatically" is on; "PDF report with thumbnails" is on. | ☐ |
+| F5 | Open a movie that existed before this build. | Both switches are as you left them. | ☐ |
+| F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
+| F7 | Finder › right-click a folder › Services › FilmCan Copy, run it. | No PDF report is written (Quick Copy is unchanged). | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
@@ -82,6 +94,28 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | 18 | Resume — partial | #2 source + one new clip added | SSD-A, SSD-B | fast | Only the new clip copies; row reads "Resuming — N files already backed up…"; a history card is added | ☐ |
 | 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
 | 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
+
+### Movie settings gate (run when presets or movie creation changed)
+
+Before the first launch of this build, keep a copy of `configs.json` and `presets.json` (Application Support › FilmCan).
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| S1 | Launch on existing data where two movies use the same preset. | Both movies show the same preset name, same folder preview as before. No "(modified)" mark. | ☐ |
+| S2 | Run a backup of an existing movie with an existing card. | Same folders and files as with the previous build (resume finds everything). | ☐ |
+| S3 | In movie A, change the folder template. Open movie B. | B's template and folder preview are unchanged. | ☐ |
+| S4 | Preset menu in a movie. | Lists "Off", "Netflix Ingest (built-in)", the shared presets once each (no duplicates), "Save as new preset", "Delete preset". | ☐ |
+| S5 | Choose a preset in movie A, edit a folder, then choose the same preset in movie B. | B gets the preset as saved, not A's edit. | ☐ |
+| S6 | "Save as new preset" in movie A. | A new preset appears in the menu of every movie; A keeps its settings. | ☐ |
+| S7 | Choose "Off", open the menu again, choose "This movie's settings (…)". Then press the trash button next to the preset name. | Off then back: the movie's own folders return unchanged. Trash: the movie goes to "Off" for good; the shared preset is still in the menu. | ☐ |
+| S8 | "Delete preset" › a preset. | It leaves the menu; movies that started from it keep their folders. | ☐ |
+| S9 | Small arrow next to "+" in the tab bar › "Like <movie>". | A new movie with the same options, no cards, no drives, empty shoot day. File › New Movie Like shows the same list. | ☐ |
+| S10 | Movie "Citizen K" with template `CITIZENK/{day}`; create a movie like it and rename it "Citizen L". | The new movie's template starts with `{movie}`; the preview shows `Citizen L/…`. The old movie still writes to `CITIZENK/…`. | ☐ |
+| S11 | Type `{movie}` in a folder template (it is in the token list). | The preview shows the movie's name. | ☐ |
+| S12 | Delete a movie, quit, open `presets.json`. | No record with that movie's `ownerFilmId` remains. | ☐ |
+| S13 | Quick Copy: pick a movie, look at the Preset picker; pick another movie. | The picker shows the shared presets plus the picked movie's own settings, never another movie's. | ☐ |
+| S14 | Settings › Import & Export › Presets › Export. | The file holds the shared presets only. | ☐ |
+| S15 | Export a movie, delete it, import it back. | Same preset name, same folder preview as before the export. | ☐ |
 
 ## Post-run sanity checks
 

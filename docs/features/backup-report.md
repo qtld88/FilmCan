@@ -17,7 +17,7 @@ The report lists everything in the roll folder on the drive, including files ski
 
 ## Enable it
 
-Options › Logs › **PDF report with thumbnails**. It needs **Create log file** to be on; the toggle is greyed out otherwise.
+Options › Logs › **PDF report with thumbnails**. It needs **Create log file** to be on; the toggle is greyed out otherwise. It is on for a new movie; movies you already had keep their setting.
 
 ---
 
@@ -56,7 +56,7 @@ Le rapport liste tout ce qui se trouve dans le dossier du roll sur le disque, y 
 
 ## L'activer
 
-Options › Logs › **PDF report with thumbnails**. **Create log file** doit être activé ; sinon l'interrupteur est grisé.
+Options › Logs › **PDF report with thumbnails**. **Create log file** doit être activé ; sinon l'interrupteur est grisé. Il est activé sur un nouveau film ; les films déjà créés gardent leur réglage.
 
 ---
 
@@ -95,7 +95,7 @@ Der Bericht listet alles im Roll-Ordner auf dem Laufwerk auf, auch Dateien, die 
 
 ## Aktivieren
 
-Options › Logs › **PDF report with thumbnails**. **Create log file** muss eingeschaltet sein; sonst ist der Schalter ausgegraut.
+Options › Logs › **PDF report with thumbnails**. **Create log file** muss eingeschaltet sein; sonst ist der Schalter ausgegraut. Bei einem neuen Film ist er an; bereits vorhandene Filme behalten ihre Einstellung.
 
 ---
 
@@ -134,7 +134,7 @@ El informe lista todo lo que hay en la carpeta del roll en la unidad, incluidos 
 
 ## Activarlo
 
-Options › Logs › **PDF report with thumbnails**. Requiere que **Create log file** esté activado; si no, el interruptor aparece atenuado.
+Options › Logs › **PDF report with thumbnails**. Requiere que **Create log file** esté activado; si no, el interruptor aparece atenuado. Está activado en una película nueva; las películas que ya tenía conservan su ajuste.
 
 ---
 
