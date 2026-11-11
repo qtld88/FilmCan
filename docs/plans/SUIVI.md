@@ -2,7 +2,7 @@
 
 Living status file for the autonomous lot-by-lot work on `next`. One lot = one `qt1/<name>` branch = one draft PR to `next`. This branch (`qt1/suivi`) only carries this file.
 
-**Session active since 2026-11-11 23:17 UTC** (refreshed every 30–60 min while a session is working; a newer session that reads a timestamp younger than 90 minutes must stop without changing anything).
+**Session active since 2026-11-11 23:23 UTC** (refreshed every 30–60 min while a session is working; a newer session that reads a timestamp younger than 90 minutes must stop without changing anything).
 
 | # | Lot | Branch | PR | State | Next action |
 |---|-----|--------|----|-------|-------------|
@@ -13,9 +13,9 @@ Living status file for the autonomous lot-by-lot work on `next`. One lot = one `
 | 4 | Calmer main screen: shoot day in header, summary line, less chrome, history as list | `qt1/calm-main-screen` | #6 | done (green: run 43075734227) | owner: real-app checks M1–M12 |
 | 5 | Film owns its settings (part 1): own copy per film, migration, "new movie like", `{movie}` token | `qt1/film-settings` (stacked on `qt1/first-launch-defaults`) | #7 | done (green: run 43079041501) | owner: real-app checks S1–S15 |
 | 5b | Movie settings panel, Settings window sidebar, plain-language labels (part 2) | `qt1/film-settings-panel` (stacked on 5) | #8 | done (green: run 43082618556) | owner: real-app checks L1–L12 (all visual, unverified) |
-| 6 | Visual folder-structure editor ("new" badges first) | `qt1/folder-tree-editor` (stacked on 5b) | — | cold review done, fixes pushed, waiting for CI | open PR once green |
-| 7a | Recognition settings page | `qt1/recognition-page` (stacked on 5b, with `qt1/more-cameras` merged in) | — | all tasks pushed, waiting for CI | open PR once green |
-| 7b | Re-create a report after the fact | `qt1/recreate-report` | — | to do | spec |
+| 6 | Visual folder-structure editor ("new" badges first) | `qt1/folder-tree-editor` (stacked on 5b) | #9 | done (green: run 43118621926) | owner: real-app checks T1–T14 |
+| 7a | Recognition settings page | `qt1/recognition-page` (stacked on 5b, with `qt1/more-cameras` merged in) | #10 | PR open (green: run 43118366146), cold review running | fix findings if any |
+| 7b | Re-create a report after the fact | `qt1/recreate-report` (stacked on `qt1/reports-on-mac`) | — | all tasks pushed (0f902cf), waiting for CI + cold review | fix findings, open PR once green |
 | 8 | Demo mode for users | `qt1/demo-mode` | — | to do | spec |
 | 9 | Speed advice before and after the copy | `qt1/speed-advice` | — | to do | spec |
 
