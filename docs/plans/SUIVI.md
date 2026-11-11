@@ -2,13 +2,13 @@
 
 Living status file for the autonomous lot-by-lot work on `next`. One lot = one `qt1/<name>` branch = one draft PR to `next`. This branch (`qt1/suivi`) only carries this file.
 
-**Session active since 2026-11-11 13:20 UTC** (refreshed every 30–60 min while a session is working; a newer session that reads a timestamp younger than 90 minutes must stop without changing anything).
+**Session active since 2026-11-11 14:05 UTC** (refreshed every 30–60 min while a session is working; a newer session that reads a timestamp younger than 90 minutes must stop without changing anything).
 
 | # | Lot | Branch | PR | State | Next action |
 |---|-----|--------|----|-------|-------------|
-| 0 | First-launch defaults: volume-access dialog text, card auto-detect on for new films, PDF report on for new films | `qt1/first-launch-defaults` | — | to do | spec |
-| 1 | Phone notifications by QR code (simple mode) + static site page | `qt1/phone-qr` | — | to do | spec |
-| 2 | More camera families: generic DCIM, Insta360, AVCHD, P2 | `qt1/more-cameras` | — | to do | spec |
+| 0 | First-launch defaults: volume-access dialog text, card auto-detect on for new films, PDF report on for new films | `qt1/first-launch-defaults` | #2 | done (green: run 43027920645) | owner: real-app checks F1–F7 |
+| 1 | Phone notifications by QR code (simple mode) + static site page | `qt1/phone-qr` | — | task 6 of 6 (pushed, waiting for CI + cold review) | open PR once green |
+| 2 | More camera families: generic DCIM, Insta360, AVCHD, P2 | `qt1/more-cameras` | — | spec | write spec and plan |
 | 3 | Copy of every report on the Mac | `qt1/reports-on-mac` | — | to do | spec |
 | 4 | Calmer main screen: shoot day in header, summary line, less chrome, history as list | `qt1/calm-main-screen` | — | to do | spec |
 | 5 | Film owns its settings, "start from a previous film", settings side panel | `qt1/film-settings` | — | to do | spec |
