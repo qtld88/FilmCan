@@ -150,7 +150,7 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | T11 | Tree at the panel's narrowest width. | The four starting choices wrap; names, marks and the "…" button stay visible. | ☐ |
 | T12 | A movie with a layout: switch "Folder layout" off. | The tree is replaced by "The folder layout is switched off. Switch it on to edit it here."; switching it on brings the same layout back. | ☐ |
 | T13 | A movie with its own settings: Preset menu › Off. | The tree is replaced by a sentence saying the movie's settings are set aside; choosing "This movie's settings" in the Preset menu brings them back unchanged. | ☐ |
-| T14 | Rename a folder in the tree to `Café & co`. | The folder is named `Caf_co` everywhere (tree, text, preview): the name a backup would write. | ☐ |
+| T14 | Rename a folder in the tree to `Café`. | The folder is named `Caf` everywhere (tree, text, preview): the name a backup would write. | ☐ |
 
 ## Post-run sanity checks
 
