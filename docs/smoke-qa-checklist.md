@@ -64,7 +64,8 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | P7 | Quit and relaunch FilmCan (and, when possible, install an update over it). | Same code, notifications still arrive, nothing to redo. | ☐ |
 | P8 | A Mac where a Topic URL (and token) was already configured before this build. Open Settings › Push. | "Advanced" is open, "Use my own ntfy server or topic" is on, the URL and token are intact, no QR code. A backup notifies the same topic as before. | ☐ |
 | P9 | In Advanced, switch "Use my own ntfy server or topic" off, then on again. | Off: the QR code appears. On: the own URL is used again, still filled in. | ☐ |
-| P10 | Open `https://www.filmcan.eu/phone/` without anything after `#`. | The page asks to scan the code again; no error. | ☐ |
+| P10 | `defaults write com.filmcan.app ntfyEnabled -bool true` with no Topic URL and no `phonePushTopic`. Open Settings › Push. | No QR code yet, a "Create my QR code" button instead; nothing was sent anywhere. Clicking it shows the code. | ☐ |
+| P11 | Open `https://www.filmcan.eu/phone/` without anything after `#`. | The page asks to scan the code again; no error. | ☐ |
 
 ## Setup
 

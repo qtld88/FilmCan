@@ -15,7 +15,7 @@ enum QRCodeImage {
     static func image(for text: String, side: CGFloat = 220) -> NSImage? {
         guard let modules = ciImage(for: text), modules.extent.width > 0 else { return nil }
         let scale = max(1, (side / modules.extent.width).rounded(.down))
-        let scaled = modules.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let scaled = modules.samplingNearest().transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         let rep = NSCIImageRep(ciImage: scaled)
         let image = NSImage(size: rep.size)
         image.addRepresentation(rep)

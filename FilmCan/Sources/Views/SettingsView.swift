@@ -369,6 +369,10 @@ struct PushSettingsView: View {
                         PhonePush.renewTopic()
                         ntfyTestResult = nil
                     }
+                } else if ntfyEnabled, !useCustomServer {
+                    // The switch was already on but nothing was set up (older preferences):
+                    // a channel is only ever created by a click, never by opening this page.
+                    Button("Create my QR code") { PhonePush.ensureTopic() }
                 }
                 HStack(spacing: 10) {
                     Button(ntfyTesting ? "Sending…" : "Send a test") { sendNtfyTest() }
@@ -506,7 +510,6 @@ struct PushSettingsView: View {
             migrateLegacyWebhookSecretIfNeeded()
             useCustomServer = PhonePush.mode() == .custom
             advancedOpen = useCustomServer
-            if ntfyEnabled, !useCustomServer { PhonePush.ensureTopic() }
         }
     }
 
