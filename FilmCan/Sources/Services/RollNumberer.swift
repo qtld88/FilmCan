@@ -108,6 +108,27 @@ final class RollNumberingStore {
         update(s, for: configId)
     }
 
+    /// Every film's state, keyed by the film's id (for the Recognition page).
+    var allStates: [String: ConfigState] { states }
+
+    /// Forgets one card of one film: the card gets a new roll name the next time it
+    /// is used with that film. The old name stays taken (kept under a key that is not
+    /// a card), so it is never given to another card while a roll folder of that name
+    /// may be on a drive. Nothing happens if the card no longer holds `rollName`.
+    /// `configId` is the stored key, so a film that no longer exists can be cleaned too.
+    func forgetAssignment(cardKey: String, rollName: String, configId: String) {
+        guard !Self.isForgottenKey(cardKey),
+              var state = states[configId], state.assignments[cardKey] == rollName else { return }
+        state.assignments.removeValue(forKey: cardKey)
+        state.assignments[Self.forgottenKeyPrefix + rollName] = rollName
+        states[configId] = state
+        save()
+    }
+
+    /// A card key starts with a volume id or "nouuid", never with this.
+    nonisolated static let forgottenKeyPrefix = "forgotten|"
+    nonisolated static func isForgottenKey(_ key: String) -> Bool { key.hasPrefix(forgottenKeyPrefix) }
+
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
         let decoder = JSONDecoder()
@@ -128,15 +149,50 @@ final class RollNumberingStore {
 /// Per-drive correction of the detector, keyed by volume UUID.
 enum CardRoleOverrides {
     private static let defaultsKey = "filmcan.cardRoleOverrides"
+    /// Drive name and date of each correction, for the Recognition page only: nothing
+    /// in detection reads it. Corrections made before it existed have no entry.
+    private static let detailsKey = "filmcan.cardRoleOverrideDetails"
 
-    static func role(forVolumeUUID uuid: String) -> CardRole? {
-        let dict = UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String]
+    struct Detail: Equatable {
+        var name: String?
+        var date: Date?
+    }
+
+    static func role(forVolumeUUID uuid: String, defaults: UserDefaults = .standard) -> CardRole? {
+        let dict = defaults.dictionary(forKey: defaultsKey) as? [String: String]
         return dict?[uuid].flatMap(CardRole.init(rawValue:))
     }
 
-    static func set(_ role: CardRole?, forVolumeUUID uuid: String) {
-        var dict = (UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String]) ?? [:]
-        if let role { dict[uuid] = role.rawValue } else { dict.removeValue(forKey: uuid) }
-        UserDefaults.standard.set(dict, forKey: defaultsKey)
+    /// `driveName` is remembered next to the correction so the drive can be named
+    /// while it is not connected.
+    static func set(_ role: CardRole?, forVolumeUUID uuid: String, driveName: String? = nil,
+                    now: Date = Date(), defaults: UserDefaults = .standard) {
+        var dict = (defaults.dictionary(forKey: defaultsKey) as? [String: String]) ?? [:]
+        var details = (defaults.dictionary(forKey: detailsKey) as? [String: [String: Any]]) ?? [:]
+        if let role {
+            dict[uuid] = role.rawValue
+            var entry: [String: Any] = ["date": now.timeIntervalSince1970]
+            if let driveName, !driveName.isEmpty { entry["name"] = driveName }
+            details[uuid] = entry
+        } else {
+            dict.removeValue(forKey: uuid)
+            details.removeValue(forKey: uuid)
+        }
+        defaults.set(dict, forKey: defaultsKey)
+        defaults.set(details, forKey: detailsKey)
+    }
+
+    /// Every remembered correction; a stored value this version does not know is left out.
+    static func all(defaults: UserDefaults = .standard) -> [String: CardRole] {
+        let dict = (defaults.dictionary(forKey: defaultsKey) as? [String: String]) ?? [:]
+        return dict.compactMapValues(CardRole.init(rawValue:))
+    }
+
+    static func details(defaults: UserDefaults = .standard) -> [String: Detail] {
+        let stored = (defaults.dictionary(forKey: detailsKey) as? [String: [String: Any]]) ?? [:]
+        return stored.mapValues { entry in
+            Detail(name: entry["name"] as? String,
+                   date: (entry["date"] as? Double).map(Date.init(timeIntervalSince1970:)))
+        }
     }
 }

@@ -121,6 +121,7 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | M11 | `defaults delete com.filmcan.app historyListView`, relaunch, open History. | Compact list. Switch to cards, relaunch: still cards. | ☐ |
 | M12 | Start a backup. | The stepper is greyed during the copy; subtitle says "Backup in progress". | ☐ |
 
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
@@ -189,7 +190,7 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | L6 | Panel open, switch movie tab; quit and relaunch. | The panel stays open and shows the current movie's settings. | ☐ |
 | L8 | Narrow the window to its minimum with the panel open. | The panel takes the whole window (close button top right); closing it shows the cards again. | ☐ |
 | L9 | Run the quick tour. | The former "Options Tabs" step highlights the "Movie settings" line. | ☐ |
-| L10 | Open Settings (Cmd+,). | A sidebar with Appearance, Notifications, Phone & webhooks, History, Drives, Shortcuts, About; each page shows what its tab showed. Reopen Settings: the last page is selected. | ☐ |
+| L10 | Open Settings (Cmd+,). | A sidebar with Appearance, Notifications, Phone & webhooks, History, Drives, Recognition, Shortcuts, About; each page shows what its tab showed. Reopen Settings: the last page is selected. | ☐ |
 | L11 | Read the labels in Basic and Destinations. | "Full check (re-reads every file)", "If a file already exists", "Checksum list format", "Folder layout", "Rename files", "Custom date in names". | ☐ |
 | L12 | Run a backup; open its log and history entry. | Same wording as before in logs and history (only the settings labels changed). | ☐ |
 
@@ -211,6 +212,19 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | T12 | A movie with a layout: switch "Folder layout" off. | The tree is replaced by "The folder layout is switched off. Switch it on to edit it here."; switching it on brings the same layout back. | ☐ |
 | T13 | A movie with its own settings: Preset menu › Off. | The tree is replaced by a sentence saying the movie's settings are set aside; choosing "This movie's settings" in the Preset menu brings them back unchanged. | ☐ |
 | T14 | Rename a folder in the tree to `Café`. | The folder is named `Caf` everywhere (tree, text, preview): the name a backup would write. | ☐ |
+
+### Recognition page gate (run when the Recognition page or card memory changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Open Settings (Cmd+,), click Recognition. | Four groups: how a card is recognised, cards it knows, your corrections, roll names. Nothing clipped, sentences wrap. | ☐ |
+| R2 | Read "Cards it knows". | One line per family (ARRI … Sound recorder), each with a short reason. | ☐ |
+| R3 | Plug a card, right-click it in Copy From › "Not a camera card". Go back to Settings › Recognition. | The drive is listed by name with "Not a card" and today's date. | ☐ |
+| R4 | Click Forget on that line. Go back to the main window. | The line is gone; the card is proposed again in Copy From (detection on). | ☐ |
+| R5 | Eject a corrected drive, reopen the page. | The drive keeps its name and reads "not connected". | ☐ |
+| R6 | With roll numbering on, run a backup, open the page. | The movie is listed with its card count and last backup date; opening it shows the roll name and the drive. | ☐ |
+| R7 | Forget one roll name, plug the same card again in that movie. | The card gets a new roll name, higher than every name used so far (its old name is not reused); other cards keep theirs. | ☐ |
+| R8 | A correction made before this version (if you have one). | Listed as "Drive not connected (…)" until the drive is plugged, then by its name. | ☐ |
 
 ## Post-run sanity checks
 

@@ -56,6 +56,11 @@ A wrong guess is corrected with a right-click on the source: **Camera card**, **
 **Not a camera card** or **Reset recognition**. The correction is remembered per drive
 (volume UUID).
 
+Settings › **Recognition** says in plain sentences what FilmCan looks at, lists every card
+family it knows, and shows what it has remembered: your corrections (per drive) and the roll
+names given to cards (per movie). **Forget** removes one entry: a forgotten correction lets
+FilmCan guess again, a forgotten roll name gives the card a new one the next time.
+
 See [Roll numbering](./roll-numbering.md) for automatic roll names.
 
 ---
