@@ -96,3 +96,19 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
   1.2.0). There is no engine picker to test; rsync code is dormant.
 - Sandbox stays disabled (entitlement file `com.apple.security.app-sandbox = false`).
 - Drive speed classifier still flags exFAT external as "slow flush required" so the `DO NOT UNPLUG` banner appears.
+
+### Speed advice gate (run when the speed advice changed; needs real drives)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| V1 | A movie with a USB 3 SSD and a USB 3 spinning hard drive as destinations, copy mode Automatic, a card loaded. | A band under the columns: "‘<hard drive>’ sets the pace for every drive", with "Copy to ‘<SSD>’ first" and "Dismiss". | ☐ |
+| V2 | Click "Copy to ‘<SSD>’ first". | The SSD moves to the top of Save To; Options › copy mode shows "One destination at a time"; the band is gone. | ☐ |
+| V3 | Put the hard drive back on top (drag). | A band "‘<SSD>’ waits behind ‘<hard drive>’" appears. | ☐ |
+| V4 | Click "Dismiss", unplug and replug both drives. | The band does not come back for these two drives. | ☐ |
+| V5 | Plug a card reader or drive into a USB 2 port or through a USB 2 cable. | A band "‘<name>’ is connected over USB 2". | ☐ |
+| V6 | Plug two drives into the same external USB hub. | A band "‘A’ and ‘B’ share one USB hub". Plugged straight into the Mac: no band. | ☐ |
+| V7 | An SSD destination that this copy would fill above 90 %. | A band "‘<SSD>’ will be over 90 % full after this copy". | ☐ |
+| V8 | Two USB 3 SSDs (no hard drive). | No band about slow drives (macOS may call an external SSD "not solid state"; that alone must not trigger a band). | ☐ |
+| V9 | While a copy runs. | No band shown. | ☐ |
+| V10 | After a copy of at least 1 GB (one destination at a time, SSD + hard drive). | Under the columns: "‘<hard drive>’ was the slowest drive: … MB/s, against … MB/s for ‘<SSD>’." Gone when the next copy of this movie starts. | ☐ |
+| V11 | Quick Copy of at least 1 GB. | No speed sentence appears for any movie. | ☐ |
