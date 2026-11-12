@@ -127,7 +127,8 @@ enum BackupLogWriter {
                                      customDate: Date?) -> String? {
         let date = customDate ?? Date()
         let meta = ShootMetadata(episode: config.episode, day: config.day,
-                                 unit: config.unit, cameraFormat: config.cameraFormat)
+                                 unit: config.unit, cameraFormat: config.cameraFormat,
+                                 movie: config.name)
         let resolved = OrganizationTemplate.resolve(
             preset: preset, sourcePath: sources.first ?? "", destinationRoot: destination,
             counter: 0, date: date, metadata: meta)

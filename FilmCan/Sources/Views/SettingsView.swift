@@ -26,70 +26,76 @@ struct SettingsView: View {
     @AppStorage("appearancePanelHex") private var appearancePanelHex: String = AppearanceDefaults.panelHex
     @AppStorage("appearanceTextHex") private var appearanceTextHex: String = AppearanceDefaults.textHex
 
-    var body: some View {
-        TabView {
-            AppearanceSettingsView(
-                accentHex: $appearanceAccentHex,
-                accentMode: $appearanceAccentMode,
-                successHex: $appearanceSuccessHex,
-                backgroundHex: $appearanceBackgroundHex,
-                sidebarHex: $appearanceSidebarHex,
-                panelHex: $appearancePanelHex,
-                textHex: $appearanceTextHex
-            )
-                .tabItem {
-                    Label("Appearance", systemImage: "paintpalette")
-                }
+    @AppStorage("settingsPage") private var settingsPageRaw: String = SettingsPage.appearance.rawValue
 
-            NotificationsSettingsView(
-                notifyOnComplete: $notifyOnComplete,
-                notifyOnError: $notifyOnError
-            )
-            .tabItem {
-                Label("Notifications", systemImage: "bell")
-            }
+    private var selectedPage: Binding<SettingsPage?> {
+        Binding(get: { SettingsPage.page(for: settingsPageRaw) },
+                set: { if let page = $0 { settingsPageRaw = page.rawValue } })
+    }
 
-            PushSettingsView(
-                ntfyEnabled: $ntfyEnabled,
-                ntfyURL: $ntfyURL,
-                ntfyBearerToken: $ntfyBearerToken,
-                ntfyTitleTemplate: $ntfyTitleTemplate,
-                ntfyMessageTemplate: $ntfyMessageTemplate,
-                webhookEnabled: $webhookEnabled,
-                webhookURL: $webhookURL,
-                webhookHeaders: $webhookHeaders,
-                webhookIncludeFullPaths: $webhookIncludeFullPaths,
-                legacyWebhookSecret: $webhookSecret
-            )
-            .tabItem {
-                Label("Push", systemImage: "paperplane")
-            }
-
-            HistorySettingsView(
-                historyRetentionLimit: $historyRetentionLimit
-            )
-            .tabItem {
-                Label("History", systemImage: "clock")
-            }
-
-            DriveSettingsView(
-                disableSpotlightIndexing: $disableSpotlightIndexing
-            )
-            .tabItem {
-                Label("Drives", systemImage: "externaldrive")
-            }
-
-            HotkeysSettingsView()
-                .tabItem {
-                    Label("Hotkeys", systemImage: "keyboard")
-                }
-
-            AboutView()
-                .tabItem {
-                    Label("About", systemImage: "info.circle")
-                }
+    /// One page per kind of app-wide setting; the sidebar replaces the former top tabs.
+    @ViewBuilder
+    private func pageContent(_ page: SettingsPage) -> some View {
+        switch page {
+        case .appearance:
+                AppearanceSettingsView(
+                    accentHex: $appearanceAccentHex,
+                    accentMode: $appearanceAccentMode,
+                    successHex: $appearanceSuccessHex,
+                    backgroundHex: $appearanceBackgroundHex,
+                    sidebarHex: $appearanceSidebarHex,
+                    panelHex: $appearancePanelHex,
+                    textHex: $appearanceTextHex
+                )
+        case .notifications:
+                NotificationsSettingsView(
+                    notifyOnComplete: $notifyOnComplete,
+                    notifyOnError: $notifyOnError
+                )
+        case .push:
+                PushSettingsView(
+                    ntfyEnabled: $ntfyEnabled,
+                    ntfyURL: $ntfyURL,
+                    ntfyBearerToken: $ntfyBearerToken,
+                    ntfyTitleTemplate: $ntfyTitleTemplate,
+                    ntfyMessageTemplate: $ntfyMessageTemplate,
+                    webhookEnabled: $webhookEnabled,
+                    webhookURL: $webhookURL,
+                    webhookHeaders: $webhookHeaders,
+                    webhookIncludeFullPaths: $webhookIncludeFullPaths,
+                    legacyWebhookSecret: $webhookSecret
+                )
+        case .history:
+                HistorySettingsView(
+                    historyRetentionLimit: $historyRetentionLimit
+                )
+        case .drives:
+                DriveSettingsView(
+                    disableSpotlightIndexing: $disableSpotlightIndexing
+                )
+        case .recognition:
+                RecognitionSettingsView()
+        case .hotkeys:
+                HotkeysSettingsView()
+        case .about:
+                AboutView()
         }
-        .frame(minWidth: 560, idealWidth: 560, minHeight: 660, idealHeight: 660)
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            List(selection: selectedPage) {
+                ForEach(SettingsPage.allCases) { page in
+                    Label(page.title, systemImage: page.icon).tag(page)
+                }
+            }
+            .listStyle(.sidebar)
+            .frame(width: 180)
+            Divider()
+            pageContent(SettingsPage.page(for: settingsPageRaw))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(minWidth: 740, idealWidth: 740, minHeight: 660, idealHeight: 660)
         .modifier(SettingsWindowSizer())
         .onAppear {
             let store = KeychainStore()
@@ -123,7 +129,7 @@ private struct SettingsWindowSizer: ViewModifier {
         guard !didApply else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
-            let newSize = NSSize(width: 560, height: 660)
+            let newSize = NSSize(width: 740, height: 660)
             let frame = window.frame
             let newOrigin = NSPoint(
                 x: frame.midX - newSize.width / 2,

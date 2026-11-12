@@ -85,6 +85,19 @@ struct BackupListView: View {
                     .clipShape(Circle())
                     .help("New movie")
                     .tourAnchor("addBackup")
+
+                    if !appState.filmsToStartFrom.isEmpty || !appState.presetsToStartFrom.isEmpty {
+                        Menu {
+                            NewMovieMenuItems(appState: appState, storage: storage)
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help("New movie with the settings of another movie or a preset")
+                    }
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 10)

@@ -49,6 +49,30 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### First-launch defaults gate (run when new-film defaults or Info.plist usage texts changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| F1 | In Terminal: `tccutil reset All com.filmcan.app`. Launch FilmCan, add a camera card as a source. | The macOS dialog "FilmCan would like to access files on a removable volume" shows a sentence explaining why. | ☐ |
+| F2 | Same reset, then pick a folder inside Documents, then Desktop, then Downloads. | Each macOS dialog shows its own explaining sentence. | ☐ |
+| F3 | Plug a camera card. Click "+" to create a new movie. | The card appears in Copy From by itself, tagged Camera (a sound recorder card: Sound). | ☐ |
+| F4 | In the new movie: Options › Source and Options › Logs. | "Detect camera and sound cards automatically" is on; "PDF report with thumbnails" is on. | ☐ |
+| F5 | Open a movie that existed before this build. | Both switches are as you left them. | ☐ |
+| F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
+| F7 | Finder › right-click a folder › Services › FilmCan Copy, run it. | No PDF report is written (Quick Copy is unchanged). | ☐ |
+
+### Card families gate (run when `CameraCardDetector` changed; needs real cards or copies of their folder layout)
+
+| # | Check (real .app, "Detect camera and sound cards automatically" on) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| C1 | Plug a photo camera, drone or phone card with a `DCIM` folder holding video. | Added to Copy From, badge "Camera card", tagged Camera. | ☐ |
+| C2 | Plug a `DCIM` card holding photos only. | Not added, no badge. | ☐ |
+| C3 | Plug an Insta360 card. | Badge "Insta360 card". | ☐ |
+| C4 | Plug an AVCHD camcorder card (`PRIVATE/AVCHD` or `AVCHD` at the root). | Badge "AVCHD card". A Panasonic card with `PANA_GRP` still says "Panasonic card"; a Sony card with `M4ROOT` still says "Sony card". | ☐ |
+| C5 | Plug a Panasonic P2 card. | Badge "Panasonic card". | ☐ |
+| C6 | Plug ARRI, RED, Sony, Canon, Blackmagic, GoPro, DJI and sound recorder cards you have. | Same badge as before this build. | ☐ |
+| C7 | Plug a backup drive that happens to have a `DCIM` folder with video at its root. | It is proposed as a camera card (expected). Right-click › "Not a camera card": it leaves and does not come back. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
@@ -82,6 +106,57 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | 18 | Resume — partial | #2 source + one new clip added | SSD-A, SSD-B | fast | Only the new clip copies; row reads "Resuming — N files already backed up…"; a history card is added | ☐ |
 | 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
 | 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
+
+### Movie settings gate (run when presets or movie creation changed)
+
+Before the first launch of this build, keep a copy of `configs.json` and `presets.json` (Application Support › FilmCan).
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| S1 | Launch on existing data where two movies use the same preset. | Both movies show the same preset name, same folder preview as before. No "(modified)" mark. | ☐ |
+| S2 | Run a backup of an existing movie with an existing card. | Same folders and files as with the previous build (resume finds everything). | ☐ |
+| S3 | In movie A, change the folder template. Open movie B. | B's template and folder preview are unchanged. | ☐ |
+| S4 | Preset menu in a movie. | Lists "Off", "Netflix Ingest (built-in)", the shared presets once each (no duplicates), "Save as new preset", "Delete preset". | ☐ |
+| S5 | Choose a preset in movie A, edit a folder, then choose the same preset in movie B. | B gets the preset as saved, not A's edit. | ☐ |
+| S6 | "Save as new preset" in movie A. | A new preset appears in the menu of every movie; A keeps its settings. | ☐ |
+| S7 | Choose "Off", open the menu again, choose "This movie's settings (…)". Then press the trash button next to the preset name. | Off then back: the movie's own folders return unchanged. Trash: the movie goes to "Off" for good; the shared preset is still in the menu. | ☐ |
+| S8 | "Delete preset" › a preset. | It leaves the menu; movies that started from it keep their folders. | ☐ |
+| S9 | Small arrow next to "+" in the tab bar › "Like <movie>". | A new movie with the same options, no cards, no drives, empty shoot day. File › New Movie Like shows the same list. | ☐ |
+| S10 | Movie "Citizen K" with template `CITIZENK/{day}`; create a movie like it and rename it "Citizen L". | The new movie's template starts with `{movie}`; the preview shows `Citizen L/…`. The old movie still writes to `CITIZENK/…`. | ☐ |
+| S11 | Type `{movie}` in a folder template (it is in the token list). | The preview shows the movie's name. | ☐ |
+| S12 | Delete a movie, quit, open `presets.json`. | No record with that movie's `ownerFilmId` remains. | ☐ |
+| S13 | Quick Copy: pick a movie, look at the Preset picker; pick another movie. | The picker shows the shared presets plus the picked movie's own settings, never another movie's. | ☐ |
+| S14 | Settings › Import & Export › Presets › Export. | The file holds the shared presets only. | ☐ |
+| S15 | Export a movie, delete it, import it back. | Same preset name, same folder preview as before the export. | ☐ |
+
+### Settings layout gate (run when the settings panel or the Settings window changed)
+
+| # | Check (real .app, window at 1280 × 800) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| L1 | Look under Copy From / Save To. | One line: gear, "Movie settings", a short summary. No tab bar, no Options card. | ☐ |
+| L2 | Click the line. | A panel opens on the right with Basic / Source / Destinations / Logs and the Preset menu. Copy From and Save To are still visible and readable. | ☐ |
+| L3 | In the panel, change the folder layout. | The folder preview in Save To follows at once. | ☐ |
+| L4 | Go through the four groups, at 1280 × 800 and in a full-screen window. | Every setting that was in the Options card is there; every switch and menu on the right of a row is fully visible, nothing clipped. | ☐ |
+| L5 | With the panel open, open History, then Catalog. Then click the line again. | The panel closes when History or Catalog opens; clicking the line closes that pane and opens the panel. | ☐ |
+| L6 | Panel open, switch movie tab; quit and relaunch. | The panel stays open and shows the current movie's settings. | ☐ |
+| L8 | Narrow the window to its minimum with the panel open. | The panel takes the whole window (close button top right); closing it shows the cards again. | ☐ |
+| L9 | Run the quick tour. | The former "Options Tabs" step highlights the "Movie settings" line. | ☐ |
+| L10 | Open Settings (Cmd+,). | A sidebar with Appearance, Notifications, Phone & webhooks, History, Drives, Recognition, Shortcuts, About; each page shows what its tab showed. Reopen Settings: the last page is selected. | ☐ |
+| L11 | Read the labels in Basic and Destinations. | "Full check (re-reads every file)", "If a file already exists", "Checksum list format", "Folder layout", "Rename files", "Custom date in names". | ☐ |
+| L12 | Run a backup; open its log and history entry. | Same wording as before in logs and history (only the settings labels changed). | ☐ |
+
+### Recognition page gate (run when the Recognition page or card memory changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Open Settings (Cmd+,), click Recognition. | Four groups: how a card is recognised, cards it knows, your corrections, roll names. Nothing clipped, sentences wrap. | ☐ |
+| R2 | Read "Cards it knows". | One line per family (ARRI … Sound recorder), each with a short reason. | ☐ |
+| R3 | Plug a card, right-click it in Copy From › "Not a camera card". Go back to Settings › Recognition. | The drive is listed by name with "Not a card" and today's date. | ☐ |
+| R4 | Click Forget on that line. Go back to the main window. | The line is gone; the card is proposed again in Copy From (detection on). | ☐ |
+| R5 | Eject a corrected drive, reopen the page. | The drive keeps its name and reads "not connected". | ☐ |
+| R6 | With roll numbering on, run a backup, open the page. | The movie is listed with its card count and last backup date; opening it shows the roll name and the drive. | ☐ |
+| R7 | Forget one roll name, plug the same card again in that movie. | The card gets a new roll name, higher than every name used so far (its old name is not reused); other cards keep theirs. | ☐ |
+| R8 | A correction made before this version (if you have one). | Listed as "Drive not connected (…)" until the drive is plugged, then by its name. | ☐ |
 
 ## Post-run sanity checks
 

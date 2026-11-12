@@ -219,7 +219,10 @@ struct MainView: View {
                 transferViewModel: transferViewModel,
                 isHistoryVisible: rightPane != .none,
                 rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
-                onToggleHistory: { togglePane(.history) }
+                onToggleHistory: { togglePane(.history) },
+                onCloseRightPane: {
+                    withAnimation(.easeInOut(duration: 0.2)) { rightPane = .none }
+                }
             )
             .id(config.id)
         } else {
