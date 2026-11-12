@@ -126,8 +126,8 @@ final class RollNumberingStore {
     }
 
     /// A card key starts with a volume id or "nouuid", never with this.
-    static let forgottenKeyPrefix = "forgotten|"
-    static func isForgottenKey(_ key: String) -> Bool { key.hasPrefix(forgottenKeyPrefix) }
+    nonisolated static let forgottenKeyPrefix = "forgotten|"
+    nonisolated static func isForgottenKey(_ key: String) -> Bool { key.hasPrefix(forgottenKeyPrefix) }
 
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
