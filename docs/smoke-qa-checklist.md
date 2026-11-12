@@ -49,6 +49,21 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### Demo gate (run when the demo or the empty screen changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| D1 | First launch with no movie (or close every movie tab). | Under "Create First Movie": a "Try with made-up cards" button and two lines of explanation. | ☐ |
+| D2 | Click it. | A "Demo" movie opens with two sources (Demo card A001, Demo sound S001 tagged Sound) and two destinations (Demo drive 1, Demo drive 2). A yellow band on top says it is a demo, with "Stop the demo". | ☐ |
+| D3 | Start the backup. | A real copy runs for a few seconds on both drives: yellow bar, then green check bar, both to 100 %. | ☐ |
+| D4 | While it runs, look at "Stop the demo". | Greyed until the backup has finished or been stopped. | ☐ |
+| D5 | Open History and the Catalog. | The demo run and its two rolls are there, under "Demo". | ☐ |
+| D6 | Click "Stop the demo". | The Demo tab is gone, as are its history entries and catalog rolls. `~/Library/Application Support/FilmCan/Demo` no longer exists. Other movies are untouched. | ☐ |
+| D7 | With phone notifications configured, run the demo backup. | No message on the phone, no webhook call; the Mac's own notification may show. | ☐ |
+| D8 | Start the demo, quit FilmCan, relaunch. | The Demo movie and its band are still there; "Stop the demo" still removes everything. | ☐ |
+| D9 | Start the demo, close the Demo tab by hand (delete the movie), go to the empty screen. | "Try with made-up cards" is offered again; clicking it starts a clean demo. | ☐ |
+| D10 | Start a copy of another movie, then start the demo copy while it runs. | "Stop the demo" stays greyed while the demo copies, even after the other movie has finished. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
