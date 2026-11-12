@@ -14,14 +14,16 @@ Living status file for the autonomous lot-by-lot work on `next`. One lot = one `
 | 5 | Film owns its settings (part 1): own copy per film, migration, "new movie like", `{movie}` token | `qt1/film-settings` (stacked on `qt1/first-launch-defaults`) | #7 | done (green: run 43079041501) | owner: real-app checks S1–S15 |
 | 5b | Movie settings panel, Settings window sidebar, plain-language labels (part 2) | `qt1/film-settings-panel` (stacked on 5) | #8 | done (green: run 43082618556) | owner: real-app checks L1–L12 (all visual, unverified) |
 | 6 | Visual folder-structure editor ("new" badges first) | `qt1/folder-tree-editor` (stacked on 5b) | #9 | done (green: run 43118621926) | owner: real-app checks T1–T14 |
-| 7a | Recognition settings page | `qt1/recognition-page` (stacked on 5b, with `qt1/more-cameras` merged in) | #10 | PR open (green: run 43118366146), cold review running | fix findings if any |
-| 7b | Re-create a report after the fact | `qt1/recreate-report` (stacked on `qt1/reports-on-mac`) | — | all tasks pushed (0f902cf), waiting for CI + cold review | fix findings, open PR once green |
-| 8 | Demo mode for users | `qt1/demo-mode` | — | to do | spec |
-| 9 | Speed advice before and after the copy | `qt1/speed-advice` | — | to do | spec |
+| 7a | Recognition settings page | `qt1/recognition-page` (stacked on 5b, with `qt1/more-cameras` merged in) | #10 | review fixes pushed; compile fix dff98f5, CI running | update PR proof once green |
+| 7b | Re-create a report after the fact | `qt1/recreate-report` (stacked on `qt1/reports-on-mac`) | — | review fixes pushed (1bd1af8); earlier run cancelled, re-run queued | open PR once green |
+| 8 | Demo mode for users | `qt1/demo-mode` | — | done in one task + cold-review fixes (22145c5), CI running | open PR once green |
+| 9 | Speed advice before and after the copy | `qt1/speed-advice` | — | spec, plan, code, tests pushed (5cdb2a7); spec cold-reviewed | CI, code review, PR |
 
 States: `to do`, `spec`, `plan`, `task n of m`, `done`, `blocked`.
 
 ## Notes
+
+- 2026-11-12 02:05 UTC: two sessions overlapped (the 23:23 session kept working without refreshing this file; a WIP draft landed on `qt1/speed-advice` at 02:02 after the 01:58 claim). The complete lot was kept with a `-s ours` merge; no force push. A session must refresh the line above before every push.
 
 - Proof for every lot is a green run of the `macOS tests` workflow on the branch's last commit.
 - Owner-only checks (real hardware, lid-closed sleep test, real-app visual pass) are listed in each PR under "À vérifier à l'œil" and in `docs/smoke-qa-checklist.md`.
