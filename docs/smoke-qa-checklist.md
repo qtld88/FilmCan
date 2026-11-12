@@ -49,6 +49,19 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### Report copies gate (run when `ReportArchive` or the report flow changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Settings › History. | A "Reports" section: switch on, path `~/Documents/FilmCan Reports`. | ☐ |
+| R2 | A movie with "PDF report with thumbnails" on, shoot day set (e.g. Day02), two drives. Run a backup. Wait for the report (a few seconds after the end). | `~/Documents/FilmCan Reports/<movie>/Day02/<drive A>/` and `/<drive B>/` each hold the PDF and one `.mhl` per roll. macOS may ask once for access to Documents. | ☐ |
+| R3 | Eject both drives. Open the PDF from that folder. | It opens, with thumbnails. | ☐ |
+| R4 | A movie with no shoot day. Run a backup. | The day folder is today's date (`2026-11-11`). | ☐ |
+| R5 | A movie with the PDF report off. Run a backup. | Nothing new in `FilmCan Reports`. | ☐ |
+| R6 | "Choose…" another folder, run a backup. Then "Reset". | Copies go to the chosen folder; after Reset the path is back to Documents. | ☐ |
+| R7 | Switch "Keep a copy of every report on this Mac" off, run a backup. | No copy is made; the report on the drive is still written. | ☐ |
+| R8 | Compare the destination drive before and after this build for the same backup. | Same folders and files on the drive. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
@@ -82,6 +95,20 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | 18 | Resume — partial | #2 source + one new clip added | SSD-A, SSD-B | fast | Only the new clip copies; row reads "Resuming — N files already backed up…"; a history card is added | ☐ |
 | 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
 | 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
+
+### Report-after-the-fact gate (run when report creation from the Catalog changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| G1 | Back up a card with the PDF report switched off. Open the Catalog, right-click the roll. | "Create report from <drive>" and the same with "re-reading every file (slow)", one pair per connected drive. | ☐ |
+| G2 | Choose "Create report from <drive>". | A line "Creating the report for…" shows, then Finder opens on `<roll>_report_recreated.pdf` in the reports folder on the Mac. | ☐ |
+| G3 | Open the PDF. | Thumbnails, sizes, checksums. Under the title: backed-up date, "Report created after the backup, on …". Status reads "Checksums from the backup's list. Files were not re-read". No "Verified". | ☐ |
+| G4 | On the drive, delete one clip and add a text file to the roll; create the report again. | The deleted clip is under "missing from the drive"; the text file reads "Not in the checksum list"; status is red. | ☐ |
+| G5 | Choose the "re-reading every file (slow)" entry on an intact roll. | Status: "Re-checked: N of N listed files match the checksum list" in green. Slower. | ☐ |
+| G6 | Eject the drive, right-click the roll. | One greyed entry asking to connect a drive that holds the roll. | ☐ |
+| G7 | Rename the drive in Finder, right-click the roll, create the report. | Works: the drive is found although its name changed. | ☐ |
+| G8 | Look at the roll folder on the drive after G2–G5. | Nothing added on the drive. | ☐ |
+| G9 | A movie set to the simple hidden checksum list: back up, then create the report. | Report without checksums; status says there is no ASC MHL checksum list. | ☐ |
 
 ## Post-run sanity checks
 

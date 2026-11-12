@@ -29,6 +29,26 @@ From History, right-click a card and choose **Open report** when the PDF exists.
 
 ---
 
+## A copy on your Mac
+
+FilmCan also keeps a copy of every report on your Mac, in `Documents/FilmCan Reports`, sorted by movie, then day, then drive. Each folder holds the PDF and the checksum list of every roll, so you can read them with the drives unplugged.
+
+Settings › History › **Reports** switches this off or picks another folder. If you pick a folder synced by iCloud or Dropbox, that tool does the syncing; FilmCan itself sends nothing anywhere. The copy is made only for backups that write a PDF report.
+
+---
+
+## Create a report later
+
+A roll backed up without a report (or whose report was lost) can get one afterwards. Open the **Catalog**, right-click the roll and choose **Create report from <drive>**; the drive that holds the roll must be connected (it is found even if it is now mounted under another name). With the roll on several connected drives, there is one entry per drive.
+
+- The PDF goes to the reports folder on your Mac (`Documents/FilmCan Reports/<movie>/<day>/<drive>/<roll>_report_recreated.pdf`) and is shown in Finder. Nothing is written on the drive.
+- The report says it was created after the backup, and when.
+- Checksums are taken from the ASC MHL checksum list already on the drive; they are **not** recomputed. A file that is not in the list, or whose size no longer matches it, shows no checksum and says why. Files in the list that are no longer on the drive are listed as missing. Such a report never says "Verified".
+- **Create report from <drive>, re-reading every file (slow)** reads every file again and compares it to the list. A file that does not match shows no checksum.
+- A roll without an ASC MHL checksum list (another tool, the list was deleted, or the movie uses the simple hidden list) gets a report without checksums, and says so.
+
+---
+
 ## Good to know
 
 - Generated in the background after history and notifications; it never delays or fails the backup.
@@ -65,6 +85,14 @@ Options › Logs › **PDF report with thumbnails**. **Create log file** doit ê
 `<nom du fichier journal>_report.pdf`, dans le même dossier que le journal. Avec le preset Netflix Ingest, le journal va dans le dossier `Reports/` du jour de tournage, donc le PDF aussi.
 
 Depuis History, faites un clic droit sur une carte et choisissez **Open report** quand le PDF existe. Avec plusieurs destinations, le menu contient une entrée **Open report** par destination.
+
+---
+
+## Une copie sur votre Mac
+
+FilmCan garde aussi une copie de chaque rapport sur votre Mac, dans `Documents/FilmCan Reports`, rangée par film, puis par jour, puis par disque. Chaque dossier contient le PDF et la liste de sommes de contrôle de chaque roll : vous pouvez les lire disques débranchés.
+
+Settings › History › **Reports** permet de désactiver cette copie ou de choisir un autre dossier. Si vous choisissez un dossier synchronisé par iCloud ou Dropbox, c'est cet outil qui synchronise ; FilmCan n'envoie rien nulle part. La copie n'est faite que pour les sauvegardes qui écrivent un rapport PDF.
 
 ---
 
@@ -107,6 +135,14 @@ Klicken Sie in History mit der rechten Maustaste auf eine Karte und wählen Sie 
 
 ---
 
+## Eine Kopie auf Ihrem Mac
+
+FilmCan behält außerdem eine Kopie jedes Berichts auf Ihrem Mac, in `Documents/FilmCan Reports`, sortiert nach Film, dann Tag, dann Laufwerk. Jeder Ordner enthält das PDF und die Prüfsummenliste jeder Rolle, sodass Sie sie auch ohne angeschlossene Laufwerke lesen können.
+
+Unter Settings › History › **Reports** schalten Sie das aus oder wählen einen anderen Ordner. Wenn Sie einen von iCloud oder Dropbox synchronisierten Ordner wählen, übernimmt dieses Werkzeug die Synchronisierung; FilmCan selbst sendet nichts. Die Kopie entsteht nur bei Backups, die einen PDF-Bericht schreiben.
+
+---
+
 ## Gut zu wissen
 
 - Wird nach Verlauf und Benachrichtigungen im Hintergrund erzeugt; es verzögert die Sicherung nie und lässt sie nie fehlschlagen.
@@ -143,6 +179,14 @@ Options › Logs › **PDF report with thumbnails**. Requiere que **Create log f
 `<nombre del archivo de registro>_report.pdf`, en la misma carpeta que el registro. Con el preset Netflix Ingest el registro va a la carpeta `Reports/` del día de rodaje, así que el PDF también.
 
 Desde History, haga clic derecho en una tarjeta y elija **Open report** cuando el PDF exista. Con varios destinos, el menú tiene una entrada **Open report** por destino.
+
+---
+
+## Una copia en su Mac
+
+FilmCan también guarda una copia de cada informe en su Mac, en `Documents/FilmCan Reports`, ordenada por película, luego día, luego unidad. Cada carpeta contiene el PDF y la lista de sumas de verificación de cada roll, para leerlos con las unidades desconectadas.
+
+En Settings › History › **Reports** puede desactivarlo o elegir otra carpeta. Si elige una carpeta sincronizada por iCloud o Dropbox, esa herramienta hace la sincronización; FilmCan no envía nada a ninguna parte. La copia solo se hace en las copias de seguridad que escriben un informe PDF.
 
 ---
 

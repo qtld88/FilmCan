@@ -8,6 +8,8 @@ enum ASCMHLReader {
         let size: Int64?
         let hash: String   // value of the file's hash element (xxh128/xxh64/md5/…)
         let mtime: Int64?
+        /// Name of the hash element the value came from ("xxh128", "md5", …).
+        var algorithm: String? = nil
     }
 
     static func read(url: URL) throws -> [Entry] {
@@ -26,6 +28,7 @@ private final class ASCMHLParser: NSObject, XMLParserDelegate {
     private var curSize: Int64?
     private var curMtime: Int64?
     private var curHash: String?
+    private var curAlgorithm: String?
     private var charBuf = ""
     private var capturingHashValue = false
 
@@ -44,7 +47,7 @@ private final class ASCMHLParser: NSObject, XMLParserDelegate {
         switch name {
         case "hash":
             inHash = true
-            curPath = nil; curSize = nil; curMtime = nil; curHash = nil
+            curPath = nil; curSize = nil; curMtime = nil; curHash = nil; curAlgorithm = nil
         case "path" where inHash:
             curSize = attrs["size"].flatMap { Int64($0) }
             curMtime = attrs["lastmodificationdate"].flatMap { Int64($0) }
@@ -64,10 +67,12 @@ private final class ASCMHLParser: NSObject, XMLParserDelegate {
             curPath = charBuf.trimmingCharacters(in: .whitespacesAndNewlines)
         case let h where ASCMHLParser.hashElements.contains(h) && capturingHashValue:
             curHash = charBuf.trimmingCharacters(in: .whitespacesAndNewlines)
+            curAlgorithm = name
             capturingHashValue = false
         case "hash":
             if let path = curPath, let hash = curHash {
-                entries.append(.init(relPath: path, size: curSize, hash: hash, mtime: curMtime))
+                entries.append(.init(relPath: path, size: curSize, hash: hash, mtime: curMtime,
+                                     algorithm: curAlgorithm))
             }
             inHash = false
         default:

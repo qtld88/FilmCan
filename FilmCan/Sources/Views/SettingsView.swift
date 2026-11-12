@@ -556,6 +556,8 @@ struct HistorySettingsView: View {
                 }
             }
 
+            ReportArchiveSettingsSection()
+
             Section("Import & Export") {
                 HStack {
                     Text("Presets")
