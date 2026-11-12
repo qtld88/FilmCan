@@ -3,15 +3,87 @@ import Foundation
 
 extension BackupEditorView {
     func overviewSection(isWide: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            nameRow
-            
+        let facts = mainScreenFacts()
+        return VStack(alignment: .leading, spacing: 16) {
+            nameRow(runSubtitle: facts.runSubtitle)
+
+            if let summary = facts.summary {
+                BackupSummaryRow(summary: summary)
+            }
+
             if isWide {
                 overviewRowLayout
             } else {
                 overviewColumnLayout
             }
         }
+    }
+
+    // MARK: - Summary line and Run subtitle (logic in `MainScreenSummary.swift`)
+
+    private var summarySources: [FolderTreeBuilder.Source] {
+        viewModel.includedSourcePaths.map { path in
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+            return FolderTreeBuilder.Source(
+                path: path, isDirectory: isDir.boolValue, kind: viewModel.mediaKind(for: path),
+                rollName: isDir.boolValue ? viewModel.rollNameOverride(for: path) : nil)
+        }
+    }
+
+    /// Same options as the Save To folder preview, so the summary names the same folders.
+    private var summaryOptions: FolderTreeBuilder.Options {
+        var o = FolderTreeBuilder.Options()
+        let preset = previewOrganizationPreset
+        o.preset = preset
+        o.organizationActive = preset.map {
+            $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
+        } ?? false
+        o.copyContents = viewModel.copyFolderContents
+        o.date = TodayClock.shared.today
+        o.metadata = previewShootMetadata
+        o.mediaIndexPreset = preset
+        return o
+    }
+
+    private var summaryDestinations: [String] { viewModel.config.includedDestinationPaths }
+
+    /// Summary line + Run subtitle, resolved in one pass per render so the sources and
+    /// their destination paths are looked up once (the folder preview already stats them).
+    func mainScreenFacts() -> (summary: BackupSummary?, runSubtitle: String) {
+        let isRunning = transferViewModel.isTransferActive(for: viewModel.config.id)
+        // A running copy re-renders this view on every progress tick: keep the line
+        // resolved before the run instead of touching the disks again each time.
+        if isRunning, let frozen = summaryFreeze.summary {
+            return (frozen, RunSubtitle.text(sourceCount: 1, driveCount: 1,
+                                             newFolderCount: 0, isRunning: true))
+        }
+        let sources = summarySources
+        let destinations = summaryDestinations
+        guard !sources.isEmpty else {
+            summaryFreeze.summary = nil
+            return (nil, RunSubtitle.text(sourceCount: 0, driveCount: destinations.count,
+                                          newFolderCount: 0, isRunning: isRunning))
+        }
+        let options = summaryOptions
+        // Without a drive yet, resolve against a placeholder root: the folders are the same.
+        let root = destinations.first ?? "/Volumes/Drive"
+        let counts = sources.compactMap { previewInfo.sourceItemCounts[$0.path] }
+        let summary = BackupSummary.make(
+            relativePaths: FolderTreeBuilder.relativePaths(for: root, sources: sources, options: options),
+            totalBytes: previewInfo.totalBytes,
+            itemCount: counts.count == sources.count ? counts.reduce(0, +) : nil,
+            driveCount: destinations.count,
+            isLoading: previewInfo.isLoading)
+        summaryFreeze.summary = summary
+        // Nothing to count while a copy runs: the subtitle then only says so.
+        let newFolders = isRunning ? 0 : destinations.reduce(0) { total, destination in
+            total + RunSubtitle.newFolderCount(
+                in: FolderTreeBuilder.lines(for: destination, sources: sources, options: options))
+        }
+        return (summary, RunSubtitle.text(
+            sourceCount: sources.count, driveCount: destinations.count,
+            newFolderCount: newFolders, isRunning: isRunning))
     }
 
     private var overviewRowLayout: some View {

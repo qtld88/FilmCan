@@ -3,7 +3,7 @@ import SwiftUI
 struct TransferHistoryView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var transferViewModel: TransferViewModel
-    @AppStorage("historyListView") private var historyListView: Bool = false
+    @AppStorage("historyListView") private var historyListView: Bool = true
     @State private var verificationSheet: VerificationAlert? = nil
     @State private var verifyingHashPaths: Set<String> = []
     @State private var verificationStatusByDestination: [String: VerificationStatus] = [:]

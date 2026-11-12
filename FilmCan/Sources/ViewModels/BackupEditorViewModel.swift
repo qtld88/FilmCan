@@ -544,6 +544,18 @@ class BackupEditorViewModel: ObservableObject {
             now: now, calendar: .current)
     }
 
+    /// Day change made from the film header. With the day counter on it is today's
+    /// override (tomorrow's first run advances from it); otherwise it is the film's day.
+    func setShootDayFromHeader(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != effectiveShootDay() else { return }
+        if config.dayAutoAdvance {
+            shootDayToday = trimmed
+        } else {
+            day = trimmed
+        }
+    }
+
     /// Today's shoot day when auto-advance is on. Setting it overrides the counter for
     /// today; tomorrow's first run advances from the edited value.
     var shootDayToday: String {
