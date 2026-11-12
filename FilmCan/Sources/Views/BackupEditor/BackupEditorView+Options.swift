@@ -224,18 +224,9 @@ extension BackupEditorView {
                     ForEach(availableOptionsTabs) { tab in
                         let isSelected = selectedOptionsTab == tab
                         Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
+                            // In the panel the content is always open: a tab only selects.
+                            selectedOptionsTab = tab
+                            isOptionsCollapsed = false
                         } label: {
                             Text(tab.shortTitle)
                                 .font(.subheadline.weight(isSelected ? .semibold : .regular))
@@ -256,24 +247,14 @@ extension BackupEditorView {
                     Spacer(minLength: 0)
                     presetSelector
                 }
-                .tourAnchor("optionsTabs")
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(availableOptionsTabs) { tab in
                         let isSelected = selectedOptionsTab == tab
                         Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
+                            // In the panel the content is always open: a tab only selects.
+                            selectedOptionsTab = tab
+                            isOptionsCollapsed = false
                         } label: {
                             Text(tab.shortTitle)
                                 .font(.subheadline.weight(isSelected ? .semibold : .regular))
@@ -294,7 +275,6 @@ extension BackupEditorView {
                     }
                     presetSelector
                 }
-                .tourAnchor("optionsTabs")
             }
         }
     }
@@ -388,10 +368,14 @@ extension BackupEditorView {
     }
 
     private func expandOptionsIfNeeded() {
-        guard isOptionsCollapsed else { return }
-        withAnimation(.easeInOut(duration: 0.15)) {
-            isOptionsCollapsed = false
-        }
+        if !isMovieSettingsShown { openMovieSettings() }
+        isOptionsCollapsed = false
+    }
+
+    /// "Netflix Ingest · Full check (re-reads every file)": what the closed line says.
+    var movieSettingsSummary: String {
+        let folders = selectedOrganizationPresetName == "Off" ? "No folder layout" : selectedOrganizationPresetName
+        return "\(folders) · \(SettingsWording.verification(viewModel.verificationMode))"
     }
 
     @ViewBuilder
