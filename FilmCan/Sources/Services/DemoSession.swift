@@ -97,14 +97,25 @@ enum DemoSession {
 
     // MARK: - Start / stop
 
+    enum StartError: LocalizedError {
+        case demoCopyRunning
+        var errorDescription: String? {
+            "The current demo is still copying. Stop that copy first."
+        }
+    }
+
     /// Creates the made-up media and the demo movie, and returns the movie. A previous
     /// demo left behind is removed first.
     @MainActor
     static func start(storage: ConfigurationStorage, catalog: MediaCatalogStore,
                       rollStore: RollNumberingStore, root: URL = defaultRoot(),
                       clipBytes: Int = defaultClipBytes,
-                      defaults: UserDefaults = .standard) throws -> BackupConfiguration {
-        stop(storage: storage, catalog: catalog, rollStore: rollStore, root: root, defaults: defaults)
+                      defaults: UserDefaults = .standard,
+                      isCopying: (UUID) -> Bool = { _ in false }) throws -> BackupConfiguration {
+        guard stop(storage: storage, catalog: catalog, rollStore: rollStore, root: root,
+                   defaults: defaults, isCopying: isCopying) else {
+            throw StartError.demoCopyRunning
+        }
         let layout = Layout(root: root)
         do {
             try createFiles(layout: layout, clipBytes: clipBytes)
@@ -118,29 +129,54 @@ enum DemoSession {
         return config
     }
 
+    /// A movie is only treated as the demo when it still looks like one: the demo's
+    /// name, and at least one card or drive inside the demo folder (a drive the user
+    /// added by hand does not make it a real movie). Anything else that ends
+    /// up under the stored id (an imported movie, restored preferences) is left alone.
+    static func looksLikeDemo(_ config: BackupConfiguration, root: URL) -> Bool {
+        let prefix = root.standardizedFileURL.path + "/"
+        let paths = config.sourcePaths + config.destinationPaths
+        return config.name == movieName && paths.contains {
+            URL(fileURLWithPath: $0).standardizedFileURL.path.hasPrefix(prefix)
+        }
+    }
+
     /// Removes everything the demo made. Safe to call when no demo is running.
+    /// Does nothing and returns `false` while the demo movie is copying: its cards and
+    /// drives are being read and written.
     @MainActor
+    @discardableResult
     static func stop(storage: ConfigurationStorage, catalog: MediaCatalogStore,
                      rollStore: RollNumberingStore, root: URL = defaultRoot(),
-                     defaults: UserDefaults = .standard) {
+                     defaults: UserDefaults = .standard,
+                     isCopying: (UUID) -> Bool = { _ in false }) -> Bool {
         if let id = demoConfigId(defaults: defaults) {
-            let runs = storage.transferHistory.filter { $0.configId == id }.count
-            if runs > 0 {
-                storage.clearHistory(for: id)
-                // Demo runs do not count as backups made with FilmCan.
-                storage.totalTransferCount = max(0, storage.totalTransferCount - runs)
+            if isCopying(id) { return false }
+            let config = storage.configurations.first(where: { $0.id == id })
+            if let config, !looksLikeDemo(config, root: root) {
+                // Not the demo any more: forget the pointer, touch nothing of that movie.
+                defaults.removeObject(forKey: defaultsKey)
+            } else {
+                let runs = storage.transferHistory.filter { $0.configId == id }.count
+                if runs > 0 {
+                    storage.clearHistory(for: id)
+                    // Demo runs do not count as backups made with FilmCan.
+                    storage.totalTransferCount = max(0, storage.totalTransferCount - runs)
+                }
+                catalog.forget(configId: id)
+                rollStore.remove(configId: id)
+                if let config {
+                    storage.delete(config)
+                }
+                if storage.lastUsedConfigId == id {
+                    storage.setLastSelectedConfigId(nil)
+                }
+                defaults.removeObject(forKey: defaultsKey)
             }
-            catalog.forget(configId: id)
-            if rollStore.state(for: id) != RollNumberingStore.ConfigState() {
-                rollStore.update(RollNumberingStore.ConfigState(), for: id)
-            }
-            if let config = storage.configurations.first(where: { $0.id == id }) {
-                storage.delete(config)
-            }
-            defaults.removeObject(forKey: defaultsKey)
         }
         if FileManager.default.fileExists(atPath: root.path) {
             try? FileManager.default.removeItem(at: root)
         }
+        return true
     }
 }

@@ -217,7 +217,7 @@ struct MainView: View {
            let config = appState.storage.configurations.first(where: { $0.id == configId }) {
             VStack(spacing: 0) {
                 if DemoSession.isDemo(config.id) {
-                    DemoBanner(canStop: !transferViewModel.isTransferring, onStop: stopDemo)
+                    DemoBanner(canStop: !transferViewModel.isTransferActive(for: config.id), onStop: stopDemo)
                 }
                 BackupEditorView(
                     config: config,
@@ -343,7 +343,8 @@ struct MainView: View {
     private func startDemo() {
         do {
             let config = try DemoSession.start(storage: appState.storage, catalog: MediaCatalogStore.shared,
-                                               rollStore: RollNumberingStore.shared)
+                                               rollStore: RollNumberingStore.shared,
+                                               isCopying: { transferViewModel.isTransferActive(for: $0) })
             appState.selectedConfigId = config.id
         } catch {
             demoError = error.localizedDescription
@@ -351,11 +352,11 @@ struct MainView: View {
     }
 
     private func stopDemo() {
-        guard !transferViewModel.isTransferring else { return }
         let demoId = DemoSession.demoConfigId()
-        DemoSession.stop(storage: appState.storage, catalog: MediaCatalogStore.shared,
-                         rollStore: RollNumberingStore.shared)
-        if appState.selectedConfigId == demoId {
+        let stopped = DemoSession.stop(storage: appState.storage, catalog: MediaCatalogStore.shared,
+                                       rollStore: RollNumberingStore.shared,
+                                       isCopying: { transferViewModel.isTransferActive(for: $0) })
+        if stopped, appState.selectedConfigId == demoId {
             appState.selectedConfigId = appState.storage.configurations.first?.id
         }
     }

@@ -140,6 +140,55 @@ final class DemoSessionTests: XCTestCase {
         XCTAssertNil(DemoSession.demoConfigId(defaults: defaults))
     }
 
+    func test_stop_whileTheDemoIsCopying_changesNothing() throws {
+        let demo = try start()
+        let stopped = DemoSession.stop(storage: storage, catalog: catalog, rollStore: rollStore,
+                                       root: root, defaults: defaults, isCopying: { $0 == demo.id })
+        XCTAssertFalse(stopped)
+        XCTAssertEqual(storage.configurations.map(\.id), [demo.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+        XCTAssertTrue(DemoSession.isDemo(demo.id, defaults: defaults))
+        XCTAssertThrowsError(try DemoSession.start(storage: storage, catalog: catalog, rollStore: rollStore,
+                                                   root: root, clipBytes: clipBytes, defaults: defaults,
+                                                   isCopying: { $0 == demo.id }))
+        XCTAssertEqual(storage.configurations.map(\.id), [demo.id])
+    }
+
+    func test_stop_whenTheStoredIdNamesARealMovie_leavesThatMovieAlone() throws {
+        var real = BackupConfiguration()
+        real.name = "Citizen K"
+        real.sourcePaths = ["/Volumes/A001"]
+        real.destinationPaths = ["/Volumes/SHUTTLE"]
+        storage.add(real)
+        let countBefore = storage.totalTransferCount
+        defer { storage.totalTransferCount = countBefore }
+        storage.appendHistory(historyEntry(for: real.id), retentionLimit: 200)
+        catalog.merge(catalogRoll(for: real.id, name: "Citizen K"))
+        defaults.set(real.id.uuidString, forKey: DemoSession.defaultsKey)
+
+        XCTAssertTrue(DemoSession.stop(storage: storage, catalog: catalog, rollStore: rollStore,
+                                       root: root, defaults: defaults))
+
+        XCTAssertEqual(storage.configurations.map(\.id), [real.id])
+        XCTAssertEqual(storage.transferHistory.map(\.configId), [real.id])
+        XCTAssertEqual(catalog.rolls.map(\.configId), [real.id])
+        XCTAssertNil(DemoSession.demoConfigId(defaults: defaults))
+    }
+
+    func test_stop_forgetsTheDemoAsLastUsedMovie_andItsRollEntry() throws {
+        let demo = try start()
+        storage.setLastSelectedConfigId(demo.id)
+        var state = RollNumberingStore.ConfigState()
+        state.assignments = ["k|": "A001"]
+        rollStore.update(state, for: demo.id)
+
+        stop()
+
+        XCTAssertNil(storage.lastUsedConfigId)
+        let saved = (try? Data(contentsOf: tmp.appendingPathComponent("roll-numbering.json"))) ?? Data()
+        XCTAssertFalse(String(decoding: saved, as: UTF8.self).contains(demo.id.uuidString))
+    }
+
     func test_muted_switchesOffPhoneAndWebhookOnly() {
         let settings = NotificationSettings(
             notifyOnComplete: true, notifyOnError: true, ntfyEnabled: true, ntfyURL: "https://example.invalid/t",

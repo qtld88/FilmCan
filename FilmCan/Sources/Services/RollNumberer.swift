@@ -102,6 +102,12 @@ final class RollNumberingStore {
         save()
     }
 
+    /// Drops everything kept for a movie (its roll names and counters).
+    func remove(configId: UUID) {
+        guard states.removeValue(forKey: configId.uuidString) != nil else { return }
+        save()
+    }
+
     func resetNumbering(for configId: UUID) {
         var s = state(for: configId)
         s.assignments = [:]
