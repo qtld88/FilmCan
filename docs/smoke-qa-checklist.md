@@ -62,6 +62,7 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | D7 | With phone notifications configured, run the demo backup. | No message on the phone, no webhook call; the Mac's own notification may show. | ☐ |
 | D8 | Start the demo, quit FilmCan, relaunch. | The Demo movie and its band are still there; "Stop the demo" still removes everything. | ☐ |
 | D9 | Start the demo, close the Demo tab by hand (delete the movie), go to the empty screen. | "Try with made-up cards" is offered again; clicking it starts a clean demo. | ☐ |
+| D10 | Start a copy of another movie, then start the demo copy while it runs. | "Stop the demo" stays greyed while the demo copies, even after the other movie has finished. | ☐ |
 
 ## Setup
 
