@@ -12,7 +12,8 @@ extension BackupEditorView {
     }
 
     private var selectedPresetDifferences: [PresetDifference] {
-        guard let preset = selectedOrganizationPreset else { return [] }
+        // A film's own copy has nothing to diverge from.
+        guard let preset = selectedOrganizationPreset, !viewModel.selectedPresetIsOwnCopy else { return [] }
         return viewModel.config.differences(from: preset)
     }
 
@@ -37,7 +38,8 @@ extension BackupEditorView {
 
     var previewShootMetadata: ShootMetadata {
         ShootMetadata(episode: viewModel.episode, day: viewModel.effectiveShootDay(),
-                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat)
+                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat,
+                      movie: viewModel.config.name)
     }
 
     var effectiveOrganizationPreset: OrganizationPreset? {
@@ -66,12 +68,14 @@ extension BackupEditorView {
 
     private var selectedPresetBinding: Binding<OrganizationPreset>? {
         guard let id = viewModel.selectedOrganizationPresetId,
-              let index = viewModel.organizationPresets.firstIndex(where: { $0.id == id }) else { return nil }
+              let current = viewModel.organizationPresets.first(where: { $0.id == id }) else { return nil }
+        // Looked up by id on every read and write: the list is shared by every movie,
+        // so a position can move under an open editor.
         return Binding(
-            get: { viewModel.organizationPresets[index] },
+            get: { viewModel.organizationPresets.first(where: { $0.id == id }) ?? current },
             set: { newValue in
                 var presets = viewModel.organizationPresets
-                if index < presets.count {
+                if let index = presets.firstIndex(where: { $0.id == id }) {
                     presets[index] = newValue
                     viewModel.organizationPresets = presets
                 }
@@ -305,20 +309,35 @@ extension BackupEditorView {
                     viewModel.applyOffOrganizationSettings()
                     expandOptionsIfNeeded()
                 }
+                if let parked = viewModel.parkedOwnCopy {
+                    Button("This movie's settings (\(parked.name))") {
+                        viewModel.useParkedOwnCopy()
+                        expandOptionsIfNeeded()
+                    }
+                }
                 Button("Netflix Ingest (built-in)") {
                     viewModel.applyNetflixIngestPreset()
                     expandOptionsIfNeeded()
                 }
-                ForEach(viewModel.organizationPresets) { preset in
+                ForEach(viewModel.sharedOrganizationPresets) { preset in
                     Button(preset.name) {
                         viewModel.applyPreset(preset)
                         expandOptionsIfNeeded()
                     }
                 }
                 Divider()
-                Button("Create new preset") {
+                Button("Save as new preset") {
                     viewModel.saveCurrentSettingsAsPreset()
                     expandOptionsIfNeeded()
+                }
+                if !viewModel.sharedOrganizationPresets.isEmpty {
+                    Menu("Delete preset") {
+                        ForEach(viewModel.sharedOrganizationPresets) { preset in
+                            Button(preset.name, role: .destructive) {
+                                viewModel.deleteSharedPreset(id: preset.id)
+                            }
+                        }
+                    }
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -362,10 +381,10 @@ extension BackupEditorView {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
-                .help("Delete preset")
+                .help("Delete this movie's folder and file settings (back to Off). To keep them aside, choose Off in the menu instead.")
             }
         }
-        .help("Presets auto-update when you make any change.")
+        .help("These settings belong to this movie. Choosing a preset copies it; changes here never alter the preset or another movie.")
     }
 
     private func expandOptionsIfNeeded() {

@@ -175,6 +175,10 @@ struct QuickCopyFormModel {
         filmAddedSources = []
         filmAddedDestinations = []
         selectedFilmId = id
+        // The previous movie's own settings are not offered any more.
+        if let presetId = selectedPresetId, !pickerPresets.contains(where: { $0.id == presetId }) {
+            selectedPresetId = nil
+        }
         guard let film = selectedFilm else { return }
         for item in drives.sources where !overlapsItem(item.path) {
             items.append(item)
@@ -221,13 +225,24 @@ struct QuickCopyFormModel {
     /// Unit and camera format come from the film (Quick Copy has no field for them).
     var shootMetadata: ShootMetadata {
         ShootMetadata(episode: sanitizedProject, day: sanitizedDay,
-                      unit: selectedFilm?.unit ?? "", cameraFormat: selectedFilm?.cameraFormat ?? "")
+                      unit: selectedFilm?.unit ?? "", cameraFormat: selectedFilm?.cameraFormat ?? "",
+                      movie: recordName)
     }
 
     /// Name history and the catalog file this copy under.
     var recordName: String {
         if let film = selectedFilm { return film.name }
         return sanitizedProject.isEmpty ? "Quick Copy" : sanitizedProject
+    }
+
+    /// Presets offered in the picker: the shared ones, plus the picked movie's own
+    /// settings (that is what the movie runs with). `savedPresets` stays the full list
+    /// for lookups by id.
+    var pickerPresets: [OrganizationPreset] {
+        savedPresets.filter { preset in
+            guard let owner = preset.ownerFilmId else { return true }
+            return owner == selectedFilmId && preset.id == selectedFilm?.selectedOrganizationPresetId
+        }
     }
 
     // MARK: Preset / organization state
