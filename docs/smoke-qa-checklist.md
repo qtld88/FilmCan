@@ -91,6 +91,19 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | C6 | Plug ARRI, RED, Sony, Canon, Blackmagic, GoPro, DJI and sound recorder cards you have. | Same badge as before this build. | ☐ |
 | C7 | Plug a backup drive that happens to have a `DCIM` folder with video at its root. | It is proposed as a camera card (expected). Right-click › "Not a camera card": it leaves and does not come back. | ☐ |
 
+### Report copies gate (run when `ReportArchive` or the report flow changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Settings › History. | A "Reports" section: switch on, path `~/Documents/FilmCan Reports`. | ☐ |
+| R2 | A movie with "PDF report with thumbnails" on, shoot day set (e.g. Day02), two drives. Run a backup. Wait for the report (a few seconds after the end). | `~/Documents/FilmCan Reports/<movie>/Day02/<drive A>/` and `/<drive B>/` each hold the PDF and one `.mhl` per roll. macOS may ask once for access to Documents. | ☐ |
+| R3 | Eject both drives. Open the PDF from that folder. | It opens, with thumbnails. | ☐ |
+| R4 | A movie with no shoot day. Run a backup. | The day folder is today's date (`2026-11-11`). | ☐ |
+| R5 | A movie with the PDF report off. Run a backup. | Nothing new in `FilmCan Reports`. | ☐ |
+| R6 | "Choose…" another folder, run a backup. Then "Reset". | Copies go to the chosen folder; after Reset the path is back to Documents. | ☐ |
+| R7 | Switch "Keep a copy of every report on this Mac" off, run a backup. | No copy is made; the report on the drive is still written. | ☐ |
+| R8 | Compare the destination drive before and after this build for the same backup. | Same folders and files on the drive. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
