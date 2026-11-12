@@ -202,9 +202,20 @@ class TransferViewModel: ObservableObject {
                 ? destinations.map { [$0] }
                 : [destinations]
 
+            // Speed note after the copy: only for a movie's own run (not Quick Copy).
+            let measuresSpeed = recordAs == nil
+                && AppState.shared.storage.configurations.contains(where: { $0.id == activeConfig.id })
+            if measuresSpeed { SpeedNoteStore.shared.set(nil, for: activeConfig.id) }
+            let runStart = Date()
+            var passSeconds: [String: TimeInterval] = [:]
+
             var perDestResults: [TransferResult] = []
             for group in destinationGroups {
                 if isCancellingAll { break }
+                let passStart = Date()
+                defer {
+                    if group.count == 1 { passSeconds[group[0]] = Date().timeIntervalSince(passStart) }
+                }
                 let fanOutResult = await runFanOut(
                     destinations: group,
                     sources: sources,
@@ -227,6 +238,23 @@ class TransferViewModel: ObservableObject {
                 results: perDestResults,
                 preset: organizationPreset
             )
+
+            if measuresSpeed {
+                let measure = SpeedRunMeasure(
+                    sources: sources.map { SpeedAdviceProbe.drive(path: $0, role: .source) },
+                    destinations: perDestResults.map { result in
+                        SpeedRunMeasure.Dest(
+                            drive: SpeedAdviceProbe.drive(path: result.destination, role: .destination),
+                            bytes: result.bytesTransferred,
+                            seconds: copySequentially ? (passSeconds[result.destination] ?? 0) : 0,
+                            success: result.success)
+                    },
+                    sequential: copySequentially,
+                    wallSeconds: Date().timeIntervalSince(runStart),
+                    rereads: activeConfig.engineOptions.verificationMode == .paranoid,
+                    cancelled: isCancellingAll || perDestResults.count < destinations.count)
+                SpeedNoteStore.shared.set(SpeedNote.sentence(for: measure), for: activeConfig.id)
+            }
 
             // Re-run of an already-complete backup: every destination skipped
             // every file (nothing copied). Don't add a history card — show an
@@ -839,18 +867,9 @@ class TransferViewModel: ObservableObject {
         mode: DestinationCopyMode,
         destinations: [String]
     ) -> Bool {
-        guard destinations.count > 1 else { return false }
-        switch mode {
-        case .parallel:   return false
-        case .sequential: return true
-        case .automatic:
-            let infos = destinations.map { DriveSpeedClassifier.info(for: $0) }
-            if infos.contains(where: { $0.isNetwork }) { return true }
-            // Two+ destinations sharing one physical volume → serialize.
-            let uuids = infos.compactMap { $0.volumeUUID }
-            if Set(uuids).count < uuids.count { return true }
-            return false
-        }
+        DestinationCopyPlan.isSequential(
+            mode: mode,
+            destinations: destinations.map { DriveSpeedClassifier.info(for: $0) })
     }
 
     private func runFanOut(

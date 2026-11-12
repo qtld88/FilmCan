@@ -310,9 +310,9 @@ struct OrganizationReuseInfo: Codable, Equatable {
 
 /// How the FilmCan fan-out engine writes to multiple destinations.
 enum DestinationCopyMode: String, Codable, CaseIterable, Identifiable {
-    /// Decide per run from drive type: parallel fan-out when every destination
-    /// is an SSD, sequential (one at a time) when any destination is a spinning
-    /// disk / network volume.
+    /// Decide per run: one destination at a time for a network drive or two
+    /// destinations on the same volume, otherwise all at once
+    /// (`DestinationCopyPlan.isSequential`).
     case automatic
     /// Always read the source once and write to all destinations at the same time.
     case parallel
@@ -332,7 +332,7 @@ enum DestinationCopyMode: String, Codable, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
-        case .automatic:  return "Parallel for SSDs, sequential for hard drives"
+        case .automatic:  return "One at a time for network drives or two folders on one drive, otherwise all at once"
         case .parallel:   return "Fastest with multiple SSDs — reads the source once"
         case .sequential: return "Gentler on shared buses and hard drives"
         }

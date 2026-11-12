@@ -137,6 +137,17 @@ class BackupEditorViewModel: ObservableObject {
         save()
     }
     
+    /// "Copy to … first": one destination at a time, those drives first. The movie keeps
+    /// this choice (visible in its options) until the user changes it.
+    func applySpeedAdvice(_ action: SpeedAdvice.Action) {
+        switch action {
+        case .copyFirst(let paths, _):
+            config.destinationCopyMode = .sequential
+            config.destinationPaths = SpeedAdvisor.reordered(config.destinationPaths, first: paths)
+            save()
+        }
+    }
+
     func moveDestinations(from source: IndexSet, to destination: Int) {
         config.destinationPaths.move(fromOffsets: source, toOffset: destination)
         save()
