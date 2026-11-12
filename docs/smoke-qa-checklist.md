@@ -79,6 +79,18 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | P10 | `defaults write com.filmcan.app ntfyEnabled -bool true` with no Topic URL and no `phonePushTopic`. Open Settings › Push. | No QR code yet, a "Create my QR code" button instead; nothing was sent anywhere. Clicking it shows the code. | ☐ |
 | P11 | Open `https://www.filmcan.eu/phone/` without anything after `#`. | The page asks to scan the code again; no error. | ☐ |
 
+### Card families gate (run when `CameraCardDetector` changed; needs real cards or copies of their folder layout)
+
+| # | Check (real .app, "Detect camera and sound cards automatically" on) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| C1 | Plug a photo camera, drone or phone card with a `DCIM` folder holding video. | Added to Copy From, badge "Camera card", tagged Camera. | ☐ |
+| C2 | Plug a `DCIM` card holding photos only. | Not added, no badge. | ☐ |
+| C3 | Plug an Insta360 card. | Badge "Insta360 card". | ☐ |
+| C4 | Plug an AVCHD camcorder card (`PRIVATE/AVCHD` or `AVCHD` at the root). | Badge "AVCHD card". A Panasonic card with `PANA_GRP` still says "Panasonic card"; a Sony card with `M4ROOT` still says "Sony card". | ☐ |
+| C5 | Plug a Panasonic P2 card. | Badge "Panasonic card". | ☐ |
+| C6 | Plug ARRI, RED, Sony, Canon, Blackmagic, GoPro, DJI and sound recorder cards you have. | Same badge as before this build. | ☐ |
+| C7 | Plug a backup drive that happens to have a `DCIM` folder with video at its root. | It is proposed as a camera card (expected). Right-click › "Not a camera card": it leaves and does not come back. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.
