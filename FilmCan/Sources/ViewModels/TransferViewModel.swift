@@ -202,9 +202,21 @@ class TransferViewModel: ObservableObject {
                 ? destinations.map { [$0] }
                 : [destinations]
 
+            // Speed note after the copy: only for a movie's own run (not Quick Copy).
+            let measuresSpeed = recordAs == nil
+                && AppState.shared.storage.configurations.contains(where: { $0.id == activeConfig.id })
+            if measuresSpeed { SpeedNoteStore.shared.set(nil, for: activeConfig.id) }
+            let runStart = Date()
+            let promptsBefore = promptsAsked
+            var passSeconds: [String: TimeInterval] = [:]
+
             var perDestResults: [TransferResult] = []
             for group in destinationGroups {
                 if isCancellingAll { break }
+                let passStart = Date()
+                defer {
+                    if group.count == 1 { passSeconds[group[0]] = Date().timeIntervalSince(passStart) }
+                }
                 let fanOutResult = await runFanOut(
                     destinations: group,
                     sources: sources,
@@ -227,6 +239,37 @@ class TransferViewModel: ObservableObject {
                 results: perDestResults,
                 preset: organizationPreset
             )
+
+            let wallSeconds = Date().timeIntervalSince(runStart)
+            let cancelled = isCancellingAll || perDestResults.count < destinations.count
+            if measuresSpeed, !cancelled, promptsAsked == promptsBefore,
+               !perDestResults.isEmpty, perDestResults.allSatisfy({ $0.success }),
+               (perDestResults.map(\.bytesTransferred).max() ?? 0) >= SpeedNote.minBytes {
+                let results = perDestResults.map { (path: $0.destination, bytes: $0.bytesTransferred, success: $0.success) }
+                let rereads = activeConfig.engineOptions.verificationMode == .paranoid
+                let sequential = copySequentially
+                let seconds = passSeconds
+                let configId = activeConfig.id
+                let sourcePaths = sources
+                // Drive facts read off the main thread: a slow volume must not stall the window.
+                let note = await Task.detached(priority: .utility) { () -> String? in
+                    let measure = SpeedRunMeasure(
+                        sources: sourcePaths.map { SpeedAdviceProbe.drive(path: $0, role: .source) },
+                        destinations: results.map { result in
+                            SpeedRunMeasure.Dest(
+                                drive: SpeedAdviceProbe.drive(path: result.path, role: .destination),
+                                bytes: result.bytes,
+                                seconds: sequential ? (seconds[result.path] ?? 0) : 0,
+                                success: result.success)
+                        },
+                        sequential: sequential,
+                        wallSeconds: wallSeconds,
+                        rereads: rereads,
+                        cancelled: false)
+                    return SpeedNote.sentence(for: measure)
+                }.value
+                SpeedNoteStore.shared.set(note, for: configId)
+            }
 
             // Re-run of an already-complete backup: every destination skipped
             // every file (nothing copied). Don't add a history card — show an
@@ -558,12 +601,18 @@ class TransferViewModel: ObservableObject {
         promptOwner.duplicates.dismissUnreadablePrompt(paths: paths)
     }
 
+    /// Counts questions put to the user during runs; a run that waited on one is not
+    /// timed for the speed note.
+    private var promptsAsked = 0
+
     func resolveRollIdentity(prompt: RollIdentityPrompt) async -> Bool {
-        await duplicates.resolveRollIdentity(prompt: prompt)
+        promptsAsked += 1
+        return await duplicates.resolveRollIdentity(prompt: prompt)
     }
 
     func resolveUnreadable(paths: [String]) async -> Bool {
         guard !paths.isEmpty else { return true }
+        promptsAsked += 1
         return await withCheckedContinuation { continuation in
             duplicates.setUnreadableContinuation(continuation, paths: paths)
         }
@@ -575,7 +624,8 @@ class TransferViewModel: ObservableObject {
     }
 
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
-        await duplicates.resolveDuplicate(prompt: prompt)
+        promptsAsked += 1
+        return await duplicates.resolveDuplicate(prompt: prompt)
     }
 
     @MainActor
@@ -851,18 +901,17 @@ class TransferViewModel: ObservableObject {
         mode: DestinationCopyMode,
         destinations: [String]
     ) -> Bool {
-        guard destinations.count > 1 else { return false }
-        switch mode {
-        case .parallel:   return false
-        case .sequential: return true
-        case .automatic:
-            let infos = destinations.map { DriveSpeedClassifier.info(for: $0) }
-            if infos.contains(where: { $0.isNetwork }) { return true }
-            // Two+ destinations sharing one physical volume → serialize.
-            let uuids = infos.compactMap { $0.volumeUUID }
-            if Set(uuids).count < uuids.count { return true }
-            return false
+        // Drives are only probed when the answer depends on them.
+        guard mode == .automatic, destinations.count > 1 else {
+            return DestinationCopyPlan.isSequential(
+                mode: mode,
+                destinations: destinations.map { _ in DriveInfo(isSSD: false, bus: .unknown, filesystem: .unknown,
+                                                               isInternal: false, isExFAT: false, isNetwork: false,
+                                                               volumeUUID: nil) })
         }
+        return DestinationCopyPlan.isSequential(
+            mode: mode,
+            destinations: destinations.map { DriveSpeedClassifier.info(for: $0) })
     }
 
     private func runFanOut(

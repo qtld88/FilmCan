@@ -210,7 +210,7 @@ struct BasicOptionsView: View {
                 description: "How FilmCan writes to multiple destinations.",
                 options: [
                     .init("Automatic",
-                          good: ["Parallel for SSDs, sequential for hard drives / shared buses",
+                          good: [DestinationCopyMode.automatic.description,
                                  "Sensible default — no need to think about it"]),
                     .init("All destinations at once (parallel)",
                           good: ["Reads the source once, writes everywhere together",

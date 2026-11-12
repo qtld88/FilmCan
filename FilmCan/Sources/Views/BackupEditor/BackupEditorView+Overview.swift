@@ -16,6 +16,13 @@ extension BackupEditorView {
             } else {
                 overviewColumnLayout
             }
+
+            SpeedAdviceSection(
+                viewModel: viewModel,
+                transferViewModel: transferViewModel,
+                bytesToCopy: includedRequiredBytes,
+                refreshToken: driveRefreshCounter
+            )
         }
     }
 
