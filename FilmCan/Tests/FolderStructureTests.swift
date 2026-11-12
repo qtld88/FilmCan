@@ -1,0 +1,427 @@
+import XCTest
+@testable import FilmCan
+
+final class FolderStructureTests: XCTestCase {
+
+    private func roundTrip(_ camera: String, _ sound: String, file: StaticString = #filePath, line: UInt = #line) {
+        guard let s = FolderStructure.parse(camera: camera, sound: sound) else {
+            return XCTFail("\(camera) | \(sound) should be editable", file: file, line: line)
+        }
+        XCTAssertEqual(s.cameraTemplate, camera, file: file, line: line)
+        XCTAssertEqual(s.soundTemplate, sound, file: file, line: line)
+    }
+
+    // MARK: Round trip, or not editable
+
+    func test_shippedLayouts_roundTripUnchanged() {
+        let netflix = OrganizationPreset.netflixIngest()
+        roundTrip(netflix.folderTemplate, netflix.soundFolderTemplate)
+        let fresh = BackupConfiguration()
+        roundTrip(fresh.cameraFolderTemplate, fresh.soundFolderTemplate)
+        roundTrip(QuickCopyFormModel.projectCameraTemplate, QuickCopyFormModel.projectSoundTemplate)
+        roundTrip(QuickCopyFormModel.dateCameraTemplate, QuickCopyFormModel.dateSoundTemplate)
+        roundTrip("", "")
+        roundTrip("CITIZENK/RUSHES/Camera_Media", "")
+        roundTrip("{movie}/{day}", "{movie}/{day}/Sound")
+        roundTrip("A/B", "X/Y")
+    }
+
+    func test_everyStartingPoint_roundTrips() {
+        for point in FolderStructure.startingPoints {
+            roundTrip(point.structure.cameraTemplate, point.structure.soundTemplate)
+        }
+    }
+
+    func test_layoutsTheTreeCannotShow_areDeclaredNotEditable() {
+        let notEditable: [(String, String)] = [
+            ("ARRI/{sourceDriveName}/DAY_{date}/CARD_{source}", ""),
+            ("RUSHES/DAY_{counter}_{date}", ""),
+            ("{filecreationdate}/Camera", ""),
+            ("A//B", ""),
+            ("/A", ""),
+            ("A/", ""),
+            (" A/B", ""),
+            ("A\\B", ""),
+            ("A/{unknown}", ""),
+            ("A", "B/{source}"),
+            ("", "Sound"),
+            ("A/ /B", ""),
+            ("A/B", "A/B"),
+            // Names a run would write differently: the tree would show another folder.
+            ("../Camera", ""),
+            ("A/./B", ""),
+            ("Café/Camera", ""),
+            ("R&D", ""),
+            ("A__B", ""),
+            ("_A", ""),
+            ("___", ""),
+            ("{date}__{day}", ""),
+            // Not an automatic name, whatever is left once "{movie}" is taken out.
+            ("{da{movie}y}", "")
+        ]
+        for (camera, sound) in notEditable {
+            XCTAssertNil(FolderStructure.parse(camera: camera, sound: sound), "\(camera) | \(sound)")
+        }
+    }
+
+    /// Whatever the editor does, the text it writes resolves through the engine's own
+    /// function to the folders the tree shows.
+    func test_editedStructure_resolvesToTheFoldersItShows() {
+        var s = FolderStructure()
+        s.addFolder("{movie}", inside: nil)
+        s.addFolder("{day}", inside: s.rows[0])
+        s.separateSound()
+        var preset = OrganizationPreset()
+        preset.useFolderTemplate = true
+        preset.folderTemplate = s.cameraTemplate
+        preset.soundFolderTemplate = s.soundTemplate
+        let meta = ShootMetadata(day: "Day02", movie: "Citizen K")
+        let date = Date(timeIntervalSince1970: 1_780_000_000)
+        let camera = OrganizationTemplate.resolve(preset: preset, sourcePath: "/cards/A001", destinationRoot: "/dest",
+                                                  counter: 0, date: date, metadata: meta, mediaKind: .camera)
+        let sound = OrganizationTemplate.resolve(preset: preset, sourcePath: "/cards/S001", destinationRoot: "/dest",
+                                                 counter: 0, date: date, metadata: meta, mediaKind: .sound)
+        XCTAssertEqual(camera.folderPath, "Citizen K/Day02")
+        XCTAssertEqual(sound.folderPath, "Citizen K/Sound")
+    }
+
+    /// Every name the tree accepts is written unchanged by a run.
+    func test_showableNames_areWrittenUnchangedByARun() {
+        let date = Date(timeIntervalSince1970: 1_780_000_000)
+        let meta = ShootMetadata(day: "Day02", movie: "CitizenK")
+        for name in ["Camera_Media", "RUSHES (A cam)", "Day-1.raw", "{movie}_{day}", "A B"] {
+            XCTAssertTrue(FolderStructure.isShowable(name), name)
+            var preset = OrganizationPreset()
+            preset.useFolderTemplate = true
+            preset.folderTemplate = "TOP/" + name
+            let resolved = OrganizationTemplate.resolve(
+                preset: preset, sourcePath: "/cards/A001", destinationRoot: "/dest",
+                counter: 0, date: date, metadata: meta, mediaKind: .camera)
+            let expected = name.replacingOccurrences(of: "{movie}", with: "CitizenK")
+                .replacingOccurrences(of: "{day}", with: "Day02")
+            XCTAssertEqual(resolved.folderPath, "TOP/" + expected, name)
+        }
+        // A typed name is cleaned to what a run writes, never stored as something else.
+        XCTAssertEqual(FolderStructure.cleanName("Café"), "Caf")
+        XCTAssertEqual(FolderStructure.cleanName("__A__B__"), "A_B")
+        XCTAssertEqual(FolderStructure.cleanName(".."), "")
+        XCTAssertEqual(FolderStructure.cleanName("&"), "")
+        for typed in ["Café", "__A__B__", "R&D rushes", "Sound (mix)"] {
+            let clean = FolderStructure.cleanName(typed)
+            XCTAssertTrue(clean.isEmpty || FolderStructure.isShowable(clean), typed)
+        }
+    }
+
+    // MARK: The reference structures, built without typing a token
+
+    /// One day and Several days from the row menus; Netflix from its starting point (its
+    /// first folder mixes four automatic names, which the menus do not compose).
+    func test_referenceStructures_areBuiltWithoutTypingAToken() {
+        var oneDay = FolderStructure()
+        oneDay.addFolder("{movie}", inside: nil)
+        oneDay.addFolder("Camera", inside: oneDay.rows[0])
+        oneDay.separateSound()
+        XCTAssertEqual(oneDay, FolderStructure.startingPoints[0].structure)
+
+        var severalDays = oneDay
+        severalDays.addFolder("{day}", inside: severalDays.rows[0])
+        XCTAssertEqual(severalDays, FolderStructure.startingPoints[1].structure)
+
+        let netflix = OrganizationPreset.netflixIngest()
+        XCTAssertEqual(FolderStructure.startingPoints[2].structure.cameraTemplate, netflix.folderTemplate)
+        XCTAssertEqual(FolderStructure.startingPoints[2].structure.soundTemplate, netflix.soundFolderTemplate)
+        XCTAssertEqual(FolderStructure.startingPoints[3].structure.cameraTemplate, "")
+    }
+
+    // MARK: Rows
+
+    func test_rows_sharedThenCameraThenSound_withLandingMarks() {
+        let s = FolderStructure(camera: ["{movie}", "{day}", "Camera"], sound: ["{movie}", "{day}", "Sound"])
+        let rows = s.rows
+        XCTAssertEqual(rows.map(\.branch), [.shared, .shared, .camera, .sound])
+        XCTAssertEqual(rows.map(\.depth), [0, 1, 2, 2])
+        XCTAssertEqual(rows.map(\.label), ["Movie name", "Shoot day", "Camera", "Sound"])
+        XCTAssertEqual(rows.map(\.holdsCards), [false, false, true, false])
+        XCTAssertEqual(rows.map(\.holdsSound), [false, false, false, true])
+        XCTAssertEqual(rows.map(\.isPlain), [false, false, true, true])
+    }
+
+    func test_soundWithCards_marksTheSameFolder() {
+        let s = FolderStructure(camera: ["{movie}", "{day}"])
+        XCTAssertEqual(s.rows.map(\.holdsCards), [false, true])
+        XCTAssertEqual(s.rows.map(\.holdsSound), [false, true])
+        XCTAssertFalse(s.soundIsSeparate)
+        XCTAssertTrue(FolderStructure().cardsAtTopLevel)
+        XCTAssertTrue(FolderStructure().soundAtTopLevel)
+    }
+
+    func test_mixedName_showsItsWordsInClear() {
+        XCTAssertEqual(FolderStructure.label(for: "{date}_{episode}_{day}_{unit}"),
+                       "‹Date›_‹Project / episode›_‹Shoot day›_‹Unit›")
+        XCTAssertEqual(FolderStructure.label(for: "RUSHES"), "RUSHES")
+    }
+
+    // MARK: Editing
+
+    func test_rename_changesSharedFolderInBothPaths_andRefusesUnsafeNames() {
+        var s = FolderStructure(camera: ["PROJECT", "Camera"], sound: ["PROJECT", "Sound"])
+        s.rename(s.rows[0], to: " Citizen/K: {x} ")
+        XCTAssertEqual(s.cameraTemplate, "CitizenK x/Camera")
+        XCTAssertEqual(s.soundTemplate, "CitizenK x/Sound")
+        s.rename(s.rows[0], to: "  ")
+        XCTAssertEqual(s.camera.first, "CitizenK x")
+        // A folder named by a word (Shoot day) is not renamed by typing.
+        var t = FolderStructure(camera: ["{day}"])
+        t.rename(t.rows[0], to: "X")
+        XCTAssertEqual(t.cameraTemplate, "{day}")
+    }
+
+    func test_remove_andMove() {
+        var s = FolderStructure(camera: ["{movie}", "{day}", "Camera"], sound: ["{movie}", "{day}", "Sound"])
+        XCTAssertTrue(s.canMove(s.rows[0], by: 1))
+        XCTAssertFalse(s.canMove(s.rows[0], by: -1))
+        XCTAssertFalse(s.canMove(s.rows[1], by: 1), "a shared folder cannot go below a folder only cards use")
+        XCTAssertFalse(s.canMove(s.rows[2], by: -1))
+        s.move(s.rows[0], by: 1)
+        XCTAssertEqual(s.cameraTemplate, "{day}/{movie}/Camera")
+        XCTAssertEqual(s.soundTemplate, "{day}/{movie}/Sound")
+        s.remove(s.rows[0])
+        XCTAssertEqual(s.cameraTemplate, "{movie}/Camera")
+        XCTAssertEqual(s.soundTemplate, "{movie}/Sound")
+        // Removing the sound's only own folder puts sound... in the shared folder.
+        s.remove(s.rows[2])
+        XCTAssertEqual(s.soundTemplate, "{movie}")
+        // Removing the cards' own folder makes both paths equal: sound is with the cards again.
+        s.remove(s.rows.first { $0.branch == .camera }!)
+        XCTAssertEqual(s.cameraTemplate, "{movie}")
+        XCTAssertEqual(s.soundTemplate, "")
+        XCTAssertFalse(s.soundIsSeparate)
+    }
+
+    func test_separateSound_andBack() {
+        var s = FolderStructure(camera: ["{movie}", "Sound"])
+        s.separateSound()
+        XCTAssertEqual(s.soundTemplate, "{movie}/Sound 2", "never the cards' own folder")
+        s.putSoundWithCards()
+        XCTAssertEqual(s.soundTemplate, "")
+        var top = FolderStructure()
+        top.separateSound()
+        XCTAssertFalse(top.soundIsSeparate, "needs a cards folder first")
+    }
+
+    func test_everyEdit_staysEditable() {
+        var s = FolderStructure.startingPoints[1].structure
+        s.addFolder("Rushes: A/B", inside: s.rows[1])
+        s.addFolder("{date}", inside: nil)
+        s.move(s.rows[1], by: 1)
+        s.rename(s.rows.last!, to: "Audio")
+        XCTAssertEqual(FolderStructure.parse(camera: s.cameraTemplate, sound: s.soundTemplate), s)
+    }
+}
+
+final class FolderLayoutSourceTests: XCTestCase {
+
+    func test_netflixPreset_readsTheFilmsOwnFieldsFirst_likeTheRun() {
+        let preset = OrganizationPreset.netflixIngest()
+        let filled = FolderLayoutSource.templates(preset: preset, isNetflix: true,
+                                                  cameraOverride: "X/Camera", soundOverride: "  ")
+        XCTAssertEqual(filled.camera, "X/Camera")
+        XCTAssertEqual(filled.sound, preset.soundFolderTemplate, "a blank field falls back to the preset")
+        let other = FolderLayoutSource.templates(preset: preset, isNetflix: false,
+                                                 cameraOverride: "X/Camera", soundOverride: "Y")
+        XCTAssertEqual(other.camera, preset.folderTemplate, "only the Netflix preset reads those fields")
+        XCTAssertEqual(other.sound, preset.soundFolderTemplate)
+    }
+
+    func test_treeState_neverOffersToEditWhatAnEditWouldReplace() {
+        typealias Source = FolderLayoutSource
+        XCTAssertEqual(Source.treeState(useFolderTemplate: true, camera: "A/B", sound: "", hasSettingsSetAside: false),
+                       .editable(FolderStructure(camera: ["A", "B"])))
+        // Off with nothing kept: an empty tree to start from.
+        XCTAssertEqual(Source.treeState(useFolderTemplate: false, camera: "", sound: "", hasSettingsSetAside: false),
+                       .editable(FolderStructure()))
+        // Off with a kept text: not offered, the text would be replaced.
+        XCTAssertEqual(Source.treeState(useFolderTemplate: false, camera: "A/B", sound: "", hasSettingsSetAside: false),
+                       .switchedOff)
+        XCTAssertEqual(Source.treeState(useFolderTemplate: false, camera: "", sound: "S", hasSettingsSetAside: false),
+                       .switchedOff)
+        XCTAssertEqual(Source.treeState(useFolderTemplate: true, camera: "A/{source}", sound: "", hasSettingsSetAside: false),
+                       .notShowable)
+        XCTAssertEqual(Source.treeState(useFolderTemplate: true, camera: "A", sound: "", hasSettingsSetAside: true),
+                       .setAside)
+        for state in [Source.TreeState.switchedOff, .setAside, .notShowable] {
+            XCTAssertNil(state.structure)
+            XCTAssertFalse((state.explanation ?? "").isEmpty)
+        }
+        XCTAssertNil(Source.TreeState.editable(FolderStructure()).explanation)
+    }
+
+    func test_newBadge_onlyOnFoldersThatWillBeCreated() {
+        XCTAssertTrue(FolderTreeLine.showsNewBadge(FolderTreeLine(depth: 0, name: "Day02", isNew: true)))
+        XCTAssertTrue(FolderTreeLine.showsNewBadge(FolderTreeLine(depth: 1, name: "A001", isNew: true, role: .copiedFolder)))
+        XCTAssertFalse(FolderTreeLine.showsNewBadge(FolderTreeLine(depth: 0, name: "Day02", isNew: false)))
+        XCTAssertFalse(FolderTreeLine.showsNewBadge(FolderTreeLine(depth: 1, name: "clip.mov", isNew: true, role: .copiedFile)))
+        XCTAssertFalse(FolderTreeLine.showsNewBadge(FolderTreeLine(depth: 1, name: "contents of A001", isNew: true, role: .contents)))
+        XCTAssertFalse(FolderTreeLine.showsNewBadge(FolderTreeLine(depth: 1, name: "", isNew: true)))
+    }
+}
+
+/// The tree writes through the film's own settings record, never into a shared preset.
+@MainActor
+final class FolderStructureWritingTests: XCTestCase {
+
+    private var dir: URL!
+    override func setUpWithError() throws {
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+    override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
+
+    func test_filmOnOff_getsItsOwnRecord_andTheSeparateSoundFolderIsKept() throws {
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        var film = BackupConfiguration()
+        film.name = "Citizen K"
+        storage.add(film)
+        let editor = BackupEditorViewModel(config: film, storage: storage)
+        let model = OrganizationEditorModel(viewModel: editor)
+        XCTAssertEqual(model.folderStructure, FolderStructure(), "a film with no layout reads as empty")
+
+        model.setFolderStructure(FolderStructure.startingPoints[1].structure)
+
+        let id = try XCTUnwrap(editor.config.selectedOrganizationPresetId)
+        let own = try XCTUnwrap(storage.organizationPresets.first { $0.id == id })
+        XCTAssertEqual(own.ownerFilmId, film.id)
+        XCTAssertTrue(own.useFolderTemplate)
+        XCTAssertEqual(own.folderTemplate, "{movie}/{day}/Camera")
+        XCTAssertEqual(own.soundFolderTemplate, "{movie}/{day}/Sound")
+        XCTAssertEqual(model.folderStructure, FolderStructure.startingPoints[1].structure)
+        XCTAssertTrue(FilmPresetOwnership.shared(storage.organizationPresets).isEmpty)
+
+        // Emptying the tree switches the layout off instead of leaving an empty one on.
+        model.setFolderStructure(FolderStructure())
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == id }?.useFolderTemplate, false)
+    }
+
+    func test_netflixFilm_treeEditsReachTheFieldsTheRunReads() throws {
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        let film = BackupConfiguration()
+        storage.add(film)
+        let editor = BackupEditorViewModel(config: film, storage: storage)
+        editor.applyNetflixIngestPreset()
+        let model = OrganizationEditorModel(viewModel: editor)
+        var structure = try XCTUnwrap(model.folderStructure)
+        XCTAssertEqual(structure, FolderStructure.startingPoints[2].structure)
+
+        structure.addFolder("RUSHES", inside: nil)
+        model.setFolderStructure(structure)
+
+        XCTAssertEqual(editor.config.cameraFolderTemplate,
+                       "RUSHES/{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}")
+        XCTAssertEqual(editor.config.soundFolderTemplate, "RUSHES/{date}_{episode}_{day}_{unit}/Sound_Media")
+        XCTAssertEqual(model.folderStructure, structure)
+    }
+
+    /// A film on "Off" runs with its own plain fields: all of them reach its new record.
+    func test_filmOnOff_keepsEverySettingItRunsWith() throws {
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        var film = BackupConfiguration()
+        film.offOrganizationRenameTemplate = "{date}_{filename}"
+        film.offOrganizationUseRenameTemplate = true
+        film.offOrganizationIncludePatterns = ["*.mov"]
+        film.offOrganizationExcludePatterns = ["*.tmp"]
+        film.offOrganizationCopyOnlyPatterns = ["*.xml"]
+        film.offOrganizationRenameOnlyPatterns = ["*.mxf"]
+        film.organizationRenameTemplate = film.offOrganizationRenameTemplate
+        film.organizationUseRenameTemplate = true
+        film.organizationIncludePatterns = film.offOrganizationIncludePatterns
+        film.organizationExcludePatterns = film.offOrganizationExcludePatterns
+        film.organizationCopyOnlyPatterns = film.offOrganizationCopyOnlyPatterns
+        film.organizationRenameOnlyPatterns = film.offOrganizationRenameOnlyPatterns
+        film.copyFolderContents = true
+        film.logEnabled = !film.logEnabled
+        storage.add(film)
+        let editor = BackupEditorViewModel(config: film, storage: storage)
+        let model = OrganizationEditorModel(viewModel: editor)
+
+        model.setFolderStructure(FolderStructure(camera: ["RUSHES"]))
+
+        let id = try XCTUnwrap(editor.config.selectedOrganizationPresetId)
+        let own = try XCTUnwrap(storage.organizationPresets.first { $0.id == id })
+        XCTAssertEqual(own.folderTemplate, "RUSHES")
+        XCTAssertEqual(own.renameTemplate, "{date}_{filename}")
+        XCTAssertTrue(own.useRenameTemplate)
+        XCTAssertEqual(own.includePatterns, ["*.mov"])
+        XCTAssertEqual(own.excludePatterns, ["*.tmp"])
+        XCTAssertEqual(own.copyOnlyPatterns, ["*.xml"])
+        XCTAssertEqual(own.renameOnlyPatterns, ["*.mxf"])
+        XCTAssertTrue(own.copyFolderContents)
+        XCTAssertEqual(own.logEnabled, film.logEnabled)
+        XCTAssertEqual(editor.config.organizationRenameTemplate, "{date}_{filename}")
+        XCTAssertEqual(editor.config.organizationIncludePatterns, ["*.mov"])
+        XCTAssertTrue(editor.config.copyFolderContents)
+    }
+
+    /// Settings kept aside while the film is on "Off" are not replaced by a tree edit.
+    func test_filmOnOff_withSettingsSetAside_treeDoesNotReplaceThem() throws {
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        let film = BackupConfiguration()
+        storage.add(film)
+        let editor = BackupEditorViewModel(config: film, storage: storage)
+        editor.applyNetflixIngestPreset()
+        editor.applyOffOrganizationSettings()
+        let aside = try XCTUnwrap(editor.parkedOwnCopy)
+        let model = OrganizationEditorModel(viewModel: editor)
+        XCTAssertEqual(model.folderTreeState, .setAside)
+
+        model.setFolderStructure(FolderStructure.startingPoints[0].structure)
+        editor.ensureOwnSettingsCopy()
+
+        XCTAssertNil(editor.config.selectedOrganizationPresetId)
+        XCTAssertEqual(editor.parkedOwnCopy, aside)
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == aside.id }, aside)
+    }
+
+    /// A layout that is switched off keeps its text: the tree does not write over it.
+    func test_switchedOffLayout_keepsItsText() throws {
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        var film = BackupConfiguration()
+        film.offOrganizationFolderTemplate = "OLD/{source}"
+        film.offOrganizationUseFolderTemplate = false
+        film.organizationFolderTemplate = "OLD/{source}"
+        film.organizationUseFolderTemplate = false
+        storage.add(film)
+        let editor = BackupEditorViewModel(config: film, storage: storage)
+        let model = OrganizationEditorModel(viewModel: editor)
+        XCTAssertEqual(model.folderTreeState, .switchedOff)
+
+        model.setFolderStructure(FolderStructure.startingPoints[0].structure)
+
+        XCTAssertNil(editor.config.selectedOrganizationPresetId)
+        XCTAssertEqual(editor.config.offOrganizationFolderTemplate, "OLD/{source}")
+        XCTAssertFalse(editor.config.offOrganizationUseFolderTemplate)
+        XCTAssertTrue(storage.organizationPresets.isEmpty)
+    }
+
+    /// The tree writes into the film's own record only; a shared preset stays as it was.
+    func test_sharedPreset_isNotTouchedByTheTree() throws {
+        let storage = ConfigurationStorage(baseDirectory: dir)
+        var shared = OrganizationPreset()
+        shared.name = "Shared"
+        shared.useFolderTemplate = true
+        shared.folderTemplate = "SHARED/Camera"
+        storage.organizationPresets = [shared]
+        let film = BackupConfiguration()
+        storage.add(film)
+        let editor = BackupEditorViewModel(config: film, storage: storage)
+        editor.applyPreset(shared)
+        let model = OrganizationEditorModel(viewModel: editor)
+        XCTAssertEqual(model.folderStructure, FolderStructure(camera: ["SHARED", "Camera"]))
+
+        model.setFolderStructure(FolderStructure(camera: ["MINE"]))
+
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == shared.id }, shared)
+        let id = try XCTUnwrap(editor.config.selectedOrganizationPresetId)
+        XCTAssertNotEqual(id, shared.id)
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == id }?.folderTemplate, "MINE")
+    }
+}

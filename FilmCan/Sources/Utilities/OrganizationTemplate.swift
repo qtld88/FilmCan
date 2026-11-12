@@ -255,6 +255,15 @@ enum OrganizationTemplate {
         return out.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
     }
 
+    /// One folder name as a run writes it (same steps as a folder layout's components);
+    /// nil when the run would drop it. Lets an editor refuse a name it could not show
+    /// faithfully.
+    static func folderNameAsWritten(_ name: String) -> String? {
+        guard let clean = sanitizePathComponent(name) else { return nil }
+        let collapsed = collapseUnderscores(clean)
+        return collapsed.isEmpty ? nil : collapsed
+    }
+
     private static func sanitizePathComponent(_ name: String) -> String? {
         if name == "." || name == ".." { return nil }
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_. ()")

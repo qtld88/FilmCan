@@ -193,6 +193,25 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | L11 | Read the labels in Basic and Destinations. | "Full check (re-reads every file)", "If a file already exists", "Checksum list format", "Folder layout", "Rename files", "Custom date in names". | ☐ |
 | L12 | Run a backup; open its log and history entry. | Same wording as before in logs and history (only the settings labels changed). | ☐ |
 
+### Folder layout gate (run when the folder editor or the folder preview changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| T1 | Movie settings › Destinations, a new movie. | "Start from" with four choices (One day, Several days, Netflix Ingest, Free), then a small tree starting at "Drive". | ☐ |
+| T2 | Click "Several days". | Tree: Movie name › Shoot day › Camera ("Cards go here") and Sound ("Sound goes here"). The folder preview in Save To shows the movie's name and the day. The text field below shows `{movie}/{day}/Camera`. | ☐ |
+| T3 | "…" on "Camera" › Rename, type RUSHES, Return. | The tree, the text field and the preview all show RUSHES. | ☐ |
+| T4 | "…" on a folder › Add a folder inside › Date; then Move up / Move down; then Remove. | Each action shows at once in the tree and the preview; Move is greyed when it cannot apply. | ☐ |
+| T5 | "Put sound with the cards", then "Give sound its own folder". | One folder carries both marks; then a Sound folder appears next to the cards' folder. | ☐ |
+| T6 | With a layout in place, click another "Start from" choice. | A confirmation is asked before replacing. | ☐ |
+| T7 | Type `ARRI/{sourceDriveName}/CARD_{source}` in the text field. | The tree is replaced by one sentence saying the layout is edited as text; the preview still follows the text. | ☐ |
+| T8 | A movie using Netflix Ingest. | The tree shows the Netflix layout; an edit in the tree changes the Camera folder / Sound folder fields above, and the reverse. | ☐ |
+| T9 | An existing movie with its own layout, untouched. | Same folder preview and same folders written as before this build. | ☐ |
+| T10 | Folder preview (Save To and Quick Copy) with a card never copied, then after its backup. | Folders to be created carry a small "new" mark; after the backup the mark is gone. Files and "contents of…" lines never carry it. | ☐ |
+| T11 | Tree at the panel's narrowest width. | The four starting choices wrap; names, marks and the "…" button stay visible. | ☐ |
+| T12 | A movie with a layout: switch "Folder layout" off. | The tree is replaced by "The folder layout is switched off. Switch it on to edit it here."; switching it on brings the same layout back. | ☐ |
+| T13 | A movie with its own settings: Preset menu › Off. | The tree is replaced by a sentence saying the movie's settings are set aside; choosing "This movie's settings" in the Preset menu brings them back unchanged. | ☐ |
+| T14 | Rename a folder in the tree to `Café`. | The folder is named `Caf` everywhere (tree, text, preview): the name a backup would write. | ☐ |
+
 ## Post-run sanity checks
 
 - `find /Volumes/<dest> -name ".filmcan-*"` returns nothing after a clean job.

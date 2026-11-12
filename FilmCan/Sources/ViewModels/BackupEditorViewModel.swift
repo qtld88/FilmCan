@@ -841,6 +841,29 @@ class BackupEditorViewModel: ObservableObject {
         return placed.copy.id
     }
 
+    /// Makes sure the film has its own settings record (a film on "Off" that never had
+    /// one), carrying exactly what it runs with today. Needed before saving anything the
+    /// plain "Off" fields cannot hold, such as a separate sound folder.
+    func ensureOwnSettingsCopy() {
+        // Settings kept aside while the film is on "Off" are never replaced from here.
+        guard config.selectedOrganizationPresetId == nil, parkedOwnCopy == nil else { return }
+        var preset = localOrganizationPreset
+        preset.copyFolderContents = config.copyFolderContents
+        preset.runInParallel = config.runInParallel
+        preset.engineOptions = config.engineOptions
+        preset.logEnabled = config.logEnabled
+        preset.logLocation = config.logLocation
+        preset.customLogPath = config.customLogPath
+        preset.logFileNameTemplate = config.logFileNameTemplate
+        preset.duplicatePolicy = config.duplicatePolicy
+        preset.duplicateCounterTemplate = config.duplicateCounterTemplate
+        isSyncingFromPreset = true
+        config.mirrorOrganization(from: preset)
+        config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
+        save()
+        isSyncingFromPreset = false
+    }
+
     /// The film's own settings while the film is switched to "Off": kept, so switching
     /// back does not lose them.
     var parkedOwnCopy: OrganizationPreset? {

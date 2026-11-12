@@ -14,6 +14,11 @@ struct FolderTreeLine: Equatable {
     var togglesCopyMode: Bool { role == .copiedFolder || role == .contents }
 
     enum Role: Equatable { case folder, copiedFolder, copiedFile, contents }
+
+    /// A folder that will be created gets a "new" mark; files and "contents of" lines do not.
+    static func showsNewBadge(_ line: FolderTreeLine) -> Bool {
+        line.isNew && !line.name.isEmpty && (line.role == .folder || line.role == .copiedFolder)
+    }
 }
 
 /// Resolves, with the engine's own path function, the folders a copy creates under

@@ -152,7 +152,23 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.toggleWidth, alignment: .leading)
                     }
 
+                    Group {
+                        let treeState = model.folderTreeState
+                        if let structure = treeState.structure {
+                            FolderStructureEditor(structure: structure) { model.setFolderStructure($0) }
+                        } else {
+                            Text(treeState.explanation ?? "")
+                                .font(FCType.meta)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                        }
+                    }
+                    .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
+
                     if presetBinding.useFolderTemplate.wrappedValue {
+                        Text("The same layout as text")
+                            .font(FCType.meta)
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                            .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
                         TextField("RUSHES/DAY_{counter}_{date}/CARD_{source}", text: presetBinding.folderTemplate)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.body, design: .monospaced))
