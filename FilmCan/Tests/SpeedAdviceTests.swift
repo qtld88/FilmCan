@@ -188,6 +188,10 @@ final class SpeedAdviceTests: XCTestCase {
         let slowUnknown = SpeedRunMeasure(sources: [], destinations: [dest(unknown, gb: 10)],
                                           sequential: false, wallSeconds: 1000, rereads: false, cancelled: false)
         XCTAssertNil(SpeedNote.sentence(for: slowUnknown), "never blames a setup whose drives are unknown")
+        let knownCardUnknownDrive = SpeedRunMeasure(sources: [card("A001")], destinations: [dest(unknown, gb: 10)],
+                                                    sequential: false, wallSeconds: 1000, rereads: false, cancelled: false)
+        XCTAssertNil(SpeedNote.sentence(for: knownCardUnknownDrive),
+                     "a slow run is not blamed on the setup while one drive's speed is unknown")
     }
 
     func test_reordered_keepsEachGroupsOrder() {

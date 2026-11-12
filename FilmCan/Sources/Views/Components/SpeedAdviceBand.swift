@@ -50,6 +50,7 @@ struct SpeedAdviceSection: View {
         .task(id: probeKey) { await refresh() }
     }
 
+    @MainActor
     private func refresh() async {
         let sources = viewModel.includedSourcePaths
         let destinations = viewModel.includedDestinationPaths

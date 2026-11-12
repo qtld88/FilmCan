@@ -298,7 +298,7 @@ enum SpeedNote {
             guard let slow = speeds.min(by: { $0.mbps < $1.mbps }),
                   let fast = speeds.max(by: { $0.mbps < $1.mbps }),
                   fast.mbps >= slow.mbps * 1.5 else { return nil }
-            return "\u{2018}\(slow.name)\u{2019} was the slowest drive: \(mbps(slow.mbps))\(check), against \(mbps(fast.mbps)) for \u{2018}\(fast.name)\u{2019}."
+            return "\u{2018}\(slow.name)\u{2019} was the slowest drive: \(mbps(slow.mbps)), against \(mbps(fast.mbps)) for \u{2018}\(fast.name)\u{2019}."
         }
 
         guard run.wallSeconds >= minSeconds else { return nil }

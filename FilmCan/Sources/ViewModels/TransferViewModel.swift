@@ -207,6 +207,7 @@ class TransferViewModel: ObservableObject {
                 && AppState.shared.storage.configurations.contains(where: { $0.id == activeConfig.id })
             if measuresSpeed { SpeedNoteStore.shared.set(nil, for: activeConfig.id) }
             let runStart = Date()
+            let promptsBefore = promptsAsked
             var passSeconds: [String: TimeInterval] = [:]
 
             var perDestResults: [TransferResult] = []
@@ -239,21 +240,35 @@ class TransferViewModel: ObservableObject {
                 preset: organizationPreset
             )
 
-            if measuresSpeed {
-                let measure = SpeedRunMeasure(
-                    sources: sources.map { SpeedAdviceProbe.drive(path: $0, role: .source) },
-                    destinations: perDestResults.map { result in
-                        SpeedRunMeasure.Dest(
-                            drive: SpeedAdviceProbe.drive(path: result.destination, role: .destination),
-                            bytes: result.bytesTransferred,
-                            seconds: copySequentially ? (passSeconds[result.destination] ?? 0) : 0,
-                            success: result.success)
-                    },
-                    sequential: copySequentially,
-                    wallSeconds: Date().timeIntervalSince(runStart),
-                    rereads: activeConfig.engineOptions.verificationMode == .paranoid,
-                    cancelled: isCancellingAll || perDestResults.count < destinations.count)
-                SpeedNoteStore.shared.set(SpeedNote.sentence(for: measure), for: activeConfig.id)
+            let wallSeconds = Date().timeIntervalSince(runStart)
+            let cancelled = isCancellingAll || perDestResults.count < destinations.count
+            if measuresSpeed, !cancelled, promptsAsked == promptsBefore,
+               !perDestResults.isEmpty, perDestResults.allSatisfy({ $0.success }),
+               (perDestResults.map(\.bytesTransferred).max() ?? 0) >= SpeedNote.minBytes {
+                let results = perDestResults.map { (path: $0.destination, bytes: $0.bytesTransferred, success: $0.success) }
+                let rereads = activeConfig.engineOptions.verificationMode == .paranoid
+                let sequential = copySequentially
+                let seconds = passSeconds
+                let configId = activeConfig.id
+                let sourcePaths = sources
+                // Drive facts read off the main thread: a slow volume must not stall the window.
+                let note = await Task.detached(priority: .utility) { () -> String? in
+                    let measure = SpeedRunMeasure(
+                        sources: sourcePaths.map { SpeedAdviceProbe.drive(path: $0, role: .source) },
+                        destinations: results.map { result in
+                            SpeedRunMeasure.Dest(
+                                drive: SpeedAdviceProbe.drive(path: result.path, role: .destination),
+                                bytes: result.bytes,
+                                seconds: sequential ? (seconds[result.path] ?? 0) : 0,
+                                success: result.success)
+                        },
+                        sequential: sequential,
+                        wallSeconds: wallSeconds,
+                        rereads: rereads,
+                        cancelled: false)
+                    return SpeedNote.sentence(for: measure)
+                }.value
+                SpeedNoteStore.shared.set(note, for: configId)
             }
 
             // Re-run of an already-complete backup: every destination skipped
@@ -584,12 +599,18 @@ class TransferViewModel: ObservableObject {
         promptOwner.duplicates.dismissUnreadablePrompt(paths: paths)
     }
 
+    /// Counts questions put to the user during runs; a run that waited on one is not
+    /// timed for the speed note.
+    private var promptsAsked = 0
+
     func resolveRollIdentity(prompt: RollIdentityPrompt) async -> Bool {
-        await duplicates.resolveRollIdentity(prompt: prompt)
+        promptsAsked += 1
+        return await duplicates.resolveRollIdentity(prompt: prompt)
     }
 
     func resolveUnreadable(paths: [String]) async -> Bool {
         guard !paths.isEmpty else { return true }
+        promptsAsked += 1
         return await withCheckedContinuation { continuation in
             duplicates.setUnreadableContinuation(continuation, paths: paths)
         }
@@ -601,7 +622,8 @@ class TransferViewModel: ObservableObject {
     }
 
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
-        await duplicates.resolveDuplicate(prompt: prompt)
+        promptsAsked += 1
+        return await duplicates.resolveDuplicate(prompt: prompt)
     }
 
     @MainActor
@@ -867,7 +889,15 @@ class TransferViewModel: ObservableObject {
         mode: DestinationCopyMode,
         destinations: [String]
     ) -> Bool {
-        DestinationCopyPlan.isSequential(
+        // Drives are only probed when the answer depends on them.
+        guard mode == .automatic, destinations.count > 1 else {
+            return DestinationCopyPlan.isSequential(
+                mode: mode,
+                destinations: destinations.map { _ in DriveInfo(isSSD: false, bus: .unknown, filesystem: .unknown,
+                                                               isInternal: false, isExFAT: false, isNetwork: false,
+                                                               volumeUUID: nil) })
+        }
+        return DestinationCopyPlan.isSequential(
             mode: mode,
             destinations: destinations.map { DriveSpeedClassifier.info(for: $0) })
     }
