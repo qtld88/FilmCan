@@ -37,6 +37,18 @@ Settings › History › **Reports** switches this off or picks another folder. 
 
 ---
 
+## Create a report later
+
+A roll backed up without a report (or whose report was lost) can get one afterwards. Open the **Catalog**, right-click the roll and choose **Create report from <drive>**; the drive that holds the roll must be connected (it is found even if it is now mounted under another name). With the roll on several connected drives, there is one entry per drive.
+
+- The PDF goes to the reports folder on your Mac (`Documents/FilmCan Reports/<movie>/<day>/<drive>/<roll>_report_recreated.pdf`) and is shown in Finder. Nothing is written on the drive.
+- The report says it was created after the backup, and when.
+- Checksums are taken from the ASC MHL checksum list already on the drive; they are **not** recomputed. A file that is not in the list, or whose size no longer matches it, shows no checksum and says why. Files in the list that are no longer on the drive are listed as missing. Such a report never says "Verified".
+- **Create report from <drive>, re-reading every file (slow)** reads every file again and compares it to the list. A file that does not match shows no checksum.
+- A roll without an ASC MHL checksum list (another tool, the list was deleted, or the movie uses the simple hidden list) gets a report without checksums, and says so.
+
+---
+
 ## Good to know
 
 - Generated in the background after history and notifications; it never delays or fails the backup.

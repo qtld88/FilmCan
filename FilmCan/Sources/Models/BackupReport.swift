@@ -9,6 +9,8 @@ struct BackupReport: Equatable {
         var checksumAlgorithm: String?
         var isVideo: Bool
         var isAudio: Bool
+        /// Why this file shows no checksum (report created after the fact only).
+        var note: String? = nil
 
         var name: String { (relPath as NSString).lastPathComponent }
     }
@@ -34,6 +36,56 @@ struct BackupReport: Equatable {
     var warning: String?
     var rolls: [Roll]
     var appVersion: String
+    /// Set when the report was created after the backup, from what is on the drive.
+    var recreated: Recreated? = nil
+
+    /// What a report created after the fact must say about itself.
+    struct Recreated: Equatable {
+        struct Recheck: Equatable {
+            var checked: Int
+            var mismatched: Int
+        }
+        var createdAt: Date
+        var hasChecksumList: Bool
+        /// In the checksum list, no longer on the drive.
+        var missingFiles: [String]
+        var sizeChanged: Int
+        var notListed: Int
+        /// Nil: the files were not re-read.
+        var recheck: Recheck?
+        /// Checksum lists on the drive that could not be read.
+        var unreadableLists: Int = 0
+
+        var hasProblems: Bool {
+            !missingFiles.isEmpty || sizeChanged > 0 || (recheck?.mismatched ?? 0) > 0 || unreadableLists > 0
+        }
+
+        /// Every file on the drive was re-read and matches the list, and nothing is unaccounted for.
+        var isFullyRechecked: Bool {
+            hasChecksumList && recheck != nil && !hasProblems && notListed == 0
+        }
+
+        /// The status line. Never says "verified": only a backup's own check does.
+        var statusText: String {
+            var notes: [String] = []
+            if !missingFiles.isEmpty { notes.append("\(missingFiles.count) missing") }
+            if sizeChanged > 0 { notes.append("\(sizeChanged) changed size") }
+            if let recheck, recheck.mismatched > 0 { notes.append("\(recheck.mismatched) do not match") }
+            if notListed > 0 { notes.append("\(notListed) not in the list") }
+            if unreadableLists > 0 { notes.append("\(unreadableLists) checksum list\(unreadableLists == 1 ? "" : "s") could not be read") }
+            guard hasChecksumList else {
+                return (["No ASC MHL checksum list on this drive: files listed without checksums, nothing re-read"]
+                        + notes.filter { $0.contains("could not be read") }).joined(separator: ". ")
+            }
+            let lead: String
+            if let recheck {
+                lead = "Re-checked: \(recheck.checked - recheck.mismatched) of \(recheck.checked) listed files match the checksum list"
+            } else {
+                lead = "Checksums from the backup's list. Files were not re-read"
+            }
+            return notes.isEmpty ? lead : lead + ". " + notes.joined(separator: ", ")
+        }
+    }
 
     static let videoExtensions: Set<String> = ["mov", "mp4", "m4v", "mxf", "avi", "mts", "m2ts", "braw", "r3d", "crm", "ari", "insv", "lrv"]
     static let audioExtensions: Set<String> = ["wav", "bwf", "aif", "aiff", "mp3", "m4a"]

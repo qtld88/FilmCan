@@ -226,6 +226,20 @@ Before the first launch of this build, keep a copy of `configs.json` and `preset
 | R7 | Forget one roll name, plug the same card again in that movie. | The card gets a new roll name, higher than every name used so far (its old name is not reused); other cards keep theirs. | ☐ |
 | R8 | A correction made before this version (if you have one). | Listed as "Drive not connected (…)" until the drive is plugged, then by its name. | ☐ |
 
+### Report-after-the-fact gate (run when report creation from the Catalog changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| G1 | Back up a card with the PDF report switched off. Open the Catalog, right-click the roll. | "Create report from <drive>" and the same with "re-reading every file (slow)", one pair per connected drive. | ☐ |
+| G2 | Choose "Create report from <drive>". | A line "Creating the report for…" shows, then Finder opens on `<roll>_report_recreated.pdf` in the reports folder on the Mac. | ☐ |
+| G3 | Open the PDF. | Thumbnails, sizes, checksums. Under the title: backed-up date, "Report created after the backup, on …". Status reads "Checksums from the backup's list. Files were not re-read". No "Verified". | ☐ |
+| G4 | On the drive, delete one clip and add a text file to the roll; create the report again. | The deleted clip is under "missing from the drive"; the text file reads "Not in the checksum list"; status is red. | ☐ |
+| G5 | Choose the "re-reading every file (slow)" entry on an intact roll. | Status: "Re-checked: N of N listed files match the checksum list" in green. Slower. | ☐ |
+| G6 | Eject the drive, right-click the roll. | One greyed entry asking to connect a drive that holds the roll. | ☐ |
+| G7 | Rename the drive in Finder, right-click the roll, create the report. | Works: the drive is found although its name changed. | ☐ |
+| G8 | Look at the roll folder on the drive after G2–G5. | Nothing added on the drive. | ☐ |
+| G9 | A movie set to the simple hidden checksum list: back up, then create the report. | Report without checksums; status says there is no ASC MHL checksum list. | ☐ |
+
 ## Post-run sanity checks
 
 - `find /Volumes/<dest> -name ".filmcan-*"` returns nothing after a clean job.

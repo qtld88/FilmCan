@@ -174,13 +174,24 @@ enum BackupReportWriter {
         y = page.text("Destination: \(report.destinationVolumeName) — \(report.destinationPath)",
                       x: margin, y: y, w: contentW, size: 10)
         let secs = max(0, report.endedAt.timeIntervalSince(report.startedAt))
-        y = page.text("\(df.string(from: report.startedAt)) → \(df.string(from: report.endedAt))  (\(formatClock(secs)))",
-                      x: margin, y: y, w: contentW, size: 10)
-        let status: (String, NSColor) = !report.success
-            ? ("Failed", NSColor(calibratedRed: 0.8, green: 0.1, blue: 0.1, alpha: 1))
-            : report.verified
-                ? ("Verified ✓", NSColor(calibratedRed: 0.1, green: 0.55, blue: 0.2, alpha: 1))
-                : ("Copied, not verified", .darkGray)
+        let red = NSColor(calibratedRed: 0.8, green: 0.1, blue: 0.1, alpha: 1)
+        let green = NSColor(calibratedRed: 0.1, green: 0.55, blue: 0.2, alpha: 1)
+        let status: (String, NSColor)
+        if let recreated = report.recreated {
+            y = page.text("Backed up \(df.string(from: report.startedAt))", x: margin, y: y, w: contentW, size: 10)
+            y = page.text("Report created after the backup, on \(df.string(from: recreated.createdAt)), from what is on the drive.",
+                          x: margin, y: y, w: contentW, size: 10)
+            status = (recreated.statusText,
+                      recreated.hasProblems ? red : recreated.isFullyRechecked ? green : .darkGray)
+        } else {
+            y = page.text("\(df.string(from: report.startedAt)) → \(df.string(from: report.endedAt))  (\(formatClock(secs)))",
+                          x: margin, y: y, w: contentW, size: 10)
+            status = !report.success
+                ? ("Failed", red)
+                : report.verified
+                    ? ("Verified ✓", green)
+                    : ("Copied, not verified", .darkGray)
+        }
         y = page.text(status.0, x: margin, y: y + 2, w: contentW, h: 16, size: 12, bold: true, color: status.1)
         if let w = report.warning, !w.isEmpty {
             y = page.text(w, x: margin, y: y, w: contentW, h: 28, size: 9, color: .orange)
@@ -195,6 +206,17 @@ enum BackupReportWriter {
         for roll in report.rolls {
             y = page.text("\(roll.name)  ·  \(roll.mediaKind.displayName)  ·  \(roll.clips.count) files  ·  \(formatBytes(roll.totalBytes))",
                           x: margin, y: y, w: contentW, size: 10)
+        }
+        if let missing = report.recreated?.missingFiles, !missing.isEmpty {
+            y += 6
+            y = page.text("In the checksum list, missing from the drive", x: margin, y: y, w: contentW,
+                          h: 14, size: 10, bold: true, color: red)
+            for name in missing.prefix(12) {
+                y = page.text(name, x: margin, y: y, w: contentW, size: 8, color: .darkGray)
+            }
+            if missing.count > 12 {
+                y = page.text("and \(missing.count - 12) more", x: margin, y: y, w: contentW, size: 8, color: .darkGray)
+            }
         }
         y += 10
         page.y = y
@@ -228,6 +250,8 @@ enum BackupReportWriter {
                 if let sum = clip.checksum {
                     page.text("\(clip.checksumAlgorithm ?? "hash"): \(sum)", x: tx, y: top + 36,
                               w: contentW - 108, size: 7, mono: true, color: .darkGray)
+                } else if let note = clip.note {
+                    page.text(note, x: tx, y: top + 36, w: contentW - 108, size: 8, color: .orange)
                 }
                 let rx = pageWidth - margin - 140
                 page.text(formatBytes(clip.size), x: rx, y: top + 6, w: 140, size: 10, align: .right)
@@ -249,7 +273,41 @@ enum BackupReportWriter {
         guard let logPath = result.logFilePath else { return nil }
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let report = BackupReport.build(result: result, config: config, appVersion: version)
+        return await write(report, toPath: reportPath(forLog: logPath))
+    }
 
+    /// Creates a report after the fact for one roll of the catalog on one connected
+    /// drive, in the reports folder on this Mac. `recheck` re-reads every file (slow).
+    /// Returns the PDF's path, nil when the roll is not reachable or the PDF failed.
+    static func recreate(roll: CatalogRoll, copy: CatalogCopy, recheck: Bool,
+                         base: URL = ReportArchive.baseURL(), now: Date = Date()) async -> String? {
+        guard let rollFolder = ReportRecreation.currentRollFolder(
+            copy: copy, mountedRootsByUUID: ReportRecreation.mountedRootsByUUID(),
+            exists: { FileManager.default.fileExists(atPath: $0) }) else { return nil }
+        let files = MediaCatalogStore.listFiles(inRollFolder: rollFolder)
+        let checksums = ReportRecreation.checksums(rollFolder: rollFolder)
+        let rechecked = recheck && checksums.found
+            ? ReportRecreation.recheck(rollFolder: rollFolder, filesOnDisk: files, checksums: checksums)
+            : nil
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let report = ReportRecreation.build(
+            roll: roll, copy: copy, rollFolder: rollFolder, filesOnDisk: files,
+            checksums: checksums, rechecked: rechecked,
+            existsOnDrive: { FileManager.default.fileExists(atPath: (rollFolder as NSString).appendingPathComponent($0)) },
+            now: now, appVersion: version)
+        let target = ReportRecreation.outputURL(roll: roll, copy: copy, base: base)
+        do {
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+        } catch {
+            DebugLog.warn("Report: cannot create \(target.deletingLastPathComponent().path): \(error.localizedDescription)")
+            return nil
+        }
+        return await write(report, toPath: target.path)
+    }
+
+    /// Thumbnails, durations, then the PDF at `finalPath` (replaced if present).
+    private static func write(_ report: BackupReport, toPath finalPath: String) async -> String? {
         let targets = report.rolls.flatMap { $0.clips }.filter { $0.isVideo || $0.isAudio }
 
         var thumbs: [String: NSImage] = [:]
@@ -279,7 +337,6 @@ enum BackupReportWriter {
             }
         }
 
-        let finalPath = reportPath(forLog: logPath)
         let tmpURL = URL(fileURLWithPath: finalPath + ".tmp")
         let finalURL = URL(fileURLWithPath: finalPath)
         let renderedThumbs = thumbs, renderedDurs = durs
