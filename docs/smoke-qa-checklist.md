@@ -53,18 +53,18 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 
 | # | Check (real .app, window at 1280 × 800) | Expected | Pass? |
 |---|-------------------|----------|-------|
-| M1 | A movie whose folder template uses `{day}` (e.g. Netflix Ingest). | `‹ Day02 ›` next to the title. A movie without `{day}`: no stepper at all. | ☐ |
-| M2 | Click `›`, then `‹`. | The day changes in the stepper, in the summary line and in the Save To folder preview, in one click. Options › Source shows the same day. | ☐ |
-| M3 | Turn on the automatic day counter, click `›`. | Today's day changes; the next calendar day's first backup advances from it. | ☐ |
+| M1 | A movie whose folder template uses `{day}` (e.g. Netflix Ingest). | `‹ Day02 ›` next to the title. A movie without `{day}`: no stepper at all. Double-click the title to rename it: the stepper stays next to the title while you type. | ☐ |
+| M2 | Click `›`, then `‹`. | The day changes in the stepper and in the Save To folder preview, in one click. Options › Source shows the same day. | ☐ |
+| M3 | Turn on the automatic day counter, click `›`. | The "Today:" field in Options › Source › Cards & rolls changes at once; the next calendar day's first backup advances from it. | ☐ |
 | M4 | Type a text-only day ("Pickups") in Options › Source. | The stepper shows it with both arrows greyed. | ☐ |
-| M5 | 1 card, 2 drives, ready to copy. | One line above the columns: folders › day › roll, then size · files · 2 drives. Count the text elements outside History: fewer than 25. | ☐ |
-| M6 | 3 cards, 2 drives. | The line ends with "3 items"; everything fits without scrolling at 1280 × 800; the flow links between the columns are where they were. | ☐ |
+| M5 | 1 card, 2 drives, ready to copy. | No summary line above the columns: the header row is followed directly by Copy From / Save To. | ☐ |
+| M6 | 3 cards, 2 drives. | Everything fits without scrolling at 1280 × 800; the flow links between the columns are where they were. | ☐ |
 | M7 | Look under "Run Now" with no card, then no drive, then both, then after a completed backup. | "Add a card or a folder to copy", "Add a drive to save to", "N folders will be created", "Folders already exist: only missing files are copied". The button is not clipped. | ☐ |
 | M8 | A whole card as source, then a subfolder of a card. | The card shows no path line (hover its name: tooltip with the path). The subfolder still shows its path. | ☐ |
 | M9 | One source and one drive, then two of each. | No order number with one row; 1, 2 with two. Checkboxes stay aligned. | ☐ |
 | M10 | After a completed backup, same cards and drives still plugged. | Save To shows one folded line "Folders already on every drive"; clicking it opens the tree. | ☐ |
 | M11 | `defaults delete com.filmcan.app historyListView`, relaunch, open History. | Compact list. Switch to cards, relaunch: still cards. | ☐ |
-| M12 | Start a backup. | The stepper is greyed during the copy; subtitle says "Backup in progress". | ☐ |
+| M12 | Start a backup. | The stepper (day text and both arrows) is visibly greyed during the copy and comes back after it; subtitle says "Backup in progress". | ☐ |
 
 ## Setup
 

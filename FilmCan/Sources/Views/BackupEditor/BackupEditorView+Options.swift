@@ -472,15 +472,25 @@ extension BackupEditorView {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 if isEditingName {
-                    TextField("Backup name", text: $viewModel.name)
-                        .textFieldStyle(.plain)
-                        .focused($isNameFocused)
+                    // A bare TextField takes all the free width and pushes the day
+                    // stepper to the far right. Size it to its text instead, using a
+                    // hidden copy of the name, so the stepper stays next to the title.
+                    Text(viewModel.name.isEmpty ? "Backup name" : viewModel.name)
                         .font(FilmCanFont.title(24))
-                        .foregroundColor(FilmCanTheme.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .onSubmit { confirmEditingName(shouldAdvanceTour: true) }
-                        .onChange(of: isNameFocused) { focused in
-                            if !focused { confirmEditingName() }
+                        .lineLimit(1)
+                        .padding(.trailing, 12)
+                        .hidden()
+                        .overlay(alignment: .leading) {
+                            TextField("Backup name", text: $viewModel.name)
+                                .textFieldStyle(.plain)
+                                .focused($isNameFocused)
+                                .font(FilmCanFont.title(24))
+                                .foregroundColor(FilmCanTheme.textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .onSubmit { confirmEditingName(shouldAdvanceTour: true) }
+                                .onChange(of: isNameFocused) { focused in
+                                    if !focused { confirmEditingName() }
+                                }
                         }
                 } else {
                     Text(viewModel.name.isEmpty ? "Untitled Backup" : viewModel.name)

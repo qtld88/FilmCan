@@ -17,17 +17,11 @@ A `‹ Day02 ›` stepper sits next to the film title.
 - It shows the day a run started now would use (`effectiveShootDay`).
 - Day counter off: an arrow changes the film's day, exactly like the existing field.
 - Day counter on: an arrow sets today's value (the existing "today" override); tomorrow's first run advances from it.
-- Disabled while that film is copying.
+- Disabled and greyed (day text and both arrows) while that film is copying.
 
-### 2. One summary line
+### 2. One summary line (removed after the trial)
 
-Between the header and the two columns: the destination breadcrumb, then size, file count and drive count.
-
-`CITIZENK › Day02 › A003        128 GB · 412 files · 2 drives`
-
-- The breadcrumb is the engine's own destination path for the included source, relative to the drive (same function as the folder preview), so it cannot disagree with the copy.
-- Several sources: the folders they share, then `3 items`.
-- No source: no line. No drive yet: the line still names the folders. Sizes still loading: `Measuring…`.
+A line between the header and the two columns repeated the destination breadcrumb, size, file count and drive count. The trial on `qt1/essai` judged it redundant with the columns and the folder preview, so it was removed. The Run subtitle below still counts new folders from the same engine path function.
 
 ### 3. Run button subtitle
 

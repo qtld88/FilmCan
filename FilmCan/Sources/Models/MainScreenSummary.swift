@@ -1,7 +1,7 @@
 import Foundation
 
-/// Logic behind the calmer main screen: the shoot-day stepper in the film header, the
-/// one-line summary above the two columns, and the sentence under the Run button.
+/// Logic behind the calmer main screen: the shoot-day stepper in the film header and
+/// the sentence under the Run button.
 /// Pure functions; the views only lay the results out.
 
 enum ShootDayStepper {
@@ -40,50 +40,6 @@ enum ShootDayStepper {
     }
 }
 
-/// "CITIZENK › Day02 › A003 — 128 GB · 412 items · 2 drives".
-struct BackupSummary: Equatable {
-    /// Destination folders from the drive root down to the roll (or "3 items").
-    var breadcrumb: [String]
-    var detail: String
-
-    /// `relativePaths`: where each included source lands under a drive
-    /// (`FolderTreeBuilder.relativePaths`). Nil when there is nothing to copy.
-    static func make(relativePaths: [String], totalBytes: Int64, itemCount: Int?,
-                     driveCount: Int, isLoading: Bool) -> BackupSummary? {
-        let paths = relativePaths.map { $0.split(separator: "/").map(String.init) }.filter { !$0.isEmpty }
-        guard !paths.isEmpty else { return nil }
-
-        var breadcrumb: [String]
-        if paths.count == 1 {
-            breadcrumb = paths[0]
-        } else {
-            var common: [String] = []
-            let shortest = paths.map(\.count).min() ?? 0
-            for index in 0..<shortest {
-                let component = paths[0][index]
-                // The last component of a path is the copied item itself, never a shared folder.
-                guard paths.allSatisfy({ $0[index] == component && index < $0.count - 1 }) else { break }
-                common.append(component)
-            }
-            breadcrumb = common + ["\(paths.count) items"]
-        }
-
-        var parts: [String] = []
-        if isLoading {
-            parts.append("Measuring…")
-        } else {
-            parts.append(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))
-            if let itemCount {
-                parts.append(itemCount == 1 ? "1 file" : "\(itemCount) files")
-            }
-        }
-        if driveCount > 0 {
-            parts.append(driveCount == 1 ? "1 drive" : "\(driveCount) drives")
-        }
-        return BackupSummary(breadcrumb: breadcrumb, detail: parts.joined(separator: " · "))
-    }
-}
-
 enum RunSubtitle {
     /// One short sentence saying what pressing Run will do, or what is missing.
     static func text(sourceCount: Int, driveCount: Int, newFolderCount: Int, isRunning: Bool) -> String {
@@ -119,10 +75,4 @@ enum MainScreenChrome {
     static func treeStartsCollapsed(_ lines: [FolderTreeLine]) -> Bool {
         !lines.isEmpty && !lines.contains { $0.isNew }
     }
-}
-
-/// Holds the summary line resolved before a run. A class on purpose: the view writes it
-/// while rendering, which must not trigger another render.
-final class SummaryFreeze {
-    var summary: BackupSummary?
 }

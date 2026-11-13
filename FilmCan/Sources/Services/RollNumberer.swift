@@ -102,6 +102,12 @@ final class RollNumberingStore {
         save()
     }
 
+    /// Drops everything stored for a film (used by tests to leave no trace).
+    func remove(for configId: UUID) {
+        guard states.removeValue(forKey: configId.uuidString) != nil else { return }
+        save()
+    }
+
     func resetNumbering(for configId: UUID) {
         var s = state(for: configId)
         s.assignments = [:]
