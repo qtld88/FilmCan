@@ -41,6 +41,9 @@ struct CatalogRoll: Codable, Identifiable, Equatable {
     var firstBackedUp: Date
     var files: [CatalogFile]
     var copies: [CatalogCopy]
+    /// `CardFingerprint` keys of the source card's clips, sorted. Nil for rolls recorded
+    /// before they existed (old catalog.json entries decode without them).
+    var clipKeys: [String]? = nil
 
     /// Identity used to merge a new run into an existing roll.
     var identityKey: String {
@@ -57,6 +60,25 @@ struct CatalogRoll: Codable, Identifiable, Equatable {
     }
 
     var totalBytes: Int64 { files.reduce(0) { $0 + $1.size } }
+
+    /// Name and size of each large file, for rolls without clip keys.
+    var legacyClipKeys: Set<String> {
+        Set(files.filter { $0.size >= CardFingerprint.minimumClipBytes }
+            .map { CardFingerprint.legacyKey(relPath: $0.relPath, size: $0.size) })
+    }
+
+    /// Same film (same config, else same project name).
+    func isSameProject(as other: CatalogRoll) -> Bool {
+        if let a = configId, let b = other.configId { return a == b }
+        return projectName == other.projectName
+    }
+}
+
+/// An earlier roll holding some of a card's clips.
+struct CatalogEarlierCopy: Equatable {
+    var roll: CatalogRoll
+    var matchingClips: Int
+    var cardClips: Int
 }
 
 struct CatalogClipHit: Identifiable, Equatable {
@@ -72,13 +94,18 @@ struct CatalogClipHit: Identifiable, Equatable {
 enum MediaCatalog {
     /// Merge `incoming` into `rolls`. Same `identityKey` ⇒ union files (by relPath, newest
     /// size wins) and upsert copies by `driveKey` (newest wins). Otherwise append.
+    /// A roll of the same project holding the very same clips (another roll name, another
+    /// drive, folder or content copy) is the same card and merges too.
     static func merge(_ incoming: CatalogRoll, into rolls: [CatalogRoll]) -> [CatalogRoll] {
         var result = rolls
-        guard let idx = result.firstIndex(where: { $0.identityKey == incoming.identityKey }) else {
+        guard let idx = result.firstIndex(where: { $0.identityKey == incoming.identityKey })
+                ?? result.firstIndex(where: { $0.isSameProject(as: incoming) && sameCard($0, incoming) })
+        else {
             result.append(incoming)
             return result
         }
         var roll = result[idx]
+        if roll.clipKeys?.isEmpty ?? true { roll.clipKeys = incoming.clipKeys }
         var byPath: [String: CatalogFile] = [:]
         for f in roll.files { byPath[f.relPath] = f }
         for f in incoming.files { byPath[f.relPath] = f }
@@ -93,6 +120,59 @@ enum MediaCatalog {
         roll.firstBackedUp = min(roll.firstBackedUp, incoming.firstBackedUp)
         result[idx] = roll
         return result
+    }
+
+    /// The same card: identical clip keys, or — when either roll predates clip keys —
+    /// identical names and sizes of at least two large files. A formatted and refilled
+    /// card never matches: its clips differ in size and modification time.
+    static func sameCard(_ a: CatalogRoll, _ b: CatalogRoll) -> Bool {
+        guard a.mediaKind == b.mediaKind else { return false }
+        if let ka = a.clipKeys, let kb = b.clipKeys, !ka.isEmpty, !kb.isEmpty {
+            return Set(ka) == Set(kb)
+        }
+        let la = a.legacyClipKeys
+        return la.count >= 2 && la == b.legacyClipKeys
+    }
+
+    /// Folds rolls already split in the catalog (same card, different roll names) into
+    /// the oldest one. Applied on load, so earlier runs count right away.
+    static func mergingSameCards(_ rolls: [CatalogRoll]) -> [CatalogRoll] {
+        var result: [CatalogRoll] = []
+        for roll in rolls.sorted(by: { $0.firstBackedUp < $1.firstBackedUp }) {
+            result = merge(roll, into: result)
+        }
+        // Keep the original order of the rolls that remain.
+        let kept = Set(result.map(\.id))
+        let order = rolls.map(\.id).filter { kept.contains($0) }
+        let byId = Dictionary(uniqueKeysWithValues: result.map { ($0.id, $0) })
+        return order.compactMap { byId[$0] }
+    }
+
+    /// Earlier rolls (any project) holding clips of the card with `clipKeys`, most
+    /// matching clips first. Legacy rolls count only on a whole-set name+size match.
+    static func earlierCopies(ofClipKeys clipKeys: [String], mediaKind: SourceMediaKind,
+                              in rolls: [CatalogRoll]) -> [CatalogEarlierCopy] {
+        let card = Set(clipKeys)
+        guard !card.isEmpty else { return [] }
+        let cardLegacy = Set(clipKeys.compactMap { key -> String? in
+            let parts = key.split(separator: "|", omittingEmptySubsequences: false)
+            guard parts.count == 3 else { return nil }
+            return "\(parts[0])|\(parts[1])"
+        })
+        var hits: [CatalogEarlierCopy] = []
+        for roll in rolls where roll.mediaKind == mediaKind && !roll.copies.isEmpty {
+            let matching: Int
+            if let keys = roll.clipKeys, !keys.isEmpty {
+                matching = card.intersection(keys).count
+            } else {
+                let legacy = roll.legacyClipKeys
+                matching = (legacy.count >= 2 && legacy == cardLegacy) ? legacy.count : 0
+            }
+            if matching > 0 {
+                hits.append(CatalogEarlierCopy(roll: roll, matchingClips: matching, cardClips: card.count))
+            }
+        }
+        return hits.sorted { $0.matchingClips > $1.matchingClips }
     }
 
     /// Case-insensitive substring match on the file's basename. Results sorted by

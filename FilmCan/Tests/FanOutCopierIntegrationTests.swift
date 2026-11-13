@@ -1,9 +1,14 @@
 import XCTest
 @testable import FilmCan
 
-private actor VerifyEmitCollector {
-    var verify: [Int64] = []
-    func add(_ v: Int64) { verify.append(v) }
+/// Records emits in the order the engine makes them. (An actor fed by one `Task`
+/// per emit recorded them in whatever order those tasks happened to run, which
+/// made the monotonic check below fail now and then with the engine in order.)
+private final class VerifyEmitCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Int64] = []
+    func add(_ v: Int64) { lock.lock(); values.append(v); lock.unlock() }
+    var verify: [Int64] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
 private actor ETACollector {
@@ -1053,16 +1058,14 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             mhlBasePath: tmpDir.path,
             dryRun: false,
             progressHandler: { prog in
-                Task { await emits.add(prog.verifyBytesCompleted) }
+                emits.add(prog.verifyBytesCompleted)
             }
         )
 
         let results = try await FanOutCopier(config: config).run()
         XCTAssertTrue(results.allSatisfy { $0.success })
 
-        // Allow the detached emit Tasks to drain.
-        try await Task.sleep(for: .milliseconds(200))
-        let verify = await emits.verify
+        let verify = emits.verify
 
         // Distinct increasing verify values BETWEEN 0 and the full file size prove
         // the signal is continuous, not a single whole-file jump.

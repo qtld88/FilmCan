@@ -37,7 +37,8 @@ extension BackupEditorView {
     }
 
     func startTransfer(confirmedDelete: Bool = false, skipNetflixValidation: Bool = false,
-                       skipDuplicateNameWarning: Bool = false) {
+                       skipDuplicateNameWarning: Bool = false,
+                       skipEarlierCopyWarning: Bool = false) {
         guard viewModel.validate() else { return }
 
         if !skipNetflixValidation && isNetflixPresetSelected {
@@ -61,6 +62,14 @@ extension BackupEditorView {
             }
         }
 
+        // A card already copied under another roll name (typo, Untitled vs Untitled_01):
+        // found by its clips in the Catalog, whatever drive or folder name it got.
+        if !skipEarlierCopyWarning, let message = earlierCopyWarning() {
+            earlierCopyWarningMessage = message
+            showEarlierCopyWarning = true
+            return
+        }
+
         // Pre-flight space check
         let insufficientSpaceDestinations = checkSpaceBeforeTransfer()
         if !insufficientSpaceDestinations.isEmpty {
@@ -70,6 +79,24 @@ extension BackupEditorView {
         }
         
         beginTransfer()
+    }
+
+    /// Message for cards whose clips the Catalog already holds under another roll name.
+    /// Content copies (no roll folder) are not checked: their folder is the destination's.
+    @MainActor
+    func earlierCopyWarning() -> String? {
+        guard !viewModel.config.copyFolderContents else { return nil }
+        let catalog = MediaCatalogStore.shared
+        guard !catalog.rolls.isEmpty else { return nil }
+        let cards = viewModel.includedSourcePaths.map { path in
+            EarlierCopyWarning.Card(
+                plannedName: viewModel.plannedRollName(for: path),
+                earlier: catalog.earlierCopies(ofSource: path, mediaKind: viewModel.mediaKind(for: path)))
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return EarlierCopyWarning.message(for: cards, formatDate: { formatter.string(from: $0) })
     }
 
     /// If two or more DIRECTORY sources share a basename, returns a message describing
@@ -156,24 +183,15 @@ extension BackupEditorView {
     }
 
     func checkSpaceBeforeTransfer() -> [(destination: String, needed: Int64, available: Int64, writableNow: Int64)] {
-        var atRisk: [(String, Int64, Int64, Int64)] = []
-        let requiredBytes = previewInfo.totalBytes
-
-        guard requiredBytes > 0 else { return [] }
-
-        for dest in viewModel.destinations {
-            // Optimistic (Finder, includes purgeable) vs immediately-writable
-            // (statfs, excludes purgeable). Warn when the job won't fit in what's
-            // writable RIGHT NOW — that's the real ENOSPC risk, whether the drive
-            // is genuinely full or just looks free because of local snapshots.
-            let available = DriveUtilities.liveAvailableBytes(for: dest) ?? 0
-            let writableNow = DriveUtilities.immediatelyWritableBytes(for: dest) ?? available
-            if requiredBytes > writableNow {
-                atRisk.append((dest, requiredBytes, available, writableNow))
-            }
-        }
-
-        return atRisk
+        // Checked, mounted destinations only; several on one drive add up. Warns when
+        // the job won't fit in what's writable RIGHT NOW (statfs, excludes purgeable) —
+        // the real ENOSPC risk, whether the drive is full or only looks free because
+        // of local snapshots.
+        DestinationSpaceCheck.shortfalls(
+            destinations: viewModel.includedDestinationPaths,
+            requiredBytes: previewInfo.totalBytes,
+            probe: DestinationSpaceCheck.liveProbe
+        ).map { ($0.destination, $0.needed, $0.available, $0.writableNow) }
     }
 
     func buildSpaceWarningMessage(_ destinations: [(destination: String, needed: Int64, available: Int64, writableNow: Int64)]) -> String {

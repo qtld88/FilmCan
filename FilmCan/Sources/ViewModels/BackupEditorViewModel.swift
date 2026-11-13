@@ -335,6 +335,12 @@ class BackupEditorViewModel: ObservableObject {
             taken: existingGenericNames(for: path) + genericNamesOfOtherSources(excluding: path))
     }
 
+    /// Roll folder name the next run gives this source: numbering, a saved card name,
+    /// else the source's own name. Does not save anything.
+    func plannedRollName(for path: String) -> String {
+        rollNamePreview(for: path) ?? rollNameOverride(for: path) ?? (path as NSString).lastPathComponent
+    }
+
     func rollNameOverride(for path: String) -> String? {
         guard genericCardSupportActive else { return nil }
         return config.genericRollNames[RollNumberer.cardKey(forPath: path)]
