@@ -293,6 +293,18 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
     static var empty: BackupConfiguration {
         BackupConfiguration()
     }
+
+    /// A film the user just created. Differs from `empty` (and from what an old saved
+    /// film decodes to) only by first-run friendly defaults: cards are recognised
+    /// without any setup, and every backup leaves a PDF report. Quick Copy, history
+    /// recall and decoding keep using the plain defaults.
+    static func newFilm(name: String) -> BackupConfiguration {
+        var config = BackupConfiguration()
+        config.name = name
+        config.cardAutoDetectEnabled = true
+        config.reportEnabled = true
+        return config
+    }
     
     static var sample: BackupConfiguration {
         var config = BackupConfiguration()

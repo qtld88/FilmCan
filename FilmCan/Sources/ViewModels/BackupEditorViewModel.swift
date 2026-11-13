@@ -319,20 +319,24 @@ class BackupEditorViewModel: ObservableObject {
             mediaKind: mediaKind(for: path))
     }
 
-    private func genericNamesOfOtherSources(excluding path: String) -> [String] {
+    private func genericNamesOfOtherSources(excluding path: String, names: [String: String]) -> [String] {
         let own = RollNumberer.cardKey(forPath: path)
         return config.sourcePaths.compactMap { other in
             guard other != path else { return nil }
             let key = RollNumberer.cardKey(forPath: other)
-            return key == own ? nil : config.genericRollNames[key]
+            return key == own ? nil : names[key]
         }
     }
 
     /// Next free numbered name for a generic card, e.g. `Untitled_01`.
     func suggestedRollName(for path: String) -> String {
+        suggestedRollName(for: path, names: config.genericRollNames)
+    }
+
+    private func suggestedRollName(for path: String, names: [String: String]) -> String {
         GenericCardName.nextNumberedName(
             base: GenericCardName.baseName((path as NSString).lastPathComponent),
-            taken: existingGenericNames(for: path) + genericNamesOfOtherSources(excluding: path))
+            taken: existingGenericNames(for: path) + genericNamesOfOtherSources(excluding: path, names: names))
     }
 
     func rollNameOverride(for path: String) -> String? {
@@ -370,14 +374,29 @@ class BackupEditorViewModel: ObservableObject {
                 }
             }
         }
-        for path in genericSourcePaths {
-            let key = RollNumberer.cardKey(forPath: path)
-            guard config.genericRollNames[key] == nil, !userEditedGenericCards.contains(key) else { continue }
-            config.genericRollNames[key] = suggestedRollName(for: path)
+        let added = GenericRollNaming.namesToFill(
+            sources: genericSourcePaths, isGeneric: { _ in true },
+            keyFor: RollNumberer.cardKey(forPath:),
+            existing: config.genericRollNames, userEdited: userEditedGenericCards,
+            // Names given earlier in this pass count as taken, like the stored ones.
+            suggest: { path, names in self.suggestedRollName(for: path, names: names) })
+        for (key, name) in added {
+            config.genericRollNames[key] = name
             autoWrittenGenericCards.insert(key)
             changed = true
         }
         if changed { save() }
+    }
+
+    /// A drive was mounted or ejected. Auto-detect may leave the source list as it was
+    /// (a new "Untitled" card mounts at the same path as the one ejected), but the card
+    /// under a path can be a different one: its roll name is looked up again.
+    func drivesDidChange() {
+        refreshAutoDetectedSources()
+        refreshAutoDetectedSoundSources()
+        refreshAutoDetectedCards()
+        refreshAutoDetectedDestinations()
+        refreshGenericCards()
     }
 
     /// Fills missing names (folder mode) and raises the contents-mode warning when needed.

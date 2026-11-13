@@ -138,10 +138,7 @@ extension BackupEditorView {
             if includePreview {
                 refreshPreview(bypassCache: force)
             }
-            viewModel.refreshAutoDetectedSources()
-            viewModel.refreshAutoDetectedSoundSources()
-            viewModel.refreshAutoDetectedCards()
-            viewModel.refreshAutoDetectedDestinations()
+            viewModel.drivesDidChange()
             driveRefreshCounter &+= 1
             if includePreview {
                 transferViewModel.clearLastRun(for: viewModel.config.id)

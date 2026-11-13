@@ -49,6 +49,19 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
 | Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
 
+### First-launch defaults gate (run when new-film defaults or Info.plist usage texts changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| F1 | In Terminal: `tccutil reset All com.filmcan.app`. Launch FilmCan, add a camera card as a source. | The macOS dialog "FilmCan would like to access files on a removable volume" shows a sentence explaining why. | ☐ |
+| F2 | Same reset, then pick a folder inside Documents, then Desktop, then Downloads. | Each macOS dialog shows its own explaining sentence. | ☐ |
+| F3 | Plug a camera card. Click "+" to create a new movie. | The card appears in Copy From by itself, tagged Camera (a sound recorder card: Sound). | ☐ |
+| F4 | In the new movie: Options › Source and Options › Logs. | "Detect camera and sound cards automatically" is on; "PDF report with thumbnails" is on. | ☐ |
+| F5 | Open a movie that existed before this build. | Both switches are as you left them. | ☐ |
+| F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
+| F7 | Finder › right-click a folder › Services › FilmCan Copy. Run it once with Movie = a movie whose « PDF report with thumbnails » is on, once with Movie = None. | With the movie: a PDF report is written next to the log, as in the main window. With None: no PDF. | ☐ |
+| F8 | Back up a card named « Untitled » (roll folder proposed: `Untitled_01`). Eject it, plug in another card also named « Untitled ». | The new card sits in the same source slot and its Roll folder reads `Untitled_02`, not empty. Plug the first card back: it shows `Untitled_01` again. | ☐ |
+
 ## Setup
 
 - macOS 14 or later, Apple Silicon and Intel both covered.

@@ -32,10 +32,9 @@ class AppState: ObservableObject {
     }
     
     func createNewConfig() -> BackupConfiguration {
-        var config = BackupConfiguration.empty
-        config.name = "Movie \(storage.configurations.count + 1)"
         // Start fresh (no prefilled sources/destinations)
-        
+        let config = BackupConfiguration.newFilm(name: "Movie \(storage.configurations.count + 1)")
+
         storage.add(config)
         selectedConfigId = config.id
         return config

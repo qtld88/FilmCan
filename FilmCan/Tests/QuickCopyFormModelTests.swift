@@ -615,6 +615,23 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertFalse(form.presetDiffersFromFilm)
     }
 
+    func test_pdfReport_followsTheSelectedMovie() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        // No movie: no report (Quick Copy as before).
+        XCTAssertFalse(form.makeConfiguration().reportEnabled)
+        var on = film(name: "With report", preset: nil)
+        on.reportEnabled = true
+        var off = film(name: "Without report", preset: nil)
+        off.reportEnabled = false
+        form.savedFilms = [on, off]
+        form.selectFilm(on.id)
+        XCTAssertTrue(form.makeConfiguration().reportEnabled)
+        form.selectFilm(off.id)
+        XCTAssertFalse(form.makeConfiguration().reportEnabled)
+        form.selectFilm(nil)
+        XCTAssertFalse(form.makeConfiguration().reportEnabled)
+    }
+
     func test_recordName_filmThenProjectThenQuickCopy() {
         var form = QuickCopyFormModel(items: [dir("A001")])
         XCTAssertEqual(form.makeConfiguration().name, "Quick Copy")
