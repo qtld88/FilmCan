@@ -8,7 +8,11 @@ struct BackupEditorView: View {
     @ObservedObject var transferViewModel: TransferViewModel
     let isHistoryVisible: Bool
     let onToggleHistory: () -> Void
+    /// Closes the history / catalog pane: the movie settings panel takes its place.
+    let onCloseRightPane: () -> Void
     @EnvironmentObject var appState: AppState
+    /// The user asked for the movie settings panel (kept across movies and launches).
+    @AppStorage("movieSettingsPanelOpen") var wantsMovieSettings = false
 
 
 
@@ -18,7 +22,6 @@ struct BackupEditorView: View {
     @State var isEditingName = false
     @FocusState var isNameFocused: Bool
     @State var optionsAvailableWidth: CGFloat = 0
-    @State var selectedOptionsTab: OptionsTab = .basic
     @State var showSpaceWarning = false
     @State var spaceWarningMessage = ""
     @State var showDeleteWarning = false
@@ -27,7 +30,8 @@ struct BackupEditorView: View {
     @State var duplicateNameWarningMessage = ""
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
-    @State var isOptionsCollapsed = true
+    /// Which groups of the movie settings panel are open (see `MovieSettingsSections`).
+    @AppStorage("movieSettingsOpenGroups") var openSettingsGroups = MovieSettingsSections.defaultStored
     @State var hostWindow: NSWindow?
     @State var didLoadDestinations = false
     // Defer the options card mount one runloop after the editor appears so a
@@ -54,6 +58,16 @@ struct BackupEditorView: View {
 
         var id: String { rawValue }
 
+        /// Key remembered for an open group of the movie settings panel.
+        var sectionKey: String {
+            switch self {
+            case .basic: return "basic"
+            case .source: return "source"
+            case .destinations: return "destinations"
+            case .logs: return "logs"
+            }
+        }
+
         var shortTitle: String {
             switch self {
             case .basic: return "Basic"
@@ -73,8 +87,10 @@ struct BackupEditorView: View {
         transferViewModel: TransferViewModel,
         isHistoryVisible: Bool,
         rightPaneWidth: CGFloat = 250,
-        onToggleHistory: @escaping () -> Void
+        onToggleHistory: @escaping () -> Void,
+        onCloseRightPane: @escaping () -> Void = {}
     ) {
+        self.onCloseRightPane = onCloseRightPane
         self.historyPanelWidth = rightPaneWidth
         self.config = config
         let vm = BackupEditorViewModel(config: config)
@@ -86,6 +102,8 @@ struct BackupEditorView: View {
     }
     
     private func editorDidAppear() {
+        // The panel was left open: it wins over the history pane a new window starts with.
+        if wantsMovieSettings && isHistoryVisible { onCloseRightPane() }
         DispatchQueue.main.async { optionsReady = true }
         refreshPreview()
         DriveInfoCache.shared.prime(viewModel.sourcePaths + viewModel.destinations)
@@ -290,29 +308,89 @@ struct BackupEditorView: View {
     @ViewBuilder
     private func editorContent(proxy: GeometryProxy) -> some View {
         let historyWidth = isHistoryVisible ? historyPanelWidth : 0
-        let contentWidth = max(proxy.size.width - 48 - historyWidth, 0)
+        let showsSettings = isMovieSettingsShown
+        let settingsWidth = showsSettings ? MovieSettingsPanel.width(editorWidth: proxy.size.width) : 0
+        let contentWidth = max(proxy.size.width - 48 - historyWidth - settingsWidth, 0)
         let isOverviewWide = contentWidth >= 750
         let contentPadding: CGFloat = contentWidth < 520 ? 12 : 24
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                overviewSection(isWide: isOverviewWide)
-                if optionsReady {
-                    optionsSection()
-                } else {
-                    optionsMountPlaceholder
+        let sideBySide = MovieSettingsPanel.isSideBySide(editorWidth: proxy.size.width)
+        HStack(spacing: 0) {
+            // In a window too narrow for both, the panel takes the editor's place.
+            if !showsSettings || sideBySide {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        overviewSection(isWide: isOverviewWide)
+                    }
+                    .padding(contentPadding)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .onTapGesture {
+                    if isEditingName {
+                        confirmEditingName()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(contentPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .onTapGesture {
-            if isEditingName {
-                confirmEditingName()
+
+            // The settings sit beside the cards and drives, so the folder preview stays
+            // in view and follows every change.
+            if showsSettings {
+                if sideBySide { Divider() }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        movieSettingsPanelHeader
+                        if optionsReady {
+                            optionsSection()
+                        } else {
+                            optionsMountPlaceholder
+                        }
+                    }
+                    .padding(.vertical, 16)
+                }
+                .frame(width: settingsWidth)
+                .frame(maxHeight: .infinity)
+                .transition(.move(edge: .trailing))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(FilmCanTheme.backgroundGradient)
+        .onChange(of: isHistoryVisible) { visible in
+            // One side pane at a time: opening history or the catalog closes the settings.
+            if visible { wantsMovieSettings = false }
+        }
+    }
+
+    var isMovieSettingsShown: Bool {
+        MovieSettingsPanel.isShown(wantsOpen: wantsMovieSettings, otherPaneOpen: isHistoryVisible)
+    }
+
+    func openMovieSettings() {
+        if isHistoryVisible { onCloseRightPane() }
+        withAnimation(.easeInOut(duration: 0.2)) { wantsMovieSettings = true }
+    }
+
+    func closeMovieSettings() {
+        withAnimation(.easeInOut(duration: 0.2)) { wantsMovieSettings = false }
+    }
+
+    private var movieSettingsPanelHeader: some View {
+        HStack {
+            Text(SettingsWording.movieSettings)
+                .font(FCType.cardTitle)
+                .foregroundColor(FilmCanTheme.textPrimary)
+            Spacer()
+            Button(action: closeMovieSettings) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(FilmCanTheme.textSecondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Close movie settings")
+        }
+        .padding(.horizontal, 16)
     }
 
     private var optionsMountPlaceholder: some View {

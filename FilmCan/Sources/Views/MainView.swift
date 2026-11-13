@@ -16,6 +16,8 @@ struct MainView: View {
     @State private var rightPane: RightPane = .history
     @State private var catalogDragStartWidth: Double?
     @AppStorage("catalogPaneWidth") private var catalogPaneWidth: Double = 380
+    /// Shared with `BackupEditorView`: the movie settings panel is open.
+    @AppStorage("movieSettingsPanelOpen") private var wantsMovieSettings = false
     @State private var showQuickTour: Bool = false
     @State private var quickTourIndex: Int = 0
     @State private var quickTourNameConfirmed: Bool = false
@@ -219,7 +221,10 @@ struct MainView: View {
                 transferViewModel: transferViewModel,
                 isHistoryVisible: rightPane != .none,
                 rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
-                onToggleHistory: { togglePane(.history) }
+                onToggleHistory: { togglePane(.history) },
+                onCloseRightPane: {
+                    withAnimation(.easeInOut(duration: 0.2)) { rightPane = .none }
+                }
             )
             .id(config.id)
         } else {
@@ -237,6 +242,7 @@ struct MainView: View {
             )
 
             HStack(spacing: 4) {
+                movieSettingsButton
                 historyButton
                 catalogButton
             }
@@ -345,6 +351,41 @@ struct MainView: View {
         .help("Catalog — where every roll is")
         .accessibilityLabel(active ? "Hide catalog" : "Show catalog")
         .accessibilityValue(atRisk ? "Some rolls are on one drive only" : "")
+    }
+
+    /// Opens the selected movie's settings in the side panel, in place of history or
+    /// the catalog (one side pane at a time).
+    private var movieSettingsButton: some View {
+        let active = isMovieSettingsOpen
+        return Button(action: toggleMovieSettings) {
+            Image(systemName: "gearshape")
+                .symbolVariant(active ? .fill : .none)
+                .foregroundColor(active ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(6)
+        }
+        .frame(width: 28, height: 28)
+        .buttonStyle(.plain)
+        .disabled(selectedConfig == nil)
+        .help(SettingsWording.movieSettings)
+        .accessibilityLabel(active ? "Hide movie settings" : "Show movie settings")
+        .tourAnchor("optionsTabs")
+    }
+
+    private var isMovieSettingsOpen: Bool {
+        selectedConfig != nil
+            && MovieSettingsPanel.isShown(wantsOpen: wantsMovieSettings, otherPaneOpen: rightPane != .none)
+    }
+
+    private func toggleMovieSettings() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if isMovieSettingsOpen {
+                wantsMovieSettings = false
+            } else {
+                rightPane = .none
+                wantsMovieSettings = true
+            }
+        }
     }
 
     private var historyButton: some View {

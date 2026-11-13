@@ -51,7 +51,7 @@ final class QuickCopySession: ObservableObject, Identifiable {
         // Quick Copy keeps its own "last used" keys — never the main app's lastUsedConfigId.
         if let raw = defaults.string(forKey: Self.lastPresetKey),
            let presetId = UUID(uuidString: raw),
-           form.savedPresets.contains(where: { $0.id == presetId }) {
+           form.savedPresets.contains(where: { $0.id == presetId && $0.ownerFilmId == nil }) {
             form.selectedPresetId = presetId
         }
         form.destinations = (defaults.stringArray(forKey: Self.lastDestinationsKey) ?? [])

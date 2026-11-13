@@ -770,7 +770,8 @@ class TransferViewModel: ObservableObject {
         let preset = config.map { resolveOrganizationPreset(for: $0) } ?? nil
         let copyContents = config?.copyFolderContents ?? false
         let metadata = ShootMetadata(episode: config?.episode ?? "", day: config?.day ?? "",
-                                     unit: config?.unit ?? "", cameraFormat: config?.cameraFormat ?? "")
+                                     unit: config?.unit ?? "", cameraFormat: config?.cameraFormat ?? "",
+                                     movie: config?.name ?? "")
         let kinds = config.map { effectiveSourceMediaKinds(for: $0, sources: sources) } ?? [:]
 
         return await Task.detached(priority: .utility) {
@@ -903,7 +904,8 @@ class TransferViewModel: ObservableObject {
                 dryRun: false,
                 forceRecopy: config.forceRecopy,
                 shootMetadata: ShootMetadata(episode: config.episode, day: config.day,
-                                             unit: config.unit, cameraFormat: config.cameraFormat),
+                                             unit: config.unit, cameraFormat: config.cameraFormat,
+                                             movie: config.name),
                 sourceMediaKinds: effectiveSourceMediaKinds(for: config, sources: sources),
                 rollNames: config.runRollNames,
                 hashListStyle: config.hashListStyle,

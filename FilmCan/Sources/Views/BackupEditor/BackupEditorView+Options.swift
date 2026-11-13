@@ -12,7 +12,8 @@ extension BackupEditorView {
     }
 
     private var selectedPresetDifferences: [PresetDifference] {
-        guard let preset = selectedOrganizationPreset else { return [] }
+        // A film's own copy has nothing to diverge from.
+        guard let preset = selectedOrganizationPreset, !viewModel.selectedPresetIsOwnCopy else { return [] }
         return viewModel.config.differences(from: preset)
     }
 
@@ -37,7 +38,8 @@ extension BackupEditorView {
 
     var previewShootMetadata: ShootMetadata {
         ShootMetadata(episode: viewModel.episode, day: viewModel.effectiveShootDay(),
-                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat)
+                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat,
+                      movie: viewModel.config.name)
     }
 
     var effectiveOrganizationPreset: OrganizationPreset? {
@@ -66,12 +68,14 @@ extension BackupEditorView {
 
     private var selectedPresetBinding: Binding<OrganizationPreset>? {
         guard let id = viewModel.selectedOrganizationPresetId,
-              let index = viewModel.organizationPresets.firstIndex(where: { $0.id == id }) else { return nil }
+              let current = viewModel.organizationPresets.first(where: { $0.id == id }) else { return nil }
+        // Looked up by id on every read and write: the list is shared by every movie,
+        // so a position can move under an open editor.
         return Binding(
-            get: { viewModel.organizationPresets[index] },
+            get: { viewModel.organizationPresets.first(where: { $0.id == id }) ?? current },
             set: { newValue in
                 var presets = viewModel.organizationPresets
-                if index < presets.count {
+                if let index = presets.firstIndex(where: { $0.id == id }) {
                     presets[index] = newValue
                     viewModel.organizationPresets = presets
                 }
@@ -175,122 +179,101 @@ extension BackupEditorView {
         .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
 
+    /// The movie settings, stacked: the preset menu, then one folding group per area
+    /// (Basic, Source, Destinations, Logs), each opened or closed on its title.
     func optionsSection() -> some View {
-        optionsTabCard
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear { optionsAvailableWidth = proxy.size.width }
-                        .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
-                }
-            )
-            .padding(.horizontal, optionsHorizontalPadding)
-    }
-
-    private var optionsTabCard: some View {
-        let isWide = effectiveOptionsWidth >= 600
-        return VStack(alignment: .leading, spacing: isOptionsCollapsed ? 0 : 16) {
-            optionsTabBar
-            // Keep the tab content mounted and just hide it (height 0) when collapsed.
-            // The Destinations tab carries the heavy organization editor (TextEditor-
-            // backed pattern editors, 26 draggable token chips); mounting/unmounting it
-            // on every open/close was the slowness. Staying mounted makes toggling free.
-            VStack(alignment: .leading, spacing: 16) {
-                Divider()
-                    .background(FilmCanTheme.cardStroke)
-                optionsTabContent
+        VStack(alignment: .leading, spacing: 0) {
+            presetSelector
+                .padding(.horizontal, MovieSettingsSections.contentInset)
+                .padding(.bottom, 12)
+            Divider().background(FilmCanTheme.cardStroke)
+            ForEach(OptionsTab.allCases) { tab in
+                settingsGroup(tab)
+                Divider().background(FilmCanTheme.cardStroke)
             }
-            .frame(height: isOptionsCollapsed ? 0 : nil, alignment: .top)
-            .clipped()
-            .opacity(isOptionsCollapsed ? 0 : 1)
-            .allowsHitTesting(!isOptionsCollapsed)
         }
-        .onAppear { if selectedOptionsTab == .destinations { scheduleDestinationsLoad() } }
-        .onChange(of: selectedOptionsTab) { if $0 == .destinations { scheduleDestinationsLoad() } }
-        .fcCardSurface(role: .settings)
-        .frame(minWidth: isWide ? 600 : nil, maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { optionsAvailableWidth = proxy.size.width }
+                    .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
+            }
+        )
+        .onAppear { if isGroupOpen(.destinations) { scheduleDestinationsLoad() } }
     }
 
-    private var optionsTabBar: some View {
-        let isWide = effectiveOptionsWidth >= 600
-        return Group {
-            if isWide {
+    func isGroupOpen(_ tab: OptionsTab) -> Bool {
+        MovieSettingsSections.isOpen(tab.sectionKey, stored: openSettingsGroups)
+    }
+
+    private func toggleGroup(_ tab: OptionsTab) {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            openSettingsGroups = MovieSettingsSections.toggling(tab.sectionKey, in: openSettingsGroups)
+        }
+        if isGroupOpen(.destinations) { scheduleDestinationsLoad() }
+    }
+
+    @ViewBuilder
+    private func settingsGroup(_ tab: OptionsTab) -> some View {
+        let open = isGroupOpen(tab)
+        VStack(alignment: .leading, spacing: 0) {
+            Button { toggleGroup(tab) } label: {
                 HStack(spacing: 8) {
-                    ForEach(availableOptionsTabs) { tab in
-                        let isSelected = selectedOptionsTab == tab
-                        Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(tab.shortTitle)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(FilmCanTheme.textTertiary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                        .frame(width: 12)
+                    Text(tab.shortTitle)
+                        .font(FCType.itemTitle)
+                        .foregroundColor(open ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
                     Spacer(minLength: 0)
-                    presetSelector
                 }
-                .tourAnchor("optionsTabs")
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(availableOptionsTabs) { tab in
-                        let isSelected = selectedOptionsTab == tab
-                        Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(tab.shortTitle)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    presetSelector
-                }
-                .tourAnchor("optionsTabs")
+                .padding(.horizontal, MovieSettingsSections.contentInset)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(tab.shortTitle)
+            .accessibilityValue(open ? "Open" : "Closed")
+            .help(open ? "Close \(tab.shortTitle)" : "Open \(tab.shortTitle)")
+
+            groupContent(tab)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, MovieSettingsSections.contentInset)
+                .padding(.bottom, open ? 14 : 0)
+                .frame(height: open ? nil : 0, alignment: .top)
+                .clipped()
+                .opacity(open ? 1 : 0)
+                .allowsHitTesting(open)
+                .accessibilityHidden(!open)
+        }
+    }
+
+    @ViewBuilder
+    private func groupContent(_ tab: OptionsTab) -> some View {
+        switch tab {
+        case .basic:
+            if isGroupOpen(.basic) {
+                BasicOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
+            }
+        case .source:
+            if isGroupOpen(.source) {
+                SourceOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
+            }
+        case .logs:
+            if isGroupOpen(.logs) {
+                LogsOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
+            }
+        case .destinations:
+            // Destinations carries the heavy organization editor: built one runloop after
+            // it is first opened (spinner meanwhile), then kept mounted so folding it
+            // closed and open again costs nothing.
+            if didLoadDestinations {
+                DestinationsOptionsView(model: organizationModel, viewModel: viewModel, availableWidth: effectiveOptionsWidth, destinationCount: viewModel.destinations.count)
+            } else if isGroupOpen(.destinations) {
+                destinationsLoadingPlaceholder
             }
         }
     }
@@ -305,20 +288,35 @@ extension BackupEditorView {
                     viewModel.applyOffOrganizationSettings()
                     expandOptionsIfNeeded()
                 }
+                if let parked = viewModel.parkedOwnCopy {
+                    Button("This movie's settings (\(parked.name))") {
+                        viewModel.useParkedOwnCopy()
+                        expandOptionsIfNeeded()
+                    }
+                }
                 Button("Netflix Ingest (built-in)") {
                     viewModel.applyNetflixIngestPreset()
                     expandOptionsIfNeeded()
                 }
-                ForEach(viewModel.organizationPresets) { preset in
+                ForEach(viewModel.sharedOrganizationPresets) { preset in
                     Button(preset.name) {
                         viewModel.applyPreset(preset)
                         expandOptionsIfNeeded()
                     }
                 }
                 Divider()
-                Button("Create new preset") {
+                Button("Save as new preset") {
                     viewModel.saveCurrentSettingsAsPreset()
                     expandOptionsIfNeeded()
+                }
+                if !viewModel.sharedOrganizationPresets.isEmpty {
+                    Menu("Delete preset") {
+                        ForEach(viewModel.sharedOrganizationPresets) { preset in
+                            Button(preset.name, role: .destructive) {
+                                viewModel.deleteSharedPreset(id: preset.id)
+                            }
+                        }
+                    }
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -362,44 +360,14 @@ extension BackupEditorView {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
-                .help("Delete preset")
+                .help("Delete this movie's folder and file settings (back to Off). To keep them aside, choose Off in the menu instead.")
             }
         }
-        .help("Presets auto-update when you make any change.")
+        .help("These settings belong to this movie. Choosing a preset copies it; changes here never alter the preset or another movie.")
     }
 
     private func expandOptionsIfNeeded() {
-        guard isOptionsCollapsed else { return }
-        withAnimation(.easeInOut(duration: 0.15)) {
-            isOptionsCollapsed = false
-        }
-    }
-
-    @ViewBuilder
-    private var optionsTabContent: some View {
-        ZStack(alignment: .topLeading) {
-            // Light tabs build on demand (cheap).
-            if selectedOptionsTab != .destinations {
-                nonDestinationsContent
-            }
-            // Destinations carries the heavy organization editor. Its first-display
-            // build + AppKit constraint layout is the felt nav lag, so mounting is
-            // deferred one runloop (scheduleDestinationsLoad) — the tab highlights and
-            // this spinner paint instantly, then the heavy form fades in next frame.
-            if selectedOptionsTab == .destinations && !didLoadDestinations {
-                destinationsLoadingPlaceholder
-            }
-            // Build it once on first visit and keep it mounted (height 0 when not
-            // selected) so later tab switches and open/close toggles don't re-pay
-            // the mount/teardown cost.
-            if didLoadDestinations {
-                DestinationsOptionsView(model: organizationModel, viewModel: viewModel, availableWidth: effectiveOptionsWidth, destinationCount: viewModel.destinations.count)
-                    .frame(height: selectedOptionsTab == .destinations ? nil : 0, alignment: .top)
-                    .clipped()
-                    .opacity(selectedOptionsTab == .destinations ? 1 : 0)
-                    .allowsHitTesting(selectedOptionsTab == .destinations)
-            }
-        }
+        if !isMovieSettingsShown { openMovieSettings() }
     }
 
     private var destinationsLoadingPlaceholder: some View {
@@ -420,34 +388,10 @@ extension BackupEditorView {
         DispatchQueue.main.async { didLoadDestinations = true }
     }
 
-    @ViewBuilder
-    private var nonDestinationsContent: some View {
-        switch selectedOptionsTab {
-        case .basic:
-            BasicOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
-        case .source:
-            SourceOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
-        case .logs:
-            LogsOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
-        case .destinations:
-            EmptyView()
-        }
-    }
-
-    private var availableOptionsTabs: [OptionsTab] {
-        OptionsTab.allCases
-    }
-
-    private var optionsHorizontalPadding: CGFloat {
-        let width = effectiveOptionsWidth
-        if width <= 0 { return 24 }
-        let padding = width * 0.05
-        return min(50, max(10, padding))
-    }
-
+    /// Width the rows of a group may use: inside the group's inset, never the panel's
+    /// outer width (sizing rows from the outer width pushed them past the edge).
     private var effectiveOptionsWidth: CGFloat {
-        let historyWidth = isHistoryVisible ? historyPanelWidth : 0
-        return max(0, optionsAvailableWidth - historyWidth)
+        MovieSettingsSections.contentWidth(panelWidth: optionsAvailableWidth)
     }
 
     private func resolvedTextWidth(_ base: CGFloat) -> CGFloat {
