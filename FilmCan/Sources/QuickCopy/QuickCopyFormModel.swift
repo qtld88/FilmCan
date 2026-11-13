@@ -489,6 +489,9 @@ extension QuickCopyFormModel {
             c.runInParallel = p.runInParallel
         }
         c.selectedOrganizationPresetId = selectedPresetId
+        // The PDF report switch belongs to the movie, not to a preset: a copy filed
+        // under a movie follows that movie's switch. With no movie there is none.
+        c.reportEnabled = selectedFilm?.reportEnabled ?? false
         let paths = Set(items.map(\.path))
         c.runRollNames = rollNameOverrides.filter { paths.contains($0.key) && !$0.value.isEmpty }
         return c

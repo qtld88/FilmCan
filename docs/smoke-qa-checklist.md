@@ -59,7 +59,7 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | F4 | In the new movie: Options › Source and Options › Logs. | "Detect camera and sound cards automatically" is on; "PDF report with thumbnails" is on. | ☐ |
 | F5 | Open a movie that existed before this build. | Both switches are as you left them. | ☐ |
 | F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
-| F7 | Finder › right-click a folder › Services › FilmCan Copy, run it. | No PDF report is written (Quick Copy is unchanged). | ☐ |
+| F7 | Finder › right-click a folder › Services › FilmCan Copy. Run it once with Movie = a movie whose « PDF report with thumbnails » is on, once with Movie = None. | With the movie: a PDF report is written next to the log, as in the main window. With None: no PDF. | ☐ |
 
 ## Setup
 
