@@ -4,14 +4,63 @@ import Foundation
 extension BackupEditorView {
     func overviewSection(isWide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            nameRow
-            
+            nameRow(runSubtitle: runSubtitle())
+
             if isWide {
                 overviewRowLayout
             } else {
                 overviewColumnLayout
             }
         }
+    }
+
+    // MARK: - Run subtitle (logic in `MainScreenSummary.swift`)
+
+    private var subtitleSources: [FolderTreeBuilder.Source] {
+        viewModel.includedSourcePaths.map { path in
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+            return FolderTreeBuilder.Source(
+                path: path, isDirectory: isDir.boolValue, kind: viewModel.mediaKind(for: path),
+                rollName: isDir.boolValue ? viewModel.rollNameOverride(for: path) : nil)
+        }
+    }
+
+    /// Same options as the Save To folder preview, so the count names the same folders.
+    private var subtitleOptions: FolderTreeBuilder.Options {
+        var o = FolderTreeBuilder.Options()
+        let preset = previewOrganizationPreset
+        o.preset = preset
+        o.organizationActive = preset.map {
+            $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
+        } ?? false
+        o.copyContents = viewModel.copyFolderContents
+        o.date = TodayClock.shared.today
+        o.metadata = previewShootMetadata
+        o.mediaIndexPreset = preset
+        return o
+    }
+
+    /// The sentence under Run Now. A running copy re-renders this view on every
+    /// progress tick, so it touches no disk then: the sentence only says a copy runs.
+    func runSubtitle() -> String {
+        let destinations = viewModel.config.includedDestinationPaths
+        if transferViewModel.isTransferActive(for: viewModel.config.id) {
+            return RunSubtitle.text(sourceCount: 1, driveCount: destinations.count,
+                                    newFolderCount: 0, isRunning: true)
+        }
+        let sources = subtitleSources
+        guard !sources.isEmpty, !destinations.isEmpty else {
+            return RunSubtitle.text(sourceCount: sources.count, driveCount: destinations.count,
+                                    newFolderCount: 0, isRunning: false)
+        }
+        let options = subtitleOptions
+        let newFolders = destinations.reduce(0) { total, destination in
+            total + RunSubtitle.newFolderCount(
+                in: FolderTreeBuilder.lines(for: destination, sources: sources, options: options))
+        }
+        return RunSubtitle.text(sourceCount: sources.count, driveCount: destinations.count,
+                                newFolderCount: newFolders, isRunning: false)
     }
 
     private var overviewRowLayout: some View {

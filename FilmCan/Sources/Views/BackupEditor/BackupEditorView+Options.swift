@@ -468,19 +468,29 @@ extension BackupEditorView {
         return min(base, maxForMenu)
     }
 
-    var nameRow: some View {
+    func nameRow(runSubtitle: String) -> some View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 if isEditingName {
-                    TextField("Backup name", text: $viewModel.name)
-                        .textFieldStyle(.plain)
-                        .focused($isNameFocused)
+                    // A bare TextField takes all the free width and pushes the day
+                    // stepper to the far right. Size it to its text instead, using a
+                    // hidden copy of the name, so the stepper stays next to the title.
+                    Text(viewModel.name.isEmpty ? "Backup name" : viewModel.name)
                         .font(FilmCanFont.title(24))
-                        .foregroundColor(FilmCanTheme.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .onSubmit { confirmEditingName(shouldAdvanceTour: true) }
-                        .onChange(of: isNameFocused) { focused in
-                            if !focused { confirmEditingName() }
+                        .lineLimit(1)
+                        .padding(.trailing, 12)
+                        .hidden()
+                        .overlay(alignment: .leading) {
+                            TextField("Backup name", text: $viewModel.name)
+                                .textFieldStyle(.plain)
+                                .focused($isNameFocused)
+                                .font(FilmCanFont.title(24))
+                                .foregroundColor(FilmCanTheme.textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .onSubmit { confirmEditingName(shouldAdvanceTour: true) }
+                                .onChange(of: isNameFocused) { focused in
+                                    if !focused { confirmEditingName() }
+                                }
                         }
                 } else {
                     Text(viewModel.name.isEmpty ? "Untitled Backup" : viewModel.name)
@@ -493,7 +503,14 @@ extension BackupEditorView {
                 }
             }
             .tourAnchor("backupName")
-            
+
+            if ShootDayStepper.usesShootDay(previewOrganizationPreset) {
+                ShootDayStepperView(day: viewModel.effectiveShootDay()) { newDay in
+                    viewModel.setShootDayFromHeader(newDay)
+                }
+                .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
+            }
+
             Spacer()
 
             if let customDateStatusText {
@@ -520,7 +537,15 @@ extension BackupEditorView {
             .cornerRadius(8)
             .help("Refresh drives")
 
-            Button("Run Now") { startTransfer() }
+            Button(action: { startTransfer() }) {
+                VStack(spacing: 1) {
+                    Text("Run Now")
+                    Text(runSubtitle)
+                        .font(FilmCanFont.body(10))
+                        .opacity(0.75)
+                        .lineLimit(1)
+                }
+            }
             .buttonStyle(FCPrimaryButtonStyle())
             .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
         }

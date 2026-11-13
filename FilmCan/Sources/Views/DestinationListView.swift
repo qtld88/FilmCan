@@ -35,6 +35,7 @@ struct DestinationListView: View {
     var isIncluded: (String) -> Bool = { _ in true }
     var setIncluded: (([String], Bool) -> Void)? = nil
     @ObservedObject private var todayClock = TodayClock.shared
+    @State private var showExistingFolders = false
     private var isActiveTransfer: Bool {
         transferViewModel.isTransferActive(for: configId)
     }
@@ -78,11 +79,23 @@ struct DestinationListView: View {
                 }
 
                 if sharedTree, let first = treeDestinations.first {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Folders on every drive")
-                            .font(FCType.metaStrong)
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                        FolderTreePreview(lines: treeLines(for: first))
+                    let sharedLines = treeLines(for: first)
+                    if MainScreenChrome.treeStartsCollapsed(sharedLines) {
+                        // Nothing new to create: one line, the tree is a click away.
+                        DisclosureGroup(isExpanded: $showExistingFolders) {
+                            FolderTreePreview(lines: sharedLines)
+                        } label: {
+                            Text("Folders already on every drive")
+                                .font(FCType.metaStrong)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Folders on every drive")
+                                .font(FCType.metaStrong)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                            FolderTreePreview(lines: sharedLines)
+                        }
                     }
                 }
                 
@@ -155,7 +168,7 @@ struct DestinationListView: View {
     private var driveBlocks: some View {
         let summaries = driveSummaries(for: destinations)
         let fulfilled = fulfilledDestinationsForCurrentConfig()
-        let numbers = DriveIncludeColumn.numbers(for: summaries.map(\.id)) { id in
+        let numbers = MainScreenChrome.displayNumbers(for: summaries.map(\.id)) { id in
             summaries.first { $0.id == id }?.paths.contains { isIncluded($0.path) } ?? true
         }
         return VStack(alignment: .leading, spacing: 12) {

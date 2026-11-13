@@ -138,7 +138,7 @@ struct SourceListView: View {
     
     private var driveBlocks: some View {
         let summaries = driveSummaries(for: sources)
-        let numbers = DriveIncludeColumn.numbers(for: summaries.map(\.id)) { id in
+        let numbers = MainScreenChrome.displayNumbers(for: summaries.map(\.id)) { id in
             summaries.first { $0.id == id }?.paths.contains { isIncluded($0.path) } ?? true
         }
         return VStack(alignment: .leading, spacing: 12) {
@@ -296,6 +296,7 @@ struct SourceListView: View {
                     .font(FCType.bodyStrong)
                     .foregroundColor(FilmCanTheme.textPrimary)
                     .lineLimit(1)
+                    .help(source.path)
 
                 cardBadgeRow(path: source.path, isDirectory: metadata.isDirectory)
 
@@ -331,11 +332,14 @@ struct SourceListView: View {
                     }
                 }
                 
-                Text(source.path)
-                    .font(FCType.meta)
-                    .foregroundColor(FilmCanTheme.textTertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                if MainScreenChrome.showsPathLine(for: source.path) {
+                    Text(source.path)
+                        .font(FCType.meta)
+                        .foregroundColor(FilmCanTheme.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(source.path)
+                }
 
                 CardSealBadge(sourcePath: source.path)
             }
