@@ -189,6 +189,15 @@ struct DestinationListView: View {
                                 EjectButton(path: first, onError: { ejectErrorMessage = $0 })
                             }
                         }
+                        if paths.count > 1 {
+                            // Several destinations on one drive share this card and its
+                            // checkbox; say so, or a run writes places nobody expected.
+                            Text(Self.placesOnDriveText(included: paths.filter(isIncluded).count,
+                                                        total: paths.count))
+                                .font(FCType.metaStrong)
+                                .foregroundColor(FilmCanTheme.brandOrange)
+                                .padding(.leading, 26)
+                        }
                         .contentShape(Rectangle())
                         .contextMenu {
                             Button("Remove drive from this backup") {
@@ -211,7 +220,8 @@ struct DestinationListView: View {
                             .padding(.leading, 26)
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { destination in
-                                    destinationPathRow(destination: destination, isExternal: summary.isExternal)
+                                    destinationPathRow(destination: destination, isExternal: summary.isExternal,
+                                                       sharesDrive: summary.paths.count > 1)
                                 }
                             }
                             .padding(.leading, 26)
@@ -219,7 +229,8 @@ struct DestinationListView: View {
                         } else {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { destination in
-                                    destinationPathRow(destination: destination, isExternal: summary.isExternal)
+                                    destinationPathRow(destination: destination, isExternal: summary.isExternal,
+                                                       sharesDrive: summary.paths.count > 1)
                                 }
                                 Text(summary.connectionMessage)
                                     .font(FCType.meta)
@@ -266,7 +277,8 @@ struct DestinationListView: View {
         }
     }
 
-    private func destinationPathRow(destination: DestinationPath, isExternal: Bool) -> some View {
+    private func destinationPathRow(destination: DestinationPath, isExternal: Bool,
+                                    sharesDrive: Bool = false) -> some View {
         let icon = DriveUtilities.iconName(
             isExternal: isExternal,
             isRoot: destination.isRoot,
@@ -287,16 +299,36 @@ struct DestinationListView: View {
         let status = presentation.status
         let progressLabelWidth: CGFloat = 120
         let percentLabelWidth: CGFloat = 42
-        let rowHasContent = !destination.isRoot || treeSources.isEmpty || showProgress
+        // A row on a shared drive always shows: it carries that destination's own
+        // checkbox and name, so each place a run writes to is visible and choosable.
+        let rowHasContent = sharesDrive || !destination.isRoot || treeSources.isEmpty || showProgress
             || (!sharedTree && isIncluded(destination.path))
+        let pathIncluded = isIncluded(destination.path)
         return VStack(alignment: .leading, spacing: 6) {
             if rowHasContent || status != .pending {
             HStack(spacing: 10) {
+                if sharesDrive, let setIncluded {
+                    Toggle("", isOn: Binding(get: { pathIncluded },
+                                             set: { setIncluded([destination.path], $0) }))
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                        .disabled(isActiveTransfer)
+                        .help(pathIncluded
+                              ? "Copied here — uncheck to skip only this place on the drive"
+                              : "Skipped — check to also copy here")
+                }
                 statusOrDriveIcon(status: status, systemIcon: icon)
                     .frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 4) {
                     if !destination.isRoot {
-                        Text((destination.path as NSString).lastPathComponent)
+                        Text(sharesDrive && !pathIncluded
+                             ? "\((destination.path as NSString).lastPathComponent) · Skipped"
+                             : (destination.path as NSString).lastPathComponent)
+                            .font(FCType.bodyStrong)
+                            .foregroundColor(FilmCanTheme.textPrimary)
+                            .lineLimit(1)
+                    } else if sharesDrive {
+                        Text(pathIncluded ? "Top of the drive" : "Top of the drive · Skipped")
                             .font(FCType.bodyStrong)
                             .foregroundColor(FilmCanTheme.textPrimary)
                             .lineLimit(1)
@@ -397,6 +429,7 @@ struct DestinationListView: View {
                     .padding(.leading, 28)
             }
         }
+        .opacity(sharesDrive && !pathIncluded ? 0.45 : 1)
         .contentShape(Rectangle())
         .contextMenu {
             Button("Choose a Folder on This Drive…") {
@@ -475,6 +508,18 @@ struct DestinationListView: View {
         guard !treeSources.isEmpty, let first = treeDestinations.first else { return false }
         let reference = treeLines(for: first)
         return treeDestinations.dropFirst().allSatisfy { treeLines(for: $0) == reference }
+    }
+
+    /// Note on a drive card that holds several destinations, e.g. "Copies to 2 places
+    /// on this drive". Each place gets the whole backup, so it also needs the space.
+    static func placesOnDriveText(included: Int, total: Int) -> String {
+        if included == total {
+            return "Copies to \(total) places on this drive — each gets the full backup"
+        }
+        if included == 0 {
+            return "\(total) places on this drive, none checked"
+        }
+        return "Copies to \(included) of \(total) places on this drive"
     }
 
     private func destinationRootLabel(_ path: String) -> String {

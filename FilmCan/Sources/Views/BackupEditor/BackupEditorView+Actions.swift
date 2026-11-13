@@ -156,24 +156,15 @@ extension BackupEditorView {
     }
 
     func checkSpaceBeforeTransfer() -> [(destination: String, needed: Int64, available: Int64, writableNow: Int64)] {
-        var atRisk: [(String, Int64, Int64, Int64)] = []
-        let requiredBytes = previewInfo.totalBytes
-
-        guard requiredBytes > 0 else { return [] }
-
-        for dest in viewModel.destinations {
-            // Optimistic (Finder, includes purgeable) vs immediately-writable
-            // (statfs, excludes purgeable). Warn when the job won't fit in what's
-            // writable RIGHT NOW — that's the real ENOSPC risk, whether the drive
-            // is genuinely full or just looks free because of local snapshots.
-            let available = DriveUtilities.liveAvailableBytes(for: dest) ?? 0
-            let writableNow = DriveUtilities.immediatelyWritableBytes(for: dest) ?? available
-            if requiredBytes > writableNow {
-                atRisk.append((dest, requiredBytes, available, writableNow))
-            }
-        }
-
-        return atRisk
+        // Checked, mounted destinations only; several on one drive add up. Warns when
+        // the job won't fit in what's writable RIGHT NOW (statfs, excludes purgeable) —
+        // the real ENOSPC risk, whether the drive is full or only looks free because
+        // of local snapshots.
+        DestinationSpaceCheck.shortfalls(
+            destinations: viewModel.includedDestinationPaths,
+            requiredBytes: previewInfo.totalBytes,
+            probe: DestinationSpaceCheck.liveProbe
+        ).map { ($0.destination, $0.needed, $0.available, $0.writableNow) }
     }
 
     func buildSpaceWarningMessage(_ destinations: [(destination: String, needed: Int64, available: Int64, writableNow: Int64)]) -> String {
