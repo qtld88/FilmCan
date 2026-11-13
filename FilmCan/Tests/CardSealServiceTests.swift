@@ -121,6 +121,54 @@ final class CardSealServiceTests: XCTestCase {
         XCTAssertFalse(CardSealService.shouldSeal(plannedDestinations: [], results: []))
     }
 
+    /// A Fast-checked run on every destination seals the card: the Catalog already
+    /// counts those copies as verified, and ejecting must not then warn "not sealed".
+    func test_shouldSeal_fastCheckOnEveryDestSeals_offDoesNot() {
+        let planned = ["/Volumes/A", "/Volumes/B"]
+        let fast = [makeResult(dest: "/Volumes/A", success: true, mode: .fast),
+                    makeResult(dest: "/Volumes/B", success: true, mode: .fast)]
+        XCTAssertTrue(CardSealService.shouldSeal(plannedDestinations: planned, results: fast))
+
+        let mixed = [makeResult(dest: "/Volumes/A", success: true, mode: .paranoid),
+                     makeResult(dest: "/Volumes/B", success: true, mode: .fast)]
+        XCTAssertTrue(CardSealService.shouldSeal(plannedDestinations: planned, results: mixed))
+
+        let oneOff = [makeResult(dest: "/Volumes/A", success: true, mode: .fast),
+                      makeResult(dest: "/Volumes/B", success: true, mode: .off)]
+        XCTAssertFalse(CardSealService.shouldSeal(plannedDestinations: planned, results: oneOff))
+
+        let oneFailed = [makeResult(dest: "/Volumes/A", success: true, mode: .fast),
+                         makeResult(dest: "/Volumes/B", success: false, mode: .fast)]
+        XCTAssertFalse(CardSealService.shouldSeal(plannedDestinations: planned, results: oneFailed))
+    }
+
+    /// The real path: per-destination records from `explodeFanOutResult`.
+    @MainActor
+    func test_shouldSeal_explodedFastRunOnTwoDrives() {
+        var a = DestResult(destinationPath: "/Volumes/A", displayName: "A")
+        a.success = true; a.verifyMode = .fast
+        var b = DestResult(destinationPath: "/Volumes/B", displayName: "B")
+        b.success = true; b.verifyMode = .fast
+        var fanOut = TransferResult(configurationName: "cfg", destination: "/Volumes/A",
+                                    startTime: Date(), success: true)
+        fanOut.destinationResults = [a, b]
+        let exploded = TransferViewModel().explodeFanOutResult(fanOut, configName: "cfg")
+        XCTAssertTrue(exploded.allSatisfy { !$0.wasVerified }, "wasVerified stays Paranoid-only")
+        XCTAssertTrue(CardSealService.shouldSeal(plannedDestinations: ["/Volumes/A", "/Volumes/B"],
+                                                 results: exploded))
+    }
+
+    private func makeResult(dest: String, success: Bool, mode: VerifyMode) -> TransferResult {
+        var dr = DestResult(destinationPath: dest, displayName: (dest as NSString).lastPathComponent)
+        dr.success = success
+        dr.verifyMode = mode
+        var r = TransferResult(configurationName: "cfg", destination: dest, startTime: Date())
+        r.success = success
+        r.wasVerified = success && mode == .paranoid
+        r.destinationResults = [dr]
+        return r
+    }
+
     private func makeResult(dest: String, success: Bool, verified: Bool) -> TransferResult {
         var r = TransferResult(configurationName: "cfg", destination: dest, startTime: Date())
         r.success = success
