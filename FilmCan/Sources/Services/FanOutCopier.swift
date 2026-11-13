@@ -149,6 +149,27 @@ struct CopyResult: Sendable {
 // MARK: - FanOutCopier
 
 actor FanOutCopier {
+
+    /// One chunk of a source file, read inside its own autorelease pool.
+    ///
+    /// `FileHandle.read` returns autoreleased Data. The source read loop is async,
+    /// and its pool only drains when `channel.send` actually suspends — which never
+    /// happens while every destination is faster than the card. Without this pool,
+    /// every chunk read during the run stayed in memory (observed: >40 GB a few
+    /// minutes into a card copy to one fast SSD). The returned Data keeps its own
+    /// reference, so the chunk is freed as soon as the writers drop it.
+    static func readChunk(_ handle: FileHandle, upTo count: Int) throws -> Data? {
+        try autoreleasepool { () throws -> Data? in
+            if #available(macOS 10.15.4, *) {
+                guard let data = try handle.read(upToCount: count), !data.isEmpty else { return nil }
+                return data
+            } else {
+                let data = handle.readData(ofLength: count)
+                return data.isEmpty ? nil : data
+            }
+        }
+    }
+
     struct Configuration: Sendable {
         var sources: [String]
         var destinations: [DestWriter.Config]
@@ -1621,16 +1642,8 @@ actor FanOutCopier {
                 // writer tasks drain and abort before finalizing (no partial file).
                 if config.shouldCancel?() == true { break }
                 let readStart = DispatchTime.now()
-                let chunkData: Data
-                if #available(macOS 10.15.4, *) {
-                    guard let data = try sourceHandle.read(upToCount: chunkSz), !data.isEmpty
-                    else { break }
-                    chunkData = data
-                } else {
-                    let data = sourceHandle.readData(ofLength: chunkSz)
-                    if data.isEmpty { break }
-                    chunkData = data
-                }
+                guard let chunkData = try Self.readChunk(sourceHandle, upTo: chunkSz)
+                else { break }
                 IOPerfProbe.shared.record(
                     .sourceRead, key: "source",
                     nanos: DispatchTime.now().uptimeNanoseconds &- readStart.uptimeNanoseconds,
