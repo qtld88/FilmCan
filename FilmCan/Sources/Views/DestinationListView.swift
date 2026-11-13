@@ -189,15 +189,7 @@ struct DestinationListView: View {
                                 EjectButton(path: first, onError: { ejectErrorMessage = $0 })
                             }
                         }
-                        if paths.count > 1 {
-                            // Several destinations on one drive share this card and its
-                            // checkbox; say so, or a run writes places nobody expected.
-                            Text(Self.placesOnDriveText(included: paths.filter(isIncluded).count,
-                                                        total: paths.count))
-                                .font(FCType.metaStrong)
-                                .foregroundColor(FilmCanTheme.brandOrange)
-                                .padding(.leading, 26)
-                        }
+                        sharedDriveNote(paths: paths)
                         .contentShape(Rectangle())
                         .contextMenu {
                             Button("Remove drive from this backup") {
@@ -508,6 +500,19 @@ struct DestinationListView: View {
         guard !treeSources.isEmpty, let first = treeDestinations.first else { return false }
         let reference = treeLines(for: first)
         return treeDestinations.dropFirst().allSatisfy { treeLines(for: $0) == reference }
+    }
+
+    /// Several destinations on one drive share a card; say so, or a run writes to
+    /// places nobody expected. Empty for a drive with a single destination.
+    @ViewBuilder
+    private func sharedDriveNote(paths: [String]) -> some View {
+        if paths.count > 1 {
+            let included = paths.filter { isIncluded($0) }.count
+            Text(Self.placesOnDriveText(included: included, total: paths.count))
+                .font(FCType.metaStrong)
+                .foregroundColor(FilmCanTheme.brandOrange)
+                .padding(.leading, 26)
+        }
     }
 
     /// Note on a drive card that holds several destinations, e.g. "Copies to 2 places
