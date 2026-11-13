@@ -299,32 +299,11 @@ struct DestinationListView: View {
         return VStack(alignment: .leading, spacing: 6) {
             if rowHasContent || status != .pending {
             HStack(spacing: 10) {
-                if sharesDrive, let setIncluded {
-                    Toggle("", isOn: Binding(get: { pathIncluded },
-                                             set: { setIncluded([destination.path], $0) }))
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
-                        .disabled(isActiveTransfer)
-                        .help(pathIncluded
-                              ? "Copied here — uncheck to skip only this place on the drive"
-                              : "Skipped — check to also copy here")
-                }
+                placeCheckbox(path: destination.path, shown: sharesDrive)
                 statusOrDriveIcon(status: status, systemIcon: icon)
                     .frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 4) {
-                    if !destination.isRoot {
-                        Text(sharesDrive && !pathIncluded
-                             ? "\((destination.path as NSString).lastPathComponent) · Skipped"
-                             : (destination.path as NSString).lastPathComponent)
-                            .font(FCType.bodyStrong)
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                            .lineLimit(1)
-                    } else if sharesDrive {
-                        Text(pathIncluded ? "Top of the drive" : "Top of the drive · Skipped")
-                            .font(FCType.bodyStrong)
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                            .lineLimit(1)
-                    }
+                    placeTitle(destination: destination, sharesDrive: sharesDrive)
                     if treeSources.isEmpty {
                         Text("→ \(rootLabel)")
                             .font(FCType.meta)
@@ -500,6 +479,37 @@ struct DestinationListView: View {
         guard !treeSources.isEmpty, let first = treeDestinations.first else { return false }
         let reference = treeLines(for: first)
         return treeDestinations.dropFirst().allSatisfy { treeLines(for: $0) == reference }
+    }
+
+    /// Own checkbox for one place on a drive that holds several destinations.
+    @ViewBuilder
+    private func placeCheckbox(path: String, shown: Bool) -> some View {
+        if shown, let setIncluded {
+            let included = isIncluded(path)
+            Toggle("", isOn: Binding(get: { included }, set: { setIncluded([path], $0) }))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .disabled(isActiveTransfer)
+                .help(included
+                      ? "Copied here — uncheck to skip only this place on the drive"
+                      : "Skipped — check to also copy here")
+        }
+    }
+
+    /// Name of a destination row: the folder's name, or "Top of the drive" for the
+    /// drive itself when it shares the card with folders on it.
+    @ViewBuilder
+    private func placeTitle(destination: DestinationPath, sharesDrive: Bool) -> some View {
+        let skipped = sharesDrive && !isIncluded(destination.path)
+        let name: String? = destination.isRoot
+            ? (sharesDrive ? "Top of the drive" : nil)
+            : (destination.path as NSString).lastPathComponent
+        if let name {
+            Text(skipped ? "\(name) · Skipped" : name)
+                .font(FCType.bodyStrong)
+                .foregroundColor(FilmCanTheme.textPrimary)
+                .lineLimit(1)
+        }
     }
 
     /// Several destinations on one drive share a card; say so, or a run writes to
