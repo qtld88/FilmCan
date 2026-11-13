@@ -60,6 +60,7 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | F5 | Open a movie that existed before this build. | Both switches are as you left them. | ☐ |
 | F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
 | F7 | Finder › right-click a folder › Services › FilmCan Copy. Run it once with Movie = a movie whose « PDF report with thumbnails » is on, once with Movie = None. | With the movie: a PDF report is written next to the log, as in the main window. With None: no PDF. | ☐ |
+| F8 | Back up a card named « Untitled » (roll folder proposed: `Untitled_01`). Eject it, plug in another card also named « Untitled ». | The new card sits in the same source slot and its Roll folder reads `Untitled_02`, not empty. Plug the first card back: it shows `Untitled_01` again. | ☐ |
 
 ## Setup
 

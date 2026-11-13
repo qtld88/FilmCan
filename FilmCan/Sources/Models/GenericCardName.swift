@@ -34,3 +34,29 @@ enum GenericCardName {
         return base + "_" + String(format: "%02d", highest + 1)
     }
 }
+
+/// Which generic cards still need a roll name, keyed by card (volume UUID + path on it).
+/// A card swapped for another one at the same mount path (two "Untitled" cards in a
+/// row) has a new key, so it shows up here again although the source list is unchanged.
+enum GenericRollNaming {
+    /// Names to add: one suggestion per generic source whose card has no name yet and
+    /// that the user did not name (or clear) by hand. Sources sharing a card key get one.
+    static func namesToFill(sources: [String],
+                            isGeneric: (String) -> Bool,
+                            keyFor: (String) -> String,
+                            existing: [String: String],
+                            userEdited: Set<String>,
+                            suggest: (String, [String: String]) -> String) -> [String: String] {
+        var names = existing
+        var added: [String: String] = [:]
+        for path in sources where isGeneric(path) {
+            let key = keyFor(path)
+            guard names[key] == nil, !userEdited.contains(key) else { continue }
+            let name = suggest(path, names)
+            names[key] = name
+            added[key] = name
+        }
+        return added
+    }
+}
+
