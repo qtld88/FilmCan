@@ -22,7 +22,6 @@ struct BackupEditorView: View {
     @State var isEditingName = false
     @FocusState var isNameFocused: Bool
     @State var optionsAvailableWidth: CGFloat = 0
-    @State var selectedOptionsTab: OptionsTab = .basic
     @State var showSpaceWarning = false
     @State var spaceWarningMessage = ""
     @State var showDeleteWarning = false
@@ -31,8 +30,8 @@ struct BackupEditorView: View {
     @State var duplicateNameWarningMessage = ""
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
-    // The settings live in the side panel now and are always open there.
-    @State var isOptionsCollapsed = false
+    /// Which groups of the movie settings panel are open (see `MovieSettingsSections`).
+    @AppStorage("movieSettingsOpenGroups") var openSettingsGroups = MovieSettingsSections.defaultStored
     @State var hostWindow: NSWindow?
     @State var didLoadDestinations = false
     // Defer the options card mount one runloop after the editor appears so a
@@ -58,6 +57,16 @@ struct BackupEditorView: View {
         case logs = "Logs"
 
         var id: String { rawValue }
+
+        /// Key remembered for an open group of the movie settings panel.
+        var sectionKey: String {
+            switch self {
+            case .basic: return "basic"
+            case .source: return "source"
+            case .destinations: return "destinations"
+            case .logs: return "logs"
+            }
+        }
 
         var shortTitle: String {
             switch self {
@@ -312,7 +321,6 @@ struct BackupEditorView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         overviewSection(isWide: isOverviewWide)
-                        movieSettingsLine
                     }
                     .padding(contentPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -359,43 +367,11 @@ struct BackupEditorView: View {
 
     func openMovieSettings() {
         if isHistoryVisible { onCloseRightPane() }
-        isOptionsCollapsed = false
         withAnimation(.easeInOut(duration: 0.2)) { wantsMovieSettings = true }
     }
 
     func closeMovieSettings() {
         withAnimation(.easeInOut(duration: 0.2)) { wantsMovieSettings = false }
-    }
-
-    /// The one quiet line left on the main screen: which settings the movie uses, and
-    /// the way into them.
-    private var movieSettingsLine: some View {
-        Button {
-            if isMovieSettingsShown { closeMovieSettings() } else { openMovieSettings() }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "gearshape")
-                    .foregroundColor(FilmCanTheme.textSecondary)
-                Text(SettingsWording.movieSettings)
-                    .font(FCType.bodyStrong)
-                    .foregroundColor(FilmCanTheme.textPrimary)
-                Text(movieSettingsSummary)
-                    .font(FCType.meta)
-                    .foregroundColor(FilmCanTheme.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: 8)
-                Image(systemName: isMovieSettingsShown ? "chevron.right" : "chevron.left")
-                    .font(.caption)
-                    .foregroundColor(FilmCanTheme.textTertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .fcCardSurface(role: .settings)
-        .tourAnchor("optionsTabs")
-        .help("Copy, verification, folders and logs for this movie")
-        .accessibilityLabel(SettingsWording.movieSettings)
     }
 
     private var movieSettingsPanelHeader: some View {

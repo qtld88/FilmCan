@@ -90,3 +90,42 @@ enum MovieSettingsPanel {
         return min(540, max(minimumWidth, editorWidth * 0.42))
     }
 }
+
+/// The movie settings panel stacks its groups one under the other, each one folding
+/// open or closed on its title (as in Lightroom). Which groups are open is remembered
+/// as a comma-separated list of group keys.
+enum MovieSettingsSections {
+    /// Keys in the order the groups are stacked.
+    static let order = ["basic", "source", "destinations", "logs"]
+
+    /// What a fresh install shows: the first group open.
+    static let defaultStored = "basic"
+
+    /// Horizontal inset of a group's content inside the panel, on each side.
+    static let contentInset: CGFloat = 16
+
+    static func openKeys(from stored: String) -> Set<String> {
+        Set(stored.split(separator: ",").map(String.init).filter(order.contains))
+    }
+
+    static func isOpen(_ key: String, stored: String) -> Bool {
+        openKeys(from: stored).contains(key)
+    }
+
+    /// Flips one group and returns the new stored value, keys kept in stacking order.
+    static func toggling(_ key: String, in stored: String) -> String {
+        var keys = openKeys(from: stored)
+        if keys.contains(key) { keys.remove(key) } else if order.contains(key) { keys.insert(key) }
+        return order.filter(keys.contains).joined(separator: ",")
+    }
+
+    /// Opens one group (a preset change shows its result), leaving the others as they are.
+    static func opening(_ key: String, in stored: String) -> String {
+        isOpen(key, stored: stored) ? stored : toggling(key, in: stored)
+    }
+
+    /// The width a group's rows may use: the panel minus the content inset on both sides.
+    static func contentWidth(panelWidth: CGFloat) -> CGFloat {
+        max(0, panelWidth - contentInset * 2)
+    }
+}

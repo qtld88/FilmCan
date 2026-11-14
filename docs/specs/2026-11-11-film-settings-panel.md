@@ -59,3 +59,9 @@ Only what is shown changes. Stored values, log lines, history entries and notifi
 - An "Advanced" fold inside each group (which rows count as advanced is a call to make on the real screen).
 - A help sentence under each group.
 - Moving a setting from one group to another.
+
+## Follow-up after the trial (2026-11-13)
+
+- The line under Copy From / Save To is gone. The way in is a gear in the top bar, left of the History and Catalog icons.
+- The panel no longer has a tab bar. Its groups (Basic, Source, Destinations, Logs) are stacked titles that each fold open or closed, as in Lightroom; several can be open at once and the open ones are remembered (`movieSettingsOpenGroups`).
+- Rows are sized from the width inside the panel, not its outer width, and a row's text leaves room for the narrowest menu. That is what pushed switches and menus past the panel's edge.
