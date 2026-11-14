@@ -102,6 +102,9 @@ final class RollNumberingStore {
         save()
     }
 
+    /// Drops everything stored for a film (used by tests to leave no trace).
+    func remove(for configId: UUID) { remove(configId: configId) }
+
     /// Drops everything kept for a movie (its roll names and counters).
     func remove(configId: UUID) {
         guard states.removeValue(forKey: configId.uuidString) != nil else { return }

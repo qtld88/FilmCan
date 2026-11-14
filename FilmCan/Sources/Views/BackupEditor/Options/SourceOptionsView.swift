@@ -437,6 +437,11 @@ private struct CardsAndRollsSection: View {
                 .font(FCType.meta)
                 .padding(.leading, indent)
                 .onAppear { todayDraft = viewModel.shootDayToday }
+                // The header stepper also changes today's day: follow it unless the
+                // user is typing here.
+                .onChange(of: viewModel.shootDayToday) { newValue in
+                    if !todayFocused { todayDraft = newValue }
+                }
                 .onChange(of: todayFocused) { focused in
                     if !focused { commitTodayDraft() }
                 }
