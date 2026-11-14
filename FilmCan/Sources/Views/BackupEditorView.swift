@@ -28,6 +28,8 @@ struct BackupEditorView: View {
     @State var deleteWarningMessage = ""
     @State var showDuplicateNameWarning = false
     @State var duplicateNameWarningMessage = ""
+    @State var showEarlierCopyWarning = false
+    @State var earlierCopyWarningMessage = ""
     @State var isEditingPresetName = false
     @FocusState var isPresetNameFocused: Bool
     /// Which groups of the movie settings panel are open (see `MovieSettingsSections`).
@@ -224,6 +226,14 @@ struct BackupEditorView: View {
             Button("Continue") { startTransfer(skipDuplicateNameWarning: true) }
         } message: {
             Text(duplicateNameWarningMessage)
+        }
+        .alert("Card already copied under another name", isPresented: $showEarlierCopyWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Copy Anyway") {
+                startTransfer(skipDuplicateNameWarning: true, skipEarlierCopyWarning: true)
+            }
+        } message: {
+            Text(earlierCopyWarningMessage)
         }
         .onAppear(perform: editorDidAppear)
         .onChange(of: viewModel.sourcePaths) { _ in refreshPreview() }

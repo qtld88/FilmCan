@@ -469,7 +469,7 @@ class TransferViewModel: ObservableObject {
                                      preset: OrganizationPreset?) async {
         guard CardSealService.shouldSeal(plannedDestinations: plannedDestinations, results: results)
         else { return }
-        let verified = Array(Set(results.filter { $0.success && $0.wasVerified }.map { $0.destination }))
+        let verified = Array(CardSealService.checkedDestinations(results))
         let mhlRef = results.first(where: { $0.hashListPath != nil })?.hashListPath
         for source in sources {
             do {
