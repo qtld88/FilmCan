@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// QR code + channel name for phone notifications (Settings › Push, simple mode).
+/// QR code + server and channel name for phone notifications (Settings › Push, simple mode).
 /// Thin view: everything it shows comes from `PhonePush`.
 struct PhonePushQRBlock: View {
     let topic: String
@@ -26,10 +26,16 @@ struct PhonePushQRBlock: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("1. Scan this code with your phone's camera.")
                 Text("2. Follow the two steps on the page that opens.")
-                Text("Your channel")
+                Text("Server")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.top, 4)
+                Text(PhonePush.server)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                Text("Your channel")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 Text(topic)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
@@ -43,7 +49,7 @@ struct PhonePushQRBlock: View {
                     }
                     Button("New code…") { confirmNewCode = true }
                 }
-                Text("No scanner? Install the ntfy app and subscribe to this channel name by hand.")
+                Text("No scanner? Install the ntfy app and subscribe to this channel on this server by hand.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
