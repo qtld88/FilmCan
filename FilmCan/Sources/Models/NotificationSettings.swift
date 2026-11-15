@@ -13,4 +13,6 @@ struct NotificationSettings {
     var webhookEnabled: Bool
     var webhookURL: String
     var webhookIncludeFullPaths: Bool
+    /// False for a generated phone topic: the keychain token is for the user's own server only.
+    var ntfySendsToken: Bool = true
 }

@@ -19,7 +19,24 @@ Get alerts when backups finish or fail.
 
 ---
 
-## ntfy (Phone/Remote)
+## Phone, by QR code
+
+No account and nothing to type.
+
+1. FilmCan **Settings** › **Push** › turn on **Send notifications to my phone**. A QR code appears.
+2. Scan it with your phone's camera. The page that opens has two steps: install the free ntfy app, then subscribe to your channel.
+3. Back in FilmCan, click **Send a test**.
+
+- FilmCan invents a long random channel name for you. Anyone who knows it can read your notifications, so keep it to yourself. **New code…** replaces it; phones must then scan again.
+- The channel name is also shown next to the QR code, to subscribe by hand in the ntfy app.
+- The public ntfy.sh server limits how many messages one network may send per day. A test that answers "HTTP 429" means that limit was reached; wait and retry.
+- The name is kept in FilmCan's preferences, so it survives app updates.
+
+---
+
+## ntfy with your own topic or server
+
+Open **Advanced** in Settings › Push and turn on **Use my own ntfy server or topic**. If you had filled a Topic URL in an earlier version, this is already on and nothing changed for you.
 
 ![Settings › Push](../../website/assets/docs/settings-push.jpg)
 
@@ -120,7 +137,24 @@ Recevez des alertes lorsque les backups se terminent ou échouent.
 
 ---
 
-## ntfy (Téléphone/Distant)
+## Téléphone, par QR code
+
+Sans compte et sans rien taper.
+
+1. FilmCan **Settings** › **Push** › activez **Send notifications to my phone**. Un QR code apparaît.
+2. Scannez-le avec l'appareil photo de votre téléphone. La page qui s'ouvre a deux étapes : installer l'application gratuite ntfy, puis vous abonner à votre canal.
+3. De retour dans FilmCan, cliquez sur **Send a test**.
+
+- FilmCan invente pour vous un long nom de canal aléatoire. Toute personne qui le connaît peut lire vos notifications : gardez-le pour vous. **New code…** le remplace ; les téléphones doivent alors scanner de nouveau.
+- Le nom du canal est aussi affiché à côté du QR code, pour vous abonner à la main dans l'application ntfy.
+- Le serveur public ntfy.sh limite le nombre de messages qu'un réseau peut envoyer par jour. Un test qui répond « HTTP 429 » signifie que cette limite est atteinte ; attendez puis réessayez.
+- Le nom est conservé dans les préférences de FilmCan : il survit aux mises à jour de l'application.
+
+---
+
+## ntfy avec votre propre sujet ou serveur
+
+Ouvrez **Advanced** dans Settings › Push et activez **Use my own ntfy server or topic**. Si vous aviez rempli un Topic URL dans une version précédente, c'est déjà activé et rien n'a changé pour vous.
 
 ![Réglages › Push](../../website/assets/docs/settings-push.jpg)
 
@@ -223,7 +257,24 @@ Erhalten Sie Benachrichtigungen, wenn Backups abgeschlossen sind oder fehlschlag
 
 ---
 
-## ntfy (Telefon/Fern)
+## Telefon, per QR-Code
+
+Ohne Konto und ohne etwas einzutippen.
+
+1. FilmCan **Settings** › **Push** › schalten Sie **Send notifications to my phone** ein. Ein QR-Code erscheint.
+2. Scannen Sie ihn mit der Kamera Ihres Telefons. Die Seite, die sich öffnet, hat zwei Schritte: die kostenlose ntfy-App installieren, dann Ihren Kanal abonnieren.
+3. Klicken Sie in FilmCan auf **Send a test**.
+
+- FilmCan erfindet für Sie einen langen zufälligen Kanalnamen. Wer ihn kennt, kann Ihre Benachrichtigungen lesen: Behalten Sie ihn für sich. **New code…** ersetzt ihn; Telefone müssen dann erneut scannen.
+- Der Kanalname steht auch neben dem QR-Code, um ihn von Hand in der ntfy-App zu abonnieren.
+- Der öffentliche Server ntfy.sh begrenzt, wie viele Nachrichten ein Netzwerk pro Tag senden darf. Ein Test mit der Antwort „HTTP 429“ bedeutet, dass diese Grenze erreicht ist; warten Sie und versuchen Sie es erneut.
+- Der Name liegt in den Einstellungen von FilmCan und übersteht App-Updates.
+
+---
+
+## ntfy mit eigenem Thema oder Server
+
+Öffnen Sie **Advanced** in Settings › Push und schalten Sie **Use my own ntfy server or topic** ein. Wenn Sie in einer früheren Version eine Topic URL eingetragen hatten, ist das bereits an und für Sie hat sich nichts geändert.
 
 ![Einstellungen › Push](../../website/assets/docs/settings-push.jpg)
 
@@ -326,7 +377,24 @@ Reciba alertas cuando los backups se completen o fallen.
 
 ---
 
-## ntfy (Teléfono/Remoto)
+## Teléfono, por código QR
+
+Sin cuenta y sin escribir nada.
+
+1. FilmCan **Settings** › **Push** › active **Send notifications to my phone**. Aparece un código QR.
+2. Escanéelo con la cámara de su teléfono. La página que se abre tiene dos pasos: instalar la aplicación gratuita ntfy y suscribirse a su canal.
+3. De vuelta en FilmCan, haga clic en **Send a test**.
+
+- FilmCan inventa para usted un nombre de canal largo y aleatorio. Cualquiera que lo conozca puede leer sus notificaciones: no lo comparta. **New code…** lo reemplaza; los teléfonos deben escanear de nuevo.
+- El nombre del canal también se muestra junto al código QR, para suscribirse a mano en la aplicación ntfy.
+- El servidor público ntfy.sh limita cuántos mensajes puede enviar una red por día. Una prueba que responde «HTTP 429» significa que se alcanzó ese límite; espere y vuelva a intentarlo.
+- El nombre se guarda en las preferencias de FilmCan, así que sobrevive a las actualizaciones.
+
+---
+
+## ntfy con su propio tema o servidor
+
+Abra **Advanced** en Settings › Push y active **Use my own ntfy server or topic**. Si había rellenado un Topic URL en una versión anterior, ya está activado y nada ha cambiado para usted.
 
 ![Ajustes › Push](../../website/assets/docs/settings-push.jpg)
 
