@@ -1,3 +1,4 @@
+import UniformTypeIdentifiers
 import Foundation
 
 struct BackupReport: Equatable {
@@ -13,6 +14,12 @@ struct BackupReport: Equatable {
         var note: String? = nil
 
         var name: String { (relPath as NSString).lastPathComponent }
+        var isImage: Bool {
+            let ext = (relPath as NSString).pathExtension
+            return !ext.isEmpty && (UTType(filenameExtension: ext)?.conforms(to: .image) ?? false)
+        }
+        /// Video, audio or still image: gets a picture row in the PDF; anything else a compact line.
+        var isMedia: Bool { isVideo || isAudio || isImage }
     }
 
     struct Roll: Equatable {
