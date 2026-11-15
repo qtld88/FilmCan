@@ -15,6 +15,7 @@ struct MainView: View {
     @ObservedObject private var catalogStore = MediaCatalogStore.shared
     @State private var rightPane: RightPane = .history
     @State private var demoError: String?
+    @State private var showNewMovieChoice = false
     @State private var catalogDragStartWidth: Double?
     @AppStorage("catalogPaneWidth") private var catalogPaneWidth: Double = 380
     /// Shared with `BackupEditorView`: the movie settings panel is open.
@@ -80,6 +81,13 @@ struct MainView: View {
                 if canAdvanceTourStep {
                     advanceTour(by: 1)
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .filmCanNewMovie)) { _ in
+                guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
+                showNewMovieChoice = true
+            }
+            .sheet(isPresented: $showNewMovieChoice) {
+                NewMovieChoice(appState: appState) { showNewMovieChoice = false }
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanShowCatalogPane)) { _ in
                 guard MainWindowTarget.shouldHandle(in: hostWindow), rightPane != .catalog else { return }
@@ -311,7 +319,7 @@ struct MainView: View {
                     .multilineTextAlignment(.center)
             }
             
-            HoverButton(action: { _ = appState.createNewConfig() }) {
+            HoverButton(action: { showNewMovieChoice = true }) {
                 Label(appState.storage.configurations.isEmpty ? "Create First Movie" : "Create New Movie", systemImage: "plus.circle.fill")
                     .font(FCType.cardTitle)
                     .foregroundColor(.black)

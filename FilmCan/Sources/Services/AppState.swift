@@ -31,59 +31,54 @@ class AppState: ObservableObject {
         selectedConfigId = config.id
     }
     
-    func createNewConfig() -> BackupConfiguration {
-        // Start fresh (no prefilled sources/destinations)
-        let config = BackupConfiguration.newFilm(name: "Movie \(storage.configurations.count + 1)")
-
-        storage.add(config)
-        selectedConfigId = config.id
-        return config
+    /// Adds a movie built by `FilmStarter` (and its own settings record) and selects it.
+    @discardableResult
+    func add(_ started: FilmStarter.Result) -> BackupConfiguration {
+        if let preset = started.preset { storage.organizationPresets.append(preset) }
+        storage.add(started.config)
+        selectedConfigId = started.config.id
+        return started.config
     }
 
-    /// Films to start a new one from, most recently used first.
+    private var nextMovieName: String {
+        FilmStarter.nextName(existing: storage.configurations.map(\.name))
+    }
+
+    /// A blank movie (first-run defaults).
+    @discardableResult
+    func createNewConfig() -> BackupConfiguration {
+        add(FilmStarter.blank(name: nextMovieName))
+    }
+
+    /// A blank movie with the Netflix Ingest folder settings.
+    @discardableResult
+    func createNetflixIngestConfig() -> BackupConfiguration {
+        add(FilmStarter.netflixIngest(name: nextMovieName))
+    }
+
+    /// Movies to start a new one from, most recently used first.
     var filmsToStartFrom: [BackupConfiguration] {
         storage.configurations.sorted {
             ($0.lastUsedAt ?? $0.createdAt) > ($1.lastUsedAt ?? $1.createdAt)
         }
     }
 
-    /// Shared presets to start a new film from.
-    var presetsToStartFrom: [OrganizationPreset] {
-        FilmPresetOwnership.shared(storage.organizationPresets)
-    }
-
-    /// A new film with the settings of an existing one (a copy, not a link).
+    /// A new movie with the settings of an existing one (a copy, not a link).
     @discardableResult
     func createNewConfig(like source: BackupConfiguration) -> BackupConfiguration {
-        var config = BackupConfiguration.newFilm(
-            name: "Movie \(storage.configurations.count + 1)", like: source)
-        if let id = source.selectedOrganizationPresetId,
-           let preset = storage.organizationPresets.first(where: { $0.id == id }) {
-            let copy = FilmPresetOwnership.ownCopy(
-                of: FilmTemplate.replacingLeadingFilmFolder(in: preset, filmName: source.name),
-                for: config.id)
-            storage.organizationPresets.append(copy)
-            config.selectedOrganizationPresetId = copy.id
-            config.mirrorOrganization(from: copy)
-        }
-        storage.add(config)
-        selectedConfigId = config.id
-        return config
+        add(FilmStarter.like(source, name: nextMovieName, presets: storage.organizationPresets))
     }
 
-    /// A new film started from a shared preset.
+    /// A new movie from a `.filmcan-movie` file. Always a new movie, never an overwrite.
     @discardableResult
-    func createNewConfig(fromPreset preset: OrganizationPreset) -> BackupConfiguration {
-        var config = BackupConfiguration.newFilm(name: "Movie \(storage.configurations.count + 1)")
-        config.takeSettings(from: preset)
-        var copy = FilmPresetOwnership.ownCopy(of: preset, for: config.id)
-        // Same log folder in the copy as in the film (Netflix pre-fills "Reports").
-        copy.logLocation = config.logLocation
-        copy.customLogPath = config.customLogPath
-        storage.organizationPresets.append(copy)
-        config.selectedOrganizationPresetId = copy.id
-        storage.add(config)
-        selectedConfigId = config.id
-        return config
+    func createNewConfig(fromSettingsFile data: Data, fileName: String?) throws -> BackupConfiguration {
+        let started = try MovieSettingsFile.makeMovie(
+            from: data, name: fileName, existingNames: storage.configurations.map(\.name))
+        return add(started)
+    }
+
+    /// The `.filmcan-movie` bytes for one movie.
+    func settingsFileData(for movie: BackupConfiguration) throws -> Data {
+        try MovieSettingsFile.export(movie: movie, presets: storage.organizationPresets)
     }
 }

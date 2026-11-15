@@ -8,7 +8,7 @@ Avant tout : sauvegarde des réglages faite (`~/Desktop/FilmCan-sauvegarde` + `F
 
 ## 1. D'abord : rien de cassé sur vos films existants (le plus important)
 
-- [ ] **S1** Au lancement, vos films qui partagent un preset gardent le même nom de preset et le même aperçu de dossiers. Aucune mention « (modified) ».
+- [ ] **S1** Au lancement, vos films qui partageaient un preset gardent le même aperçu de dossiers ; chacun a maintenant ses propres réglages. Plus aucun preset.
 - [ ] **S2** Copier une carte déjà sauvegardée avec un film existant : mêmes dossiers, mêmes fichiers qu'avant (la reprise retrouve tout).
 - [ ] **T9** Un film existant avec sa propre structure, sans y toucher : même aperçu, mêmes dossiers écrits qu'avant.
 - [ ] **F5** Un film existant : les réglages « détection des cartes » et « rapport PDF » sont restés comme vous les aviez.
@@ -52,7 +52,7 @@ Avant tout : sauvegarde des réglages faite (`~/Desktop/FilmCan-sauvegarde` + `F
 ## 4. Réglages du film et fenêtre Réglages — PR #7, #8
 
 - [ ] **L1** Sous Copy From / Save To : une seule ligne « Movie settings » avec un résumé, plus de carte Options.
-- [ ] **L2** Cliquer : un volet à droite (Basic / Source / Destinations / Logs + menu Preset) ; les colonnes restent lisibles.
+- [ ] **L2** Cliquer : un volet à droite (Basic / Source / Destinations / Logs + interrupteur des dossiers) ; les colonnes restent lisibles.
 - [ ] **L3** Changer la structure dans le volet : l'aperçu Save To suit tout de suite.
 - [ ] **L4** Parcourir les 4 groupes en 1280 × 800 et en plein écran : tous les réglages sont là, rien de coupé.
 - [ ] **L5** Volet ouvert, ouvrir Historique puis Catalogue : le volet se ferme ; recliquer la ligne le rouvre.
@@ -61,17 +61,17 @@ Avant tout : sauvegarde des réglages faite (`~/Desktop/FilmCan-sauvegarde` + `F
 - [ ] **L9** Visite guidée : l'ancienne étape « Options Tabs » montre la ligne « Movie settings ».
 - [ ] **L10** Réglages (Cmd+,) : barre latérale avec 8 pages ; la dernière page ouverte est retenue.
 - [ ] **L11** Libellés simples : « Full check (re-reads every file) », « If a file already exists », « Checksum list format », « Folder layout »…
-- [ ] **S4** Menu Preset : Off, Netflix Ingest, presets partagés une seule fois, « Save as new preset », « Delete preset ».
-- [ ] **S5** Preset choisi dans A puis modifié, même preset dans B : B reçoit le preset tel qu'enregistré.
-- [ ] **S6** « Save as new preset » dans A : visible dans tous les films ; A garde ses réglages.
-- [ ] **S7** « Off » puis « This movie's settings (…) » : les dossiers du film reviennent intacts. Poubelle : le film passe à Off.
-- [ ] **S8** « Delete preset » : les films partis de ce preset gardent leurs dossiers.
-- [ ] **S9** Petite flèche à côté de « + » › « Like ‹film› » : nouveau film avec mêmes options, sans cartes ni disques ni jour.
+- [ ] **S4** Aucun menu Preset nulle part ; Destinations a l'interrupteur d'organisation des dossiers et « Use Netflix Ingest folders » (demande confirmation).
+- [ ] **S4b** « + » demande : Blank movie, Netflix Ingest, Like ‹film›, From a settings file… ; fermer le menu ne crée rien.
+- [ ] **S4c** Export Settings → importer comme nouveau film : mêmes dossiers sur une copie de test, ni disques, ni jour, ni épisode repris.
+- [ ] **S4d** Après la mise à jour avec tes réglages actuels : chaque film copie vers les mêmes dossiers qu'avant.
+- [ ] **S7** Interrupteur dossiers sur Off puis On : les dossiers du film reviennent intacts.
+- [ ] **S9** « + » › « Like ‹film› » : nouveau film avec mêmes options, sans cartes ni disques ni jour ni épisode.
 - [ ] **S10** Film « Citizen K » avec `CITIZENK/{day}`, créer un film « comme » lui nommé « Citizen L » : son gabarit commence par `{movie}`, l'aperçu montre `Citizen L/…`.
 - [ ] **S11** Taper `{movie}` dans un gabarit : l'aperçu montre le nom du film.
 - [ ] **S12** Supprimer un film, quitter : plus aucune trace de lui dans `presets.json`.
-- [ ] **S13** Quick Copy : le menu Preset montre les presets partagés + les réglages du film choisi seulement.
-- [ ] **S14** Export des presets : seulement les presets partagés.
+- [ ] **S13** Quick Copy : plus de ligne Preset ni de panneau « Save as preset » ; le menu Movie commence par « No movie » ; un film charge ses réglages de dossiers, projet et jour, sans rien écrire dans le film.
+- [ ] **Q-gate** Quick Copy : la ligne Preset et « Save as preset » ont disparu ; le menu Movie commence par « No movie ».
 - [ ] **S15** Exporter un film, le supprimer, le réimporter : même preset, même aperçu.
 
 ## 5. Éditeur de structure de dossiers — PR #9
@@ -87,7 +87,7 @@ Avant tout : sauvegarde des réglages faite (`~/Desktop/FilmCan-sauvegarde` + `F
 - [ ] **T10** Aperçu (Save To et Quick Copy) : marque « new » sur les dossiers à créer ; disparaît après la copie.
 - [ ] **T11** Volet le plus étroit : les 4 choix passent à la ligne, rien de caché.
 - [ ] **T12** « Folder layout » désactivé : phrase à la place de l'arbre ; réactivé : même structure.
-- [ ] **T13** Preset › Off : phrase « réglages mis de côté » ; « This movie's settings » les rend intacts.
+- [ ] **T13** Interrupteur dossiers sur Off : phrase « réglages mis de côté » ; sur On, ils reviennent intacts.
 - [ ] **T14** Renommer un dossier `Café` : il devient `Caf` partout.
 
 ## 6. Rapports — PR #5, #11

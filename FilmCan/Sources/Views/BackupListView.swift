@@ -10,6 +10,7 @@ struct BackupListView: View {
     var trailingInset: CGFloat = 0
     @ObservedObject private var storage = ConfigurationStorage.shared
     @State private var draggingConfigId: UUID? = nil
+    @State private var showNewMovieChoice = false
     
     var body: some View {
         HStack(spacing: 0) {
@@ -56,6 +57,9 @@ struct BackupListView: View {
                             },
                             onShowDestination: {
                                 showInFinder(paths: config.destinationPaths)
+                            },
+                            onExportSettings: {
+                                exportSettings(of: config)
                             }
                         )
                         .onDrag {
@@ -73,7 +77,7 @@ struct BackupListView: View {
                     }
 
                     Button(action: {
-                        _ = appState.createNewConfig()
+                        showNewMovieChoice = true
                     }) {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .bold))
@@ -85,18 +89,8 @@ struct BackupListView: View {
                     .clipShape(Circle())
                     .help("New movie")
                     .tourAnchor("addBackup")
-
-                    if !appState.filmsToStartFrom.isEmpty || !appState.presetsToStartFrom.isEmpty {
-                        Menu {
-                            NewMovieMenuItems(appState: appState, storage: storage)
-                        } label: {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-                        .help("New movie with the settings of another movie or a preset")
+                    .popover(isPresented: $showNewMovieChoice, arrowEdge: .bottom) {
+                        NewMovieChoice(appState: appState) { showNewMovieChoice = false }
                     }
                 }
                 .padding(.vertical, 6)
@@ -122,6 +116,7 @@ private struct MovieTabButton: View {
     let onShowLogs: () -> Void
     let onShowSource: () -> Void
     let onShowDestination: () -> Void
+    let onExportSettings: () -> Void
 
     @State private var isHovered = false
     @State private var isEditingTitle = false
@@ -180,6 +175,7 @@ private struct MovieTabButton: View {
             Button("Rename") { beginEditingTitle() }
             Button("Run Now") { onRun() }
             Button("Duplicate") { onDuplicate() }
+            Button("Export Settings\u{2026}") { onExportSettings() }
             Button("Show Source") { onShowSource() }
             Button("Show Destination") { onShowDestination() }
             Button("Show Logs") { onShowLogs() }
@@ -310,4 +306,23 @@ private func showInFinder(paths: [String]) {
     }
     guard !urls.isEmpty else { return }
     NSWorkspace.shared.activateFileViewerSelecting(urls)
+}
+
+/// Saves one movie's settings as `<Movie name>.filmcan-movie`.
+@MainActor
+private func exportSettings(of config: BackupConfiguration) {
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [MovieSettingsFile.contentType]
+    panel.nameFieldStringValue = "\(config.name).\(MovieSettingsFile.fileExtension)"
+    panel.message = "Save this movie's settings"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+        try AppState.shared.settingsFileData(for: config).write(to: url, options: .atomic)
+    } catch {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn't export the settings"
+        alert.informativeText = error.localizedDescription
+        alert.runModal()
+    }
 }

@@ -3,7 +3,7 @@
 
 Options are grouped into tabs in the **Backup Editor**. Click the open tab again to collapse the options, or a tab to expand them.
 
-The preset menu shows **(modified)** after the preset name when this movie's settings differ from the preset; hover it to list the differences.
+There are no presets: every movie owns its settings. The top of the panel has the folder organization switch, **Use Netflix Ingest folders** and **Export Settings…**. See [Starting a movie from another](./destination-presets.md).
 
 > The copy-engine picker was removed in 1.2.0, the FilmCan Engine handles every
 > backup. See [Copy Engines](./copy-engines.md).
@@ -157,7 +157,7 @@ Voir [Destination Presets](./destination-presets.md) pour les modèles et les je
 
 Optionen sind in Registerkarten im **Backup Editor** gruppiert. Ein Klick auf die geöffnete Registerkarte klappt die Optionen ein, ein Klick auf eine Registerkarte klappt sie aus.
 
-Das Preset-Menü zeigt **(modified)** hinter dem Preset-Namen, wenn die Einstellungen dieses Films vom Preset abweichen; fahren Sie darüber, um die Unterschiede aufzulisten.
+Es gibt keine Presets mehr: Jeder Film hat seine eigenen Einstellungen. Oben im Bereich stehen der Schalter für die Ordnerorganisation, **Use Netflix Ingest folders** und **Export Settings…**. Siehe [Einen Film aus einem anderen starten](./destination-presets.md).
 
 > Die Auswahl des Kopier-Engines wurde in Version 1.2.0 entfernt. Das FilmCan Engine verwaltet jeden
 > Backup. Siehe [Copy Engines](./copy-engines.md).
@@ -234,7 +234,7 @@ Siehe [Destination Presets](./destination-presets.md) für Vorlagen und Token.
 
 Las opciones se agrupan en pestañas en el **Backup Editor**. Haga clic de nuevo en la pestaña abierta para contraer las opciones, o en una pestaña para desplegarlas.
 
-El menú de presets muestra **(modified)** tras el nombre del preset cuando los ajustes de esta película difieren de él; pase el cursor para ver las diferencias.
+Ya no hay presets: cada película tiene sus propios ajustes. En la parte superior del panel están el interruptor de organización de carpetas, **Use Netflix Ingest folders** y **Export Settings…**. Vea [Empezar una película desde otra](./destination-presets.md).
 
 > El selector de motor de copia se eliminó en la versión 1.2.0, el Motor FilmCan maneja cada
 > backup. Ver [Copy Engines](./copy-engines.md).

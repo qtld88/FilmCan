@@ -25,15 +25,13 @@ The window is about 900 pt wide and has two columns: **Copy From** and **Setting
 
 - **Copy From**: your selection. Each row shows the full name and size, then the path. When folders are organized, each row also has a **Camera / Sound** switch (click either side to flip it), pre-filled from the content (an item is Sound when most of its files are audio), and an **x** to remove the source.
 - **Save To**: one destination to start. Click **Add destination** for more, or drop folders or drives on the card. Drop files or folders on **Copy From** to add sources. The source is read once and written to every destination. Each destination shows a capacity bar (used, to copy, free, left to right) with a legend.
-- **Movie** (in **Settings**): pick one of your movies (the tabs of the main window) or **None**. With a movie, the copy appears in that movie's History tab and under its name in the Catalog, and the window loads the movie's preset, project and day, and adds its mounted cards (its own sources and the drives its auto-detect rules match) and its destinations next to the card you opened Quick Copy on; a line below reminds you which preset the movie uses. You can still change the preset for this copy only. Without a movie, the Catalog files the copy under the typed project, or under *Quick Copy*. The movie's **PDF report with thumbnails** switch applies too: with it on, Quick Copy writes the PDF report next to the log; without a movie, no PDF is written.
-- **Preset** (in **Settings**): pick **None** or one of your saved organization presets. With a preset, the window shows its options as chips (for example *Paranoid check*, *Skip existing files*, *Whole folder* or *Contents only*, *ASC MHL*); hover them for details. A preset set to *Ask each time* runs as *Skip*.
-- With **None**, the basic options are:
+- **Movie** (in **Settings**): pick one of your movies (the tabs of the main window) or **No movie**. With a movie, the copy appears in that movie's History tab and under its name in the Catalog, and the window loads the movie's own folder settings, project and day, and adds its mounted cards (its own sources and the drives its auto-detect rules match) and its destinations next to the card you opened Quick Copy on. The options of the movie show as chips (for example *Paranoid check*, *Skip existing files*, *Whole folder* or *Contents only*, *ASC MHL*; hover them for details); a movie set to *Ask each time* runs as *Skip*. A change made in this window (folder or contents, Camera/Sound folder name, date) is for this copy only and is never written to the movie. Without a movie, the Catalog files the copy under the typed project, or under *Quick Copy*. The movie's **PDF report with thumbnails** switch applies too: with it on, Quick Copy writes the PDF report next to the log; without a movie, no PDF is written.
+- With **No movie**, the basic options are:
   - **Verification**: Fast (default), Paranoid or Off.
   - **If file exists**: Skip (default), Overwrite, Add counter or Verify using hash list.
   - **Copy**: the folder (default) or its contents only.
   - **Organization**: None, Date only, or Project + day.
-- **Organization** section (when organized): **Project** and **Day** (Day is optional), then a live preview of the folders that will be created, always fully expanded, new ones highlighted. One **Folders on every drive** tree is shown when all destinations get the same folders, otherwise one tree per drive. The top folder and the Camera/Sound folder (`Camera_Media`, `Sound_Media`) have a pencil: click it to rename that folder in place for this copy; the arrow restores the preset's name.
-- **Save as preset**: type a name to keep these settings as a preset. Leave it empty to skip. A picked date is never saved.
+- **Organization** section (when organized): **Project** and **Day** (Day is optional), then a live preview of the folders that will be created, always fully expanded, new ones highlighted. One **Folders on every drive** tree is shown when all destinations get the same folders, otherwise one tree per drive. The top folder and the Camera/Sound folder (`Camera_Media`, `Sound_Media`) have a pencil: click it to rename that folder in place for this copy; the arrow restores the movie's name.
 
 Project and Day are cleaned before use: spaces and characters Netflix prohibits become `_`.
 
@@ -80,7 +78,7 @@ If FilmCan was not running and the Quick Copy started it, FilmCan quits when you
 
 - Quick Copy has **Stop**, but no Pause.
 - Select **one loose file at a time**, or put several files in a folder. Several loose files in the same selection cannot share one hash list yet, so **Run** stays disabled.
-- With the **Netflix Ingest** preset, a folder name containing prohibited characters blocks **Run**. Rename the folder first.
+- With a movie that uses the **Netflix Ingest** folders, a folder name containing prohibited characters blocks **Run**. Rename the folder first.
 - Quick Copy works like a normal backup: it writes the transfer log, sends notifications, ntfy and webhooks, and saves a history entry. With a movie, it is listed in that movie's History tab; without one, the entry is saved but not listed.
 
 ---
@@ -121,14 +119,13 @@ La fenêtre fait environ 900 pt de large sur deux colonnes : **Copy From** et **
 - **Copy From** : votre sélection. Chaque ligne affiche le nom complet et la taille, puis le chemin. Quand les dossiers sont organisés, chaque ligne a aussi un interrupteur **Camera / Sound** (cliquez sur l'un ou l'autre côté pour le basculer), pré-rempli selon le contenu (un élément est Sound quand la plupart de ses fichiers sont de l'audio), et un **x** pour retirer la source.
 - **Save To** : une destination au départ. **Add destination** en ajoute d'autres, tout comme un dossier ou un disque glissé sur la carte. Glisser des fichiers ou dossiers sur **Copy From** ajoute des sources. La source est lue une seule fois et écrite sur chaque destination. Chaque destination affiche une barre de capacité (utilisé, à copier, libre, de gauche à droite) avec une légende.
 - **Movie** (dans **Settings**) : choisissez l'un de vos films (les onglets de la fenêtre principale) ou **None**. Avec un film, la copie apparaît dans l'onglet Historique de ce film et sous son nom dans le Catalogue, et la fenêtre charge le préset, le projet et le jour du film, et ajoute ses cartes branchées (ses sources et les disques que ses règles de détection reconnaissent) et ses destinations à côté de la carte qui a ouvert Quick Copy ; une ligne rappelle le préset du film. Vous pouvez toujours changer le préset pour cette copie seulement. Sans film, le Catalogue range la copie sous le projet saisi, ou sous *Quick Copy*. L'interrupteur **PDF report with thumbnails** du film s'applique aussi : activé, Quick Copy écrit le rapport PDF à côté du journal ; sans film, pas de PDF.
-- **Preset** (dans **Settings**) : choisissez **None** ou l'un de vos présets d'organisation. Avec un préset, la fenêtre affiche ses options sous forme de pastilles (par ex. *Paranoid check*, *Skip existing files*, *Whole folder* ou *Contents only*, *ASC MHL*) ; survolez-les pour le détail. Un préset réglé sur *Ask each time* s'exécute en *Skip*.
+- Les présets n'existent plus : choisissez un film (ses réglages de dossiers se chargent) ou **No movie** (options de base). Un changement fait ici ne vaut que pour cette copie.
 - Avec **None**, les options de base sont :
   - **Verification** : Fast (par défaut), Paranoid ou Off.
   - **If file exists** : Skip (par défaut), Overwrite, Add counter ou Verify using hash list.
   - **Copy** : le dossier (par défaut) ou son contenu seulement.
   - **Organization** : None, Date only ou Project + day.
 - Section **Organization** (si les dossiers sont organisés) : **Project** et **Day** (Day est facultatif), puis un aperçu en direct des dossiers qui seront créés, toujours entièrement dépliés, les nouveaux étant mis en évidence. Un seul arbre **Folders on every drive** s'affiche quand toutes les destinations reçoivent les mêmes dossiers, sinon un arbre par disque. Le dossier du haut et le dossier Camera/Sound (`Camera_Media`, `Sound_Media`) ont un crayon : cliquez dessus pour renommer ce dossier sur place pour cette copie ; la flèche rétablit le nom du preset.
-- **Save as preset** : saisissez un nom pour garder ces réglages comme préset. Laissez vide pour ne rien enregistrer. Une date choisie n'est jamais enregistrée.
 
 Project et Day sont nettoyés avant usage : les espaces et les caractères interdits par Netflix deviennent `_`.
 
@@ -216,14 +213,13 @@ Das Fenster ist etwa 900 pt breit und hat zwei Spalten: **Copy From** und **Sett
 - **Copy From**: Ihre Auswahl. Jede Zeile zeigt den vollen Namen und die Größe, darunter den Pfad. Bei organisierten Ordnern hat jede Zeile außerdem einen **Camera / Sound**-Schalter (auf eine der beiden Seiten klicken, um umzuschalten), der nach dem Inhalt vorbelegt wird (ein Element ist Sound, wenn die meisten Dateien Audio sind), und ein **x** zum Entfernen der Quelle.
 - **Save To**: zunächst ein Ziel. **Add destination** fügt weitere hinzu, ebenso ein auf die Karte gezogener Ordner oder ein Laufwerk. Auf **Copy From** gezogene Dateien oder Ordner werden als Quellen hinzugefügt. Die Quelle wird einmal gelesen und auf jedes Ziel geschrieben. Jedes Ziel zeigt einen Kapazitätsbalken (belegt, zu kopieren, frei, von links nach rechts) mit Legende.
 - **Movie** (unter **Settings**): wählen Sie einen Ihrer Filme (die Tabs des Hauptfensters) oder **None**. Mit einem Film erscheint die Kopie im Verlauf dieses Films und unter seinem Namen im Katalog; das Fenster lädt Voreinstellung, Projekt und Tag des Films und fügt seine angeschlossenen Karten (eigene Quellen und von den Erkennungsregeln gefundene Laufwerke) sowie seine Ziele zur geöffneten Karte hinzu, und eine Zeile nennt die Voreinstellung des Films. Sie können die Voreinstellung trotzdem nur für diese Kopie ändern. Ohne Film legt der Katalog die Kopie unter dem eingegebenen Projekt ab, sonst unter *Quick Copy*.
-- **Preset** (unter **Settings**): wählen Sie **None** oder eine Ihrer gespeicherten Organisationsvoreinstellungen. Mit einer Voreinstellung zeigt das Fenster deren Optionen als Chips (z. B. *Paranoid check*, *Skip existing files*, *Whole folder* oder *Contents only*, *ASC MHL*); Details im Tooltip. Eine Voreinstellung auf *Ask each time* läuft als *Skip*.
+- Voreinstellungen gibt es nicht mehr: Wählen Sie einen Film (seine Ordnereinstellungen werden geladen) oder **No movie** (Basisoptionen). Eine Änderung hier gilt nur für diese Kopie.
 - Mit **None** gelten die Grundoptionen:
   - **Verification**: Fast (Standard), Paranoid oder Off.
   - **If file exists**: Skip (Standard), Overwrite, Add counter oder Verify using hash list.
   - **Copy**: der Ordner (Standard) oder nur sein Inhalt.
   - **Organization**: None, Date only oder Project + day.
 - Abschnitt **Organization** (bei organisierten Ordnern): **Project** und **Day** (Day ist optional), dann eine Live-Vorschau der Ordner, die angelegt werden, immer vollständig aufgeklappt, neue hervorgehoben. Ein einziger Baum **Folders on every drive** erscheint, wenn alle Ziele dieselben Ordner erhalten, sonst ein Baum pro Laufwerk. Der oberste Ordner und der Camera/Sound-Ordner (`Camera_Media`, `Sound_Media`) haben einen Stift: Ein Klick benennt den Ordner direkt für diese Kopie um; der Pfeil stellt den Namen des Presets wieder her.
-- **Save as preset**: geben Sie einen Namen ein, um diese Einstellungen als Voreinstellung zu behalten. Leer lassen, um nichts zu speichern. Ein gewähltes Datum wird nie gespeichert.
 
 Project und Day werden vor der Verwendung bereinigt: Leerzeichen und von Netflix verbotene Zeichen werden zu `_`.
 
@@ -311,14 +307,13 @@ La ventana mide unos 900 pt de ancho y tiene dos columnas: **Copy From** y **Set
 - **Copy From**: su selección. Cada fila muestra el nombre completo y el tamaño, y debajo la ruta. Cuando las carpetas se organizan, cada fila tiene además un interruptor **Camera / Sound** (haga clic en cualquiera de los dos lados para cambiarlo), rellenado según el contenido (un elemento es Sound cuando la mayoría de sus archivos son de audio), y una **x** para quitar el origen.
 - **Save To**: un destino al principio. **Add destination** añade más, igual que una carpeta o un disco arrastrado a la tarjeta. Arrastrar archivos o carpetas a **Copy From** añade orígenes. El origen se lee una vez y se escribe en cada destino. Cada destino muestra una barra de capacidad (usado, por copiar, libre, de izquierda a derecha) con leyenda.
 - **Movie** (en **Settings**): elija una de sus películas (las pestañas de la ventana principal) o **None**. Con una película, la copia aparece en el Historial de esa película y bajo su nombre en el Catálogo, y la ventana carga el preajuste, el proyecto y el día de la película, y añade sus tarjetas conectadas (sus orígenes y las unidades que reconocen sus reglas de detección) y sus destinos junto a la tarjeta con la que se abrió Quick Copy; una línea recuerda el preajuste de la película. Aún puede cambiar el preajuste solo para esta copia. Sin película, el Catálogo guarda la copia bajo el proyecto escrito, o bajo *Quick Copy*.
-- **Preset** (en **Settings**): elija **None** o uno de sus ajustes preestablecidos de organización. Con un preajuste, la ventana muestra sus opciones como etiquetas (p. ej. *Paranoid check*, *Skip existing files*, *Whole folder* o *Contents only*, *ASC MHL*); pase el cursor para ver el detalle. Un preajuste en *Ask each time* se ejecuta como *Skip*.
+- Los preajustes ya no existen: elija una película (se cargan sus ajustes de carpetas) o **No movie** (opciones básicas). Un cambio hecho aquí solo vale para esta copia.
 - Con **None**, las opciones básicas son:
   - **Verification**: Fast (por defecto), Paranoid u Off.
   - **If file exists**: Skip (por defecto), Overwrite, Add counter o Verify using hash list.
   - **Copy**: la carpeta (por defecto) o solo su contenido.
   - **Organization**: None, Date only o Project + day.
 - Sección **Organization** (cuando se organiza): **Project** y **Day** (Day es opcional), luego una vista previa en directo de las carpetas que se crearán, siempre desplegadas por completo, con las nuevas resaltadas. Se muestra un solo árbol **Folders on every drive** cuando todos los destinos reciben las mismas carpetas; si no, un árbol por unidad. La carpeta superior y la carpeta Camera/Sound (`Camera_Media`, `Sound_Media`) tienen un lápiz: haga clic para renombrarla en el sitio para esta copia; la flecha restaura el nombre del preset.
-- **Save as preset**: escriba un nombre para guardar estos ajustes como preajuste. Déjelo vacío para no guardar. Una fecha elegida nunca se guarda.
 
 Project y Day se limpian antes de usarse: los espacios y los caracteres que Netflix prohíbe pasan a `_`.
 

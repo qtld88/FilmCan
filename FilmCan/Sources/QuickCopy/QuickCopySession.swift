@@ -9,7 +9,6 @@ final class QuickCopySession: ObservableObject, Identifiable {
 
     enum Phase { case setup, running, finished }
 
-    static let lastPresetKey = "quickCopy.lastPresetId"
     static let lastDestinationsKey = "quickCopy.lastDestinations"
     static let lastFilmKey = "quickCopy.lastFilmId"
 
@@ -49,11 +48,6 @@ final class QuickCopySession: ObservableObject, Identifiable {
         var form = QuickCopyFormModel(items: QuickCopyFormModel.items(for: paths))
         form.savedPresets = storage.organizationPresets
         // Quick Copy keeps its own "last used" keys — never the main app's lastUsedConfigId.
-        if let raw = defaults.string(forKey: Self.lastPresetKey),
-           let presetId = UUID(uuidString: raw),
-           form.savedPresets.contains(where: { $0.id == presetId && $0.ownerFilmId == nil }) {
-            form.selectedPresetId = presetId
-        }
         form.destinations = (defaults.stringArray(forKey: Self.lastDestinationsKey) ?? [])
             .filter { FileManager.default.fileExists(atPath: $0) }
         form.savedFilms = storage.configurations
@@ -226,13 +220,6 @@ final class QuickCopySession: ObservableObject, Identifiable {
         TodayClock.shared.refresh()
         form.today = TodayClock.shared.today
 
-        if let preset = form.makeSavedPreset() {
-            storage.addPreset(preset)
-            form.savedPresets = storage.organizationPresets
-            form.selectedPresetId = preset.id
-            form.savePresetName = ""
-        }
-        defaults.set(form.selectedPresetId?.uuidString, forKey: Self.lastPresetKey)
         defaults.set(form.destinations, forKey: Self.lastDestinationsKey)
         defaults.set(form.selectedFilmId?.uuidString, forKey: Self.lastFilmKey)
 
