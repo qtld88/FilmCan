@@ -56,7 +56,7 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | # | Check (real .app, one iPhone, one Android phone if available) | Expected | Pass? |
 |---|-------------------|----------|-------|
 | P1 | Fresh preferences (`defaults delete com.filmcan.app ntfyURL; defaults delete com.filmcan.app ntfyUseCustomServer; defaults delete com.filmcan.app phonePushTopic`). Settings › Push. | One switch "Send notifications to my phone", off. "Advanced" is folded. No QR code yet. | ☐ |
-| P2 | Turn the switch on. | A QR code and a channel name starting with `filmcan-` appear. | ☐ |
+| P2 | Turn the switch on. | A QR code appears, with the server (`https://ntfy.sh`) above a channel name starting with `filmcan-`. | ☐ |
 | P3 | Scan the code with a phone that does not have ntfy. | The FilmCan page opens in the phone's language, shows the same channel name, and offers the right store. | ☐ |
 | P4 | Install ntfy, subscribe (button "Open in ntfy", else copy and paste the name). Click "Send a test" in FilmCan. | The phone receives "FilmCan test". From P2 to here: under 2 minutes. Note whether "Open in ntfy" worked on iPhone and on Android. | ☐ |
 | P5 | Run a small backup. | The phone receives the end-of-backup message. | ☐ |
