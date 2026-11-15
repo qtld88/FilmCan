@@ -243,6 +243,9 @@ final class FilmsOnlyTests: XCTestCase {
         var expected = BackupConfiguration.newFilm(name: "Movie 1")
         expected.id = started.config.id
         expected.createdAt = started.config.createdAt
+        // Fresh default dates differ by microseconds between two constructions.
+        expected.organizationCustomDate = started.config.organizationCustomDate
+        expected.offOrganizationCustomDate = started.config.offOrganizationCustomDate
         XCTAssertEqual(started.config, expected)
     }
 
