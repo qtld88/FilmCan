@@ -15,8 +15,8 @@ final class SharedJobTimingTests: XCTestCase {
     func testSSDAndHDDShowTheSameSpeedAndTimeLeft() {
         let rows = [row("ssd", speed: 83, eta: 14 * 60), row("hdd", speed: 44, eta: 28 * 60)]
         let shared = rows.sharingJobTiming()
-        XCTAssertEqual(shared.map(\.speedBytesPerSecond), [44, 44])
-        XCTAssertEqual(shared.map(\.estimatedTimeRemaining), [28 * 60, 28 * 60])
+        XCTAssertEqual(shared.map(\.speedBytesPerSecond), [Double(44), Double(44)])
+        XCTAssertEqual(shared.map(\.estimatedTimeRemaining), [TimeInterval(28 * 60), TimeInterval(28 * 60)])
     }
 
     func testBytesAndOtherFieldsAreUntouched() {
@@ -41,8 +41,8 @@ final class SharedJobTimingTests: XCTestCase {
     func testStillEstimatingRowsDoNotBlankTheOthers() {
         let rows = [row("a", speed: 0, eta: nil), row("b", speed: 40, eta: 300)]
         let shared = rows.sharingJobTiming()
-        XCTAssertEqual(shared.map(\.estimatedTimeRemaining), [300, 300])
-        XCTAssertEqual(shared.map(\.speedBytesPerSecond), [40, 40])
+        XCTAssertEqual(shared.map(\.estimatedTimeRemaining), [TimeInterval(300), TimeInterval(300)])
+        XCTAssertEqual(shared.map(\.speedBytesPerSecond), [Double(40), Double(40)])
     }
 
     func testSharedTimingRowLooksUpById() {
