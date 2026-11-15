@@ -1,6 +1,8 @@
 import AppKit
 import AVFoundation
+import MediaToolbox
 import QuickLookThumbnailing
+import VideoToolbox
 
 enum BackupReportWriter {
     static func reportPath(forLog logFilePath: String) -> String {
@@ -11,50 +13,76 @@ enum BackupReportWriter {
 
     private static let thumbnailSize = CGSize(width: 160, height: 90)
 
-    static func thumbnail(for path: String, isVideo: Bool, isAudio: Bool) async -> NSImage {
-        let fallback = { NSWorkspace.shared.icon(forFile: path) }
-        if isAudio {
-            let cfg = NSImage.SymbolConfiguration(pointSize: 40, weight: .regular)
-            return NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
-                .withSymbolConfiguration(cfg) ?? fallback()
-        }
-        guard isVideo else { return fallback() }
+    /// Lets AVFoundation open MXF through Apple's Pro Video Formats readers when they are
+    /// installed; a no-op otherwise. Must run before the first AVURLAsset of the process.
+    private static let proVideoFormatsRegistered: Void = {
+        MTRegisterProfessionalVideoWorkflowFormatReaders()
+        VTRegisterProfessionalVideoWorkflowVideoDecoders()
+    }()
 
-        let request = QLThumbnailGenerator.Request(
-            fileAt: URL(fileURLWithPath: path), size: thumbnailSize,
-            scale: 2, representationTypes: .thumbnail)
-        let image: NSImage? = await withTaskGroup(of: NSImage?.self) { group in
+    private static func withTimeout<T>(_ work: @escaping () async -> T?) async -> T? {
+        await withTaskGroup(of: T?.self) { group in
+            group.addTask { await work() }
             group.addTask {
-                guard let rep = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
-                else { return nil }
-                return rep.nsImage
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
                 return nil
             }
             let first = await group.next() ?? nil
             group.cancelAll()
             return first
         }
-        return image ?? fallback()
+    }
+
+    /// Stills at 1 s, the middle and the end of the clip; nil when AVFoundation can't
+    /// decode it (BRAW, R3D, ARRIRAW, or MXF without Pro Video Formats).
+    private static func frameStrip(_ url: URL) async -> [NSImage]? {
+        _ = proVideoFormatsRegistered
+        let asset = AVURLAsset(url: url)
+        guard let duration = try? await asset.load(.duration), duration.seconds.isFinite,
+              duration.seconds > 0 else { return nil }
+        let d = duration.seconds
+        let gen = AVAssetImageGenerator(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: thumbnailSize.width * 2, height: thumbnailSize.height * 2)
+        var stills: [NSImage] = []
+        for t in [min(1, d / 2), d / 2, max(0, d - 1)] {
+            guard let (cg, _) = try? await gen.image(at: CMTime(seconds: t, preferredTimescale: 600))
+            else { continue }
+            stills.append(NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)))
+        }
+        return stills.isEmpty ? nil : stills
+    }
+
+    /// Up to three stills for a video (start, middle, end); one image otherwise.
+    static func stills(for path: String, isVideo: Bool, isAudio: Bool) async -> [NSImage] {
+        let fallback = { [NSWorkspace.shared.icon(forFile: path)] }
+        if isAudio {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 40, weight: .regular)
+            guard let wave = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
+                .withSymbolConfiguration(cfg) else { return fallback() }
+            return [wave]
+        }
+        let url = URL(fileURLWithPath: path)
+        if isVideo, let strip = await withTimeout({ () async -> [NSImage]? in await frameStrip(url) }) {
+            return strip
+        }
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url, size: thumbnailSize, scale: 2, representationTypes: .thumbnail)
+        if let image = await withTimeout({ () async -> NSImage? in
+            try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
+        }) {
+            return [image]
+        }
+        return fallback()
     }
 
     static func duration(for path: String) async -> TimeInterval? {
-        await withTaskGroup(of: TimeInterval?.self) { group in
-            group.addTask {
-                let asset = AVURLAsset(url: URL(fileURLWithPath: path))
-                guard let t = try? await asset.load(.duration) else { return nil }
-                let s = t.seconds
-                return s.isFinite && s >= 0 ? s : nil
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
+        _ = proVideoFormatsRegistered
+        return await withTimeout { () async -> TimeInterval? in
+            let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+            guard let t = try? await asset.load(.duration) else { return nil }
+            let s = t.seconds
+            return s.isFinite && s >= 0 ? s : nil
         }
     }
 
@@ -63,7 +91,11 @@ enum BackupReportWriter {
     private static let pageWidth: CGFloat = 595
     private static let pageHeight: CGFloat = 842
     private static let margin: CGFloat = 36
-    private static let rowHeight: CGFloat = 64
+    private static let rowHeight: CGFloat = 76
+    private static let compactRowHeight: CGFloat = 26
+    private static let stillW: CGFloat = 96
+    private static let stillH: CGFloat = 54
+    private static let stillGap: CGFloat = 4
     private static let footerHeight: CGFloat = 24
 
     private static func formatBytes(_ b: Int64) -> String {
@@ -150,7 +182,7 @@ enum BackupReportWriter {
         }
     }
 
-    static func render(_ report: BackupReport, thumbnails: [String: NSImage],
+    static func render(_ report: BackupReport, thumbnails: [String: [NSImage]],
                        durations: [String: TimeInterval], to url: URL) throws {
         var box = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
         guard let ctx = CGContext(url as CFURL, mediaBox: &box, nil) else {
@@ -235,28 +267,44 @@ enum BackupReportWriter {
             rollTitle(cont: false)
 
             for clip in roll.clips {
-                if page.y + rowHeight > maxY {
+                let height = clip.isMedia ? rowHeight : compactRowHeight
+                if page.y + height > maxY {
                     page.end(); page.begin()
                     rollTitle(cont: true)
                 }
                 let top = page.y
-                if let img = thumbnails[clip.absolutePath] {
-                    page.image(img, in: NSRect(x: margin, y: top + 5, width: 96, height: 54))
+                guard clip.isMedia else {
+                    page.text(clip.relPath, x: margin, y: top + 3, w: contentW - 80, size: 8, color: .darkGray)
+                    page.text(formatBytes(clip.size), x: pageWidth - margin - 80, y: top + 3, w: 80,
+                              size: 8, color: .darkGray, align: .right)
+                    if let sum = clip.checksum {
+                        page.text("\(clip.checksumAlgorithm ?? "hash"): \(sum)", x: margin, y: top + 14,
+                                  w: contentW, size: 7, mono: true, color: .gray)
+                    } else if let note = clip.note {
+                        page.text(note, x: margin, y: top + 14, w: contentW, size: 7, color: .orange)
+                    }
+                    page.y = top + height
+                    continue
                 }
-                let tx = margin + 108
-                let textW = contentW - 108 - 150
-                page.text(clip.name, x: tx, y: top + 6, w: textW, size: 10, bold: true)
-                page.text(clip.relPath, x: tx, y: top + 21, w: textW, size: 8, color: .gray)
-                if let sum = clip.checksum {
-                    page.text("\(clip.checksumAlgorithm ?? "hash"): \(sum)", x: tx, y: top + 36,
-                              w: contentW - 108, size: 7, mono: true, color: .darkGray)
-                } else if let note = clip.note {
-                    page.text(note, x: tx, y: top + 36, w: contentW - 108, size: 8, color: .orange)
+                for (i, img) in (thumbnails[clip.absolutePath] ?? []).prefix(3).enumerated() {
+                    let x = margin + CGFloat(i) * (stillW + stillGap)
+                    page.image(img, in: NSRect(x: x, y: top + 5, width: stillW, height: stillH))
                 }
-                let rx = pageWidth - margin - 140
-                page.text(formatBytes(clip.size), x: rx, y: top + 6, w: 140, size: 10, align: .right)
+                let tx = margin + 3 * stillW + 2 * stillGap + 10
+                let textW = contentW - (tx - margin)
+                let sideW: CGFloat = 70
+                page.text(clip.name, x: tx, y: top + 6, w: textW - sideW, size: 10, bold: true)
+                page.text(formatBytes(clip.size), x: tx + textW - sideW, y: top + 6, w: sideW, size: 10, align: .right)
+                page.text(clip.relPath, x: tx, y: top + 21, w: textW - sideW, size: 8, color: .gray)
                 if let d = durations[clip.absolutePath] {
-                    page.text(formatClock(d), x: rx, y: top + 21, w: 140, size: 9, color: .darkGray, align: .right)
+                    page.text(formatClock(d), x: tx + textW - sideW, y: top + 21, w: sideW,
+                              size: 9, color: .darkGray, align: .right)
+                }
+                if let sum = clip.checksum {
+                    page.text("\(clip.checksumAlgorithm ?? "hash"): \(sum)", x: margin, y: top + stillH + 8,
+                              w: contentW, size: 7, mono: true, color: .darkGray)
+                } else if let note = clip.note {
+                    page.text(note, x: margin, y: top + stillH + 8, w: contentW, size: 8, color: .orange)
                 }
                 page.y = top + rowHeight
             }
@@ -308,35 +356,28 @@ enum BackupReportWriter {
 
     /// Thumbnails, durations, then the PDF at `finalPath` (replaced if present).
     private static func write(_ report: BackupReport, toPath finalPath: String) async -> String? {
-        let targets = report.rolls.flatMap { $0.clips }.filter { $0.isVideo || $0.isAudio }
+        let targets = report.rolls.flatMap { $0.clips }.filter(\.isMedia)
 
-        var thumbs: [String: NSImage] = [:]
+        var thumbs: [String: [NSImage]] = [:]
         var durs: [String: TimeInterval] = [:]
         var index = 0
-        await withTaskGroup(of: (String, NSImage?, TimeInterval?).self) { group in
+        await withTaskGroup(of: (String, [NSImage], TimeInterval?).self) { group in
             func addNext() {
                 guard index < targets.count else { return }
                 let c = targets[index]; index += 1
                 group.addTask {
-                    async let img = thumbnail(for: c.absolutePath, isVideo: c.isVideo, isAudio: c.isAudio)
+                    async let img = stills(for: c.absolutePath, isVideo: c.isVideo, isAudio: c.isAudio)
                     async let dur = duration(for: c.absolutePath)
                     return (c.absolutePath, await img, await dur)
                 }
             }
             for _ in 0..<4 { addNext() }
             while let (path, img, dur) = await group.next() {
-                if let img { thumbs[path] = img }
+                if !img.isEmpty { thumbs[path] = img }
                 if let dur { durs[path] = dur }
                 addNext()
             }
         }
-        // Non-media files get their file icon.
-        for roll in report.rolls {
-            for c in roll.clips where thumbs[c.absolutePath] == nil {
-                thumbs[c.absolutePath] = NSWorkspace.shared.icon(forFile: c.absolutePath)
-            }
-        }
-
         let tmpURL = URL(fileURLWithPath: finalPath + ".tmp")
         let finalURL = URL(fileURLWithPath: finalPath)
         let renderedThumbs = thumbs, renderedDurs = durs

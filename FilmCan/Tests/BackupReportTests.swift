@@ -106,9 +106,24 @@ final class BackupReportTests: XCTestCase {
         let f = tmpDir.appendingPathComponent("x.xml")
         try Data("<a/>".utf8).write(to: f)
         let start = Date()
-        let img = await BackupReportWriter.thumbnail(for: f.path, isVideo: false, isAudio: false)
+        let stills = await BackupReportWriter.stills(for: f.path, isVideo: false, isAudio: false)
         XCTAssertLessThan(Date().timeIntervalSince(start), 1)
-        XCTAssertGreaterThan(img.size.width, 0)
+        XCTAssertEqual(stills.count, 1)
+        XCTAssertGreaterThan(stills[0].size.width, 0)
+    }
+
+    func test_clipKinds_sidecarIsNotMedia() {
+        func clip(_ rel: String, video: Bool = false, audio: Bool = false) -> BackupReport.Clip {
+            BackupReport.Clip(relPath: rel, absolutePath: "/x/" + rel, size: 1, checksum: nil,
+                              checksumAlgorithm: nil, isVideo: video, isAudio: audio)
+        }
+        XCTAssertTrue(clip("A.MXF", video: true).isMedia)
+        XCTAssertTrue(clip("A.wav", audio: true).isMedia)
+        XCTAssertTrue(clip("A.jpg").isMedia)
+        XCTAssertTrue(clip("A.dng").isMedia)
+        XCTAssertFalse(clip("A.XML").isMedia)
+        XCTAssertFalse(clip("A.BIM").isMedia)
+        XCTAssertFalse(clip("noext").isMedia)
     }
 
     func test_generate_withoutLog_returnsNil() async {
