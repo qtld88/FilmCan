@@ -18,13 +18,14 @@ The code already went half way: every movie owns a private copy of its settings 
 
 ## What the user sees
 
-**New movie.** The "+" button keeps making a blank movie (today's first-run defaults). Its menu, and File › New Movie Like, list:
+**New movie.** The "+" button (and File › New Backup, ⌘N) no longer creates a movie at once: it asks what to start from. The separate chevron menu goes away. A small popover (or sheet, when opened from the menu) lists, in this order:
 
+- **Blank movie**: today's first-run defaults (`BackupConfiguration.newFilm(name:)`).
 - **Netflix Ingest**: a blank movie with the Netflix Ingest folder settings (same values as today's built-in preset, `Reports` log folder included).
 - **Like ‹movie›**, newest first: today's `BackupConfiguration.newFilm(name:like:)`.
 - **From a settings file…**: opens a `.filmcan-movie` file (see Export).
 
-"Start from a preset" disappears.
+Picking one creates the movie and selects it; closing the popover creates nothing. With no movie yet (first launch, "Create First Movie"), the same choice shows, without the "Like" list. File › New Movie Like goes away (the choice covers it). "Start from a preset" disappears.
 
 **Movie settings, Destinations › folder section.** The Preset menu (checklist S4) is replaced by:
 
@@ -100,7 +101,7 @@ An existing movie must produce the same folders and files after the update. That
 `ESSAI-CHECKLIST.md` / `docs/smoke-qa-checklist.md`: S4 replaced by:
 
 - **S4** No Preset menu anywhere; Destinations has the organization switch and "Use Netflix Ingest folders".
-- **S4b** New movie menu: Netflix Ingest, Like ‹movie›, From a settings file…
+- **S4b** "+" asks: Blank movie, Netflix Ingest, Like ‹movie›, From a settings file…; closing it creates nothing.
 - **S4c** Export Settings → import as new movie: same folders on a test copy, no drives, day or episode carried over.
 - **S4d** After updating with your current settings: each movie copies to the same folders as before.
 - Quick Copy gate (Q rows): Preset row and Save as preset gone; Movie picker with No movie.
