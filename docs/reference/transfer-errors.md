@@ -20,6 +20,7 @@ These are shown as alerts in the Backup Editor:
 - `Source does not exist: <path>`
 - `Permission denied: Cannot read source <name>`
 - `Destination is read-only (<format>): <path>`
+- `The drive "<name>" is not connected. Connect it, or untick it in Save To.` (destination on an unmounted /Volumes drive; checked first)
 - `Cannot create destination folder: <path>\n<error>`
 - `Permission denied: Cannot write to <name>`
 
@@ -86,6 +87,7 @@ Celles-ci sont affichées sous forme d’alertes dans l’éditeur de backup:
 - `Source does not exist: <path>`
 - `Permission denied: Cannot read source <name>`
 - `Destination is read-only (<format>): <path>`
+- `The drive "<name>" is not connected. Connect it, or untick it in Save To.` (destination on an unmounted /Volumes drive; checked first)
 - `Cannot create destination folder: <path>\n<error>`
 - `Permission denied: Cannot write to <name>`
 
@@ -152,6 +154,7 @@ Diese werden als Warnungen im Backup-Editor angezeigt:
 - `Source does not exist: <path>`
 - `Permission denied: Cannot read source <name>`
 - `Destination is read-only (<format>): <path>`
+- `The drive "<name>" is not connected. Connect it, or untick it in Save To.` (destination on an unmounted /Volumes drive; checked first)
 - `Cannot create destination folder: <path>\n<error>`
 - `Permission denied: Cannot write to <name>`
 
@@ -218,6 +221,7 @@ Se muestran como alertas en el editor de backup:
 - `Source does not exist: <path>`
 - `Permission denied: Cannot read source <name>`
 - `Destination is read-only (<format>): <path>`
+- `The drive "<name>" is not connected. Connect it, or untick it in Save To.` (destination on an unmounted /Volumes drive; checked first)
 - `Cannot create destination folder: <path>\n<error>`
 - `Permission denied: Cannot write to <name>`
 

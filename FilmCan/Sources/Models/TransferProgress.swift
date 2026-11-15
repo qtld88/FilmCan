@@ -84,6 +84,21 @@ class TransferProgress: ObservableObject {
         )
     }
 
+    /// Progress of the whole job for the movie tab, 0...1. A fan-out run reads its
+    /// destination rows (copy + verify, the slowest drive sets the pace, failed
+    /// drives are left out); other runs fall back to `overallProgress`. The old tab
+    /// value summed copied bytes over every drive against one drive's total, so a
+    /// two-drive copy looked finished halfway, and it ignored the verify pass.
+    var jobFraction: Double {
+        if !isRunning && phase == .finished && !hasError && !isCancelled && !isPaused {
+            return 1.0
+        }
+        guard !perDestProgress.isEmpty else { return overallProgress }
+        let live = perDestProgress.filter { if case .failed = $0.status { return false } else { return true } }
+        guard !live.isEmpty else { return 0 }
+        return live.map(\.workFraction).min() ?? 0
+    }
+
     var formattedProgress: String {
         if totalBytes > 0 {
             let progressBytes = cumulativeBytes > 0 ? cumulativeBytes : bytesCompleted

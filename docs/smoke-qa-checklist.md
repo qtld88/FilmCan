@@ -115,7 +115,7 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | M4 | Type a text-only day ("Pickups") in Options › Source. | The stepper shows it with both arrows greyed. | ☐ |
 | M5 | 1 card, 2 drives, ready to copy. | No summary line above the columns: the header row is followed directly by Copy From / Save To. | ☐ |
 | M6 | 3 cards, 2 drives. | Everything fits without scrolling at 1280 × 800; the flow links between the columns are where they were. | ☐ |
-| M7 | Look under "Run Now" with no card, then no drive, then both, then after a completed backup. | "Add a card or a folder to copy", "Add a drive to save to", "N folders will be created", "Folders already exist: only missing files are copied". The button is not clipped. | ☐ |
+| M7 | Look under "Run Now" with no card, then no drive, then both, then after a completed backup. | "Add a card or a folder to copy", "Add a drive to save to", "N folders will be created" (one drive) or "N folders per drive will be created" (several drives getting the same folders), "Folders already exist: only missing files are copied". The button is not clipped. | ☐ |
 | M8 | A whole card as source, then a subfolder of a card. | The card shows no path line (hover its name: tooltip with the path). The subfolder still shows its path. | ☐ |
 | M9 | One source and one drive, then two of each. | No order number with one row; 1, 2 with two. Checkboxes stay aligned. | ☐ |
 | M10 | After a completed backup, same cards and drives still plugged. | Save To shows one folded line "Folders already on every drive"; clicking it opens the tree. | ☐ |

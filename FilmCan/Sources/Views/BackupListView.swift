@@ -168,8 +168,8 @@ private struct MovieTabButton: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .stroke(borderColor, lineWidth: isSelected ? 1.5 : 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(progressOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture {
             onSelect()
@@ -253,15 +253,23 @@ private struct MovieTabButton: View {
         isActiveTransfer ? progressValue : 0
     }
 
+    /// Thin bar along the tab's bottom edge, drawn inside the rounded clip so it
+    /// follows the corners, with a faint track so 0% still reads as "running".
     @ViewBuilder
     private var progressOverlay: some View {
         if isActiveTransfer {
             GeometryReader { geo in
                 let clamped = max(0, min(activeTransferProgress, 1))
-                Rectangle()
-                    .fill(FilmCanTheme.brandGreen)
-                    .frame(width: max(6, geo.size.width * clamped), height: 2)
-                    .offset(x: 0, y: geo.size.height - 2)
+                ZStack(alignment: .bottomLeading) {
+                    Rectangle()
+                        .fill(FilmCanTheme.brandGreen.opacity(0.2))
+                        .frame(width: geo.size.width, height: 3)
+                    Rectangle()
+                        .fill(FilmCanTheme.brandGreen)
+                        .frame(width: geo.size.width * clamped, height: 3)
+                        .animation(.linear(duration: 0.4), value: clamped)
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottomLeading)
             }
             .allowsHitTesting(false)
         }
