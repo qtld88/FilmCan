@@ -124,6 +124,8 @@ class TransferViewModel: ObservableObject {
         if !isBackgroundWorker {
             activeTransferConfigIds.insert(activeConfig.id)
             tabProgressByConfig[activeConfig.id] = 0
+            progressBinding?.cancel()
+            progressBinding = trackTabProgress(of: progress, configId: activeConfig.id)
         }
         captureDriveSnapshot(paths: activeConfig.sourcePaths + activeConfig.destinationPaths)
         verifiedDestinationsByConfig.removeValue(forKey: activeConfig.id)
@@ -381,9 +383,29 @@ class TransferViewModel: ObservableObject {
 
     func tabProgress(for configId: UUID) -> Double {
         if activeConfigId == configId, isTransferring {
-            return progress.overallProgress
+            return progress.jobFraction
+        }
+        if let worker = concurrentWorkers[configId], worker.isTransferring {
+            return worker.progress.jobFraction
         }
         return tabProgressByConfig[configId] ?? 0
+    }
+
+    /// `progress` is a class mutated in place, so `@Published progress` never fires
+    /// during a run and the movie tabs (which observe this view model, not the
+    /// progress object) never redrew their bar. Mirror the job fraction into
+    /// `tabProgressByConfig`, twice a second and only when it moved, so tabs follow.
+    private func trackTabProgress(of progress: TransferProgress, configId: UUID) -> AnyCancellable {
+        progress.objectWillChange
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self, weak progress] _ in
+                guard let self, let progress else { return }
+                let value = progress.jobFraction
+                let previous = self.tabProgressByConfig[configId] ?? -1
+                if abs(value - previous) >= 0.005 || (value >= 1 && previous < 1) {
+                    self.tabProgressByConfig[configId] = value
+                }
+            }
     }
 
     func hasActiveTransfers() -> Bool {
@@ -418,11 +440,7 @@ class TransferViewModel: ObservableObject {
         worker.duplicates.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
-        worker.$progress
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] progress in
-                self?.tabProgressByConfig[configId] = progress.overallProgress
-            }
+        trackTabProgress(of: worker.progress, configId: configId)
             .store(in: &cancellables)
 
         worker.$isTransferring
@@ -439,7 +457,7 @@ class TransferViewModel: ObservableObject {
     }
 
     private func finishConcurrentTransfer(configId: UUID, worker: TransferViewModel) {
-        tabProgressByConfig[configId] = worker.progress.overallProgress
+        tabProgressByConfig[configId] = worker.progress.jobFraction
         activeTransferConfigIds.remove(configId)
         concurrentWorkerCancellables[configId]?.forEach { $0.cancel() }
         concurrentWorkerCancellables.removeValue(forKey: configId)

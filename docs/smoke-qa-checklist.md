@@ -69,7 +69,7 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | # | Check (real .app, one iPhone, one Android phone if available) | Expected | Pass? |
 |---|-------------------|----------|-------|
 | P1 | Fresh preferences (`defaults delete com.filmcan.app ntfyURL; defaults delete com.filmcan.app ntfyUseCustomServer; defaults delete com.filmcan.app phonePushTopic`). Settings › Push. | One switch "Send notifications to my phone", off. "Advanced" is folded. No QR code yet. | ☐ |
-| P2 | Turn the switch on. | A QR code and a channel name starting with `filmcan-` appear. | ☐ |
+| P2 | Turn the switch on. | A QR code appears, with the server (`https://ntfy.sh`) above a channel name starting with `filmcan-`. | ☐ |
 | P3 | Scan the code with a phone that does not have ntfy. | The FilmCan page opens in the phone's language, shows the same channel name, and offers the right store. | ☐ |
 | P4 | Install ntfy, subscribe (button "Open in ntfy", else copy and paste the name). Click "Send a test" in FilmCan. | The phone receives "FilmCan test". From P2 to here: under 2 minutes. Note whether "Open in ntfy" worked on iPhone and on Android. | ☐ |
 | P5 | Run a small backup. | The phone receives the end-of-backup message. | ☐ |
@@ -115,7 +115,7 @@ The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once
 | M4 | Type a text-only day ("Pickups") in Options › Source. | The stepper shows it with both arrows greyed. | ☐ |
 | M5 | 1 card, 2 drives, ready to copy. | No summary line above the columns: the header row is followed directly by Copy From / Save To. | ☐ |
 | M6 | 3 cards, 2 drives. | Everything fits without scrolling at 1280 × 800; the flow links between the columns are where they were. | ☐ |
-| M7 | Look under "Run Now" with no card, then no drive, then both, then after a completed backup. | "Add a card or a folder to copy", "Add a drive to save to", "N folders will be created", "Folders already exist: only missing files are copied". The button is not clipped. | ☐ |
+| M7 | Look under "Run Now" with no card, then no drive, then both, then after a completed backup. | "Add a card or a folder to copy", "Add a drive to save to", "N folders will be created" (one drive) or "N folders per drive will be created" (several drives getting the same folders), "Folders already exist: only missing files are copied". The button is not clipped. | ☐ |
 | M8 | A whole card as source, then a subfolder of a card. | The card shows no path line (hover its name: tooltip with the path). The subfolder still shows its path. | ☐ |
 | M9 | One source and one drive, then two of each. | No order number with one row; 1, 2 with two. Checkboxes stay aligned. | ☐ |
 | M10 | After a completed backup, same cards and drives still plugged. | Save To shows one folded line "Folders already on every drive"; clicking it opens the tree. | ☐ |
