@@ -51,7 +51,14 @@ struct DuplicatePromptSheet: View {
                     .foregroundColor(FilmCanTheme.textTertiary)
             }
 
-            Toggle(UIStrings.DuplicatePrompt.applyToAll, isOn: $applyToAll)
+            if prompt.conflictCount > 1 {
+                conflictList
+            }
+
+            Toggle(prompt.conflictCount > 1
+                   ? UIStrings.DuplicatePrompt.applyToRemaining(prompt.conflictCount - prompt.position)
+                   : UIStrings.DuplicatePrompt.applyToAll,
+                   isOn: $applyToAll)
                 .toggleStyle(.switch)
                 .tint(FilmCanTheme.toggleTint)
                 .controlSize(.small)
@@ -83,6 +90,30 @@ struct DuplicatePromptSheet: View {
         .interactiveDismissDisabled(true)
         .sheet(isPresented: $showCounterSheet) {
             counterStyleSheet
+        }
+    }
+
+    /// Every file in conflict, so the user knows what "apply to all" covers.
+    private var conflictList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(UIStrings.DuplicatePrompt.conflictCount(prompt.conflictCount, current: prompt.position + 1))
+                .font(FCType.bodyStrong)
+                .foregroundColor(FilmCanTheme.textSecondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(prompt.conflictNames.enumerated()), id: \.offset) { index, path in
+                        Text(path)
+                            .font(FCType.meta)
+                            .foregroundColor(index == prompt.position
+                                             ? FilmCanTheme.textPrimary : FilmCanTheme.textTertiary)
+                            .fontWeight(index == prompt.position ? .semibold : .regular)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 120)
         }
     }
 

@@ -292,10 +292,9 @@ actor FanOutCopier {
         let logicalSize: Int64
     }
 
-    /// Resolved duplicate policy (after optional pre-flight `.ask` prompt).
-    private var conflictPolicy: OrganizationPreset.DuplicatePolicy = .overwrite
-    /// Set of resolved paths that had an unmanifested collision pre-flight.
-    private var conflictPaths: Set<String> = []
+    /// Pre-flight conflicts and what to do with each, keyed by resolved destination
+    /// path. A path absent from the map is not a conflict.
+    private var conflictDecisionByPath: [String: ConflictDecision] = [:]
 
     /// What this run enumerated and which unreadable items the user chose to ignore.
     /// Read by the caller after `run()` — the card seal covers exactly this list.
@@ -388,8 +387,17 @@ actor FanOutCopier {
         finalizedBytesByDest[destPath] ?? 0
     }
 
-    func isConflict(path: String) -> Bool { conflictPaths.contains(path) }
-    func conflictPolicyValue() -> OrganizationPreset.DuplicatePolicy { conflictPolicy }
+    func conflictDecision(path: String) -> ConflictDecision? { conflictDecisionByPath[path] }
+
+    /// Only an explicit Overwrite or Add-counter answer may touch an existing file.
+    /// `.ask`/`.verify` left unanswered mean the user decided nothing: keep the
+    /// existing file (Skip still adopts an identical one).
+    nonisolated static func effectivePolicy(_ p: OrganizationPreset.DuplicatePolicy) -> OrganizationPreset.DuplicatePolicy {
+        switch p {
+        case .ask, .verify: return .skip
+        case .skip, .overwrite, .increment: return p
+        }
+    }
 
     /// The exact path a planned file is written to at a destination, accounting
     /// for the organization preset and copy-folder-contents. Pure (no I/O); the
@@ -691,6 +699,9 @@ actor FanOutCopier {
     nonisolated let config: Configuration
 
     init(config: Configuration) {
+        // A roll name becomes one path component: never "..", never a "/".
+        var config = config
+        config.rollNames = config.rollNames.compactMapValues(OrganizationTemplate.folderNameAsWritten)
         self.config = config
     }
 
@@ -894,6 +905,11 @@ actor FanOutCopier {
         // manifest and recopies it on a mismatch, so a skip never rests on a hash nobody
         // compared. Skipped files that pass count as proven in this run's result.
         var trustedSkipPathsByDest: [String: Set<String>] = [:]
+        // Manifested destination files the source no longer matches (other size or
+        // other hash): rewriting them would destroy the backed-up file, so they go to
+        // the conflict pre-flight like an unmanifested homonym. A reused card whose
+        // clips restart at C0001 lands here.
+        var changedManifestedPaths = Set<String>()
         func destsNeeding(_ f: PlannedFile) async -> [DestWriter.Config] {
             if config.forceRecopy { return config.destinations }
             let name = plannedSourceName(f)
@@ -919,14 +935,29 @@ actor FanOutCopier {
                 // A manifest written before FilmCan recorded logical sizes holds the ALLOCATED
                 // size. Accept either so an upgrade does not trigger a full re-copy.
                 if recorded.size != 0, recorded.size != f.logicalSize, recorded.size != f.size {
+                    changedManifestedPaths.insert(path)
                     needed.append(dest); continue
                 }
                 // The destination file must be as long as the source (also covers a
                 // simple hash list, which records no size). A truncated or padded file
                 // is recopied, not skipped on its name alone.
-                if destSize != f.logicalSize { needed.append(dest); continue }
+                if destSize != f.logicalSize {
+                    // No recorded size (simple hash list): hash the destination. If it
+                    // still matches the manifest it is the backed-up file and the source
+                    // changed — a conflict, not a damaged copy.
+                    if recorded.size == 0,
+                       let destHash = try? await Self.rereadHashDetached(
+                           url: URL(fileURLWithPath: path), chunkSz: 8 * 1024 * 1024,
+                           perfKey: "resume conflict check"),
+                       destHash.lowercased() == recorded.hash.lowercased() {
+                        changedManifestedPaths.insert(path)
+                    }
+                    needed.append(dest); continue
+                }
                 if config.reVerifyExistingOnResume,
                    sourceHashForReverify?.lowercased() != recorded.hash.lowercased() {
+                    // The source no longer hashes to what was backed up.
+                    if sourceHashForReverify != nil { changedManifestedPaths.insert(path) }
                     needed.append(dest); continue
                 }
                 if Self.isVerifying(dest, config) {
@@ -965,6 +996,23 @@ actor FanOutCopier {
         }
         let nameCollisions = SourceCollisionValidator.collisions(resolvedRoots: resolvedRootsForCollision)
         if !nameCollisions.isEmpty { throw Error.duplicateSourceNames(nameCollisions) }
+
+        // Target-path preflight: every planned file must land on its own path at every
+        // destination. Two sources in "copy folder contents" mode with a common relative
+        // path, or two loose files with one name, would otherwise write the same file
+        // twice — the second over the first, after its verification.
+        for dest in config.destinations {
+            let targets = allPlannedFiles.map { f in
+                (source: f.absPath, target: Self.resolveDestFilePath(
+                    destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
+                    relPath: f.relPath, preset: config.organizationPreset,
+                    copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                    metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath),
+                    rollNameIsAssigned: isAssignedRoll(f.rootPath)))
+            }
+            let clashes = TargetPathValidator.collisions(targets: targets, destRoot: dest.destPath)
+            if !clashes.isEmpty { throw Error.duplicateTargetPaths(clashes) }
+        }
 
         // Writability preflight: a destination that can't be written (disconnected
         // or read-only) aborts the whole run before any data is copied, with a clear
@@ -1173,16 +1221,23 @@ actor FanOutCopier {
         }
         let conflicts = ConflictScanner.scan(
             plannedTargets: plannedTargets,
-            manifestedRelPathsByDestRoot: manifestedRelPathsByDestRoot)
+            manifestedRelPathsByDestRoot: manifestedRelPathsByDestRoot,
+            changedManifestedPaths: changedManifestedPaths)
+        conflictDecisionByPath = [:]
         if !conflicts.isEmpty {
-            let resolvedPolicy: OrganizationPreset.DuplicatePolicy
+            // One decision per conflict. Nothing answered for a file ⇒ Skip.
+            let answers: [String: ConflictDecision]
             if let resolver = config.duplicateResolver {
-                resolvedPolicy = (await resolver(conflicts)).values.first?.policy ?? config.duplicatePolicy
+                answers = await resolver(conflicts)
             } else {
-                resolvedPolicy = config.duplicatePolicy
+                answers = Dictionary(conflicts.map { ($0.resolvedPath, ConflictDecision(policy: config.duplicatePolicy)) },
+                                     uniquingKeysWith: { first, _ in first })
             }
-            self.conflictPolicy = resolvedPolicy
-            self.conflictPaths = Set(conflicts.map { $0.resolvedPath })
+            for c in conflicts {
+                var d = answers[c.resolvedPath] ?? ConflictDecision(policy: .skip)
+                d.policy = Self.effectivePolicy(d.policy)
+                conflictDecisionByPath[c.resolvedPath] = d
+            }
         }
 
         // Concurrency: cap by number of distinct source drives so we don't oversubscribe a single bus.
@@ -1700,16 +1755,14 @@ actor FanOutCopier {
 
                 let destHash = destHasher.finalize().hexString
                 // Conflict: check if this resolved path is a pre-flight conflict and apply policy.
-                let conflictPolicy: OrganizationPreset.DuplicatePolicy =
-                    await self.isConflict(path: destFileURL.path)
-                        ? await self.conflictPolicyValue()
-                        : .overwrite
+                let decision = await self.conflictDecision(path: destFileURL.path)
+                let conflictPolicy: OrganizationPreset.DuplicatePolicy = decision?.policy ?? .overwrite
                 let actualWrittenPath: String
                 do {
                     actualWrittenPath = try await writer.finalize(
                         fileHash: destHash, sourceSize: sourceSize,
                         conflictPolicy: conflictPolicy,
-                        counterTemplate: config.duplicateCounterTemplate)
+                        counterTemplate: decision?.counterTemplate ?? config.duplicateCounterTemplate)
                     // MHL is appended in the verify lane AFTER paranoid re-read, not here.
                 } catch is DestWriter.SkippedDueToConflict {
                     // A file with this name is already there and not in the manifest. The
