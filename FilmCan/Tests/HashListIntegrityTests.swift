@@ -160,6 +160,20 @@ final class HashListIntegrityTests: XCTestCase {
         XCTAssertEqual(dated, 1, "only the carried clip keeps the old date:\n\(gen2)")
     }
 
+    /// A carried entry with no recorded action (e.g. from a simple hash list) is
+    /// still written `original` (ASC tools ignore entries without an action), but
+    /// gets no invented hashdate.
+    func test_carriedEntryWithoutAction_isOriginal_withoutAHashDate() async throws {
+        let asc = tmp.appendingPathComponent("ascmhl")
+        let w = try ASCMHLWriter(ascmhlDir: asc, rollName: "R")
+        await w.seed([MHLEntry(relPath: "old.bin", size: 1, hash: "aa", mtime: nil)])
+        try await w.append(relPath: "new.bin", size: 1, hash: "bb", mtime: nil)
+        try await w.seal()
+        let xml = try String(contentsOfFile: w.manifestPath, encoding: .utf8)
+        XCTAssertTrue(xml.contains(#"<xxh128 action="original">aa</xxh128>"#), xml)
+        XCTAssertTrue(xml.contains(#"<xxh128 action="original" hashdate=""#), xml)
+    }
+
     /// A cancelled run leaves a partial generation outside the chain. The next
     /// complete run takes its number and replaces it: no hole in the chain, and no
     /// stray manifest the reference tool would load as a generation.

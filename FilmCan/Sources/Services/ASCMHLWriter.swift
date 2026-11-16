@@ -133,8 +133,10 @@ actor ASCMHLWriter: MHLWriting {
                     " lastmodificationdate=\"\(Self.iso8601(Date(timeIntervalSince1970: TimeInterval($0))))\""
                 } ?? ""
                 // A fresh entry was hashed by this generation: original, today. A carried
-                // one keeps what its own generation recorded (absent stays absent).
-                let action = e.isCarried ? e.action : "original"
+                // one keeps what its own generation recorded. Without a recorded action
+                // (legacy simple list) it is written `original` with no invented date:
+                // the reference `ascmhl` ignores a hash entry that has no action.
+                let action = e.isCarried ? (e.action ?? "original") : "original"
                 let hashDate = e.isCarried ? e.hashDate : creationDate
                 // The element the value was recorded under: an md5 value is never
                 // relabelled xxh128. (Carried names come from ASCMHLReader's list.)
