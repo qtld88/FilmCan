@@ -267,6 +267,7 @@ final class OverwriteSafetyTests: XCTestCase {
         XCTAssertEqual(prompts.first?.conflictCount, 3)
         XCTAssertEqual(prompts.first?.conflictNames.count, 3)
         XCTAssertEqual(prompts.map(\.position), [0, 1, 2])
+        guard prompts.count == 3 else { return }
 
         let names = prompts.map { ($0.destinationPath as NSString).lastPathComponent }
         let overwritten = names[1]
