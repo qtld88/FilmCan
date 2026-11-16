@@ -11,7 +11,7 @@ xcodebuild build -project FilmCan/FilmCan.xcodeproj -scheme FilmCan -configurati
 open FilmCan/build/qc/Build/Products/Debug/FilmCan.app
 ```
 
-Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (fusionnée) · 4 = hash lists conformes et robustes (fusionnée).
+Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (fusionnée) · 4 = hash lists conformes et robustes (fusionnée) · 5 = résultats annoncés autour du moteur (fusionnée).
 
 ---
 
@@ -159,3 +159,53 @@ Prérequis : une carte (ou un dossier) avec 3 à 5 clips, deux disques de destin
 - [ ] Réparation depuis une destination sœur (Retry › copier depuis l'autre disque) : la génération écrite porte `action="original"` et la date du jour pour les fichiers réparés.
 - [ ] Rapport PDF et recréation de rapport : les checksums affichés sont inchangés.
 - [ ] Connu, non corrigé : une entrée `action="failed"` d'un autre outil compte encore pour la reprise ; le rapport, l'archive de rapport et `HashListVerifier` lisent toujours le dernier manifest sans repli.
+
+---
+
+## Session 5 : les fonctions autour du moteur n'annoncent plus un résultat faux
+
+Objectif : réparation, « Verify data », rapport PDF, auto-fix Netflix, annulation et statuts disent ce qui s'est vraiment passé.
+Tests automatiques : `HonestOutcomeTests` (15 tests).
+
+Prérequis : deux cartes (ou dossiers) de 3 clips chacune, deux disques de destination, film réel.
+
+### Réparation depuis une autre destination (constat 1)
+- [ ] Run à **deux cartes**, une destination en échec (débrancher pendant la copie). Retry › copier depuis l'autre disque : les deux rolls reviennent sur le disque réparé, chacun avec son `ascmhl/`.
+- [ ] Supprimer un clip du second roll sur le disque sain avant la réparation : la réparation échoue, la destination reste rouge.
+- [ ] Un clip réparé est relu depuis le disque : la réparation est plus longue qu'avant (deux lectures). Attendu.
+
+### Réparation depuis la source (constat 2)
+- [ ] Film Netflix (épisode, jour, unité remplis), une destination en échec. Retry › depuis la source : les clips arrivent dans le **même** dossier `<date>_<épisode>_<jour>_<unité>/Camera_Media/…` que sur le disque sain, pas dans un dossier aux champs vides.
+- [ ] Connu : si minuit passe entre la sauvegarde et la réparation, `{date}` change de jour (non corrigé).
+
+### Verify data (constat 3)
+- [ ] Numérotation automatique activée (A001…). Run complet, puis relancer : popup « déjà sauvegardé ». **Verify data** : le nombre de fichiers vérifiés est celui de la carte, pas 0.
+- [ ] Même chose avec une carte « Untitled » (nom générique `Untitled_NN`).
+
+### Rapport PDF (constat 4)
+- [ ] Désactiver le log, activer le rapport : un PDF est écrit à l'endroit où le log serait allé (destination, ou `Reports/` en Netflix).
+- [ ] En-tête : « Verified ✓ — N verified this run · M from an earlier backup » quand tout est prouvé. Chaque clip porte « xxh128: … · Verified this run » ou « From an earlier backup ».
+- [ ] Run en Vérification **Off** : en-tête « Not everything is verified », clips « Copied, not verified », **aucun** checksum affiché.
+- [ ] Modifier la taille d'un clip sur la destination puis générer un rapport (relancer avec un nouveau clip) : ce clip n'a pas de checksum, note « Size changed since the backup ».
+- [ ] Rapport d'une centaine de clips : la fenêtre reste fluide pendant la génération.
+
+### Auto-fix Netflix (constat 5)
+- [ ] Film Netflix, carte nommée `A#01` : la fenêtre de validation propose Auto-fix. Après Auto-fix : la carte s'appelle **toujours** `A#01` dans le Finder, le roll s'appelle `A_01` sur les destinations.
+- [ ] Deux cartes qui donnent le même nom corrigé : la seconde devient `…_001` sur les destinations.
+- [ ] Avec la numérotation automatique : le nom numéroté gagne, l'auto-fix ne change rien.
+
+### Annulation en mode séquentiel (constat 6)
+- [ ] Mode de copie **Sequential**, trois destinations. Pendant la copie de la première, Stop sur la troisième (en attente) : elle n'est jamais copiée, sa carte passe en « Cancelled by user ». La deuxième est copiée normalement.
+- [ ] Stop sur la destination **en cours** : seule elle s'arrête, la suivante démarre.
+
+### Option « Copy order » (constat 7)
+- [ ] Options › Basic : la ligne « Copy order » a disparu. Un film qui l'avait réglée s'ouvre sans erreur.
+
+### Statuts (constat 8)
+- [ ] Paranoid, gros clip : Stop pendant « Verifying… ». La carte et l'historique disent « Cancelled by user », jamais « Verification mismatch ».
+- [ ] Une carte rouge pendant la copie ne redevient jamais bleue/active avant la fin du run.
+
+### Régression à surveiller
+- [ ] Copie normale 2 destinations, Fast puis Paranoid : barres, statuts, historique inchangés.
+- [ ] Quick Copy : copie, vérification et rapport (si le film l'a activé) comme avant.
+- [ ] Connu, non corrigé : un clip déjà renommé en place mais pas encore vérifié au moment du Stop reste sur le disque hors manifest ; le run suivant le présente comme un fichier inconnu (prompt doublons).

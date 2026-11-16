@@ -26,7 +26,6 @@ See [Copy Engines](./copy-engines.md) for engine behavior.
   - `Automatic` *(default)*: parallel for SSDs / distinct drives, sequential for a network destination or two destinations on the same physical volume.
   - `All destinations at once`: read the source once, write everywhere together.
   - `One destination at a time`: copy each destination fully before the next (re-reads the source per destination).
-- **Copy order**: `Default order`, `Smallest first`, `Largest first`, `Creation date`.
 
 ---
 
@@ -103,7 +102,6 @@ Voir [Copy Engines](./copy-engines.md) pour le comportement du moteur.
   - `Automatic` *(par défaut)* : parallèle pour les disques SSD/disques distincts, séquentiel pour une destination réseau ou deux destinations sur le même volume physique.
   - `All destinations at once` : lire la source une fois, écrire partout ensemble.
   - `One destination at a time` : copier chaque destination complètement avant la suivante (relit la source par destination).
-- **Copy order** : `Default order`, `Smallest first`, `Largest first`, `Creation date`.
 
 ---
 
@@ -180,7 +178,6 @@ Siehe [Copy Engines](./copy-engines.md) für das Engine-Verhalten.
   - `Automatic` *(Standard)* : parallel für SSDs/unterschiedliche Laufwerke, sequenziell für ein Netzwerkziel oder zwei Ziele auf dem gleichen physischen Volume.
   - `All destinations at once` : Quelle einmal lesen, überall gleichzeitig schreiben.
   - `One destination at a time` : jedes Ziel vollständig kopieren, bevor das nächste kopiert wird (liest die Quelle pro Ziel erneut).
-- **Copy order** : `Default order`, `Smallest first`, `Largest first`, `Creation date`.
 
 ---
 
@@ -257,7 +254,6 @@ Ver [Copy Engines](./copy-engines.md) para el comportamiento del motor.
   - `Automatic` *(predeterminado)* : paralelo para unidades SSD/distintas, secuencial para un destino de red o dos destinos en el mismo volumen físico.
   - `All destinations at once` : lea la fuente una vez, escriba en todas partes juntas.
   - `One destination at a time` : copie cada destino completamente antes del siguiente (relee la fuente por destino).
-- **Copy order** : `Default order`, `Smallest first`, `Largest first`, `Creation date`.
 
 ---
 

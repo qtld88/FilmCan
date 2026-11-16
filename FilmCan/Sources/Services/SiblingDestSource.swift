@@ -110,5 +110,38 @@ actor SiblingDestSource {
             try? fm.removeItem(at: tempURL)
             throw Error.readFailed("rename(2) failed for \(destURL.path) (errno=\(errno))")
         }
+
+        // The streamed hash only proves the bytes we handed to the drive. Read the
+        // repaired copy back from disk (no cache) before calling it repaired; a copy
+        // that does not read back identical is removed.
+        try Self.checkOnDisk(path: destURL.path, fileName: fileName, expectedHash: expectedHash,
+                             chunkSize: chunkSize)
+    }
+
+    /// Re-reads `path` with caching off and throws unless its xxh128 is `expectedHash`.
+    /// A file that does not match (or cannot be read) is removed.
+    static func checkOnDisk(path: String, fileName: String, expectedHash: String,
+                            chunkSize: Int = 4 * 1024 * 1024) throws {
+        let fm = FileManager.default
+        let actual: String
+        do {
+            let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+            defer { try? handle.close() }
+            fcntl(handle.fileDescriptor, F_NOCACHE, 1)
+            guard let hasher = XXH128StreamingHasher() else { throw Error.readFailed("XXH128 unavailable") }
+            while try autoreleasepool(invoking: {
+                guard let data = try handle.read(upToCount: chunkSize), !data.isEmpty else { return false }
+                hasher.update(data: data)
+                return true
+            }) {}
+            actual = hasher.finalize().hexString
+        } catch {
+            try? fm.removeItem(atPath: path)
+            throw Error.readFailed("Read-back of \(fileName) failed: \(error.localizedDescription)")
+        }
+        guard actual.lowercased() == expectedHash.lowercased() else {
+            try? fm.removeItem(atPath: path)
+            throw Error.hashMismatch(fileName, expectedHash, actual)
+        }
     }
 }

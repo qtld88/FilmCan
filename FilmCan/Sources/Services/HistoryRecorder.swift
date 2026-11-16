@@ -24,7 +24,8 @@ final class HistoryRecorder {
         results: [TransferResult],
         preset: OrganizationPreset?,
         transferStartTime: Date?,
-        retentionLimit: Int
+        retentionLimit: Int,
+        shootMetadata: ShootMetadata? = nil
     ) async -> RunContext {
         let start = results.map { $0.startTime }.min() ?? (transferStartTime ?? Date())
         let end = results.compactMap { $0.endTime }.max() ?? Date()
@@ -82,7 +83,8 @@ final class HistoryRecorder {
             sourceMediaKinds: config.sourceMediaKinds,
             duplicatePolicy: config.duplicatePolicy,
             hashListStyle: config.hashListStyle,
-            rollNames: config.runRollNames
+            rollNames: config.runRollNames,
+            shootMetadata: shootMetadata ?? ShootMetadata(config: config)
         )
         entry.runContext = ctx
         storage.appendHistory(entry, retentionLimit: retentionLimit)

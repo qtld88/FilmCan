@@ -10,12 +10,15 @@ struct RunContext: Codable {
     var hashListStyle: HashListStyle
     /// Source path → assigned roll name for this run (empty when numbering was off).
     var rollNames: [String: String] = [:]
+    /// Episode / day / unit / camera format / movie of the run (Netflix folder tokens).
+    /// Nil for entries recorded before it was kept.
+    var shootMetadata: ShootMetadata? = nil
 }
 
 extension RunContext {
     private enum CodingKeys: String, CodingKey {
         case organizationPresetId, cameraFolderTemplate, soundFolderTemplate, copyFolderContents
-        case sourceMediaKinds, duplicatePolicy, hashListStyle, rollNames
+        case sourceMediaKinds, duplicatePolicy, hashListStyle, rollNames, shootMetadata
     }
 
     init(from decoder: Decoder) throws {
@@ -28,6 +31,7 @@ extension RunContext {
         duplicatePolicy = try c.decode(OrganizationPreset.DuplicatePolicy.self, forKey: .duplicatePolicy)
         hashListStyle = try c.decode(HashListStyle.self, forKey: .hashListStyle)
         rollNames = try c.decodeIfPresent([String: String].self, forKey: .rollNames) ?? [:]
+        shootMetadata = try c.decodeIfPresent(ShootMetadata.self, forKey: .shootMetadata)
     }
 }
 

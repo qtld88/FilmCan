@@ -10,6 +10,9 @@ struct DestResult: Equatable {
     var bytesTransferred: Int64 = 0
     var failureReason: DestFailureReason?
     var mhlPath: String?
+    /// Every roll's manifest at this destination (one per roll). `mhlPath` is only
+    /// the first; repair and anything that must cover the whole run reads this.
+    var mhlPaths: [String] = []
     /// Non-nil when the copy + verify succeeded but the ASC MHL manifest could not
     /// be sealed (data is safe; only the chain-of-custody deliverable is missing).
     /// Carries the seal error so the UI can explain it. Distinct from `failureReason`

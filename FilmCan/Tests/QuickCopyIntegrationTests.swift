@@ -49,7 +49,7 @@ final class QuickCopyIntegrationTests: XCTestCase {
             sources: config.sourcePaths, fanOutDestinations: dests, configName: config.name,
             organizationPreset: preset, copyFolderContents: config.copyFolderContents,
             useHashListPrecheck: config.engineOptions.customVerifyEnabled, hashListPath: nil,
-            fileOrdering: config.engineOptions.fileOrdering, duplicatePolicy: config.duplicatePolicy,
+            duplicatePolicy: config.duplicatePolicy,
             duplicateCounterTemplate: config.duplicateCounterTemplate, duplicateResolver: nil,
             verifyMode: mode, dryRun: false,
             shootMetadata: ShootMetadata(episode: config.episode, day: config.day,

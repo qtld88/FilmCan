@@ -1,15 +1,15 @@
 <!-- lang:en -->
 # PDF Backup Report
 
-FilmCan can write a readable PDF for each destination after a backup, next to the transfer log.
+FilmCan can write a readable PDF for each destination after a backup, next to the transfer log (or where the log would go when the log is off).
 
 ---
 
 ## What is in it
 
-- Header: project, episode/day/unit (when set), destination volume and path, start/end time and duration, status ("Verified ✓", "Copied, not verified" or "Failed"), warning (if any), FilmCan version.
+- Header: project, episode/day/unit (when set), destination volume and path, start/end time and duration, status counted per file ("Verified ✓" only when every file is proved, else "Not everything is verified" or "Failed", followed by how many files were verified this run, come from an earlier backup, were copied without a check, or have no checksum), warning (if any), FilmCan version.
 - Summary: one line per roll with kind (Camera/Sound), file count and total size.
-- One section per roll: a row per file with a thumbnail, name, relative path, size, duration (video/audio) and checksum.
+- One section per roll: a row per file with a thumbnail, name, relative path, size, duration (video/audio), checksum and status. A checksum is shown only when the drive's ASC MHL list proves it (xxh128 entry of the same size; a damaged newest list falls back to the previous one). A file copied with Verification Off, missing from the list, or whose size changed shows no checksum and says why.
 
 The report lists everything in the roll folder on the drive, including files skipped on a resumed run. Hidden files and the `ascmhl/` folder are left out. XML sidecars and other non-media files are listed with their file icon.
 
@@ -17,13 +17,13 @@ The report lists everything in the roll folder on the drive, including files ski
 
 ## Enable it
 
-Options › Logs › **PDF report with thumbnails**. It needs **Create log file** to be on; the toggle is greyed out otherwise. It is on for a new movie; movies you already had keep their setting.
+Options › Logs › **PDF report with thumbnails**. It works with or without **Create log file**. It is on for a new movie; movies you already had keep their setting.
 
 ---
 
 ## Where it goes
 
-`<log file name>_report.pdf`, in the same folder as the log. With the Netflix Ingest preset the log goes in the shoot-day `Reports/` folder, so the PDF does too.
+`<log file name>_report.pdf`, in the same folder as the log (with the log off: the folder and name the log would have had). With the Netflix Ingest preset the log goes in the shoot-day `Reports/` folder, so the PDF does too.
 
 From History, right-click a card and choose **Open report** when the PDF exists. With several destinations, the menu has one **Open report** entry per destination.
 
@@ -76,7 +76,7 @@ Le rapport liste tout ce qui se trouve dans le dossier du roll sur le disque, y 
 
 ## L'activer
 
-Options › Logs › **PDF report with thumbnails**. **Create log file** doit être activé ; sinon l'interrupteur est grisé. Il est activé sur un nouveau film ; les films déjà créés gardent leur réglage.
+Options › Logs › **PDF report with thumbnails**. Il fonctionne avec ou sans **Create log file**. Il est activé sur un nouveau film ; les films déjà créés gardent leur réglage.
 
 ---
 
@@ -123,7 +123,7 @@ Der Bericht listet alles im Roll-Ordner auf dem Laufwerk auf, auch Dateien, die 
 
 ## Aktivieren
 
-Options › Logs › **PDF report with thumbnails**. **Create log file** muss eingeschaltet sein; sonst ist der Schalter ausgegraut. Bei einem neuen Film ist er an; bereits vorhandene Filme behalten ihre Einstellung.
+Options › Logs › **PDF report with thumbnails**. Er funktioniert mit oder ohne **Create log file**. Bei einem neuen Film ist er an; bereits vorhandene Filme behalten ihre Einstellung.
 
 ---
 
@@ -170,7 +170,7 @@ El informe lista todo lo que hay en la carpeta del roll en la unidad, incluidos 
 
 ## Activarlo
 
-Options › Logs › **PDF report with thumbnails**. Requiere que **Create log file** esté activado; si no, el interruptor aparece atenuado. Está activado en una película nueva; las películas que ya tenía conservan su ajuste.
+Options › Logs › **PDF report with thumbnails**. Funciona con o sin **Create log file**. Está activado en una película nueva; las películas que ya tenía conservan su ajuste.
 
 ---
 

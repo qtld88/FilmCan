@@ -11,6 +11,14 @@ struct AlreadyBackedUpInfo: Identifiable {
     /// The date the original backup run started — needed to resolve dated folder
     /// templates to the same roll folder the engine wrote.
     let date: Date
+    /// What the run used to place each roll, so "Verify data" looks where the engine
+    /// wrote: assigned roll names (numbering, generic cards), preset, shoot tokens,
+    /// Camera/Sound tags, content copy.
+    var rollNames: [String: String] = [:]
+    var preset: OrganizationPreset? = nil
+    var metadata: ShootMetadata = .empty
+    var mediaKinds: [String: SourceMediaKind] = [:]
+    var copyFolderContents: Bool = false
 }
 
 struct AlreadyBackedUpSheet: View {

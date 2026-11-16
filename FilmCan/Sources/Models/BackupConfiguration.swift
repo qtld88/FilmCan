@@ -283,6 +283,17 @@ struct BackupConfiguration: Codable, Identifiable, Equatable {
         return copy
     }
 
+    /// Copy where each source without a run roll name takes the one given here
+    /// (Netflix auto-fix). Numbered and generic-card names stay as they are.
+    func withRollNameFallbacks(_ names: [String: String]) -> BackupConfiguration {
+        guard !names.isEmpty else { return self }
+        var copy = self
+        for path in sourcePaths where copy.runRollNames[path] == nil {
+            if let name = names[path], !name.isEmpty { copy.runRollNames[path] = name }
+        }
+        return copy
+    }
+
     var isValid: Bool {
         !includedSourcePaths.isEmpty &&
         !includedDestinationPaths.isEmpty &&

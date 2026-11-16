@@ -120,11 +120,36 @@ enum BackupLogWriter {
         return existing.contains(new) ? existing : "\(existing)\n\(new)"
     }
 
+    /// Where this destination's log goes (or would go with the log on), WITHOUT
+    /// creating anything: the Netflix `Reports/` folder, the custom log folder, or the
+    /// destination. The PDF report sits next to it even when the log is off.
+    static func plannedLogPath(config: BackupConfiguration, destination: String,
+                               sources: [String], preset: OrganizationPreset?) -> String {
+        let customDate = preset?.useCustomDate == true ? preset?.customDate : nil
+        if let preset, preset.name == OrganizationPreset.netflixIngestName,
+           let nf = netflixReportLogPathCandidate(destination: destination, config: config, preset: preset,
+                                                  sources: sources, customDate: customDate) {
+            return nf
+        }
+        let date = customDate ?? Date()
+        let logName = LogFileNamer.makeFileName(
+            template: config.logFileNameTemplate, configName: config.name,
+            destination: destination, sources: sources, date: date)
+        var base = destination
+        if config.logLocation == .custom && !config.customLogPath.isEmpty {
+            let resolved = LogFolderNamer.resolveFolderPath(
+                template: config.customLogPath, destination: destination, sources: sources, date: date)
+            base = resolved.isEmpty ? config.customLogPath : resolved
+        }
+        return (base as NSString).appendingPathComponent(logName)
+    }
+
     /// `<destination>/<shoot-day-root>/Reports/<logname>` for the Netflix preset, where
     /// the shoot-day root is the first folder component of the resolved Netflix template.
-    static func netflixReportLogPath(destination: String, config: BackupConfiguration,
-                                     preset: OrganizationPreset, sources: [String],
-                                     customDate: Date?) -> String? {
+    /// Creates nothing.
+    static func netflixReportLogPathCandidate(destination: String, config: BackupConfiguration,
+                                              preset: OrganizationPreset, sources: [String],
+                                              customDate: Date?) -> String? {
         let date = customDate ?? Date()
         let meta = ShootMetadata(episode: config.episode, day: config.day,
                                  unit: config.unit, cameraFormat: config.cameraFormat,
@@ -140,7 +165,16 @@ enum BackupLogWriter {
         let logName = LogFileNamer.makeFileName(
             template: config.logFileNameTemplate, configName: config.name,
             destination: destination, sources: sources, date: date)
-        let path = (reportsDir as NSString).appendingPathComponent(logName)
+        return (reportsDir as NSString).appendingPathComponent(logName)
+    }
+
+    /// Same place as `netflixReportLogPathCandidate`, created and checked writable.
+    static func netflixReportLogPath(destination: String, config: BackupConfiguration,
+                                     preset: OrganizationPreset, sources: [String],
+                                     customDate: Date?) -> String? {
+        guard let path = netflixReportLogPathCandidate(
+            destination: destination, config: config, preset: preset,
+            sources: sources, customDate: customDate) else { return nil }
         return Self.ensureWritableLogPath(path) ? path : nil
     }
 

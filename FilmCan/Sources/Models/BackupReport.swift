@@ -10,8 +10,31 @@ struct BackupReport: Equatable {
         var checksumAlgorithm: String?
         var isVideo: Bool
         var isAudio: Bool
-        /// Why this file shows no checksum (report created after the fact only).
+        /// Why this file shows no checksum.
         var note: String? = nil
+        /// What this backup can say about the file (report written by the backup itself).
+        var status: Status? = nil
+
+        enum Status: Equatable {
+            /// Copied by this run, checked against the source, in the checksum list.
+            case verifiedThisRun
+            /// Copied by this run without a check (Verification Off) or with no usable
+            /// checksum-list entry.
+            case copiedNotVerified
+            /// Already on the drive from an earlier backup, in the checksum list.
+            case fromEarlierBackup
+            /// No checksum the report can stand behind (see `note`).
+            case noProof
+
+            var text: String {
+                switch self {
+                case .verifiedThisRun: return "Verified this run"
+                case .copiedNotVerified: return "Copied, not verified"
+                case .fromEarlierBackup: return "From an earlier backup, checksum list"
+                case .noProof: return "No checksum"
+                }
+            }
+        }
 
         var name: String { (relPath as NSString).lastPathComponent }
         var isImage: Bool {
@@ -39,6 +62,8 @@ struct BackupReport: Equatable {
     var startedAt: Date
     var endedAt: Date
     var success: Bool
+    /// True only when EVERY file listed is proved: copied and checked this run, or
+    /// already on the drive with a matching checksum-list entry. Never a blanket flag.
     var verified: Bool
     var warning: String?
     var rolls: [Roll]
@@ -94,17 +119,22 @@ struct BackupReport: Equatable {
         }
     }
 
+    static let noteWrittenUnchecked = "Written with Verification Off: never checked"
+
     static let videoExtensions: Set<String> = ["mov", "mp4", "m4v", "mxf", "avi", "mts", "m2ts", "braw", "r3d", "crm", "ari", "insv", "lrv"]
     static let audioExtensions: Set<String> = ["wav", "bwf", "aif", "aiff", "mp3", "m4a"]
 
     /// Builds the report for ONE destination result. Lists every file in each roll folder
     /// (what is on the drive, not only this run's copies), skipping hidden components and
-    /// the `ascmhl/` directory, sorted by relative path.
+    /// the `ascmhl/` directory, sorted by relative path. Each file gets its own status;
+    /// a checksum is shown only when the checksum list proves it (xxh128, same size).
     static func build(result: TransferResult, config: BackupConfiguration,
                       appVersion: String) -> BackupReport {
         let dest = result.destinationResults.first
         let rollFolders = dest?.rollFolders ?? [:]
         let destPath = dest?.destinationPath ?? result.destination
+        let checked = (dest?.verifyMode ?? .off) != .off
+        let copiedThisRun = Set(dest?.transferredFileNames ?? [])
 
         let rolls: [Roll] = rollFolders
             .sorted { $0.value < $1.value }
@@ -112,8 +142,12 @@ struct BackupReport: Equatable {
                 Roll(name: (rootPath as NSString).lastPathComponent,
                      folderPath: folder,
                      mediaKind: config.sourceMediaKinds[rootPath] ?? .camera,
-                     clips: clips(inRollFolder: folder))
+                     clips: clips(inRollFolder: folder, copiedThisRun: copiedThisRun, checked: checked))
             }
+        let allClips = rolls.flatMap(\.clips)
+        let everyFileProved = !allClips.isEmpty && allClips.allSatisfy {
+            $0.status == .verifiedThisRun || $0.status == .fromEarlierBackup
+        }
 
         let volumeName = (try? URL(fileURLWithPath: destPath)
             .resourceValues(forKeys: [.volumeNameKey]).volumeName)
@@ -127,23 +161,39 @@ struct BackupReport: Equatable {
             startedAt: result.startTime,
             endedAt: result.endTime ?? result.startTime,
             success: result.success,
-            verified: result.wasVerified,
+            verified: result.success && everyFileProved,
             warning: result.warningMessage,
             rolls: rolls,
             appVersion: appVersion)
     }
 
-    private static func clips(inRollFolder folder: String) -> [Clip] {
+    /// What the report says about the files of this run, in one line.
+    var statusLine: String {
+        let clips = rolls.flatMap(\.clips)
+        let count = { (s: Clip.Status) in clips.filter { $0.status == s }.count }
+        let verifiedNow = count(.verifiedThisRun), earlier = count(.fromEarlierBackup)
+        let notVerified = count(.copiedNotVerified), noProof = count(.noProof)
+        var parts: [String] = []
+        if verifiedNow > 0 { parts.append("\(verifiedNow) verified this run") }
+        if earlier > 0 { parts.append("\(earlier) from an earlier backup") }
+        if notVerified > 0 { parts.append("\(notVerified) copied, not verified") }
+        if noProof > 0 { parts.append("\(noProof) without checksum") }
+        let detail = parts.joined(separator: " · ")
+        let lead = !success ? "Failed" : verified ? "Verified ✓" : "Not everything is verified"
+        return detail.isEmpty ? lead : "\(lead) — \(detail)"
+    }
+
+    private static func clips(inRollFolder folder: String, copiedThisRun: Set<String>,
+                              checked: Bool) -> [Clip] {
         let root = URL(fileURLWithPath: folder)
         let fm = FileManager.default
         let rootPrefix = root.standardizedFileURL.path + "/"
 
-        var checksums: [String: String] = [:]
-        let ascDir = FanOutCopier.ascMHLDir(rollFolder: folder)
-        if let name = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir),
-           let entries = try? ASCMHLReader.read(url: ascDir.appendingPathComponent(name)) {
-            for e in entries { checksums[e.relPath] = e.hash }
-        }
+        // Every readable generation, xxh128 with a size only (a damaged newest one
+        // falls back to the previous): same proof rule as a report made after the fact.
+        let listed = ReportRecreation.checksums(rollFolder: folder).byRelPath
+        // Entries written by a Verification-Off run were never checked.
+        let unverified = UnverifiedLedger.load(rollFolder: folder)
 
         guard let en = fm.enumerator(at: root,
                                      includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
@@ -160,13 +210,30 @@ struct BackupReport: Equatable {
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
             guard values?.isRegularFile == true else { continue }
             let ext = url.pathExtension.lowercased()
-            let sum = checksums[rel]
-            out.append(Clip(relPath: rel, absolutePath: std,
-                            size: Int64(values?.fileSize ?? 0),
-                            checksum: sum,
-                            checksumAlgorithm: sum == nil ? nil : "xxh128",
+            let size = Int64(values?.fileSize ?? 0)
+            var clip = Clip(relPath: rel, absolutePath: std, size: size,
+                            checksum: nil, checksumAlgorithm: nil,
                             isVideo: videoExtensions.contains(ext),
-                            isAudio: audioExtensions.contains(ext)))
+                            isAudio: audioExtensions.contains(ext))
+            if unverified.contains(rel) {
+                clip.note = noteWrittenUnchecked
+            } else if let entry = listed[rel] {
+                if entry.size == size {
+                    clip.checksum = entry.hash
+                    clip.checksumAlgorithm = "xxh128"
+                } else {
+                    clip.note = ReportRecreation.noteSizeChanged
+                }
+            } else {
+                clip.note = ReportRecreation.noteNotListed
+            }
+            let proved = clip.checksum != nil
+            if copiedThisRun.contains(rel) {
+                clip.status = proved && checked ? .verifiedThisRun : .copiedNotVerified
+            } else {
+                clip.status = proved ? .fromEarlierBackup : .noProof
+            }
+            out.append(clip)
         }
         return out.sorted { $0.relPath < $1.relPath }
     }

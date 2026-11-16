@@ -8,31 +8,11 @@ extension BackupEditorView {
             == OrganizationPreset.netflixIngestName
     }
 
-    /// Rename source folders to satisfy Netflix naming (sanitize prohibited chars,
-    /// dedupe), update the source list, and re-run.
+    /// Netflix naming fix: the corrected roll names apply at the destination only.
+    /// The card is never renamed.
     func autoFixNetflixNames() {
-        let fm = FileManager.default
-        var used = Set<String>()
-        var newPaths: [String] = []
-        for path in viewModel.sourcePaths {
-            let url = URL(fileURLWithPath: path)
-            let base = NetflixNameValidator.sanitize(url.lastPathComponent)
-            var candidate = base
-            var n = 1
-            while used.contains(candidate) { candidate = "\(base)_\(String(format: "%03d", n))"; n += 1 }
-            used.insert(candidate)
-            if candidate != url.lastPathComponent {
-                let dst = url.deletingLastPathComponent().appendingPathComponent(candidate)
-                if (try? fm.moveItem(at: url, to: dst)) != nil {
-                    newPaths.append(dst.path)
-                } else {
-                    newPaths.append(path)
-                }
-            } else {
-                newPaths.append(path)
-            }
-        }
-        viewModel.sourcePaths = newPaths
+        viewModel.netflixRollNameFixes = NetflixNameValidator.fixedRollNames(
+            sources: viewModel.includedSourcePaths)
         startTransfer(skipNetflixValidation: true)
     }
 
@@ -42,7 +22,9 @@ extension BackupEditorView {
         guard viewModel.validate() else { return }
 
         if !skipNetflixValidation && isNetflixPresetSelected {
-            let rolls = viewModel.includedSourcePaths.map { ($0 as NSString).lastPathComponent }
+            // Names as they will be written: an auto-fix already chosen counts.
+            let fixes = viewModel.netflixRollNameFixes
+            let rolls = viewModel.includedSourcePaths.map { fixes[$0] ?? ($0 as NSString).lastPathComponent }
             let issues = NetflixNameValidator.validate(rollNames: rolls)
             if !issues.isEmpty {
                 netflixValidation = NetflixValidationInfo(issues: issues)
@@ -174,8 +156,10 @@ extension BackupEditorView {
     }
 
     func beginTransfer() {
+        let fixes = viewModel.netflixRollNameFixes
+        viewModel.netflixRollNameFixes = [:]
         Task {
-            await transferViewModel.startTransfer(config: viewModel.config)
+            await transferViewModel.startTransfer(config: viewModel.config, rollNameFallbacks: fixes)
         }
     }
 

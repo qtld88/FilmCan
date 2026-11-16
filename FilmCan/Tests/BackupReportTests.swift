@@ -126,9 +126,4 @@ final class BackupReportTests: XCTestCase {
         XCTAssertFalse(clip("noext").isMedia)
     }
 
-    func test_generate_withoutLog_returnsNil() async {
-        let result = TransferResult(configurationName: "X", destination: tmpDir.path, startTime: Date())
-        let path = await BackupReportWriter.generate(result: result, config: BackupConfiguration())
-        XCTAssertNil(path)
-    }
 }
