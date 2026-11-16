@@ -12,6 +12,13 @@ struct CatalogView: View {
 
     /// Set when hosted in the main window's right pane; nil in the standalone window.
     var paneWidth: CGFloat? = nil
+    /// The selected movie tab. Nil shows every movie (no tab selected).
+    var scope: CatalogScope? = nil
+
+    /// The rolls this Catalog shows: the selected movie's only, when one is selected.
+    private var rolls: [CatalogRoll] {
+        scope.map { $0.rolls(in: store.rolls) } ?? store.rolls
+    }
 
     private var isCompact: Bool { (paneWidth ?? .infinity) < 420 }
 
@@ -89,10 +96,12 @@ struct CatalogView: View {
     // MARK: Coverage mode
 
     private var coverageList: some View {
-        let atRisk = MediaCatalog.atRisk(store.rolls)
+        let atRisk = MediaCatalog.atRisk(rolls)
         return Group {
-            if store.rolls.isEmpty {
-                placeholder("No roll recorded yet. Rolls appear here after their first backup.")
+            if rolls.isEmpty {
+                placeholder(scope == nil
+                    ? "No roll recorded yet. Rolls appear here after their first backup."
+                    : "No roll recorded for this movie yet. Rolls appear here after their first backup.")
             } else {
                 List {
                     if !atRisk.isEmpty {
@@ -124,7 +133,7 @@ struct CatalogView: View {
     private struct ProjectGroup { var name: String; var days: [DayGroup] }
 
     private var projectGroups: [ProjectGroup] {
-        let byProject = Dictionary(grouping: store.rolls, by: \.projectName)
+        let byProject = Dictionary(grouping: rolls, by: \.projectName)
         return byProject.keys.sorted().map { name in
             let byDay = Dictionary(grouping: byProject[name] ?? [], by: \.shootDay)
             let days = byDay.map { day, rolls in
@@ -297,14 +306,14 @@ struct CatalogView: View {
 
     private var resultsList: some View {
         let limit = 200
-        let hits = MediaCatalog.search(trimmedQuery, in: store.rolls, limit: limit)
+        let hits = MediaCatalog.search(trimmedQuery, in: rolls, limit: limit)
         return Group {
             if hits.isEmpty {
                 placeholder("No clip matches “\(trimmedQuery)”.")
             } else {
                 List {
                     ForEach(hits) { hit in
-                        let hitCoverage = store.rolls.first(where: { $0.id == hit.rollId })?.coverage
+                        let hitCoverage = rolls.first(where: { $0.id == hit.rollId })?.coverage
                         HStack(alignment: .top, spacing: 10) {
                             VStack(alignment: .leading, spacing: 4) {
                                 VStack(alignment: .leading, spacing: 2) {

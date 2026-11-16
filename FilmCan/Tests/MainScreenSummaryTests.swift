@@ -70,20 +70,37 @@ final class MainScreenSummaryTests: XCTestCase {
     // MARK: - Run subtitle
 
     func testRunSubtitleSaysWhatIsMissingFirst() {
-        XCTAssertEqual(RunSubtitle.text(sourceCount: 0, driveCount: 0, newFolderCount: 0, isRunning: false),
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 0, driveCount: 0, newFoldersPerDrive: [], isRunning: false),
                        "Add a card or a folder to copy")
-        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 0, newFolderCount: 0, isRunning: false),
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 0, newFoldersPerDrive: [], isRunning: false),
                        "Add a drive to save to")
     }
 
-    func testRunSubtitleCountsNewFolders() {
-        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFolderCount: 1, isRunning: false),
+    func testRunSubtitleCountsNewFoldersPerDriveWhenEveryDriveMatches() {
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFoldersPerDrive: [3, 3], isRunning: false),
+                       "3 folders per drive will be created")
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFoldersPerDrive: [1, 1], isRunning: false),
+                       "1 folder per drive will be created")
+    }
+
+    func testRunSubtitleSingleDriveSaysPlainCount() {
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 1, newFoldersPerDrive: [1], isRunning: false),
                        "1 folder will be created")
-        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFolderCount: 3, isRunning: false),
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 1, newFoldersPerDrive: [3], isRunning: false),
                        "3 folders will be created")
-        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFolderCount: 0, isRunning: false),
+    }
+
+    func testRunSubtitleNamesHowManyDrivesWhenCountsDiffer() {
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFoldersPerDrive: [3, 0], isRunning: false),
+                       "3 folders will be created on 1 drive")
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFoldersPerDrive: [3, 1], isRunning: false),
+                       "4 folders will be created on 2 drives")
+    }
+
+    func testRunSubtitleNothingNewOrRunning() {
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFoldersPerDrive: [0, 0], isRunning: false),
                        "Folders already exist: only missing files are copied")
-        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFolderCount: 3, isRunning: true),
+        XCTAssertEqual(RunSubtitle.text(sourceCount: 1, driveCount: 2, newFoldersPerDrive: [3, 3], isRunning: true),
                        "Backup in progress")
     }
 

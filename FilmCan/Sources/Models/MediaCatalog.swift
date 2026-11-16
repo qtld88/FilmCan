@@ -72,6 +72,22 @@ struct CatalogRoll: Codable, Identifiable, Equatable {
         if let a = configId, let b = other.configId { return a == b }
         return projectName == other.projectName
     }
+    /// True when this roll belongs to the movie `configId` (named `name` today).
+    /// Rolls recorded before the config id was stored fall back to the name.
+    func belongs(toMovie configId: UUID, named name: String) -> Bool {
+        if let own = self.configId { return own == configId }
+        return projectName == name
+    }
+}
+
+/// The movie the Catalog is limited to: the selected movie tab.
+struct CatalogScope: Equatable {
+    var configId: UUID
+    var movieName: String
+
+    func rolls(in rolls: [CatalogRoll]) -> [CatalogRoll] {
+        rolls.filter { $0.belongs(toMovie: configId, named: movieName) }
+    }
 }
 
 /// An earlier roll holding some of a card's clips.

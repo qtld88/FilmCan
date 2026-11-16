@@ -251,6 +251,9 @@ actor FanOutCopier {
                 let req = FilmCanFormatters.bytes(required, style: .file)
                 return "Not enough space on \"\(dest)\" — needs \(req), only \(av) is writable right now. Finder may show more free space, but most of it is held by local snapshots or caches that couldn't be reclaimed. Free space (empty Trash, remove files, or delete snapshots) or pick another drive."
             case .destinationUnwritable(let path):
+                if let driveName = DriveUtilities.disconnectedDriveName(for: path) {
+                    return DriveUtilities.driveNotConnectedMessage(driveName: driveName)
+                }
                 return "Cannot write to \"\((path as NSString).lastPathComponent)\". Check the drive is connected and not read-only."
             case .duplicateSourceNames(let names):
                 return "Two or more sources resolve to the same destination folder: \(names.joined(separator: ", ")). Rename one so each lands in its own folder."

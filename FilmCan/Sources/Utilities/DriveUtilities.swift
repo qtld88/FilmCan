@@ -203,6 +203,22 @@ enum DriveUtilities {
         return normalizedPath == expectedRoot
     }
 
+    /// Name of the external drive a `/Volumes/<name>/...` path lives on when that
+    /// drive is not mounted, else nil. Lets the UI say "NAV_B is not connected"
+    /// instead of the raw permission error macOS returns for /Volumes.
+    static func disconnectedDriveName(
+        for path: String,
+        exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    ) -> String? {
+        guard let root = volumeRootPath(for: path), !exists(root) else { return nil }
+        return (root as NSString).lastPathComponent
+    }
+
+    /// User-facing sentence for a destination whose drive is not connected.
+    static func driveNotConnectedMessage(driveName: String) -> String {
+        "The drive \"\(driveName)\" is not connected. Connect it, or untick it in Save To."
+    }
+
     static func volumeRootPath(for path: String) -> String? {
         let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
         guard components.count >= 3, components[1] == "Volumes" else { return nil }

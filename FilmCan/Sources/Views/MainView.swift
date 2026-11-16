@@ -173,16 +173,21 @@ struct MainView: View {
         CGFloat(min(max(catalogPaneWidth, 250), 420))
     }
 
+    /// The Catalog follows the selected movie tab.
+    private var catalogScope: CatalogScope? {
+        CatalogScope.selected(in: appState)
+    }
+
     private var catalogPane: some View {
         VStack(spacing: 0) {
-            Text("Catalog — all movies")
+            Text(catalogScope.map { "Catalog — \($0.movieName)" } ?? "Catalog — all movies")
                 .font(FCType.itemTitle)
                 .foregroundColor(FilmCanTheme.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
             Divider().background(FilmCanTheme.cardStroke)
-            CatalogView(paneWidth: clampedCatalogWidth)
+            CatalogView(paneWidth: clampedCatalogWidth, scope: catalogScope)
                 .environmentObject(catalogStore)
         }
         .frame(width: clampedCatalogWidth)

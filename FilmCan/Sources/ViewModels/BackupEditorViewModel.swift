@@ -1214,6 +1214,13 @@ class BackupEditorViewModel: ObservableObject {
         
         // Validate destinations
         for dest in config.includedDestinationPaths {
+            // A missing /Volumes/<name> means the drive is unplugged: say so before
+            // trying to create the folder (macOS would answer "permission denied").
+            if let driveName = DriveUtilities.disconnectedDriveName(for: dest) {
+                validationMessage = DriveUtilities.driveNotConnectedMessage(driveName: driveName)
+                showValidationError = true
+                return false
+            }
             let summary = DriveUtilities.summary(for: dest)
             if summary.isReadOnly == true {
                 let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""

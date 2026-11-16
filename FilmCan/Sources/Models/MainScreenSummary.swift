@@ -42,13 +42,29 @@ enum ShootDayStepper {
 
 enum RunSubtitle {
     /// One short sentence saying what pressing Run will do, or what is missing.
-    static func text(sourceCount: Int, driveCount: Int, newFolderCount: Int, isRunning: Bool) -> String {
+    /// `newFoldersPerDrive` holds one count per included drive. When every drive
+    /// gets the same folders the sentence says so ("3 folders per drive"), so a
+    /// two-drive backup does not read as 6 separate folders.
+    static func text(sourceCount: Int, driveCount: Int, newFoldersPerDrive: [Int], isRunning: Bool) -> String {
         if isRunning { return "Backup in progress" }
         if sourceCount == 0 { return "Add a card or a folder to copy" }
         if driveCount == 0 { return "Add a drive to save to" }
-        if newFolderCount == 1 { return "1 folder will be created" }
-        if newFolderCount > 1 { return "\(newFolderCount) folders will be created" }
-        return "Folders already exist: only missing files are copied"
+        let counts = newFoldersPerDrive.filter { $0 > 0 }
+        guard let first = counts.first else {
+            return "Folders already exist: only missing files are copied"
+        }
+        let sameOnEveryDrive = counts.count == newFoldersPerDrive.count && counts.allSatisfy { $0 == first }
+        if newFoldersPerDrive.count > 1 && sameOnEveryDrive {
+            return first == 1 ? "1 folder per drive will be created"
+                              : "\(first) folders per drive will be created"
+        }
+        let total = counts.reduce(0, +)
+        let noun = total == 1 ? "1 folder" : "\(total) folders"
+        if newFoldersPerDrive.count > 1 {
+            let drives = counts.count == 1 ? "1 drive" : "\(counts.count) drives"
+            return "\(noun) will be created on \(drives)"
+        }
+        return "\(noun) will be created"
     }
 
     /// Folders that do not exist yet, among the lines of one drive's preview.

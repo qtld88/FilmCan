@@ -54,20 +54,20 @@ extension BackupEditorView {
         let destinations = viewModel.config.includedDestinationPaths
         if transferViewModel.isTransferActive(for: viewModel.config.id) {
             return RunSubtitle.text(sourceCount: 1, driveCount: destinations.count,
-                                    newFolderCount: 0, isRunning: true)
+                                    newFoldersPerDrive: [], isRunning: true)
         }
         let sources = subtitleSources
         guard !sources.isEmpty, !destinations.isEmpty else {
             return RunSubtitle.text(sourceCount: sources.count, driveCount: destinations.count,
-                                    newFolderCount: 0, isRunning: false)
+                                    newFoldersPerDrive: [], isRunning: false)
         }
         let options = subtitleOptions
-        let newFolders = destinations.reduce(0) { total, destination in
-            total + RunSubtitle.newFolderCount(
+        let perDrive = destinations.map { destination in
+            RunSubtitle.newFolderCount(
                 in: FolderTreeBuilder.lines(for: destination, sources: sources, options: options))
         }
         return RunSubtitle.text(sourceCount: sources.count, driveCount: destinations.count,
-                                newFolderCount: newFolders, isRunning: false)
+                                newFoldersPerDrive: perDrive, isRunning: false)
     }
 
     private var overviewRowLayout: some View {

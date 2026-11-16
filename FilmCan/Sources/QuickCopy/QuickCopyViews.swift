@@ -615,7 +615,7 @@ struct QuickCopyProgressView: View {
                 Label(fallback ?? "Not completed", systemImage: "xmark.circle.fill")
                     .foregroundColor(FilmCanTheme.dangerText)
             } else {
-                let live = worker.progress.perDestProgress.first { $0.id == destination }
+                let live = worker.progress.perDestProgress.sharedTimingRow(for: destination)
                     ?? DestProgress(id: destination, displayName: name, status: .preparing,
                                     verifyMode: session.form.effectiveVerification)
                 InlineFanOutProgress(progress: live, showPill: true,
