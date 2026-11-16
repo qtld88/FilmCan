@@ -103,6 +103,21 @@ final class OverwriteSafetyTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: dest.appendingPathComponent("CARD/C0001.MP4")), old)
     }
 
+    /// "Re-copy every file" re-copies, but still asks before replacing a backed-up
+    /// clip of another size.
+    func test_reusedCard_forceRecopy_stillAsks() async throws {
+        let (card, dest, old, _) = try await reusedCard()
+        let seen = Seen()
+        var cfg = config(sources: [card], dests: [dest])
+        cfg.forceRecopy = true
+        cfg.duplicatePolicy = .ask
+        cfg.duplicateResolver = { conflicts in await seen.add(conflicts); return [:] }
+        _ = try await FanOutCopier(config: cfg).run()
+        let shown = await seen.conflicts
+        XCTAssertEqual(shown.first?.first?.kind, .differsFromManifest)
+        XCTAssertEqual(try Data(contentsOf: dest.appendingPathComponent("CARD/C0001.MP4")), old)
+    }
+
     func test_reusedCard_userAcceptsOverwrite_replacesTheClip() async throws {
         let (card, dest, _, new) = try await reusedCard()
         var cfg = config(sources: [card], dests: [dest])

@@ -938,8 +938,24 @@ actor FanOutCopier {
         // clips restart at C0001 lands here.
         var changedManifestedPaths = Set<String>()
         func destsNeeding(_ f: PlannedFile) async -> [DestWriter.Config] {
-            if config.forceRecopy { return config.destinations }
             let name = plannedSourceName(f)
+            if config.forceRecopy {
+                // Re-copy everything, but a backed-up file of another size is still
+                // not ours to replace without asking.
+                for dest in config.destinations {
+                    guard let recorded = existingMHLByDest[dest.destPath]?[f.rootName]?
+                        .first(where: { $0.fileName == name }),
+                          recorded.size != 0, recorded.size != f.logicalSize, recorded.size != f.size
+                    else { continue }
+                    changedManifestedPaths.insert(Self.resolveDestFilePath(
+                        destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
+                        relPath: f.relPath, preset: config.organizationPreset,
+                        copyFolderContents: config.copyFolderContents, date: jobStartTime,
+                        metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath),
+                        rollNameIsAssigned: isAssignedRoll(f.rootPath)))
+                }
+                return config.destinations
+            }
             let proofKey = PlannedSourceFile.proofKey(f.absPath)
             var sourceHashForReverify: String?
             if config.reVerifyExistingOnResume {
