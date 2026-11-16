@@ -26,7 +26,9 @@ actor SimpleMHLWriter: MHLWriting {
 
     func seed(_ existing: [MHLEntry]) {
         guard !finalized, !existing.isEmpty else { return }
-        let fresh = existing.filter { indexByRelPath[$0.relPath] == nil }
+        // The format has no algorithm field and is read back as xxh128: an entry
+        // recorded with another algorithm cannot be carried without relabelling it.
+        let fresh = existing.filter { indexByRelPath[$0.relPath] == nil && $0.algorithm == MHLEntry.xxh128 }
         entries = fresh + entries
         indexByRelPath = Dictionary(uniqueKeysWithValues: entries.enumerated().map { ($1.relPath, $0) })
     }

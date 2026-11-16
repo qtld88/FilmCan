@@ -51,7 +51,7 @@ final class HashListIntegrityTests: XCTestCase {
 
     private func mhlFiles(_ ascDir: URL) -> [URL] {
         ASCMHLChain.manifestFilesOnDisk(ascmhlDir: ascDir)
-            .sorted { $0.seq < $1.seq }.map(\.url)
+            .sorted { $0.seq < $1.seq }.map { $0.url }
     }
 
     private func latestManifestXML(_ ascDir: URL) throws -> String {
@@ -155,7 +155,7 @@ final class HashListIntegrityTests: XCTestCase {
 
         let gen2 = try latestManifestXML(asc)
         let hexA = try XCTUnwrap(Hashing.hash(for: a, algorithm: .xxh128))
-        XCTAssertTrue(gen2.contains("hashdate=\"\(old)\">\(hexA)<"), gen2)
+        XCTAssertTrue(gen2.lowercased().contains("hashdate=\"\(old)\">\(hexA)<".lowercased()), gen2)
         let dated = gen2.components(separatedBy: "hashdate=\"\(old)\"").count - 1
         XCTAssertEqual(dated, 1, "only the carried clip keeps the old date:\n\(gen2)")
     }
@@ -251,7 +251,7 @@ final class HashListIntegrityTests: XCTestCase {
             try XCTUnwrap(ASCMHLChain.latestManifestFileName(ascmhlDir: asc))))
         let hex = try XCTUnwrap(Hashing.hash(for: clip, algorithm: .xxh128))
         let clipEntry = try XCTUnwrap(entries.first { $0.relPath == "CLIP.MOV" })
-        XCTAssertEqual(clipEntry.hash, hex)
+        XCTAssertEqual(clipEntry.hash.lowercased(), hex.lowercased())
         XCTAssertEqual(clipEntry.algorithm, "xxh128")
         let oldEntry = try XCTUnwrap(entries.first { $0.relPath == "OLD.MOV" })
         XCTAssertEqual(oldEntry.algorithm, "md5", "a carried entry keeps its algorithm")

@@ -18,6 +18,8 @@ actor ASCMHLWriter: MHLWriting {
     private var indexByRelPath: [String: Int] = [:]
     private var finalized = false
     private let creationDate: String
+    /// Unchained FilmCan partial generations this one replaces (same number).
+    private let supersededPartials: [URL]
 
     init(ascmhlDir: URL, rollName: String) throws {
         self.ascmhlDir = ascmhlDir
@@ -25,11 +27,20 @@ actor ASCMHLWriter: MHLWriting {
         // Do NOT create the ascmhl/ directory here — only when something is actually
         // written (render). A roll whose files aren't copied this run leaves no
         // empty ascmhl/ folder behind.
-        let seq = ASCMHLChain.nextSequence(ascmhlDir: ascmhlDir)
+        let plan = ASCMHLChain.planGeneration(ascmhlDir: ascmhlDir)
+        let seq = plan.sequence
         self.sequence = seq
+        self.supersededPartials = plan.superseded
         let now = Date()
         self.creationDate = Self.iso8601(now)
-        let name = String(format: "%04d_%@_%@.mhl", seq, rollName, Self.fileStamp(now))
+        // A superseded partial written the same second would share the name: keep
+        // ours distinct so cancel() never deletes the partial it was meant to replace.
+        let stem = String(format: "%04d_%@_%@", seq, rollName, Self.fileStamp(now))
+        var name = "\(stem).mhl"
+        var n = 2
+        while FileManager.default.fileExists(atPath: ascmhlDir.appendingPathComponent(name).path) {
+            name = "\(stem)-\(n).mhl"; n += 1
+        }
         self.manifestFileName = name
         let url = ascmhlDir.appendingPathComponent(name)
         self.manifestURL = url
@@ -38,7 +49,10 @@ actor ASCMHLWriter: MHLWriting {
 
     func seed(_ existing: [MHLEntry]) {
         guard !finalized, !existing.isEmpty else { return }
+        // Carried entries keep the algorithm, hashdate and action they were recorded
+        // with: they were not hashed again by this generation.
         let fresh = existing.filter { indexByRelPath[$0.relPath] == nil }
+            .map { e -> MHLEntry in var c = e; c.isCarried = true; return c }
         entries = fresh + entries
         indexByRelPath = Dictionary(uniqueKeysWithValues: entries.enumerated().map { ($1.relPath, $0) })
     }
@@ -65,9 +79,14 @@ actor ASCMHLWriter: MHLWriting {
         guard !entries.isEmpty else { finalized = true; return }
         try render()
         let data = try Data(contentsOf: manifestURL)
+        // Sealed or not, this manifest now holds everything the superseded partials
+        // carried; the chain error (if any) is rethrown after.
+        finalized = true
         try ASCMHLChain.append(ascmhlDir: ascmhlDir, sequence: sequence,
                                manifestFileName: manifestFileName, manifestData: data)
-        finalized = true
+        for url in supersededPartials where url.lastPathComponent != manifestFileName {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     /// A partial generation writes its manifest but is NOT added to the chain, so
@@ -109,9 +128,23 @@ actor ASCMHLWriter: MHLWriting {
             xml += "  </processinfo>\n"
             xml += "  <hashes>\n"
             for e in entries {
+                // lastmodificationdate and hashdate are xs:dateTime in ASC MHL v2.0.
+                let modified = e.mtime.map {
+                    " lastmodificationdate=\"\(Self.iso8601(Date(timeIntervalSince1970: TimeInterval($0))))\""
+                } ?? ""
+                // A fresh entry was hashed by this generation: original, today. A carried
+                // one keeps what its own generation recorded (absent stays absent).
+                let action = e.isCarried ? e.action : "original"
+                let hashDate = e.isCarried ? e.hashDate : creationDate
+                // The element the value was recorded under: an md5 value is never
+                // relabelled xxh128. (Carried names come from ASCMHLReader's list.)
+                let tag = e.algorithm
+                var attrs = ""
+                if let action { attrs += " action=\"\(Self.esc(action))\"" }
+                if let hashDate { attrs += " hashdate=\"\(Self.esc(hashDate))\"" }
                 xml += "    <hash>\n"
-                xml += "      <path size=\"\(e.size)\"" + (e.mtime.map { " lastmodificationdate=\"\($0)\"" } ?? "") + ">\(Self.esc(e.relPath))</path>\n"
-                xml += "      <xxh128 action=\"original\" hashdate=\"\(creationDate)\">\(e.hash)</xxh128>\n"
+                xml += "      <path size=\"\(e.size)\"\(modified)>\(Self.esc(e.relPath))</path>\n"
+                xml += "      <\(tag)\(attrs)>\(Self.esc(e.hash))</\(tag)>\n"
                 xml += "    </hash>\n"
             }
             xml += "  </hashes>\n"
@@ -128,11 +161,17 @@ actor ASCMHLWriter: MHLWriting {
          .replacingOccurrences(of: "'", with: "&apos;")
     }
 
-    private static func iso8601(_ date: Date) -> String {
+    /// Shared: render() runs after every appended file, over every entry.
+    /// ISO8601DateFormatter is thread-safe.
+    private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         f.timeZone = TimeZone(secondsFromGMT: 0)
-        return f.string(from: date).replacingOccurrences(of: "Z", with: "+00:00")
+        return f
+    }()
+
+    private static func iso8601(_ date: Date) -> String {
+        isoFormatter.string(from: date).replacingOccurrences(of: "Z", with: "+00:00")
     }
 
     /// Filename timestamp like the reference tool: `2026-06-15_120000Z` (UTC).
