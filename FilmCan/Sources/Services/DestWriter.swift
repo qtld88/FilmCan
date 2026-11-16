@@ -9,12 +9,15 @@ actor DestWriter {
         case createFailed(String)
         case writeFailed(String)
         case finalizeFailed(String)
+        case sizeMismatch(written: Int64, expected: Int64)
 
         var errorDescription: String? {
             switch self {
             case .createFailed(let s): return "Create failed: \(s)"
             case .writeFailed(let s): return "Write failed: \(s)"
             case .finalizeFailed(let s): return "Finalize failed: \(s)"
+            case .sizeMismatch(let written, let expected):
+                return "Incomplete file: \(written) bytes written, \(expected) expected"
             }
         }
     }
@@ -41,6 +44,9 @@ actor DestWriter {
     private var tempName: String?
     private var writeHandle: FileHandle?
     private var finalized = false
+    /// Bytes appended to the temp file so far; `finalize` refuses to rename the
+    /// temp into place unless this matches the expected size.
+    private var bytesWritten: Int64 = 0
 
     private let fm = FileManager.default
 
@@ -110,9 +116,25 @@ actor DestWriter {
         try IOPerfProbe.shared.measure(.destWrite, key: displayName, bytes: Int64(data.count)) {
             try autoreleasepool { try handle.write(contentsOf: data) }
         }
+        bytesWritten += Int64(data.count)
+    }
+
+    /// Close and delete the temp file without renaming it. Used when the file
+    /// must not land under its final name (e.g. the source read failed).
+    func discard() {
+        guard !finalized, let tempURL = tempFileURL else { return }
+        finalized = true
+        try? writeHandle?.close()
+        writeHandle = nil
+        try? fm.removeItem(at: tempURL)
+        tempFileURL = nil
+        if let n = tempName { Task { await OrphanCleaner.shared.unregisterActive(n) } }
     }
 
     /// Flush, fsync, close, then atomically rename temp → final destination.
+    /// - `sourceSize`: the source's byte count (logical size). When the bytes
+    ///   written differ, the temp is deleted and `WriterError.sizeMismatch` is
+    ///   thrown — an incomplete file never lands under its final name.
     /// - `conflictPolicy`: when `.skip` and dest exists, throws `SkippedDueToConflict`.
     ///   When `.increment`, finds an unused name using `counterTemplate` (e.g. `"_001"`).
     @discardableResult
@@ -122,6 +144,12 @@ actor DestWriter {
         counterTemplate: String = "_001"
     ) throws -> String {
         guard !finalized, let tempURL = tempFileURL, let handle = writeHandle else { return destPath }
+
+        if bytesWritten != sourceSize {
+            let written = bytesWritten
+            discard()
+            throw WriterError.sizeMismatch(written: written, expected: sourceSize)
+        }
 
         let destURL = URL(fileURLWithPath: destPath)
 

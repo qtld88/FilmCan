@@ -29,6 +29,12 @@ struct DestWriterResult: Sendable {
     /// (a flat-file root has no roll folder of its own).
     var rootPath: String? = nil
     var rollFolder: String? = nil
+    /// The file was already at the destination (Skip policy, identical content)
+    /// and kept as-is: this run did not write it, so it must never delete it.
+    var adoptedExisting: Bool = false
+
+    /// True only for a file this run actually wrote to disk.
+    var wroteFileThisRun: Bool { success && filesTransferred > 0 && !adoptedExisting }
 }
 
 // MARK: - Accumulator across sources for one destination
@@ -147,6 +153,20 @@ struct CopyResult: Sendable {
     let rootName: String
     /// Source mtime at copy time; carried to the verify lane for MHL entries.
     let srcMtime: Int64?
+    /// Set when reading the source failed mid-file. No destination finalized the
+    /// file (each writer result is a failure); the verify lane skips it and the
+    /// failure is per file, never a run-level throw.
+    var sourceReadError: String? = nil
+}
+
+/// Set by the source reader BEFORE it finishes the writer channels, read by each
+/// writer after its channel ends: a writer must never finalize a file whose
+/// source read failed (the channel ending looks like a normal end of file).
+final class SourceReadFailure: @unchecked Sendable {
+    private let lock = NSLock()
+    private var message: String?
+    func set(_ m: String) { lock.lock(); if message == nil { message = m }; lock.unlock() }
+    var value: String? { lock.lock(); defer { lock.unlock() }; return message }
 }
 
 // MARK: - FanOutCopier
@@ -218,6 +238,13 @@ actor FanOutCopier {
         #if DEBUG
         var _testForceDestReadHashNil: Bool = false
         var _testForceMHLAppendFailure: Bool = false
+        /// Source files (by last path component) whose copy-time read throws EIO
+        /// once the first chunk has been sent to the writers.
+        var _testSourceReadFailsFileNames: Set<String> = []
+        /// Source files whose paranoid source re-read yields no hash.
+        var _testNilSourceRereadFileNames: Set<String> = []
+        /// Source files whose paranoid source re-read yields a different hash.
+        var _testCorruptSourceRereadFileNames: Set<String> = []
         #endif
     }
 
@@ -916,7 +943,9 @@ actor FanOutCopier {
             let proofKey = PlannedSourceFile.proofKey(f.absPath)
             var sourceHashForReverify: String?
             if config.reVerifyExistingOnResume {
-                sourceHashForReverify = await Self.rereadHashDetached(
+                // Unchanged resume semantics: an unreadable source has no hash
+                // and is therefore re-copied.
+                sourceHashForReverify = try? await Self.rereadHashDetached(
                     url: URL(fileURLWithPath: f.absPath), chunkSz: 8 * 1024 * 1024,
                     perfKey: "resume re-verify")
             }
@@ -963,7 +992,8 @@ actor FanOutCopier {
                 if Self.isVerifying(dest, config) {
                     let rollFolder = rollFolderByDestRoot[dest.destPath]?[f.rootName] ?? ""
                     if ledgerAtStart[rollFolder]?.contains(name) == true {
-                        let destHash = await Self.rereadHashDetached(
+                        // Unreadable → no hash → recopied (resume semantics unchanged).
+                        let destHash = try? await Self.rereadHashDetached(
                             url: URL(fileURLWithPath: path), chunkSz: 8 * 1024 * 1024,
                             perfKey: "resume re-hash")
                         guard let destHash, destHash.lowercased() == recorded.hash.lowercased() else {
@@ -1320,8 +1350,11 @@ actor FanOutCopier {
                     // A dest that failed to WRITE this file (e.g. ENOSPC) is dead
                     // for the rest of the job — mark it so enqueueNext stops
                     // sending it further files.
+                    // A source read failure is not the destination's fault: keep
+                    // sending it the remaining files.
                     for w in copyResult.writerResults
-                    where !w.success && w.failureReason != nil && w.failureReason != .conflict {
+                    where copyResult.sourceReadError == nil
+                        && !w.success && w.failureReason != nil && w.failureReason != .conflict {
                         if deadDestPaths.insert(w.destPath).inserted {
                             DebugLog.warn("FanOutCopier: destination fatally failed, skipping remaining files: \(w.destPath)")
                         }
@@ -1338,9 +1371,16 @@ actor FanOutCopier {
         // so the consumer task can't deadlock on a pending receive.
         await verifyChannel.finish()
         let outcomes = await verifyOutcomes
-        if let copyError { throw copyError }
 
+        // Run aborts: still finalize every manifest as PARTIAL so the files
+        // verified so far are recorded (resume can trust them) without
+        // certifying the interrupted generation in the chain.
+        if let copyError {
+            await finalizeManifestsAsPartial(sharedMHLsByDest, reason: "Run failed: \(copyError.localizedDescription)")
+            throw copyError
+        }
         if let corrupt = outcomes.first(where: { $0.sourceCorrupted }) {
+            await finalizeManifestsAsPartial(sharedMHLsByDest, reason: "Source corruption detected")
             throw Error.sourceCorruption(corrupt.sourcePath)
         }
 
@@ -1405,6 +1445,22 @@ actor FanOutCopier {
                               filesTotalByDest: filesTotalByDest, skippedByDest: skippedByDest)
         }
         return results
+    }
+
+    /// Finalize every shared hash list as a partial generation (no chain entry).
+    /// Errors are logged, never thrown: the caller is already failing the run.
+    private func finalizeManifestsAsPartial(
+        _ sharedMHLsByDest: [String: [String: any MHLWriting]], reason: String
+    ) async {
+        for (destPath, destMHLs) in sharedMHLsByDest {
+            for (rootName, writer) in destMHLs {
+                do {
+                    try await writer.finalizeAsPartial(reason: reason)
+                } catch {
+                    DebugLog.error("MHL partial-finalize failed for \(rootName) at \(destPath): \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     /// One authoritative `.complete` per successful destination once everything
@@ -1596,6 +1652,7 @@ actor FanOutCopier {
         }
 
         var writerTasks: [Task<DestWriterResult, Never>] = []
+        let sourceFailure = SourceReadFailure()
 
         for destCfg in destinations {
             let channel = channels[destCfg.destPath]!
@@ -1741,6 +1798,22 @@ actor FanOutCopier {
                     )
                 }
 
+                // Source read failed mid-file: the channel ended early, so the temp
+                // holds a truncated copy. Never finalize it — delete the temp.
+                if let message = sourceFailure.value {
+                    await writer.discard()
+                    let reason = DestFailureReason.ioError(message)
+                    await emitFailed(reason)
+                    return DestWriterResult(
+                        destPath: destCfg.destPath, displayName: destCfg.displayName,
+                        success: false, bytesTransferred: totalBytes, filesTransferred: 0,
+                        durationSec: Date().timeIntervalSince(startTime),
+                        mhlPath: nil, failureReason: reason,
+                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                        writtenFilePath: destFileURL.path
+                    )
+                }
+
                 if let reason = writeFailed {
                     await emitFailed(reason)
                     return DestWriterResult(
@@ -1758,9 +1831,10 @@ actor FanOutCopier {
                 let decision = await self.conflictDecision(path: destFileURL.path)
                 let conflictPolicy: OrganizationPreset.DuplicatePolicy = decision?.policy ?? .overwrite
                 let actualWrittenPath: String
+                var adoptedExisting = false
                 do {
                     actualWrittenPath = try await writer.finalize(
-                        fileHash: destHash, sourceSize: sourceSize,
+                        fileHash: destHash, sourceSize: sourceLogicalSize,
                         conflictPolicy: conflictPolicy,
                         counterTemplate: decision?.counterTemplate ?? config.duplicateCounterTemplate)
                     // MHL is appended in the verify lane AFTER paranoid re-read, not here.
@@ -1770,7 +1844,8 @@ actor FanOutCopier {
                     // → keep it and carry on as if written (it gets verified and inscribed
                     // like any other file). Different or unreadable → a real conflict; the
                     // existing file is left alone and the destination does not succeed.
-                    let existingHash = await Self.rereadHashDetached(
+                    // An unreadable existing file is a conflict (nil), never a match.
+                    let existingHash = try? await Self.rereadHashDetached(
                         url: destFileURL, chunkSz: chunkSz, perfKey: "skip compare")
                     guard let existingHash, existingHash == destHash else {
                         await emitFailed(.conflict)
@@ -1784,6 +1859,7 @@ actor FanOutCopier {
                         )
                     }
                     actualWrittenPath = destFileURL.path
+                    adoptedExisting = true
                 } catch {
                     await emitFailed(.ioError(error.localizedDescription))
                     return DestWriterResult(
@@ -1849,7 +1925,8 @@ actor FanOutCopier {
                     writtenFilePath: actualWrittenPath,
                     transferredRelPath: writtenRelPath,
                     rootPath: rootPath,
-                    rollFolder: relPath.isEmpty ? nil : rollFolder
+                    rollFolder: relPath.isEmpty ? nil : rollFolder,
+                    adoptedExisting: adoptedExisting
                 )
             }
             writerTasks.append(task)
@@ -1873,10 +1950,21 @@ actor FanOutCopier {
                 throw Error.sourceReadFailed("xxhash unavailable for \(sourcePath)")
             }
 
+            #if DEBUG
+            var chunksSent = 0
+            let failReadAfterFirstChunk = config._testSourceReadFailsFileNames
+                .contains(sourceURL.lastPathComponent)
+            #endif
             while true {
                 // User cancel: stop reading; channels are finished below so the
                 // writer tasks drain and abort before finalizing (no partial file).
                 if config.shouldCancel?() == true { break }
+                #if DEBUG
+                if failReadAfterFirstChunk && chunksSent >= 1 {
+                    throw POSIXError(.EIO)
+                }
+                chunksSent += 1
+                #endif
                 let readStart = DispatchTime.now()
                 guard let chunkData = try Self.readChunk(sourceHandle, upTo: chunkSz)
                 else { break }
@@ -1903,6 +1991,9 @@ actor FanOutCopier {
             sourceHash = sourceHasher.finalize().hexString
         } catch {
             sourceError = error
+            // Before finishing the channels: writers check this once their
+            // channel ends and then discard instead of finalizing.
+            sourceFailure.set("Source read failed for \(sourceName): \(error.localizedDescription)")
         }
 
         for channel in channels.values { await channel.finish() }
@@ -1912,10 +2003,11 @@ actor FanOutCopier {
             writerResults.append(await task.value)
         }
 
-        if let sourceError { throw sourceError }
-        guard let verifiedSourceHash = sourceHash else {
-            throw Error.sourceReadFailed(sourcePath)
+        if let sourceError {
+            DebugLog.error("FanOutCopier: source read failed for \(sourcePath): \(sourceError.localizedDescription)")
         }
+        let readFailure = sourceFailure.value
+        let verifiedSourceHash = sourceHash ?? ""
 
         let srcMtime = ((try? FileManager.default.attributesOfItem(atPath: sourcePath))?[.modificationDate] as? Date)
             .map { Int64($0.timeIntervalSince1970) }
@@ -1939,7 +2031,8 @@ actor FanOutCopier {
             jobStartTime: jobStartTime,
             cancelledEarly: config.shouldCancel?() == true,
             rootName: rootName,
-            srcMtime: srcMtime
+            srcMtime: srcMtime,
+            sourceReadError: readFailure
         )
     }
 
@@ -1981,6 +2074,15 @@ actor FanOutCopier {
             return PerSourceOutcome(
                 sourcePath: c.sourcePath, writerResults: c.writerResults,
                 verifyFailedDestPaths: cancelled, sourceCorrupted: false
+            )
+        }
+
+        // Source read failed during copy: no destination finalized the file and
+        // each writer result already carries the failure. Nothing to verify.
+        if c.sourceReadError != nil {
+            return PerSourceOutcome(
+                sourcePath: c.sourcePath, writerResults: c.writerResults,
+                verifyFailedDestPaths: [], sourceCorrupted: false
             )
         }
 
@@ -2056,13 +2158,48 @@ actor FanOutCopier {
             }
 
             await emitSourceRereadProgress(read: 0)
-            let sourceHashFromDisk = await rereadHash(
-                url: c.sourceURL, chunkSz: c.chunkSz, perfKey: "source re-read",
-                onProgress: { read in await emitSourceRereadProgress(read: read) })
-            if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
+            var sourceHashFromDisk: String?
+            do {
+                sourceHashFromDisk = try await rereadHash(
+                    url: c.sourceURL, chunkSz: c.chunkSz, perfKey: "source re-read",
+                    onProgress: { read in await emitSourceRereadProgress(read: read) })
+            } catch {
+                DebugLog.error("FanOutCopier: paranoid source re-read failed for \(c.sourcePath): \(error.localizedDescription)")
+                sourceHashFromDisk = nil
+            }
+            #if DEBUG
+            let seamName = c.sourceURL.lastPathComponent
+            if config._testNilSourceRereadFileNames.contains(seamName) { sourceHashFromDisk = nil }
+            if config._testCorruptSourceRereadFileNames.contains(seamName) {
+                sourceHashFromDisk = String(repeating: "0", count: 32)
+            }
+            #endif
+            // Only files this run wrote are ours to delete: a pre-existing file kept
+            // by the Skip policy (conflict, or adopted because identical) is not.
+            if sourceHashFromDisk == nil {
+                // The source could not be re-read: Paranoid cannot confirm this
+                // file, so it fails verification (never passes silently). The copy
+                // is removed so neither the manifest nor resume trusts it.
+                for r in c.writerResults where r.success && r.filesTransferred > 0 {
+                    if r.wroteFileThisRun { try? fm.removeItem(atPath: r.writtenFilePath) }
+                    verifyFailed.insert(r.destPath)
+                    await self.clearVerifyInFlight(destPath: r.destPath)
+                    var prog = DestProgress(
+                        id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                        status: .failed(.verify), bytesTotal: c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources,
+                        filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid)
+                    prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
+                    prog.filesCompleted = await self.completedFilesForDest(r.destPath)
+                    prog.verifyBytesTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
+                    prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
+                    prog.currentFile = "Source re-read failed — retry"
+                    prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
+                    config.progressHandler?(prog)
+                }
+            } else if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
                 corrupted = true
-                for r in c.writerResults where r.success {
-                    try? fm.removeItem(atPath: r.writtenFilePath)
+                for r in c.writerResults where r.success && r.filesTransferred > 0 {
+                    if r.wroteFileThisRun { try? fm.removeItem(atPath: r.writtenFilePath) }
                     verifyFailed.insert(r.destPath)
                     await self.clearVerifyInFlight(destPath: r.destPath)
                     // Flip the card to red now; the run also aborts with a corruption error.
@@ -2104,7 +2241,9 @@ actor FanOutCopier {
                         let dTotal = c.bytesTotalByDest[destPath] ?? c.totalBytesAllSources
                         let mode = verifyModeByDest[destPath] ?? self.config.verifyMode
                         let filesTotal = c.filesTotalByDest[destPath] ?? c.totalSources
-                        let hash = await Self.rereadHashDetached(
+                        let hash: String?
+                        do {
+                            hash = try await Self.rereadHashDetached(
                             url: destFileURL, chunkSz: c.chunkSz,
                             perfKey: (destPath as NSString).lastPathComponent,
                             onProgress: { read in
@@ -2132,6 +2271,10 @@ actor FanOutCopier {
                                 prog.filesSkipped = c.skippedByDest[destPath] ?? 0
                                 self.config.progressHandler?(prog)
                             })
+                        } catch {
+                            DebugLog.error("FanOutCopier: destination re-read failed for \(destFileURL.path): \(error.localizedDescription)")
+                            hash = nil
+                        }
                         return (destPath, hash)
                     }
                 }
@@ -2345,11 +2488,12 @@ actor FanOutCopier {
         url: URL, chunkSz: Int,
         perfKey: String = "verify",
         onProgress: (@Sendable (Int64) async -> Void)? = nil
-    ) async -> String? {
-        await Self.rereadHashDetached(url: url, chunkSz: chunkSz, perfKey: perfKey, onProgress: onProgress)
+    ) async throws -> String {
+        try await Self.rereadHashDetached(url: url, chunkSz: chunkSz, perfKey: perfKey, onProgress: onProgress)
     }
 
     /// Re-reads `url` with caching disabled and returns its xxh128 hex hash.
+    /// Any open or read error is thrown — never mistaken for end of file.
     /// `onProgress`, if provided, is called with the cumulative bytes read so far
     /// each time another `reportEveryBytes` have been read (and once more at EOF if
     /// the tail since the last report is non-empty). Throttling by bytes (not time)
@@ -2359,13 +2503,14 @@ actor FanOutCopier {
         reportEveryBytes: Int64 = 16 * 1024 * 1024,
         perfKey: String = "verify",
         onProgress: (@Sendable (Int64) async -> Void)? = nil
-    ) async -> String? {
-        await Task.detached(priority: .utility) {
-            guard FileManager.default.fileExists(atPath: url.path),
-                  let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+    ) async throws -> String {
+        try await Task.detached(priority: .utility) { () async throws -> String in
+            let handle = try FileHandle(forReadingFrom: url)
             defer { try? handle.close() }
             _ = fcntl(handle.fileDescriptor, F_NOCACHE, 1)
-            guard let hasher = XXH128StreamingHasher() else { return nil }
+            guard let hasher = XXH128StreamingHasher() else {
+                throw Error.sourceReadFailed("xxhash unavailable for \(url.path)")
+            }
             var readSoFar: Int64 = 0
             var lastReported: Int64 = 0
             // This is a tight synchronous loop with no `await` to drain the
@@ -2373,10 +2518,10 @@ actor FanOutCopier {
             // accumulate for the ENTIRE file (observed: 2 dests + source re-read
             // ~= 3x a multi-GB clip = >15 GB). Drain per chunk.
             while true {
-                let chunkLen = autoreleasepool { () -> Int in
+                let chunkLen = try autoreleasepool { () throws -> Int in
                     let readStart = DispatchTime.now()
                     if #available(macOS 10.15.4, *) {
-                        guard let data = try? handle.read(upToCount: chunkSz), !data.isEmpty else { return 0 }
+                        guard let data = try handle.read(upToCount: chunkSz), !data.isEmpty else { return 0 }
                         IOPerfProbe.shared.record(
                             .verifyRead, key: perfKey,
                             nanos: DispatchTime.now().uptimeNanoseconds &- readStart.uptimeNanoseconds,

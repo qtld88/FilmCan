@@ -3,14 +3,43 @@
 Une section par session. Chaque session ajoute et coche la sienne. Cocher = testé à la main sur un vrai Mac avec de vrais disques.
 Les tests automatiques (workflow `macOS tests`) ne remplacent pas cette liste.
 
-Statut des sessions : 1 = finalisation des fichiers (à compléter par son auteur) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (à compléter).
+Build à tester sans toucher à `/Applications` (quitter les autres FilmCan avant) :
+
+```
+xcodebuild build -project FilmCan/FilmCan.xcodeproj -scheme FilmCan -configuration Debug \
+  -destination platform=macOS -derivedDataPath FilmCan/build/qc
+open FilmCan/build/qc/Build/Products/Debug/FilmCan.app
+```
+
+Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (à compléter).
 
 ---
 
 ## Session 1 : finalisation des fichiers
-_À remplir par la session 1._
 
-- [ ] …
+Objectif : un fichier n'arrive jamais sous son nom final s'il est incomplet, et une vérification impossible est un échec, jamais un succès.
+Tests automatiques : `FanOutCopierReadFailureTests` (7 tests).
+
+Prérequis : une carte (ou clé USB) avec quelques clips de plus de 100 Mo, deux disques de destination, vérification **Paranoid**.
+
+### Source arrachée en pleine copie (constats 1 et 4)
+- [ ] Débrancher la carte pendant la copie d'un gros clip : les deux cartes de destination passent en rouge (« Source read failed for … »). Pas de plantage.
+- [ ] Dans le Finder, aucune destination ne contient ce clip sous son nom final (pas de fichier tronqué).
+- [ ] Aucun fichier `.filmcan-*` ne reste dans le dossier du roll (`ls -la`).
+- [ ] L'historique montre un résultat **par destination**, pas un échec global sans détail.
+- [ ] `ascmhl/` contient un manifest (partiel ou non) avec les clips déjà vérifiés.
+- [ ] Rebrancher et relancer : seuls les clips manquants sont copiés, tout finit en vert, le roll est scellé dans `ascmhl_chain.xml`.
+
+### Vérification impossible (constat 2)
+- [ ] Difficile à provoquer à la main (couvert par tests). Si une erreur de relecture apparaît (disque qui décroche pendant « Verifying… ») : la destination doit finir en **échec de vérification**, jamais en vert.
+
+### Fichier préexistant conservé par Skip (constat 3)
+- [ ] Couvert par tests (corruption source simulée). À la main : vérifier qu'un fichier identique déjà présent avec Skip reste en place après la copie (recoupe la session 2).
+
+### Régression à surveiller
+- [ ] Copie normale Fast puis Paranoid, 2 destinations : tout en vert, 100 % sur les deux barres, aucune erreur « Incomplete file ».
+- [ ] Quick Copy d'un seul clip (source = fichier, pas dossier) : copie et vérification en vert.
+- [ ] Risque connu : un source choisi via un **lien symbolique** (fichier seul) peut être refusé par le nouveau contrôle de taille (« Incomplete file: … bytes written, … expected »). Le noter si ça arrive.
 
 ---
 
