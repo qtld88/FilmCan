@@ -358,6 +358,14 @@ final class OverwriteSafetyEditorTests: XCTestCase {
 
     // MARK: 5. Typed roll name
 
+    func test_rollNameAsWritten_isOneVisibleFolderName() {
+        XCTAssertNil(OrganizationTemplate.rollNameAsWritten(".."))
+        XCTAssertNil(OrganizationTemplate.rollNameAsWritten("."))
+        XCTAssertEqual(OrganizationTemplate.rollNameAsWritten("../Jour 1"), "_Jour 1")
+        XCTAssertEqual(OrganizationTemplate.rollNameAsWritten(".hidden"), "hidden")
+        XCTAssertEqual(OrganizationTemplate.rollNameAsWritten("A001"), "A001")
+    }
+
     func test_typedRollNameDotDot_isNeverStored() throws {
         let card = tmp.appendingPathComponent("CARD")
         try fm.createDirectory(at: card, withIntermediateDirectories: true)
@@ -368,6 +376,6 @@ final class OverwriteSafetyEditorTests: XCTestCase {
         vm.setRollNameOverride("../../Day 1", for: card.path)
         let stored = vm.config.genericRollNames[key] ?? ""
         XCTAssertFalse(stored.contains("/"))
-        XCTAssertEqual(stored, OrganizationTemplate.folderNameAsWritten("../../Day 1"))
+        XCTAssertEqual(stored, OrganizationTemplate.rollNameAsWritten("../../Day 1"))
     }
 }

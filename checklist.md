@@ -11,7 +11,7 @@ xcodebuild build -project FilmCan/FilmCan.xcodeproj -scheme FilmCan -configurati
 open FilmCan/build/qc/Build/Products/Debug/FilmCan.app
 ```
 
-Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (à compléter).
+Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (branche `claude/filmcan-audit-overwrite-safety-qt79u8`).
 
 ---
 
@@ -90,6 +90,36 @@ Prérequis : une carte (ou un dossier) avec 3 à 5 clips, deux disques de destin
 ---
 
 ## Session 3 : écrasement de fichiers manifestés et collisions de chemins
-_À remplir par la session 3._
 
-- [ ] …
+Prérequis : une carte (ou un dossier) avec 3 clips de plus de 1 Mo, deux disques de destination, politique doublons « Ask » (défaut).
+
+### Carte réutilisée (constat 1)
+- [ ] Run 1 complet. Vider la carte dans le Finder **sans formater**, filmer (ou copier) d'autres clips nommés C0001… de **taille différente**. Run 2 : le prompt doublons apparaît, liste les clips concernés. Choisir **Skip** : les anciens clips sont intacts sur les deux disques, la destination passe en échec « conflit », pas de seal.
+- [ ] Même scénario, choisir **Overwrite** : les nouveaux clips remplacent les anciens. Le manifest (`ascmhl/`) liste les nouveaux hash.
+- [ ] Même scénario, choisir **Add counter** : `C0001_001.MP4` à côté de l'ancien, les deux listés au manifest.
+- [ ] Même scénario avec le style de liste « simple » (Options › hash list) : même prompt.
+- [ ] Fermer le prompt sans répondre : rien n'est écrasé.
+- [ ] Non-régression : tronquer un clip de destination à 0 octet (carte inchangée). Relancer : recopié **sans** prompt.
+- [ ] Politique réglée sur **Overwrite** dans les options du film : le run 2 écrase sans prompt (choix explicite de l'utilisateur). Attendu.
+
+### Deux sources, un même chemin (constat 2)
+- [ ] « Copy folder contents » activé, deux cartes contenant chacune `DCIM/100MEDIA/C0001.MP4` : le run s'arrête **avant toute copie** avec « Two or more files would be copied to the same place: … ». Rien sur les disques.
+- [ ] Deux fichiers isolés de même nom, venant de deux dossiers, dans Quick Copy (s'il est autorisé) ou via la fenêtre principale : bloqué (voir constat 4).
+- [ ] Deux cartes en « contents » sans nom commun : copie normale.
+
+### Prompt doublons (constat 3)
+- [ ] Trois fichiers déjà présents hors manifest : le prompt indique « 3 files are already at the destination — file 1 of 3 » et liste les trois chemins (le fichier courant en gras).
+- [ ] « Apply to … » **désactivé** : Skip sur le 1er, Overwrite sur le 2e, Skip sur le 3e. Seul le 2e est remplacé.
+- [ ] « Apply to … » **activé** au 1er fichier : plus de question, le choix vaut pour les trois.
+- [ ] « Add counter » avec un style personnalisé (ex. `-v2`) : le style saisi est utilisé.
+- [ ] Même vérifications dans une fenêtre Quick Copy.
+
+### Fichiers isolés multiples (constat 4)
+- [ ] Fenêtre principale : ajouter deux fichiers isolés comme sources, Run : message « Several loose files can't be copied together yet… », rien n'est lancé.
+- [ ] Un fichier isolé + un dossier : le run part.
+
+### Nom de roll saisi (constat 5)
+- [ ] Carte « Untitled » : taper `..` comme nom de roll. Le nom est refusé (champ vidé), rien n'est écrit dans le dossier parent de la destination.
+- [ ] Taper `../Jour 1` : le nom affiché devient `_Jour 1` (pas de point de tête : pas de dossier caché), un seul dossier sous la destination.
+- [ ] Noms accentués (`Bobine é`) : les caractères hors ASCII deviennent `_`, comme dans les modèles de dossiers. Attendu.
+- [ ] Préfixes de numérotation (Options › Number rolls) : seules des lettres sont acceptées, `.` et `/` ignorés.

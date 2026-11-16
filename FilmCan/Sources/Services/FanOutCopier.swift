@@ -728,7 +728,7 @@ actor FanOutCopier {
     init(config: Configuration) {
         // A roll name becomes one path component: never "..", never a "/".
         var config = config
-        config.rollNames = config.rollNames.compactMapValues(OrganizationTemplate.folderNameAsWritten)
+        config.rollNames = config.rollNames.compactMapValues(OrganizationTemplate.rollNameAsWritten)
         self.config = config
     }
 

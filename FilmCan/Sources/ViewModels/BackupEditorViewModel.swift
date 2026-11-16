@@ -368,7 +368,7 @@ class BackupEditorViewModel: ObservableObject {
         let key = RollNumberer.cardKey(forPath: path)
         // The name becomes one folder at every destination: same cleaning as the
         // folder templates ("/" and ".." can never escape the destination).
-        let cleaned = OrganizationTemplate.folderNameAsWritten(name) ?? ""
+        let cleaned = OrganizationTemplate.rollNameAsWritten(name) ?? ""
         userEditedGenericCards.insert(key)
         autoWrittenGenericCards.remove(key)
         if cleaned.isEmpty {
