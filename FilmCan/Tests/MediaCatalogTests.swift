@@ -129,7 +129,9 @@ final class MediaCatalogTests: XCTestCase {
                                   verifyMode: .paranoid, requiresFullFsync: false, chunkSize: 32768)
             ],
             verifyMode: .paranoid, mhlBasePath: nil, dryRun: false, progressHandler: nil)
-        let destResults = try await FanOutCopier(config: cfg).run()
+        let copier = FanOutCopier(config: cfg)
+        let destResults = try await copier.run()
+        let plan = await copier.runPlan
 
         let now = Date()
         var fanOut = TransferResult(configurationName: "Proj", destination: d1.path,
@@ -142,7 +144,7 @@ final class MediaCatalogTests: XCTestCase {
         let store = MediaCatalogStore(fileURL: url)
         var config = BackupConfiguration()
         config.name = "Proj"
-        await store.record(config: config, sources: [card.path], results: exploded, runDate: now)
+        await store.record(config: config, sources: [card.path], results: exploded, runDate: now, plan: plan)
 
         XCTAssertEqual(store.rolls.count, 1)
         XCTAssertEqual(store.rolls[0].files.count, 3)
