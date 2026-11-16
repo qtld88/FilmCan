@@ -11,8 +11,12 @@ final class VerifiedProofTests: XCTestCase {
     private let fm = FileManager.default
 
     override func setUpWithError() throws {
-        // Resolved: the enumerator reports /private/var paths, not the /var symlink.
-        tmp = fm.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("proof-\(UUID().uuidString)")
+        // realpath: the enumerator reports /private/var paths, not the /var symlink
+        // (resolvingSymlinksInPath would strip /private again).
+        let raw = fm.temporaryDirectory.appendingPathComponent("proof-\(UUID().uuidString)")
+        try fm.createDirectory(at: raw, withIntermediateDirectories: true)
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        tmp = realpath(raw.path, &buffer) != nil ? URL(fileURLWithPath: String(cString: buffer)) : raw
         card = tmp.appendingPathComponent("CARD")
         dest = tmp.appendingPathComponent("dest")
         try fm.createDirectory(at: card, withIntermediateDirectories: true)
