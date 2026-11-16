@@ -66,7 +66,7 @@ Want files organized by date or card? Open **Options → Destinations** and set 
 
 ## Optional: Copy from the Finder
 
-Select files or folders in the Finder, right-click, then choose **Services → FilmCan Copy**. A small window asks for a preset and destinations, then copies with the FilmCan engine. The main window stays closed.
+Select files or folders in the Finder, right-click, then choose **Services → FilmCan Copy**. A small window asks for a movie (optional) and destinations, then copies with the FilmCan engine. The main window stays closed.
 
 [Learn more →](./features/quick-copy.md)
 

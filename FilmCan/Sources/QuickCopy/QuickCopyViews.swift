@@ -200,7 +200,6 @@ struct QuickCopySetupView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sourcesPanel
                         settingsPanel
-                        if session.form.selectedPresetId == nil { savePresetPanel }
                     }
                     .frame(minWidth: 300, idealWidth: 340, maxWidth: 380)
                     flowArrow
@@ -357,25 +356,11 @@ struct QuickCopySetupView: View {
                 Picker("", selection: Binding(
                     get: { session.form.selectedFilmId },
                     set: { session.selectFilm($0) })) {
-                    Text("None").tag(UUID?.none)
+                    Text("No movie").tag(UUID?.none)
                     ForEach(session.form.savedFilms) { Text($0.name).tag(UUID?.some($0.id)) }
                 }
             }
-            .help("History and the catalog file this copy under the movie.")
-            if let filmPreset = session.form.filmPresetName {
-                Text(session.form.presetDiffersFromFilm
-                     ? "Preset changed for this copy (movie uses \u{201C}\(filmPreset)\u{201D})"
-                     : "Preset of this movie: \u{201C}\(filmPreset)\u{201D}")
-                    .font(FCType.meta)
-                    .foregroundColor(session.form.presetDiffersFromFilm
-                                     ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-            }
-            QCSettingRow(label: "Preset") {
-                Picker("", selection: $session.form.selectedPresetId) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(session.form.pickerPresets) { Text($0.name).tag(UUID?.some($0.id)) }
-                }
-            }
+            .help("A movie loads its folder settings and files this copy under it in history and the catalog. A change made here is for this copy only.")
             if let chips = session.form.presetChips {
                 QCChipFlow(chips: chips).help(session.form.presetChipsHelp ?? "")
                 Button("Edit in FilmCan…") { QuickCopyCoordinator.shared.showMainWindow() }
@@ -440,14 +425,6 @@ struct QuickCopySetupView: View {
                     if line.isRoot { session.form.rootFolderName = nil }
                     else if let kind = line.mediaKind { session.form.mediaFolderNames[kind] = nil }
                 }))
-    }
-
-    // Save as preset
-    private var savePresetPanel: some View {
-        QCPanel(title: "SAVE AS PRESET") {
-            TextField("Preset name (empty = don't save)", text: $session.form.savePresetName)
-                .textFieldStyle(.roundedBorder)
-        }
     }
 
     // Footer

@@ -65,6 +65,10 @@ Local data lives in `~/Application Support`.
 - **Resume reads the latest manifest ON DISK** (`ASCMHLChain.latestManifestFileName`), sealed *or* partial — a cancelled run writes a partial manifest (no chain entry), so chain-only lookup would miss it. `nextSequence` also counts on-disk generations.
 - **Writability preflight**: `run()` probes each destination (write+delete a `.filmcan-writeprobe`) and throws `Error.destinationUnwritable` before copying. A mid-copy write/finalize/verify failure or source corruption emits a per-dest `.failed` so the card flips red live while other dests continue.
 
+## Movies only (no presets)
+
+A movie is the only kind of settings (spec `docs/specs/2026-11-15-films-only.md`). Each movie keeps its own `OrganizationPreset` record (`ownerFilmId == movie id`, pointed at by `selectedOrganizationPresetId`); the engine path is unchanged. Shared presets are gone: `FilmPresetOwnership.migrateToFilmsOnly` (adopt, delete shared, delete orphans) runs once at `ConfigurationStorage.load`. New movies come from `FilmStarter` (blank / Netflix Ingest / like another) or a `.filmcan-movie` file (`MovieSettingsFile`, Models/FilmsOnly.swift); the "+" button shows `NewMovieChoice`. Quick Copy reads the picked movie's own record (`QuickCopyFormModel.selectedPreset`), never writes it.
+
 ## Netflix Ingest & Camera/Sound Routing
 
 - **Netflix Ingest preset** (`OrganizationPreset.netflixIngest()`, name `OrganizationPreset.netflixIngestName`): camera template `{date}_{episode}_{day}_{unit}/Camera_Media/{cameraFormat}`, sound template `{date}_{episode}_{day}_{unit}/Sound_Media`. Roll folder auto-appended. Scaffolds sibling `Reports/` + `Sound_Media/`. Shoot metadata = `BackupConfiguration.episode/day/unit/cameraFormat` → `ShootMetadata` tokens.

@@ -2,21 +2,6 @@ import SwiftUI
 import Foundation
 
 extension BackupEditorView {
-    private var selectedOrganizationPresetName: String {
-        let presets = viewModel.organizationPresets
-        if let id = viewModel.selectedOrganizationPresetId,
-           let preset = presets.first(where: { $0.id == id }) {
-            return preset.name
-        }
-        return "Off"
-    }
-
-    private var selectedPresetDifferences: [PresetDifference] {
-        // A film's own copy has nothing to diverge from.
-        guard let preset = selectedOrganizationPreset, !viewModel.selectedPresetIsOwnCopy else { return [] }
-        return viewModel.config.differences(from: preset)
-    }
-
     var selectedOrganizationPreset: OrganizationPreset? {
         let presets = viewModel.organizationPresets
         guard let id = viewModel.selectedOrganizationPresetId else { return nil }
@@ -66,23 +51,6 @@ extension BackupEditorView {
         viewModel.selectedOrganizationPresetId == nil
     }
 
-    private var selectedPresetBinding: Binding<OrganizationPreset>? {
-        guard let id = viewModel.selectedOrganizationPresetId,
-              let current = viewModel.organizationPresets.first(where: { $0.id == id }) else { return nil }
-        // Looked up by id on every read and write: the list is shared by every movie,
-        // so a position can move under an open editor.
-        return Binding(
-            get: { viewModel.organizationPresets.first(where: { $0.id == id }) ?? current },
-            set: { newValue in
-                var presets = viewModel.organizationPresets
-                if let index = presets.firstIndex(where: { $0.id == id }) {
-                    presets[index] = newValue
-                    viewModel.organizationPresets = presets
-                }
-            }
-        )
-    }
-
     private func hasCustomFilterPatterns(_ preset: OrganizationPreset) -> Bool {
         SourceFilterMatching.hasCustomFilterPatterns(
             include: preset.includePatterns,
@@ -91,17 +59,6 @@ extension BackupEditorView {
         )
     }
 
-    private func startEditingPresetName() {
-        isEditingPresetName = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            isPresetNameFocused = true
-        }
-    }
-
-    private func finishEditingPresetName() {
-        isEditingPresetName = false
-        isPresetNameFocused = false
-    }
     
     private func optionRow(
         icon: String,
@@ -278,92 +235,54 @@ extension BackupEditorView {
         }
     }
 
+    /// Folder organization on/off, the Netflix Ingest model and the settings export.
     private var presetSelector: some View {
-        HStack(spacing: 8) {
-            Text("Preset:")
-                .font(.subheadline)
-                .foregroundColor(FilmCanTheme.textSecondary)
-            Menu {
-                Button("Off") {
-                    viewModel.applyOffOrganizationSettings()
-                    expandOptionsIfNeeded()
-                }
-                if let parked = viewModel.parkedOwnCopy {
-                    Button("This movie's settings (\(parked.name))") {
-                        viewModel.useParkedOwnCopy()
-                        expandOptionsIfNeeded()
-                    }
-                }
-                Button("Netflix Ingest (built-in)") {
-                    viewModel.applyNetflixIngestPreset()
-                    expandOptionsIfNeeded()
-                }
-                ForEach(viewModel.sharedOrganizationPresets) { preset in
-                    Button(preset.name) {
-                        viewModel.applyPreset(preset)
-                        expandOptionsIfNeeded()
-                    }
-                }
-                Divider()
-                Button("Save as new preset") {
-                    viewModel.saveCurrentSettingsAsPreset()
-                    expandOptionsIfNeeded()
-                }
-                if !viewModel.sharedOrganizationPresets.isEmpty {
-                    Menu("Delete preset") {
-                        ForEach(viewModel.sharedOrganizationPresets) { preset in
-                            Button(preset.name, role: .destructive) {
-                                viewModel.deleteSharedPreset(id: preset.id)
-                            }
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(selectedOrganizationPresetName)
-                    if !selectedPresetDifferences.isEmpty {
-                        Text("(modified)")
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                            .help(selectedPresetDifferences.map(\.summary).joined(separator: "\n"))
-                    }
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(FilmCanTheme.card)
-                .cornerRadius(6)
+        HStack(spacing: 12) {
+            Toggle("Organize folders", isOn: Binding(
+                get: { viewModel.folderOrganizationIsOn },
+                set: { on in
+                    viewModel.setFolderOrganization(on)
+                    if on { expandOptionsIfNeeded() }
+                }))
+                .toggleStyle(.switch)
+                .help("On: this movie creates folders and names files from its own settings. Off: it copies as is; its settings are kept aside.")
+            Button("Use Netflix Ingest folders") { confirmNetflixIngest = true }
+                .help("Replaces this movie's folder and naming settings with the Netflix Ingest ones.")
+            Button("Export Settings\u{2026}") { exportMovieSettings() }
+                .help("Saves this movie's settings to a file another movie can start from.")
+            Spacer(minLength: 0)
+        }
+        .alert("Use Netflix Ingest folders?", isPresented: $confirmNetflixIngest) {
+            Button("Replace", role: .destructive) {
+                viewModel.applyNetflixIngestPreset()
+                expandOptionsIfNeeded()
             }
-            .buttonStyle(.plain)
-
-            if let presetBinding = selectedPresetBinding {
-                if isEditingPresetName {
-                    TextField("Preset name", text: presetBinding.name)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($isPresetNameFocused)
-                        .onSubmit { finishEditingPresetName() }
-                        .onChange(of: isPresetNameFocused) { focused in
-                            if !focused { finishEditingPresetName() }
-                        }
-                        .frame(width: 160)
-                } else {
-                    Button(action: { startEditingPresetName() }) {
-                        Image(systemName: "pencil")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                }
-
-                Button(role: .destructive) {
-                    viewModel.deleteOrganizationPreset(id: presetBinding.wrappedValue.id)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .help("Delete this movie's folder and file settings (back to Off). To keep them aside, choose Off in the menu instead.")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Replaces this movie's folder and naming settings.")
+        }
+        .fileExporter(
+            isPresented: $showSettingsExport,
+            document: settingsExportDocument,
+            contentType: MovieSettingsFile.contentType,
+            defaultFilename: viewModel.config.name
+        ) { result in
+            if case .failure(let error) = result {
+                viewModel.validationMessage = "Failed to export settings: \(error.localizedDescription)"
+                viewModel.showValidationError = true
             }
         }
-        .help("These settings belong to this movie. Choosing a preset copies it; changes here never alter the preset or another movie.")
+    }
+
+    private func exportMovieSettings() {
+        do {
+            settingsExportDocument = JSONExportDocument(
+                data: try AppState.shared.settingsFileData(for: viewModel.config))
+            showSettingsExport = true
+        } catch {
+            viewModel.validationMessage = "Failed to export settings: \(error.localizedDescription)"
+            viewModel.showValidationError = true
+        }
     }
 
     private func expandOptionsIfNeeded() {

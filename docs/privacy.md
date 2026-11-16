@@ -19,7 +19,7 @@ Only if you enable it:
 FilmCan does not send files, hashes, or logs to FilmCan servers (there are none).
 
 ## Storage Locations
-FilmCan stores local data such as presets and history in its app support folder. Logs and hash lists are stored in the locations you choose (destinations or custom log folders). You can delete presets and history from within the app, and remove the app support folder to clear local settings.
+FilmCan stores local data such as movie settings and history in its app support folder. Logs and hash lists are stored in the locations you choose (destinations or custom log folders). You can delete movies and history from within the app, and remove the app support folder to clear local settings.
 
 ## Contact
 If you have questions, see [Support](/#support).

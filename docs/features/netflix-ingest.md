@@ -8,7 +8,7 @@ required folder structure plus a conformant **ASC MHL** manifest per roll.
 
 ## Quick start
 
-1. In **Options**, open the **Preset** menu and choose **Netflix Ingest (built-in)**.
+1. Create a movie with **+ › Netflix Ingest**, or, in an existing movie's **Options › Destinations**, press **Use Netflix Ingest folders** (it asks before replacing the movie's folder and naming settings).
 2. The **Shoot metadata** fields appear (in the Destinations tab). Fill in:
    - **Episode / Block**, e.g. `EP103`, `Block01`, `B01`, `BK1`
    - **Day**, e.g. `Day05`, `D05`
@@ -81,7 +81,7 @@ fanned out.
 
 ## Naming validation
 
-When the Netflix Ingest preset is active, FilmCan pre-flights your roll (source
+When a movie uses the Netflix Ingest folders, FilmCan pre-flights your roll (source
 folder) names against Netflix's prohibited-character set and uniqueness rule. If a
 name is invalid or duplicated, a sheet offers:
 
@@ -104,7 +104,7 @@ more destinations (fan-out is one pass) to make extra copies.
 
 ## Notes
 
-- Logs: selecting the preset pre-fills the log location to `Reports/` (changeable in
+- Logs: starting a movie from Netflix Ingest (or using its folders) pre-fills the log location to `Reports/` (changeable in
   **Options › Logs**).
 - exFAT destinations trigger the existing "DO NOT UNPLUG" banner; Netflix prefers APFS.
 
@@ -123,7 +123,7 @@ structure de dossier requise plus un manifeste **ASC MHL** conforme par roll.
 
 ## Démarrage rapide
 
-1. Dans **Options**, ouvrez le menu **Preset** et choisissez **Netflix Ingest (built-in)**.
+1. Créez un film avec **+ › Netflix Ingest**, ou, dans **Options › Destinations** d'un film existant, appuyez sur **Use Netflix Ingest folders** (une confirmation précède le remplacement des réglages de dossiers et de noms).
 2. Les champs **Shoot metadata** apparaissent (dans l'onglet Destinations). Remplissez :
    - **Episode / Block**, par ex. `EP103`, `Block01`, `B01`, `BK1`
    - **Day**, par ex. `Day05`, `D05`
@@ -238,7 +238,7 @@ erforderliche Ordnerstruktur plus ein konformes **ASC MHL**-Manifest pro Roll.
 
 ## Schnelleinstieg
 
-1. Öffnen Sie in **Options** das Menü **Preset** und wählen Sie **Netflix Ingest (built-in)**.
+1. Legen Sie einen Film mit **+ › Netflix Ingest** an oder drücken Sie in **Options › Destinations** eines vorhandenen Films **Use Netflix Ingest folders** (vor dem Ersetzen der Ordner- und Namenseinstellungen wird nachgefragt).
 2. Die Felder **Shoot metadata** erscheinen (auf der Registerkarte Destinations). Füllen Sie aus:
    - **Episode / Block**, z. B. `EP103`, `Block01`, `B01`, `BK1`
    - **Day**, z. B. `Day05`, `D05`
@@ -352,7 +352,7 @@ estructura de carpeta requerida más un manifiesto **ASC MHL** conforme por roll
 
 ## Inicio rápido
 
-1. En **Options**, abra el menú **Preset** y elija **Netflix Ingest (built-in)**.
+1. Cree una película con **+ › Netflix Ingest** o, en **Options › Destinations** de una existente, pulse **Use Netflix Ingest folders** (pide confirmación antes de reemplazar los ajustes de carpetas y nombres).
 2. Aparecen los campos **Shoot metadata** (en la pestaña Destinations). Rellene:
    - **Episode / Block**, por ejemplo, `EP103`, `Block01`, `B01`, `BK1`
    - **Day**, por ejemplo, `Day05`, `D05`

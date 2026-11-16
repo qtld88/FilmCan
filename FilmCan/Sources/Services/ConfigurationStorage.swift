@@ -172,6 +172,18 @@ class ConfigurationStorage: ObservableObject {
         return true
     }
 
+    /// The one-time "movies only" migration (see `FilmPresetOwnership.migrateToFilmsOnly`).
+    /// Writes nothing; returns whether anything changed.
+    @discardableResult
+    func migrateToFilmsOnly() -> Bool {
+        let result = FilmPresetOwnership.migrateToFilmsOnly(
+            configurations: configurations, presets: organizationPresets)
+        guard result.changed else { return false }
+        organizationPresets = result.presets
+        configurations = result.configurations
+        return true
+    }
+
     func moveConfig(from sourceId: UUID, to destinationId: UUID) {
         guard let fromIndex = configurations.firstIndex(where: { $0.id == sourceId }),
               let toIndex = configurations.firstIndex(where: { $0.id == destinationId }),
@@ -225,6 +237,7 @@ class ConfigurationStorage: ObservableObject {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        var configsLoaded = false
         if let loadedConfigs: [BackupConfiguration] = decodeWithFallback(
             type: [BackupConfiguration].self,
             primaryURL: configFileURL,
@@ -232,6 +245,7 @@ class ConfigurationStorage: ObservableObject {
             decoder: decoder
         ) {
             configurations = loadedConfigs
+            configsLoaded = true
         } else if fileManager.fileExists(atPath: configFileURL.path) {
             quarantine(configFileURL)
             noteLoadFailure("configs.json")
@@ -278,10 +292,12 @@ class ConfigurationStorage: ObservableObject {
             transferHistory = []
         }
         seedTotalTransferCountIfNeeded()
-        // A film owns its settings: one-time copy for films still linked to a shared
-        // preset. A file that failed to load leaves nothing to adopt, and `save`
-        // refuses to write while a quarantined file is unresolved.
-        if adoptPresetCopies() { save() }
+        // Movies only: each movie keeps its own settings record, shared presets go
+        // (after every movie pointing at one got its own copy), and so do records of
+        // movies that no longer exist. Skipped when the movies did not load: every
+        // record would look orphaned. `save` refuses to write while a quarantined file
+        // is unresolved.
+        if configsLoaded, migrateToFilmsOnly() { save() }
 
         // Load last used
         if let lastUsedIdString = userDefaults.string(forKey: lastUsedKey),
@@ -379,34 +395,7 @@ class ConfigurationStorage: ObservableObject {
         set { userDefaults.set(newValue, forKey: lastDestKey) }
     }
 
-    // MARK: - Organization Presets
-
-    func addPreset(_ preset: OrganizationPreset) {
-        organizationPresets.append(preset)
-        save()
-    }
-
-    func updatePreset(_ preset: OrganizationPreset) {
-        if let index = organizationPresets.firstIndex(where: { $0.id == preset.id }) {
-            organizationPresets[index] = preset
-            save()
-        }
-    }
-
-    func deletePreset(_ preset: OrganizationPreset) {
-        organizationPresets.removeAll { $0.id == preset.id }
-        save()
-    }
-
     // MARK: - Import / Export
-
-    func exportPresetsData() throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        // Shared presets only: a film's own copy travels with the film, not here.
-        return try encoder.encode(FilmPresetOwnership.shared(organizationPresets))
-    }
 
     func exportMoviesHistoryData() throws -> Data {
         let allIds = Set(configurations.map(\.id))
@@ -429,24 +418,6 @@ class ConfigurationStorage: ObservableObject {
             filmPresets: organizationPresets.filter { $0.ownerFilmId.map(configIds.contains) ?? false }
         )
         return try encoder.encode(payload)
-    }
-
-    func importPresets(from data: Data) throws {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let incoming = try decoder.decode([OrganizationPreset].self, from: data)
-        var updated = organizationPresets
-        for var preset in incoming {
-            // An imported preset is always a shared one.
-            preset.ownerFilmId = nil
-            if let index = updated.firstIndex(where: { $0.id == preset.id }) {
-                updated[index] = preset
-            } else {
-                updated.append(preset)
-            }
-        }
-        organizationPresets = updated
-        save()
     }
 
     func importMoviesHistory(from data: Data, retentionLimit: Int) throws {
@@ -476,6 +447,7 @@ class ConfigurationStorage: ObservableObject {
     }
 
     private func decodeMoviesHistoryPayload(from data: Data) throws -> MoviesHistoryExport {
+        if MovieSettingsFile.looksLikeOldPresetsFile(data) { throw MovieSettingsFile.ImportError.presetsFile }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(MoviesHistoryExport.self, from: data)

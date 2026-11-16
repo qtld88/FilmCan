@@ -124,15 +124,6 @@ final class FilmPresetOwnershipTests: XCTestCase {
                        [shared, other])
     }
 
-    func test_nextSharedName_ignoresOwnCopies_andSkipsTakenNames() {
-        var p2 = sharedPreset("Preset 2")
-        p2.id = UUID()
-        let own = FilmPresetOwnership.ownCopy(of: sharedPreset("Preset 9"), for: UUID())
-        XCTAssertEqual(FilmPresetOwnership.nextSharedName(in: [own]), "Preset 1")
-        XCTAssertEqual(FilmPresetOwnership.nextSharedName(in: [sharedPreset("X"), p2]), "Preset 3")
-        XCTAssertEqual(FilmPresetOwnership.nextSharedName(in: [p2]), "Preset 3")
-    }
-
     // MARK: Storage
 
     private func writeLegacyFiles(configs: [BackupConfiguration], presets: [OrganizationPreset]) throws {
@@ -148,12 +139,13 @@ final class FilmPresetOwnershipTests: XCTestCase {
                              presets: [preset])
 
         let first = ConfigurationStorage(baseDirectory: dir)
-        XCTAssertEqual(first.organizationPresets.count, 3)
+        XCTAssertEqual(first.organizationPresets.count, 2, "one own copy per movie, no shared preset")
+        XCTAssertTrue(first.organizationPresets.allSatisfy { $0.ownerFilmId != nil })
         let ids = first.configurations.map(\.selectedOrganizationPresetId)
         XCTAssertFalse(ids.contains(preset.id))
 
         let second = ConfigurationStorage(baseDirectory: dir)
-        XCTAssertEqual(second.organizationPresets.count, 3, "a second launch adopts nothing more")
+        XCTAssertEqual(second.organizationPresets.count, 2, "a second launch changes nothing more")
         XCTAssertEqual(second.configurations.map(\.selectedOrganizationPresetId), ids)
     }
 
@@ -166,7 +158,7 @@ final class FilmPresetOwnershipTests: XCTestCase {
         XCTAssertEqual(storage.configurations.first?.selectedOrganizationPresetId, preset.id)
     }
 
-    func test_deletingAFilm_removesItsCopy_notTheSharedPreset() throws {
+    func test_deletingAFilm_removesItsCopy_notTheOthers() throws {
         let preset = sharedPreset()
         try writeLegacyFiles(configs: [film("A", preset: preset.id), film("B", preset: preset.id)],
                              presets: [preset])
@@ -175,28 +167,9 @@ final class FilmPresetOwnershipTests: XCTestCase {
 
         storage.delete(a)
 
-        XCTAssertEqual(storage.organizationPresets.count, 2)
-        XCTAssertTrue(storage.organizationPresets.contains { $0.id == preset.id })
+        XCTAssertEqual(storage.organizationPresets.count, 1)
+        XCTAssertTrue(storage.organizationPresets.allSatisfy { $0.ownerFilmId == storage.configurations[0].id })
         XCTAssertFalse(storage.organizationPresets.contains { $0.ownerFilmId == a.id })
-    }
-
-    func test_export_writesSharedPresetsOnly_andImportNeverCreatesAnOwnedOne() throws {
-        let preset = sharedPreset()
-        try writeLegacyFiles(configs: [film("A", preset: preset.id)], presets: [preset])
-        let storage = ConfigurationStorage(baseDirectory: dir)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let exported = try decoder.decode([OrganizationPreset].self, from: storage.exportPresetsData())
-        XCTAssertEqual(exported.map(\.id), [preset.id])
-
-        var incoming = sharedPreset("Imported")
-        incoming.id = UUID()
-        incoming.ownerFilmId = UUID()
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        try storage.importPresets(from: encoder.encode([incoming]))
-        XCTAssertNil(storage.organizationPresets.first { $0.id == incoming.id }?.ownerFilmId)
     }
 
     func test_settingOwnCopy_keepsTheRecordId_andLeavesOneCopy() {
@@ -239,24 +212,19 @@ final class FilmPresetOwnershipTests: XCTestCase {
 
     // MARK: Editing one film never reaches another
 
-    func test_editingOneFilm_leavesTheOtherFilmAndTheSharedPresetUnchanged() throws {
+    func test_editingOneFilm_leavesTheOtherFilmUnchanged() throws {
         // A storage of its own in a temp directory: the app's real films are never touched.
         let storage = ConfigurationStorage(baseDirectory: dir)
-        let preset = sharedPreset()
-        var a = film("Ownership A", preset: nil), b = film("Ownership B", preset: nil)
-        storage.organizationPresets.append(preset)
-        storage.add(a)
-        storage.add(b)
-
+        let started = [FilmStarter.netflixIngest(name: "Ownership A"),
+                       FilmStarter.netflixIngest(name: "Ownership B")]
+        for item in started {
+            storage.organizationPresets.append(try XCTUnwrap(item.preset))
+            storage.add(item.config)
+        }
+        let a = started[0].config, b = started[1].config
         let editorA = BackupEditorViewModel(config: a, storage: storage)
-        let editorB = BackupEditorViewModel(config: b, storage: storage)
-        editorA.applyPreset(preset)
-        editorB.applyPreset(preset)
-        a = editorA.config
-        b = editorB.config
         let idA = try XCTUnwrap(a.selectedOrganizationPresetId)
         let idB = try XCTUnwrap(b.selectedOrganizationPresetId)
-        XCTAssertNotEqual(idA, preset.id)
         XCTAssertNotEqual(idA, idB)
         let copyBBefore = storage.organizationPresets.first { $0.id == idB }
 
@@ -268,41 +236,32 @@ final class FilmPresetOwnershipTests: XCTestCase {
         editorA.syncFromSelectedPresetIfNeeded()
         editorA.copyFolderContents.toggle()
 
-        XCTAssertEqual(storage.organizationPresets.first { $0.id == preset.id }, preset)
         XCTAssertEqual(storage.organizationPresets.first { $0.id == idB }, copyBBefore)
         XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.folderTemplate, "CHANGED/{day}")
 
-        // Choosing a preset again refreshes the copy in place: one copy, same record id
-        // (history entries refer to it).
-        editorA.applyPreset(preset)
+        // "Use Netflix Ingest folders" refreshes the record in place: one record, same
+        // id (history entries refer to it).
+        editorA.applyNetflixIngestPreset()
         XCTAssertEqual(storage.organizationPresets.filter { $0.ownerFilmId == a.id }.map(\.id), [idA])
         XCTAssertEqual(editorA.config.selectedOrganizationPresetId, idA)
-        XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.folderTemplate, "CITIZENK/{day}")
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.folderTemplate,
+                       OrganizationPreset.netflixIngest().folderTemplate)
+        XCTAssertEqual(storage.organizationPresets.first { $0.id == idB }, copyBBefore)
+
         // Off keeps the film's settings aside; switching back finds them.
         presets = editorA.organizationPresets
         let indexA = try XCTUnwrap(presets.firstIndex { $0.id == idA })
         presets[indexA].soundFolderTemplate = "TAILORED/Sound"
         editorA.organizationPresets = presets
-        editorA.applyOffOrganizationSettings()
+        editorA.setFolderOrganization(false)
+        XCTAssertFalse(editorA.folderOrganizationIsOn)
         XCTAssertNil(editorA.config.selectedOrganizationPresetId)
         XCTAssertEqual(editorA.parkedOwnCopy?.id, idA)
-        editorA.useParkedOwnCopy()
+        editorA.setFolderOrganization(true)
         XCTAssertEqual(editorA.config.selectedOrganizationPresetId, idA)
         XCTAssertNil(editorA.parkedOwnCopy)
         XCTAssertEqual(storage.organizationPresets.first { $0.id == idA }?.soundFolderTemplate, "TAILORED/Sound")
-        // The trash button deletes them and never falls back to another record.
-        editorA.deleteOrganizationPreset(id: idA)
-        XCTAssertNil(editorA.config.selectedOrganizationPresetId)
-        XCTAssertTrue(storage.organizationPresets.filter { $0.ownerFilmId == a.id }.isEmpty)
-        XCTAssertEqual(storage.organizationPresets.first { $0.id == idB }, copyBBefore)
-        // Saving as a preset adds a shared one and keeps film B on its own copy.
-        let sharedBefore = FilmPresetOwnership.shared(storage.organizationPresets).count
-        editorB.saveCurrentSettingsAsPreset()
-        let sharedAfter = FilmPresetOwnership.shared(storage.organizationPresets)
-        XCTAssertEqual(sharedAfter.count, sharedBefore + 1)
-        XCTAssertEqual(editorB.config.selectedOrganizationPresetId, idB)
-        XCTAssertEqual(sharedAfter.last?.soundFolderTemplate, preset.soundFolderTemplate)
-        XCTAssertEqual(sharedAfter.last?.name, "Preset 2", "the name of the starting preset is taken")
+        XCTAssertTrue(FilmPresetOwnership.shared(storage.organizationPresets).isEmpty)
     }
 }
 
@@ -414,7 +373,7 @@ final class NewFilmLikeTests: XCTestCase {
         XCTAssertEqual(copy.sourceAutoDetectPatterns, ["A*"])
         XCTAssertEqual(copy.destinationAutoDetectPatterns, ["SSD*"])
         XCTAssertEqual(copy.soundAutoDetectPatterns, ["MIX*"])
-        XCTAssertEqual(copy.episode, "EP1")
+        XCTAssertEqual(copy.episode, "", "the episode belongs to the shoot")
         XCTAssertEqual(copy.unit, "MU")
         XCTAssertEqual(copy.cameraFormat, "ARRI")
         // The new film gets its own top folder.

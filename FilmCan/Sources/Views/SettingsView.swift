@@ -588,13 +588,10 @@ private struct NotificationTokenChip: View {
 struct HistorySettingsView: View {
     @Binding var historyRetentionLimit: Int
     @ObservedObject private var storage = ConfigurationStorage.shared
-    @State private var showPresetExport = false
-    @State private var showPresetImport = false
     @State private var showHistoryExport = false
     @State private var showHistoryImport = false
     @State private var showHistoryExportPicker = false
     @State private var showHistoryImportPicker = false
-    @State private var presetExportDocument = JSONExportDocument(data: Data())
     @State private var historyExportDocument = JSONExportDocument(data: Data())
     @State private var historyExportSelection = Set<UUID>()
     @State private var historyImportSelection = Set<UUID>()
@@ -613,22 +610,6 @@ struct HistorySettingsView: View {
             ReportArchiveSettingsSection()
 
             Section("Import & Export") {
-                HStack {
-                    Text("Presets")
-                    Spacer()
-                    Button("Export") {
-                        do {
-                            presetExportDocument = JSONExportDocument(data: try storage.exportPresetsData())
-                            showPresetExport = true
-                        } catch {
-                            importErrorMessage = "Failed to export presets: \(error.localizedDescription)"
-                        }
-                    }
-                    Button("Import") {
-                        showPresetImport = true
-                    }
-                }
-
                 HStack {
                     Text("Movies & History")
                     Spacer()
@@ -651,16 +632,6 @@ struct HistorySettingsView: View {
         .padding()
         .padding(.top, 30)
         .fileExporter(
-            isPresented: $showPresetExport,
-            document: presetExportDocument,
-            contentType: .json,
-            defaultFilename: "filmcan-presets"
-        ) { result in
-            if case .failure(let error) = result {
-                importErrorMessage = "Failed to export presets: \(error.localizedDescription)"
-            }
-        }
-        .fileExporter(
             isPresented: $showHistoryExport,
             document: historyExportDocument,
             contentType: .json,
@@ -668,22 +639,6 @@ struct HistorySettingsView: View {
         ) { result in
             if case .failure(let error) = result {
                 importErrorMessage = "Failed to export movies and history: \(error.localizedDescription)"
-            }
-        }
-        .fileImporter(
-            isPresented: $showPresetImport,
-            allowedContentTypes: [.json]
-        ) { result in
-            switch result {
-            case .success(let url):
-                do {
-                    let data = try Data(contentsOf: url)
-                    try storage.importPresets(from: data)
-                } catch {
-                    importErrorMessage = "Failed to import presets: \(error.localizedDescription)"
-                }
-            case .failure(let error):
-                importErrorMessage = "Failed to import presets: \(error.localizedDescription)"
             }
         }
         .fileImporter(
@@ -767,23 +722,6 @@ struct HistorySettingsView: View {
         } message: {
             Text(importErrorMessage ?? "")
         }
-    }
-}
-
-private struct JSONExportDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-    var data: Data
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        data = configuration.file.regularFileContents ?? Data()
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
     }
 }
 

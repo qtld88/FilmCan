@@ -401,27 +401,4 @@ final class FolderStructureWritingTests: XCTestCase {
         XCTAssertFalse(editor.config.offOrganizationUseFolderTemplate)
         XCTAssertTrue(storage.organizationPresets.isEmpty)
     }
-
-    /// The tree writes into the film's own record only; a shared preset stays as it was.
-    func test_sharedPreset_isNotTouchedByTheTree() throws {
-        let storage = ConfigurationStorage(baseDirectory: dir)
-        var shared = OrganizationPreset()
-        shared.name = "Shared"
-        shared.useFolderTemplate = true
-        shared.folderTemplate = "SHARED/Camera"
-        storage.organizationPresets = [shared]
-        let film = BackupConfiguration()
-        storage.add(film)
-        let editor = BackupEditorViewModel(config: film, storage: storage)
-        editor.applyPreset(shared)
-        let model = OrganizationEditorModel(viewModel: editor)
-        XCTAssertEqual(model.folderStructure, FolderStructure(camera: ["SHARED", "Camera"]))
-
-        model.setFolderStructure(FolderStructure(camera: ["MINE"]))
-
-        XCTAssertEqual(storage.organizationPresets.first { $0.id == shared.id }, shared)
-        let id = try XCTUnwrap(editor.config.selectedOrganizationPresetId)
-        XCTAssertNotEqual(id, shared.id)
-        XCTAssertEqual(storage.organizationPresets.first { $0.id == id }?.folderTemplate, "MINE")
-    }
 }

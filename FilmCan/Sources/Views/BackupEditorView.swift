@@ -30,8 +30,9 @@ struct BackupEditorView: View {
     @State var duplicateNameWarningMessage = ""
     @State var showEarlierCopyWarning = false
     @State var earlierCopyWarningMessage = ""
-    @State var isEditingPresetName = false
-    @FocusState var isPresetNameFocused: Bool
+    @State var confirmNetflixIngest = false
+    @State var showSettingsExport = false
+    @State var settingsExportDocument = JSONExportDocument(data: Data())
     /// Which groups of the movie settings panel are open (see `MovieSettingsSections`).
     @AppStorage("movieSettingsOpenGroups") var openSettingsGroups = MovieSettingsSections.defaultStored
     @State var hostWindow: NSWindow?
@@ -283,10 +284,6 @@ struct BackupEditorView: View {
         }
         .onChange(of: viewModel.organizationPresets) { _ in
             viewModel.syncFromSelectedPresetIfNeeded()
-        }
-        .onChange(of: viewModel.selectedOrganizationPresetId) { _ in
-            isEditingPresetName = false
-            isPresetNameFocused = false
         }
         .onChange(of: config) { updated in
             PerfSignpost.region("onChange.config") {

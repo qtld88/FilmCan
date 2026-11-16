@@ -26,13 +26,9 @@ struct FilmCanApp: App {
 
             CommandGroup(replacing: .newItem) {
                 Button("New Backup") {
-                    _ = appState.createNewConfig()
+                    NotificationCenter.default.post(name: .filmCanNewMovie, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
-
-                Menu("New Movie Like") {
-                    NewMovieMenuItems(appState: appState, storage: appState.storage)
-                }
 
                 NewWindowMenuItems()
             }

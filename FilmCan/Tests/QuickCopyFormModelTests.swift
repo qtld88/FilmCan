@@ -23,6 +23,21 @@ final class QuickCopyFormModelTests: XCTestCase {
         ).folderPath
     }
 
+    /// What the Movie picker does for a movie that has its own settings record.
+    private func pick(_ preset: OrganizationPreset, in form: inout QuickCopyFormModel) {
+        var film = BackupConfiguration()
+        film.name = "Test movie"
+        film.cameraFolderTemplate = ""
+        film.soundFolderTemplate = ""
+        var own = preset
+        own.ownerFilmId = film.id
+        film.selectedOrganizationPresetId = own.id
+        form.savedPresets.removeAll { $0.id == own.id }
+        form.savedPresets.append(own)
+        form.savedFilms = [film]
+        form.selectedFilmId = film.id
+    }
+
     // MARK: sanitizing
     func test_sanitizeName_spacesAndProhibitedChars() {
         XCTAssertEqual(QuickCopyFormModel.sanitizeName("Docu Truc"), "Docu_Truc")
@@ -96,12 +111,12 @@ final class QuickCopyFormModelTests: XCTestCase {
         let noName = netflixLike()
         form.savedPresets = [withName, noName]
 
-        form.selectedPresetId = noName.id
+        pick(noName, in: &form)
         XCTAssertTrue(form.organizationActive)
         XCTAssertTrue(form.showsProjectField)
         XCTAssertTrue(form.showsDayField)
 
-        form.selectedPresetId = withName.id
+        pick(withName, in: &form)
         XCTAssertFalse(form.showsProjectField)
         XCTAssertEqual(form.sanitizedProject, "Show")
     }
@@ -111,7 +126,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var p = netflixLike()
         p.duplicatePolicy = .ask
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         XCTAssertEqual(form.effectiveDuplicatePolicy, .skip)
         XCTAssertTrue(form.duplicatePolicyWasMapped)
     }
@@ -120,7 +135,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var form = QuickCopyFormModel(items: [dir("A001")])
         let p = netflixLike()
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         form.pickedDate = date(2026, 1, 5)
         let run = try XCTUnwrap(form.runPreset())
         XCTAssertTrue(run.useCustomDate)
@@ -162,7 +177,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         p.hashListStyle = .simpleHidden
         p.runInParallel = true
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         form.destinations = ["/Volumes/SSD"]
         form.verification = .paranoid   // ignored: preset wins
         let c = form.makeConfiguration()
@@ -211,7 +226,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var form = QuickCopyFormModel(items: [dir("A001")])
         let p = netflixLike()          // {episode} in template, empty projectName
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         form.destinations = ["/Volumes/SSD"]
         form.pathExists = { _ in true }
         XCTAssertEqual(form.blocker, .missingProject)
@@ -220,7 +235,7 @@ final class QuickCopyFormModelTests: XCTestCase {
 
         let named = netflixLike(projectName: "Show")
         form.savedPresets = [named]
-        form.selectedPresetId = named.id
+        pick(named, in: &form)
         form.project = ""
         XCTAssertNil(form.blocker)     // preset supplies the project name
     }
@@ -235,7 +250,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var p = netflixLike(projectName: "Show")
         p.name = OrganizationPreset.netflixIngestName
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         XCTAssertEqual(form.blocker, .invalidRollName("A@001"))
         XCTAssertTrue(form.blocker?.message.contains("A@001") == true)
         XCTAssertTrue(form.blocker?.message.contains("@") == true)
@@ -243,51 +258,8 @@ final class QuickCopyFormModelTests: XCTestCase {
         var other = p
         other.name = "Something else"
         form.savedPresets = [other]
-        form.selectedPresetId = other.id
+        pick(other, in: &form)
         XCTAssertNil(form.blocker)
-    }
-
-    // MARK: Save as preset
-    func test_makeSavedPreset_contents_noDateStored() throws {
-        var form = QuickCopyFormModel(items: [dir("A001")])
-        form.organization = .projectAndDay
-        form.project = "Docu Truc"
-        form.verification = .paranoid
-        form.duplicatePolicy = .verify
-        form.copyFolderContents = true
-        form.pickedDate = date(2026, 3, 2)
-        form.savePresetName = "  Docu  "
-        let p = try XCTUnwrap(form.makeSavedPreset())
-        XCTAssertEqual(p.name, "Docu")
-        XCTAssertEqual(p.engineOptions.verificationMode, .paranoid)
-        XCTAssertEqual(p.duplicatePolicy, .verify)
-        XCTAssertTrue(p.copyFolderContents)
-        XCTAssertTrue(p.logEnabled)
-        XCTAssertEqual(p.hashListStyle, .ascMHL)
-        XCTAssertEqual(p.projectName, "Docu_Truc")
-        XCTAssertTrue(p.useFolderTemplate)
-        XCTAssertEqual(p.folderTemplate, QuickCopyFormModel.projectCameraTemplate)
-        XCTAssertEqual(p.soundFolderTemplate, QuickCopyFormModel.projectSoundTemplate)
-        XCTAssertFalse(p.useCustomDate)
-    }
-
-    func test_makeSavedPreset_nilWhenNameEmptyOrPresetSelected() {
-        var form = QuickCopyFormModel(items: [dir("A001")])
-        XCTAssertNil(form.makeSavedPreset())
-        form.savePresetName = "X"
-        let p = netflixLike()
-        form.savedPresets = [p]
-        form.selectedPresetId = p.id
-        XCTAssertNil(form.makeSavedPreset())
-    }
-
-    func test_makeSavedPreset_noOrganization_hasNoTemplate() throws {
-        var form = QuickCopyFormModel(items: [dir("A001")])
-        form.savePresetName = "Plain"
-        let p = try XCTUnwrap(form.makeSavedPreset())
-        XCTAssertFalse(p.useFolderTemplate)
-        XCTAssertEqual(p.folderTemplate, "")
-        XCTAssertEqual(p.projectName, "")
     }
 
     // MARK: Summary line
@@ -296,14 +268,14 @@ final class QuickCopyFormModelTests: XCTestCase {
         var p = netflixLike()
         p.duplicatePolicy = .ask
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         let chips = form.presetChips ?? []
         XCTAssertTrue(chips.contains("Fast check"), "\(chips)")
         XCTAssertTrue(chips.contains("Skip existing files"), "\(chips)")
         XCTAssertTrue(chips.contains("ASC MHL"), "\(chips)")
         XCTAssertEqual(chips.count, 4)
         XCTAssertTrue(form.presetChipsHelp?.contains("Ask each time") == true)
-        form.selectedPresetId = nil
+        form.selectFilm(nil)
         XCTAssertNil(form.presetChips)
         XCTAssertNil(form.presetChipsHelp)
     }
@@ -313,7 +285,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var p = netflixLike()
         p.duplicatePolicy = .overwrite
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         XCTAssertTrue(form.presetChips?.contains("Overwrite existing files") == true)
         XCTAssertNil(form.presetChipsHelp)
     }
@@ -379,7 +351,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         XCTAssertEqual(form.sanitizedProject, "Foo")
         let named = netflixLike(projectName: "Show")
         form.savedPresets = [named]
-        form.selectedPresetId = named.id
+        pick(named, in: &form)
         XCTAssertFalse(form.showsProjectField)
         XCTAssertEqual(form.sanitizedProject, "Show")
     }
@@ -388,7 +360,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var form = QuickCopyFormModel(items: [dir("A001")])
         let unnamed = netflixLike()
         form.savedPresets = [unnamed]
-        form.selectedPresetId = unnamed.id
+        pick(unnamed, in: &form)
         form.project = "Foo"
         XCTAssertTrue(form.showsProjectField)
         XCTAssertEqual(form.sanitizedProject, "Foo")
@@ -399,7 +371,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var p = netflixLike()
         p.useCustomDate = true
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         let run = try XCTUnwrap(form.runPreset())
         XCTAssertFalse(run.useCustomDate)
         XCTAssertTrue(form.savedPresets[0].useCustomDate)
@@ -424,20 +396,9 @@ final class QuickCopyFormModelTests: XCTestCase {
         p.folderTemplate = "{date}/Camera_Media"
         p.soundFolderTemplate = "{date}/Sound_Media"
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         XCTAssertTrue(form.organizationActive)
         XCTAssertFalse(form.showsDayField)
-    }
-
-    func test_makeSavedPreset_dateOnly() throws {
-        var form = QuickCopyFormModel(items: [dir("A001")])
-        form.savePresetName = "By date"
-        form.organization = .dateOnly
-        let p = try XCTUnwrap(form.makeSavedPreset())
-        XCTAssertTrue(p.useFolderTemplate)
-        XCTAssertEqual(p.folderTemplate, "{date}/Camera_Media")
-        XCTAssertEqual(p.soundFolderTemplate, "{date}/Sound_Media")
-        XCTAssertEqual(p.projectName, "")
     }
 
     // MARK: gate feedback (2026-11-03)
@@ -453,7 +414,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var form = QuickCopyFormModel(items: [dir("261103_", .sound)])
         let p = cameraOnlyPreset()
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         form.today = date(2026, 11, 3)
         form.day = "J07"
         XCTAssertTrue(form.showsMediaKind)
@@ -466,7 +427,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         var p = cameraOnlyPreset()
         p.folderTemplate = "{date}"
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         form.destinations = ["/Volumes/SSD"]
         form.pathExists = { $0 == "/Volumes/SSD" }
         form.today = date(2026, 11, 3)
@@ -549,7 +510,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         p.copyFolderContents = true
         var form = QuickCopyFormModel(items: [dir("A001")])
         form.savedPresets = [p]
-        form.selectedPresetId = p.id
+        pick(p, in: &form)
         form.destinations = ["/Volumes/SSD"]
         XCTAssertTrue(form.treePreview(for: "/Volumes/SSD").contains { $0.role == .contents })
 
@@ -585,34 +546,55 @@ final class QuickCopyFormModelTests: XCTestCase {
         return f
     }
 
-    func test_selectFilm_loadsPresetProjectAndDay() {
-        let netflix = OrganizationPreset.netflixIngest()
-        let other = OrganizationPreset()
+    func test_selectFilm_loadsItsOwnSettingsProjectAndDay() {
         var form = QuickCopyFormModel(items: [dir("A001")])
-        form.savedPresets = [netflix, other]
-        let f = film(preset: netflix)
+        var f = film(preset: nil)
+        var own = OrganizationPreset.netflixIngest()
+        own.ownerFilmId = f.id
+        f.selectedOrganizationPresetId = own.id
+        form.savedPresets = [own]
         form.savedFilms = [f]
         form.selectFilm(f.id)
-        XCTAssertEqual(form.selectedPresetId, netflix.id)
+        XCTAssertEqual(form.selectedPresetId, own.id)
         XCTAssertEqual(form.project, "TLF")
         XCTAssertEqual(form.day, "DAY03")
-        XCTAssertEqual(form.filmPresetName, netflix.name)
-        XCTAssertFalse(form.presetDiffersFromFilm)
-
-        form.selectedPresetId = other.id
-        XCTAssertTrue(form.presetDiffersFromFilm)
-        XCTAssertEqual(form.filmPresetName, netflix.name)
+        XCTAssertTrue(form.organizationActive)
     }
 
-    func test_selectFilm_withDeletedPreset_fallsBackToNone() {
+    func test_selectFilm_ignoresARecordOwnedByAnotherMovie_andNoMovieMeansNoRecord() {
         var form = QuickCopyFormModel(items: [dir("A001")])
-        form.selectedPresetId = UUID()
-        let f = film(preset: OrganizationPreset())
+        var foreign = OrganizationPreset.netflixIngest()
+        foreign.ownerFilmId = UUID()
+        let f = film(preset: foreign)
+        form.savedPresets = [foreign]
         form.savedFilms = [f]
         form.selectFilm(f.id)
         XCTAssertNil(form.selectedPresetId)
-        XCTAssertEqual(form.filmPresetName, "None")
-        XCTAssertFalse(form.presetDiffersFromFilm)
+        form.selectFilm(nil)
+        XCTAssertNil(form.selectedPresetId)
+        XCTAssertNil(form.runPreset())
+    }
+
+    func test_switchingMovie_neverWritesTheMovie() {
+        var form = QuickCopyFormModel(items: [dir("A001")])
+        var a = film(name: "A", preset: nil)
+        var recordA = OrganizationPreset.netflixIngest()
+        recordA.ownerFilmId = a.id
+        a.selectedOrganizationPresetId = recordA.id
+        let b = film(name: "B", preset: nil)
+        form.savedPresets = [recordA]
+        form.savedFilms = [a, b]
+        let presetsBefore = form.savedPresets, filmsBefore = form.savedFilms
+        form.selectFilm(a.id)
+        form.setCopyFolderContents(true)
+        form.pickedDate = date(2026, 1, 5)
+        form.project = "Other"
+        _ = form.runPreset()
+        form.selectFilm(b.id)
+        XCTAssertNil(form.selectedPresetId, "movie B has no record: basic options")
+        form.selectFilm(a.id)
+        XCTAssertEqual(form.savedPresets, presetsBefore)
+        XCTAssertEqual(form.savedFilms, filmsBefore)
     }
 
     func test_pdfReport_followsTheSelectedMovie() {
@@ -657,10 +639,11 @@ final class QuickCopyFormModelTests: XCTestCase {
     }
 
     func test_film_netflixTemplates_driveRunPresetAndPreview() {
-        let netflix = OrganizationPreset.netflixIngest()
+        var netflix = OrganizationPreset.netflixIngest()
         var form = QuickCopyFormModel(items: [dir("A001")])
-        form.savedPresets = [netflix]
         var f = film(preset: netflix)
+        netflix.ownerFilmId = f.id
+        form.savedPresets = [netflix]
         f.cameraFolderTemplate = "{episode}_{day}_{unit}/CAM/{cameraFormat}"
         form.savedFilms = [f]
         form.selectFilm(f.id)
@@ -668,7 +651,7 @@ final class QuickCopyFormModelTests: XCTestCase {
         let rel = form.relativePaths(for: "/Volumes/SSD").first ?? ""
         XCTAssertTrue(rel.hasPrefix("TLF_DAY03_MAIN/CAM/ARRI/"), rel)
 
-        form.selectedPresetId = nil
+        form.selectFilm(nil)
         XCTAssertNotEqual(form.runPreset()?.folderTemplate, f.cameraFolderTemplate)
     }
 

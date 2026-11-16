@@ -72,14 +72,6 @@ enum FilmPresetOwnership {
         return (out, copy)
     }
 
-    /// "Preset 3": numbered among the shared presets, skipping names already taken.
-    static func nextSharedName(in presets: [OrganizationPreset]) -> String {
-        let names = Set(shared(presets).map(\.name))
-        var number = names.count + 1
-        while names.contains("Preset \(number)") { number += 1 }
-        return "Preset \(number)"
-    }
-
     /// Presets left once a film is deleted: its own copies go with it.
     static func removingCopies(ownedBy filmId: UUID,
                                from presets: [OrganizationPreset]) -> [OrganizationPreset] {
@@ -158,7 +150,7 @@ enum FilmTemplate {
 extension BackupConfiguration {
     /// A new film with the settings of `source`: a copy, never a link. What belongs to
     /// the other film's shoot stays there: cards, drives, their tags, the shoot day,
-    /// card names, usage dates. Counters and history are stored per film id, so a new
+    /// card names, episode, usage dates. Unit and camera format stay (crew setup). Counters and history are stored per film id, so a new
     /// id starts them fresh. The caller gives the film its own preset copy.
     static func newFilm(name: String, like source: BackupConfiguration) -> BackupConfiguration {
         var config = source
@@ -173,6 +165,7 @@ extension BackupConfiguration {
         config.genericRollNames = [:]
         config.runRollNames = [:]
         config.day = ""
+        config.episode = ""
         config.forceRecopy = false
         config.selectedOrganizationPresetId = nil
         config.createdAt = Date()
