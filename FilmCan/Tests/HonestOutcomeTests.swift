@@ -279,7 +279,8 @@ final class HonestOutcomeTests: XCTestCase {
     func test_report_verificationOff_isNotVerified() async throws {
         let card = try makeCard("A001", files: ["A.mov"])
         let dest = try makeDir("dest")
-        let dr = try XCTUnwrap(try await run(sources: [card], dests: [dest], verify: .off).first)
+        let offResults = try await run(sources: [card], dests: [dest], verify: .off)
+        let dr = try XCTUnwrap(offResults.first)
         var config = BackupConfiguration()
         config.name = "Proj"
         let report = BackupReport.build(result: transferResult(dr), config: config, appVersion: "1")
