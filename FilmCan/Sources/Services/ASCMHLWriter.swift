@@ -141,8 +141,7 @@ actor ASCMHLWriter: MHLWriting {
                 // The element the value was recorded under: an md5 value is never
                 // relabelled xxh128. (Carried names come from ASCMHLReader's list.)
                 let tag = e.algorithm
-                var attrs = ""
-                if let action { attrs += " action=\"\(Self.esc(action))\"" }
+                var attrs = " action=\"\(Self.esc(action))\""
                 if let hashDate { attrs += " hashdate=\"\(Self.esc(hashDate))\"" }
                 xml += "    <hash>\n"
                 xml += "      <path size=\"\(e.size)\"\(modified)>\(Self.esc(e.relPath))</path>\n"
