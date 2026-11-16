@@ -1,7 +1,9 @@
 # Technical Debt & Cleanup Plan
 
 This document tracks known weak spots and a plan to improve them, based on the
-current codebase. As of 1.2.x the **FilmCan Engine (fan-out copier) is the only
+current codebase. _Refreshed 2026-11-16 against `main` @ `d335a02` (after the
+films-only / Catalog / PDF report / phone push merge). Line counts are from that
+commit._ As of 1.2.x the **FilmCan Engine (fan-out copier) is the only
 copy engine** — the rsync engine code + UI were removed and FilmCan no longer
 requires Homebrew rsync. (The build still bundles the rsync binary solely to ship
 `libxxhash` for verification — see item 7.)
@@ -19,7 +21,9 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
 
 2. **Duplicate handling + hash list verification**
    - Duplicate policy branches (skip / overwrite / add counter / ask) are
-     intertwined with copy and verify in the FilmCan Engine path.
+     intertwined with copy and verify in the FilmCan Engine path. Since
+     `ConflictScanner` the decision is taken in pre-flight (never mid-copy), but
+     the resolver closure still lives in `FanOutCopier.Configuration`.
    - “Verify using hash list” behaves differently depending on MHL availability.
 
 3. **CustomCopierService / FanOutCopier complexity**
@@ -27,13 +31,16 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
      in one actor with many branches, making regressions easy.
    - Single-responsibility concerns: `FanOutCopier.run()` does preflight, MHL
      seeding, resume filtering, pipelining, and result explosion.
+     `FanOutCopier.swift` is 2 181 lines.
 
 4. **History rendering + logic**
-   - Transfer history view owns filtering, sorting, formatting, and verification UI.
+   - Transfer history view owns filtering, sorting, formatting, and verification UI
+     (`TransferHistoryView.swift`, 1 270 lines).
    - Log parsing for counts happens inside the view flow.
 
 5. **Drive refresh + auto-detect**
-   - Drive list refresh is time-based and notification-based.
+   - Drive list refresh is time-based (`MainView.swift:54`, 6 s timer) and
+     notification-based.
    - Auto-detect behavior depends on refresh timing and can be nondeterministic.
 
 6. **Log + hash list lifecycle**
@@ -52,6 +59,26 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
      `StreamingHasher` returns nil if it can't load). To stop bundling rsync, vendor
      `libxxhash.0.dylib` standalone (own embed step + update
      `XXHash.possibleLibraryPaths`) first, then drop the rsync embed.
+
+8. **Large files mixing roles**
+   - `DestinationListView.swift` 1 326 lines, `TransferViewModel.swift` 1 285,
+     `BackupEditorViewModel.swift` 1 167.
+
+9. **Known functional limits (by design for now)**
+   - No real Pause: `pause()` only sets flags the fan-out engine never reads.
+   - `RunContext`, `verifyAlreadyBackedUp` and `repairFromSource` do not know the
+     Quick Copy override preset (Quick Copy UI never calls them).
+   - Quick Copy blocks two or more loose files in one selection: each would get its
+     own `ASCMHLWriter` on the same `<parent>/ascmhl/`, and `ASCMHLChain.append`
+     replaces by sequence (`test_twoLooseFiles_shareAscmhlFolder_chainKeepsOneGeneration`).
+   - The saved ntfy token disappears on update (keychain partition list pinned to
+     `cdhash:` with a self-signed certificate). See `docs/release.md`.
+
+10. **Docs drift**
+   - `docs/features/rsync.md` and `custom-rsync.md` describe the retired rsync
+     engine (they carry a "retired" banner; decide keep-as-history or delete).
+   - `docs/architecture.md` lagged 126 commits before this refresh: re-check it
+     whenever a service is added.
 
 ---
 

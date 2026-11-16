@@ -48,7 +48,7 @@ Local data lives in `~/Application Support`.
 - **Several main windows**: File › New Window opens another `WindowGroup(id: "main")` window. Menu hotkeys are NotificationCenter broadcasts, so receivers must guard `MainWindowTarget.shouldHandle(in: hostWindow)` (only the frontmost main window acts). File › New Quick Copy Window → `QuickCopyCoordinator.openEmpty()`.
 - **Entry point**: `FilmCanApp.swift` — creates `MainView` window and `SettingsView`. No storyboards.
 - **No CI, no linter, no formatter, no pre-commit hooks** — bare Xcode project.
-- **Automated tests**: `FilmCan/Tests/` (~100 tests, real temp-dir disk I/O, no mocks) — `FanOutCopierIntegrationTests` (progress monotonicity, per-dest resume, sound routing, cancel/partial), `FanOutCopierSafetyTests` (cancel/unwritable), `ASCMHLWriter/Reader/Chain/Conformance` (validated against the reference `ascmhl` CLI), `C4HashTests`, `OrganizationTemplateTokenTests`, and the Quick Copy suites (`QuickCopyFormModelTests`, `QuickCopyIntegrationTests`, `MediaKindGuesserTests`, `QuickCopyServiceProviderTests`, `OrganizationPresetDecodingTests`). ~320 tests total.
+- **Automated tests**: `FilmCan/Tests/` (93 files, ~745 test functions, real temp-dir disk I/O, no mocks) — `FanOutCopierIntegrationTests` (progress monotonicity, per-dest resume, sound routing, cancel/partial), `FanOutCopierSafetyTests` (cancel/unwritable), `ASCMHLWriter/Reader/Chain/Conformance` (validated against the reference `ascmhl` CLI), `C4HashTests`, `OrganizationTemplateTokenTests`, the Quick Copy suites (`QuickCopyFormModelTests`, `QuickCopyIntegrationTests`, `MediaKindGuesserTests`, `QuickCopyServiceProviderTests`, `OrganizationPresetDecodingTests`), plus Catalog, card seal, phone push, report and roll-numbering suites.
 - **State pattern**: `@StateObject` in views, `@Published` in ObservableObjects. `TransferViewModel` is the single source of truth for backup runs.
 
 ## Fan-Out Engine — Key Details
@@ -68,6 +68,20 @@ Local data lives in `~/Application Support`.
 ## Movies only (no presets)
 
 A movie is the only kind of settings (spec `docs/specs/2026-11-15-films-only.md`). Each movie keeps its own `OrganizationPreset` record (`ownerFilmId == movie id`, pointed at by `selectedOrganizationPresetId`); the engine path is unchanged. Shared presets are gone: `FilmPresetOwnership.migrateToFilmsOnly` (adopt, delete shared, delete orphans) runs once at `ConfigurationStorage.load`. New movies come from `FilmStarter` (blank / Netflix Ingest / like another) or a `.filmcan-movie` file (`MovieSettingsFile`, Models/FilmsOnly.swift); the "+" button shows `NewMovieChoice`. Quick Copy reads the picked movie's own record (`QuickCopyFormModel.selectedPreset`), never writes it.
+
+## Features added in the 1.3.x trial merge (Nov 2026)
+
+Merged to `main` from `qt1/essai` on 2026-11-16. User docs in `docs/features/`.
+
+- **Card seal**: `CardSealService` writes `<source>/.filmcan/seal.json` (`CardSeal`) after a run. `shouldSeal` ("Decision C"): every planned destination must report a checked success — Fast or Paranoid. Verification Off never seals. Best-effort: a seal write failure never fails the backup. `SealState` feeds the badge and the eject guard.
+- **Catalog** (`MediaCatalog`, `MediaCatalogStore` → `~/Library/Application Support/FilmCan/catalog.json`, `CatalogView`, `CatalogWindowController`): rolls per movie; the standalone window follows the selected movie tab. A card is recognised by its clips (`CardFingerprint`: `name|size|modified` of files ≥ 1 MiB, folders ignored), whatever roll name it got. Drives compare by volume UUID, never by volume name.
+- **Roll names**: `RollNumberer` (per-movie counters, card key = volume UUID + root; ARRI/RED keep their reel name), `RollNumbering` (day auto-advance), `GenericCardName` + `GenericRollNameScanner` ("Untitled" cards get `Untitled_NN`), `RollIdentity` (`<rollFolder>/.filmcan/roll.json`: same card = resume, other card with same name = own folder). Settings › Recognition (`RecognitionGuide`, `CameraCardDetector`).
+- **PDF report** (`BackupReport`, `BackupReportWriter`): per roll, up to 3 stills per video via AVFoundation (MXF only with Apple Pro Video Formats; BRAW/R3D/ARRIRAW get none). `ReportArchive` keeps a local copy under `<base>/<film>/<day>/<drive>/`. `ReportRecreation` rebuilds a report after the fact from the drive's checksum list, never inventing a checksum.
+- **Phone push** (`PhonePush`, `Settings/PhonePushQRBlock`, `QRCodeImage`): no local server. A random `filmcan-…` topic on `https://ntfy.sh`, subscribed by QR code. The topic is the secret and lives in preferences, not the keychain. Custom mode keeps the user's own ntfy URL + token.
+- **Secrets**: `KeychainStore` (service `com.filmcan.app`, `kSecAttrAccessibleAfterFirstUnlock`) holds `ntfyBearerToken`, `webhookHeaders`, `webhookSecret`. `SecretsMigration` moves pre-`5856ad4` plaintext `UserDefaults` copies into the keychain. Token loss on update: see Conventions.
+- **Speed advice** (`SpeedAdvice` pure rules, `SpeedAdviceProbe`, `NetworkSpeedProbe`): one note before the copy, one sentence after.
+- **Demo mode** (`DemoSession`, debug `DemoMode`): "Try with made-up cards" runs a real copy on folders; `stop` removes everything tied to the demo movie only.
+- **Calmer main screen** (`MainScreenSummary`): shoot-day stepper + sentence under Run.
 
 ## Netflix Ingest & Camera/Sound Routing
 
@@ -107,7 +121,7 @@ Progress is mounted **inside each destination card** in `DestinationListView` �
 
 ## Known Technical Debt
 
-`docs/technical-debt.md` is canonical — read it there, don't trust summaries copied elsewhere (this file's copy drifted once already). Headline areas: progress/verification state scattered, duplicate-detection branches intertwined, CustomCopierService/FanOutCopier complexity, HistoryView mixing logic and UI, nondeterministic drive refresh, log/hashlist lifecycle spread, dormant code.
+`docs/technical-debt.md` is canonical (refreshed 2026-11-16) — read it there, don't trust summaries copied elsewhere (this file's copy drifted once already). Headline areas: progress/verification state scattered, duplicate-detection branches intertwined, CustomCopierService/FanOutCopier complexity, HistoryView mixing logic and UI, nondeterministic drive refresh, log/hashlist lifecycle spread, dormant code.
 
 ## Conventions
 
