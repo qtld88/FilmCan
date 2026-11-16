@@ -11,10 +11,17 @@ final class ASCMHLConformanceTests: XCTestCase {
         which.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         which.arguments = ["which", "ascmhl"]
         let pipe = Pipe(); which.standardOutput = pipe
-        try? which.run(); which.waitUntilExit()
-        let p = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return (which.terminationStatus == 0 && !p.isEmpty) ? p : nil
+        if (try? which.run()) != nil {
+            which.waitUntilExit()
+            let p = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if which.terminationStatus == 0 && !p.isEmpty { return p }
+        }
+        // The test host does not inherit the shell PATH: look where pipx (CI) and
+        // Homebrew put it.
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["\(home)/.local/bin/ascmhl", "/opt/homebrew/bin/ascmhl", "/usr/local/bin/ascmhl"]
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     func testReferenceToolReadsAndVerifiesOurManifest() async throws {

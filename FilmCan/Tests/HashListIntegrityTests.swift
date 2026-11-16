@@ -282,7 +282,9 @@ final class HashListIntegrityTests: XCTestCase {
         let aside = try fm.contentsOfDirectory(atPath: asc.path)
             .filter { $0.hasPrefix("ascmhl_chain.xml.") }
         XCTAssertEqual(aside.count, 1, "the damaged chain is kept aside")
-        XCTAssertEqual(try Data(contentsOf: asc.appendingPathComponent(aside[0])), damaged)
+        if let kept = aside.first {
+            XCTAssertEqual(try Data(contentsOf: asc.appendingPathComponent(kept)), damaged)
+        }
         XCTAssertFalse(fm.fileExists(atPath: chain.path),
                        "no fresh chain pretending the history starts here")
     }
