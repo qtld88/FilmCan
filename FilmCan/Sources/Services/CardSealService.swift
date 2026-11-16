@@ -10,19 +10,27 @@ enum CardSealService {
             .appendingPathComponent("seal.json")
     }
 
+    /// Entries of one source from the plan the engine copied and checked — the list
+    /// the seal covers. The card is never walked again after the copy.
+    static func entries(of plan: RunPlan, source: String) -> [CardSeal.Entry] {
+        plan.files(inRoot: source).map {
+            CardSeal.Entry(relPath: $0.relPath, size: $0.size, modified: $0.modified)
+        }
+    }
+
     /// Write a seal for a fully-verified source. Best-effort: throws only on write
     /// failure so the caller can log and continue — it must never fail a backup.
     static func seal(source: URL,
+                     entries: [CardSeal.Entry],
                      preset: OrganizationPreset?,
                      destinationsVerified: [String],
                      mhlRef: String?) async throws {
-        let entries = await enumerate(source: source, preset: preset)
         let seal = CardSeal(
             schemaVersion: CardSeal.currentSchemaVersion,
             volumeUUID: volumeUUID(for: source) ?? "",
             sealDate: Date(),
             appVersion: appVersion(),
-            entries: entries,
+            entries: entries.sorted { $0.relPath < $1.relPath },
             includePatterns: preset?.includePatterns ?? [],
             excludePatterns: preset?.excludePatterns ?? [],
             copyOnlyPatterns: preset?.copyOnlyPatterns ?? [],
@@ -57,17 +65,18 @@ enum CardSealService {
         filter.copyOnlyPatterns = seal.copyOnlyPatterns
 
         let current = await enumerate(source: source, preset: filter)
-        let currentByRel = Dictionary(current.map { ($0.relPath, $0.size) },
+        struct Stamp: Equatable { let size: Int64; let modified: Int64 }
+        let currentByRel = Dictionary(current.map { ($0.relPath, Stamp(size: $0.size, modified: $0.modified)) },
                                       uniquingKeysWith: { a, _ in a })
-        let sealByRel = Dictionary(seal.entries.map { ($0.relPath, $0.size) },
+        let sealByRel = Dictionary(seal.entries.map { ($0.relPath, Stamp(size: $0.size, modified: $0.modified)) },
                                    uniquingKeysWith: { a, _ in a })
 
         var added: [String] = []
         var missing: [String] = []
         var modified: [String] = []
-        for (rel, size) in currentByRel {
+        for (rel, stamp) in currentByRel {
             if let old = sealByRel[rel] {
-                if old != size { modified.append(rel) }
+                if old != stamp { modified.append(rel) }
             } else {
                 added.append(rel)
             }
@@ -82,24 +91,43 @@ enum CardSealService {
         return .broken(added: added.sorted(), missing: missing.sorted(), modified: modified.sorted())
     }
 
-    /// Decision C: a card is safe to seal only if every planned destination
-    /// reported a checked success — Fast or Paranoid (covers fresh copies and
-    /// already-verified re-runs). Verification Off never seals.
-    static func shouldSeal(plannedDestinations: [String], results: [TransferResult]) -> Bool {
-        guard !plannedDestinations.isEmpty else { return false }
-        return Set(plannedDestinations).isSubset(of: checkedDestinations(results))
+    /// A card is safe to seal only if the run saw the whole card and every planned
+    /// destination holds a hash-compared copy of EVERY file the engine planned:
+    /// checked this run (Fast or Paranoid), or already there and re-hashed or recorded
+    /// by an earlier checked run. Verification Off proves nothing, so it never seals.
+    /// A run that ignored unreadable items never seals either.
+    static func shouldSeal(plannedDestinations: [String], results: [TransferResult],
+                           plan: RunPlan?) -> Bool {
+        guard let plan, plan.ignoredUnreadable.isEmpty,
+              !plan.files.isEmpty, !plannedDestinations.isEmpty else { return false }
+        return Set(plannedDestinations).isSubset(of: provenDestinations(results, plan: plan))
     }
 
-    /// Destinations that hold a checked copy of the card.
-    static func checkedDestinations(_ results: [TransferResult]) -> Set<String> {
-        Set(results.filter(\.isCheckedCopy).map(\.destination))
+    /// Destinations whose successful result proves every planned file.
+    static func provenDestinations(_ results: [TransferResult], plan: RunPlan) -> Set<String> {
+        let needed = Set(plan.files.map(\.sourcePath))
+        var proven: [String: Set<String>] = [:]
+        for result in results where result.success {
+            for dr in result.destinationResults where dr.success {
+                proven[dr.destinationPath, default: []].formUnion(dr.verifiedSourcePaths)
+            }
+        }
+        return Set(proven.filter { needed.isSubset(of: $0.value) }.keys)
+    }
+
+    /// The demo movie is a normal movie the user may add a real card to; its cards are
+    /// made-up folders. Never seal anything for it.
+    static func isSealable(configId: UUID, defaults: UserDefaults = .standard) -> Bool {
+        !DemoSession.isDemo(configId, defaults: defaults)
     }
 
     // MARK: - Helpers
 
     private static func enumerate(source: URL, preset: OrganizationPreset?) async -> [CardSeal.Entry] {
         let result = await FileEnumerator.enumerateFiles(sources: [source.path], preset: preset)
-        return result.entries.map { CardSeal.Entry(relPath: $0.relativePath, size: $0.logicalSize) }
+        return result.entries.map {
+            CardSeal.Entry(relPath: $0.relativePath, size: $0.logicalSize, modified: $0.modified)
+        }
     }
 
     private static func volumeUUID(for url: URL) -> String? {

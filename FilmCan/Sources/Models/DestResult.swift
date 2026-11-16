@@ -23,4 +23,10 @@ struct DestResult: Equatable {
     /// Source root path → roll folder written at this destination this run. Roots whose
     /// files were all skipped (resume) are absent.
     var rollFolders: [String: String] = [:]
+    /// Absolute source paths whose bytes at this destination were compared by hash in
+    /// this run: copied and checked (Fast/Paranoid), or already there and re-hashed
+    /// (or recorded by an earlier checked run). The card seal and the catalog's
+    /// "verified" flag require every planned file here; a run with Verification Off
+    /// leaves it empty.
+    var verifiedSourcePaths: Set<String> = []
 }

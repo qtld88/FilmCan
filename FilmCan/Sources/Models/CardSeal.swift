@@ -3,7 +3,8 @@ import Foundation
 /// On-card record of a verified backup. Serialized to `<source>/.filmcan/seal.json`.
 /// Self-contained: stores the filter patterns used so evaluation needs no live preset.
 struct CardSeal: Codable {
-    static let currentSchemaVersion = 1
+    /// 2: entries carry the modification time. Version-1 seals read as "not sealed".
+    static let currentSchemaVersion = 2
 
     let schemaVersion: Int
     let volumeUUID: String
@@ -19,6 +20,8 @@ struct CardSeal: Codable {
     struct Entry: Codable {
         let relPath: String
         let size: Int64
+        /// Whole seconds since 1970.
+        let modified: Int64
     }
 }
 

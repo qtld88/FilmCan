@@ -213,6 +213,7 @@ class TransferViewModel: ObservableObject {
             var passSeconds: [String: TimeInterval] = [:]
 
             var perDestResults: [TransferResult] = []
+            var groupPlans: [RunPlan?] = []
             for group in destinationGroups {
                 if isCancellingAll { break }
                 let passStart = Date()
@@ -225,6 +226,7 @@ class TransferViewModel: ObservableObject {
                     config: activeConfig,
                     organizationPreset: organizationPreset
                 )
+                groupPlans.append(fanOutResult.runPlan)
                 let exploded = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
                 // If exploded is empty the fan-out threw before producing per-dest
                 // results (e.g. insufficient disk space). Fall back to the aggregate
@@ -235,12 +237,21 @@ class TransferViewModel: ObservableObject {
                 perDestResults.append(contentsOf: groupResults)
             }
 
-            await sealVerifiedSources(
-                sources: sources,
-                plannedDestinations: destinations,
-                results: perDestResults,
-                preset: organizationPreset
-            )
+            // One plan for the run: nil as soon as one pass never produced one (the
+            // engine failed before it enumerated), so nothing is sealed or called verified.
+            let runPlan: RunPlan? = groupPlans.isEmpty || groupPlans.contains(where: { $0 == nil })
+                ? nil : RunPlan.merged(groupPlans.compactMap { $0 })
+            let effectiveKinds = effectiveSourceMediaKinds(for: activeConfig, sources: sources)
+
+            if CardSealService.isSealable(configId: activeConfig.id) {
+                await sealVerifiedSources(
+                    sources: sources,
+                    plannedDestinations: destinations,
+                    results: perDestResults,
+                    plan: runPlan,
+                    preset: organizationPreset
+                )
+            }
 
             let wallSeconds = Date().timeIntervalSince(runStart)
             let cancelled = isCancellingAll || perDestResults.count < destinations.count
@@ -303,7 +314,8 @@ class TransferViewModel: ObservableObject {
                 )
                 await MediaCatalogStore.shared.record(
                     config: recordConfig, sources: sources,
-                    results: perDestResults, runDate: transferStartTime ?? Date())
+                    results: perDestResults, runDate: transferStartTime ?? Date(),
+                    plan: runPlan, mediaKinds: effectiveKinds)
                 await NotificationDispatcher.sendSource(
                     source: sources.first ?? "",
                     config: activeConfig,
@@ -480,19 +492,27 @@ class TransferViewModel: ObservableObject {
     }
 
     /// Seal each source card once the run is fully verified (best-effort — a seal
-    /// write failure is logged and never affects the backup result).
+    /// write failure is logged and never affects the backup result). The seal lists
+    /// the files the engine copied and checked, not a fresh walk of the card.
     private func sealVerifiedSources(sources: [String],
                                      plannedDestinations: [String],
                                      results: [TransferResult],
+                                     plan: RunPlan?,
                                      preset: OrganizationPreset?) async {
-        guard CardSealService.shouldSeal(plannedDestinations: plannedDestinations, results: results)
+        guard let plan,
+              CardSealService.shouldSeal(plannedDestinations: plannedDestinations,
+                                         results: results, plan: plan)
         else { return }
-        let verified = Array(CardSealService.checkedDestinations(results))
+        let verified = CardSealService.provenDestinations(results, plan: plan).sorted()
         let mhlRef = results.first(where: { $0.hashListPath != nil })?.hashListPath
         for source in sources {
+            let planned = plan.files(inRoot: source)
+            // A loose file has no card to seal.
+            guard let first = planned.first, first.isDirectoryRoot else { continue }
             do {
                 try await CardSealService.seal(
                     source: URL(fileURLWithPath: source),
+                    entries: CardSealService.entries(of: plan, source: source),
                     preset: preset,
                     destinationsVerified: verified,
                     mhlRef: mhlRef

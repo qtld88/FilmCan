@@ -166,6 +166,7 @@ class CustomCopierService: ObservableObject, TransferService {
             wasVerified: verifyMode == .paranoid && failedCount == 0
         )
         result.destinationResults = destResults
+        result.runPlan = await copier.runPlan
         return result
     }
 

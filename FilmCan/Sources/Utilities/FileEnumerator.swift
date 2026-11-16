@@ -9,6 +9,8 @@ struct SourceFileEntry {
     /// max(logical, allocated) — what the progress bars and the space preflight need.
     let allocatedSize: Int64
     let sourceIsDirectory: Bool
+    /// Modification time, whole seconds since 1970.
+    var modified: Int64 = 0
 }
 
 struct EnumerationResult {
@@ -48,6 +50,7 @@ enum FileEnumerator {
                 .isDirectoryKey,
                 .isSymbolicLinkKey,
                 .fileSizeKey,
+                .contentModificationDateKey,
                 .fileAllocatedSizeKey,
                 .totalFileAllocatedSizeKey
             ]
@@ -104,7 +107,8 @@ enum FileEnumerator {
                                         relativePath: relative,
                                         logicalSize: logicalSize,
                                         allocatedSize: max(logicalSize, allocatedSize),
-                                        sourceIsDirectory: true
+                                        sourceIsDirectory: true,
+                                        modified: Int64(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)
                                     )
                                 )
                             }
@@ -130,7 +134,8 @@ enum FileEnumerator {
                                 relativePath: relative,
                                 logicalSize: logicalSize,
                                 allocatedSize: max(logicalSize, allocatedSize),
-                                sourceIsDirectory: false
+                                sourceIsDirectory: false,
+                                modified: Int64(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)
                             )
                         )
                     }

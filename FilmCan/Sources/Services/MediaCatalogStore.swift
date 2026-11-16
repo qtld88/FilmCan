@@ -89,8 +89,13 @@ final class MediaCatalogStore: ObservableObject {
     }
 
     /// Record a finished run. Called once per run with the exploded per-destination results.
+    /// `plan` is what the engine planned: a copy is marked verified only when its
+    /// destination holds a hash-compared copy of every planned file of that source.
+    /// `mediaKinds` are the run's effective Camera/Sound tags (including the Sound
+    /// auto-detect); without them the config's explicit tags are used.
     func record(config: BackupConfiguration, sources: [String],
-                results: [TransferResult], runDate: Date) async {
+                results: [TransferResult], runDate: Date,
+                plan: RunPlan? = nil, mediaKinds: [String: SourceMediaKind]? = nil) async {
         // sourcePath -> (copies, first successful roll folder)
         var copiesBySource: [String: [CatalogCopy]] = [:]
         var firstFolderBySource: [String: String] = [:]
@@ -104,7 +109,8 @@ final class MediaCatalogStore: ObservableObject {
                     destVolumeUUID: info.uuid,
                     destVolumeName: info.name ?? dr.displayName,
                     rollFolderPath: rollFolder,
-                    verified: result.success && dr.verifyMode != .off,
+                    verified: result.success && dr.success
+                        && Self.isProven(dr, sourcePath: sourcePath, plan: plan),
                     date: runDate
                 )
                 if copiesBySource[sourcePath] == nil { order.append(sourcePath) }
@@ -135,7 +141,7 @@ final class MediaCatalogStore: ObservableObject {
                 projectName: config.name,
                 shootDay: config.day.isEmpty ? fallbackDay : config.day,
                 rollName: (listFolder as NSString).lastPathComponent,
-                mediaKind: config.sourceMediaKinds[sourcePath] ?? .camera,
+                mediaKind: (mediaKinds ?? config.sourceMediaKinds)[sourcePath] ?? .camera,
                 sourceVolumeUUID: Self.volumeInfo(for: standardized).uuid,
                 sourcePath: standardized,
                 firstBackedUp: runDate,
@@ -146,6 +152,13 @@ final class MediaCatalogStore: ObservableObject {
             rolls = MediaCatalog.merge(roll, into: rolls)
         }
         if !order.isEmpty { save() }
+    }
+
+    /// True when `dr` holds a hash-compared copy of every planned file of `sourcePath`.
+    nonisolated static func isProven(_ dr: DestResult, sourcePath: String, plan: RunPlan?) -> Bool {
+        guard let plan else { return false }
+        let needed = Set(plan.files(inRoot: sourcePath).map(\.sourcePath))
+        return !needed.isEmpty && needed.isSubset(of: dr.verifiedSourcePaths)
     }
 
     /// Earlier copies of the card at `sourcePath`, found by its clips (not its name).

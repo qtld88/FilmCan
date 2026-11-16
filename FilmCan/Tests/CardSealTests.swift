@@ -10,8 +10,8 @@ final class CardSealTests: XCTestCase {
             sealDate: Date(timeIntervalSince1970: 1_700_000_000),
             appVersion: "1.4.0",
             entries: [
-                CardSeal.Entry(relPath: "A001.MOV", size: 100),
-                CardSeal.Entry(relPath: "sub/B002.MOV", size: 200)
+                CardSeal.Entry(relPath: "A001.MOV", size: 100, modified: 1_700_000_000),
+                CardSeal.Entry(relPath: "sub/B002.MOV", size: 200, modified: 1_700_000_100)
             ],
             includePatterns: ["*.mov"],
             excludePatterns: [],

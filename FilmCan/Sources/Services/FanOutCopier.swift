@@ -50,6 +50,8 @@ struct DestResultBuilder {
     /// Names of files actually copied this run (for a truthful transferred-items list).
     var transferredNames: [String] = []
     var rollFolders: [String: String] = [:]
+    /// Source files whose bytes at this destination were compared by hash this run.
+    var verifiedSourcePaths: Set<String> = []
 
     mutating func incorporate(_ result: DestWriterResult) {
         if result.success, let root = result.rootPath, let folder = result.rollFolder {
@@ -103,7 +105,8 @@ struct DestResultBuilder {
             durationSec: totalDuration,
             verifyMode: verifyMode,
             transferredFileNames: transferredNames,
-            rollFolders: rollFolders
+            rollFolders: rollFolders,
+            verifiedSourcePaths: verifiedSourcePaths
         )
     }
 }
@@ -281,6 +284,23 @@ actor FanOutCopier {
     private var conflictPolicy: OrganizationPreset.DuplicatePolicy = .overwrite
     /// Set of resolved paths that had an unmanifested collision pre-flight.
     private var conflictPaths: Set<String> = []
+
+    /// What this run enumerated and which unreadable items the user chose to ignore.
+    /// Read by the caller after `run()` — the card seal covers exactly this list.
+    private(set) var runPlan = RunPlan()
+
+    /// Roll folder per destination and root name (resume, ledger and proof lookups).
+    private var rollFolderByDestRoot: [String: [String: String]] = [:]
+    /// The unverified ledger of each roll folder as it stood when the run began.
+    private var ledgerAtStart: [String: UnverifiedLedger] = [:]
+    /// Roll folders that got the Off-run wildcard marker at start (rewritten at the end).
+    private var wildcardedRollFolders: Set<String> = []
+    /// Manifest names written this run without a hash comparison (Verification Off).
+    private var offNamesByRollFolder: [String: Set<String>] = [:]
+    /// Manifest names written this run after a hash comparison.
+    private var verifiedNamesByRollFolder: [String: Set<String>] = [:]
+    /// Resumed manifest names that were listed as unverified and re-hashed this run.
+    private var rehashedNamesByRollFolder: [String: Set<String>] = [:]
 
     private var completedFilesByDest: [String: Int] = [:]
     private var verifiedFilesByDest: [String: Int] = [:]
@@ -692,6 +712,13 @@ actor FanOutCopier {
         guard !config.sources.isEmpty else { throw Error.sourceNotFound("(empty)") }
 
 
+        runPlan = RunPlan()
+        rollFolderByDestRoot.removeAll()
+        ledgerAtStart.removeAll()
+        wildcardedRollFolders.removeAll()
+        offNamesByRollFolder.removeAll()
+        verifiedNamesByRollFolder.removeAll()
+        rehashedNamesByRollFolder.removeAll()
         completedFilesByDest.removeAll()
         verifiedFilesByDest.removeAll()
         verifiedBytesByDest.removeAll()
@@ -746,6 +773,17 @@ actor FanOutCopier {
         guard !entries.isEmpty else {
             throw Error.sourceReadFailed(config.sources.first ?? "")
         }
+        // Reaching here with unreadable items means the user chose to go on without
+        // them: the card is then not fully covered, and the run can never seal it.
+        runPlan = RunPlan(
+            files: entries.map {
+                PlannedSourceFile(
+                    sourcePath: PlannedSourceFile.proofKey($0.sourcePath),
+                    rootPath: $0.sourceRoot, relPath: $0.relativePath,
+                    size: $0.logicalSize, modified: $0.modified,
+                    isDirectoryRoot: $0.sourceIsDirectory)
+            },
+            ignoredUnreadable: enumResult.unreadable)
 
         // Wall-clock start, also the date used for organization-template path resolution
         // so the resume presence-check and the actual copy agree.
@@ -817,6 +855,8 @@ actor FanOutCopier {
                     shallowFolders.insert(rf)
                 }
                 byRoot[root] = Self.loadExistingMHLEntries(destPath: dest.destPath, rootName: root, rollFolder: rf)
+                rollFolderByDestRoot[dest.destPath, default: [:]][root] = rf
+                if ledgerAtStart[rf] == nil { ledgerAtStart[rf] = UnverifiedLedger.load(rollFolder: rf) }
             }
             existingMHLByDest[dest.destPath] = byRoot
         }
@@ -834,36 +874,64 @@ actor FanOutCopier {
         // Per-destination resume: a file already recorded AND present at a given
         // destination is skipped FOR THAT DESTINATION only; it is still copied to any
         // destination missing it. `forceRecopy` needs everything everywhere.
-        // Size+mtime are validated so a source modified in place (same name, different
-        // content) is correctly detected as changed. `reVerifyExistingOnResume` adds
-        // a full re-hash for cryptographic certainty.
+        // A skip needs: the manifest entry; the destination file present with the
+        // source's byte count; the recorded size matching the source (so a source
+        // modified in place is seen as changed). `reVerifyExistingOnResume` adds a full
+        // re-hash of the source. A file a Verification-Off run wrote is listed in the
+        // unverified ledger: a verified run re-hashes it at the destination against the
+        // manifest and recopies it on a mismatch, so a skip never rests on a hash nobody
+        // compared. Skipped files that pass count as proven in this run's result.
+        var trustedSkipPathsByDest: [String: Set<String>] = [:]
         func destsNeeding(_ f: PlannedFile) async -> [DestWriter.Config] {
             if config.forceRecopy { return config.destinations }
             let name = plannedSourceName(f)
+            let proofKey = PlannedSourceFile.proofKey(f.absPath)
             var sourceHashForReverify: String?
             if config.reVerifyExistingOnResume {
                 sourceHashForReverify = await Self.rereadHashDetached(
                     url: URL(fileURLWithPath: f.absPath), chunkSz: 8 * 1024 * 1024,
                     perfKey: "resume re-verify")
             }
-            return config.destinations.filter { dest in
+            var needed: [DestWriter.Config] = []
+            for dest in config.destinations {
                 guard let recorded = existingMHLByDest[dest.destPath]?[f.rootName]?
                     .first(where: { $0.fileName == name })
-                else { return true }  // not recorded → needs copy
+                else { needed.append(dest); continue }  // not recorded → needs copy
                 let path = Self.resolveDestFilePath(
                     destRoot: dest.destPath, rootName: f.rootName, rootPath: f.rootPath,
                     relPath: f.relPath, preset: config.organizationPreset,
                     copyFolderContents: config.copyFolderContents, date: jobStartTime,
                     metadata: config.shootMetadata, mediaKind: mediaKind(forRoot: f.rootPath), rollNameIsAssigned: isAssignedRoll(f.rootPath))
-                guard FileManager.default.fileExists(atPath: path) else { return true }  // missing → copy
+                // Missing → copy.
+                guard let destSize = Self.fileByteCount(atPath: path) else { needed.append(dest); continue }
                 // A manifest written before FilmCan recorded logical sizes holds the ALLOCATED
                 // size. Accept either so an upgrade does not trigger a full re-copy.
-                if recorded.size != 0, recorded.size != f.logicalSize, recorded.size != f.size { return true }
-                if config.reVerifyExistingOnResume {
-                    return sourceHashForReverify?.lowercased() != recorded.hash.lowercased()
+                if recorded.size != 0, recorded.size != f.logicalSize, recorded.size != f.size {
+                    needed.append(dest); continue
                 }
-                return false
+                // The destination file must be as long as the source (also covers a
+                // simple hash list, which records no size). A truncated or padded file
+                // is recopied, not skipped on its name alone.
+                if destSize != f.logicalSize { needed.append(dest); continue }
+                if config.reVerifyExistingOnResume,
+                   sourceHashForReverify?.lowercased() != recorded.hash.lowercased() {
+                    needed.append(dest); continue
+                }
+                if Self.isVerifying(dest, config) {
+                    let rollFolder = rollFolderByDestRoot[dest.destPath]?[f.rootName] ?? ""
+                    if ledgerAtStart[rollFolder]?.contains(name) == true {
+                        let destHash = await Self.rereadHashDetached(
+                            url: URL(fileURLWithPath: path), chunkSz: 8 * 1024 * 1024,
+                            perfKey: "resume re-hash")
+                        guard let destHash, destHash.lowercased() == recorded.hash.lowercased() else {
+                            needed.append(dest); continue
+                        }
+                        rehashedNamesByRollFolder[rollFolder, default: []].insert(name)
+                    }
+                    trustedSkipPathsByDest[dest.destPath, default: []].insert(proofKey)
+                }
             }
+            return needed
         }
 
         // Duplicate-source preflight: two DIRECTORY sources that STILL resolve to the
@@ -918,6 +986,10 @@ actor FanOutCopier {
             neededDestsByPlan.append(needed)
         }
 
+        for dest in config.destinations {
+            builders[dest.destPath]?.verifiedSourcePaths.formUnion(trustedSkipPathsByDest[dest.destPath] ?? [])
+        }
+
         // Progress bars span the WHOLE job (already-present + this run), so a resume
         // reads e.g. 30/500 GB rather than 0/470 GB. Each destination's bar starts at
         // what it already has and counts up to the full total — seed the live copy,
@@ -960,6 +1032,7 @@ actor FanOutCopier {
 
         // Nothing to copy to any destination.
         guard !plannedFiles.isEmpty else {
+            persistUnverifiedLedgers(existingMHLByDest: existingMHLByDest)
             return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
         }
 
@@ -1042,6 +1115,24 @@ actor FanOutCopier {
                 }
                 if !present.isEmpty {
                     await writer.seed(present.map { MHLEntry(relPath: $0.fileName, size: $0.size, hash: $0.hash, mtime: $0.mtime) })
+                }
+            }
+        }
+
+        // A destination running with Verification Off writes manifest entries nobody
+        // compares. Say so on disk before the first byte (the precise list replaces this
+        // marker at the end): a crash in between can then only make a later verified run
+        // re-hash more, never trust an entry it should not.
+        for dest in config.destinations where !Self.isVerifying(dest, config) {
+            for rootName in uniqueRootNames {
+                guard let rollFolder = rollFolderByDestRoot[dest.destPath]?[rootName] else { continue }
+                var marker = ledgerAtStart[rollFolder] ?? UnverifiedLedger()
+                marker.allUnverified = true
+                do {
+                    try UnverifiedLedger.save(marker, rollFolder: rollFolder)
+                    wildcardedRollFolders.insert(rollFolder)
+                } catch {
+                    DebugLog.warn("Unverified ledger not written for \(rollFolder): \(error)")
                 }
             }
         }
@@ -1162,7 +1253,8 @@ actor FanOutCopier {
                     // A dest that failed to WRITE this file (e.g. ENOSPC) is dead
                     // for the rest of the job — mark it so enqueueNext stops
                     // sending it further files.
-                    for w in copyResult.writerResults where !w.success && w.failureReason != nil {
+                    for w in copyResult.writerResults
+                    where !w.success && w.failureReason != nil && w.failureReason != .conflict {
                         if deadDestPaths.insert(w.destPath).inserted {
                             DebugLog.warn("FanOutCopier: destination fatally failed, skipping remaining files: \(w.destPath)")
                         }
@@ -1188,6 +1280,14 @@ actor FanOutCopier {
         for outcome in outcomes {
             for w in outcome.writerResults {
                 builders[w.destPath]?.incorporate(w)
+                // Proof for the seal: this file was hash-compared at this destination
+                // in this run (copied, then checked — never a Verification-Off write).
+                if w.success, w.filesTransferred > 0,
+                   !outcome.verifyFailedDestPaths.contains(w.destPath),
+                   w.verifyMode != .off, config.verifyMode != .off {
+                    builders[w.destPath]?.verifiedSourcePaths.insert(
+                        PlannedSourceFile.proofKey(outcome.sourcePath))
+                }
             }
             for dp in outcome.verifyFailedDestPaths {
                 builders[dp]?.markVerificationFailed()
@@ -1231,6 +1331,7 @@ actor FanOutCopier {
             }
         }
 
+        persistUnverifiedLedgers(existingMHLByDest: existingMHLByDest)
         let results = config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
         if !wasCancelled {
             emitFinalComplete(results: results, bytesTotalByDest: bytesTotalByDest,
@@ -1298,6 +1399,10 @@ actor FanOutCopier {
                                 relPath: r.transferredRelPath ?? c.sourceName, size: c.sourceLogicalSize,
                                 hash: r.destHashFromStream ?? c.verifiedSourceHash,
                                 mtime: c.srcMtime)
+                            noteManifestEntry(
+                                destPath: r.destPath, rootName: c.rootName,
+                                name: r.transferredRelPath ?? c.sourceName,
+                                compared: r.verifyMode != .off && config.verifyMode != .off)
                         } catch {
                             appendFailed.insert(r.destPath)
                         }
@@ -1315,6 +1420,58 @@ actor FanOutCopier {
             out.append(outcome)
         }
         return out
+    }
+
+    /// True when this destination checks what it writes (Fast or Paranoid).
+    nonisolated static func isVerifying(_ dest: DestWriter.Config, _ config: Configuration) -> Bool {
+        dest.verifyMode != .off && config.verifyMode != .off
+    }
+
+    nonisolated static func fileByteCount(atPath path: String) -> Int64? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? NSNumber else { return nil }
+        return size.int64Value
+    }
+
+    /// Remember a manifest entry written this run, for the unverified ledger.
+    private func noteManifestEntry(destPath: String, rootName: String, name: String, compared: Bool) {
+        guard let rollFolder = rollFolderByDestRoot[destPath]?[rootName] else { return }
+        if compared {
+            verifiedNamesByRollFolder[rollFolder, default: []].insert(name)
+        } else {
+            offNamesByRollFolder[rollFolder, default: []].insert(name)
+        }
+    }
+
+    /// Bring each roll's unverified ledger up to date: a verifying destination clears
+    /// what it compared (or re-hashed) this run; one running with Verification Off
+    /// replaces its start-of-run marker with the precise list. Best-effort.
+    private func persistUnverifiedLedgers(
+        existingMHLByDest: [String: [String: [(fileName: String, hash: String, size: Int64, mtime: Int64?)]]]
+    ) {
+        for dest in config.destinations {
+            let verifying = Self.isVerifying(dest, config)
+            for (rootName, rollFolder) in rollFolderByDestRoot[dest.destPath] ?? [:] {
+                let old = ledgerAtStart[rollFolder] ?? UnverifiedLedger()
+                var updated = old
+                if verifying {
+                    if old.allUnverified {
+                        updated.allUnverified = false
+                        updated.names = Set((existingMHLByDest[dest.destPath]?[rootName] ?? []).map(\.fileName))
+                    }
+                    updated.names.subtract(verifiedNamesByRollFolder[rollFolder] ?? [])
+                    updated.names.subtract(rehashedNamesByRollFolder[rollFolder] ?? [])
+                } else {
+                    updated.names.formUnion(offNamesByRollFolder[rollFolder] ?? [])
+                }
+                guard updated != old || wildcardedRollFolders.contains(rollFolder) else { continue }
+                do {
+                    try UnverifiedLedger.save(updated, rollFolder: rollFolder)
+                } catch {
+                    DebugLog.warn("Unverified ledger not updated for \(rollFolder): \(error)")
+                }
+            }
+        }
     }
 
     /// Source concurrency: one worker per distinct source drive, capped at sources.count.
@@ -1543,14 +1700,25 @@ actor FanOutCopier {
                         counterTemplate: config.duplicateCounterTemplate)
                     // MHL is appended in the verify lane AFTER paranoid re-read, not here.
                 } catch is DestWriter.SkippedDueToConflict {
-                    // File pre-existed and policy was skip — treat as if already present.
-                    return DestWriterResult(
-                        destPath: destCfg.destPath, displayName: destCfg.displayName,
-                        success: true, bytesTransferred: 0, filesTransferred: 0,
-                        durationSec: 0, mhlPath: nil, failureReason: nil,
-                        verifyMode: destCfg.verifyMode, destHashFromStream: nil,
-                        writtenFilePath: destFileURL.path
-                    )
+                    // A file with this name is already there and not in the manifest. The
+                    // name is not proof: hash what is on disk against the source. Identical
+                    // → keep it and carry on as if written (it gets verified and inscribed
+                    // like any other file). Different or unreadable → a real conflict; the
+                    // existing file is left alone and the destination does not succeed.
+                    let existingHash = await Self.rereadHashDetached(
+                        url: destFileURL, chunkSz: chunkSz, perfKey: "skip compare")
+                    guard let existingHash, existingHash == destHash else {
+                        await emitFailed(.conflict)
+                        return DestWriterResult(
+                            destPath: destCfg.destPath, displayName: destCfg.displayName,
+                            success: false, bytesTransferred: 0, filesTransferred: 0,
+                            durationSec: Date().timeIntervalSince(startTime),
+                            mhlPath: nil, failureReason: .conflict,
+                            verifyMode: destCfg.verifyMode, destHashFromStream: nil,
+                            writtenFilePath: destFileURL.path
+                        )
+                    }
+                    actualWrittenPath = destFileURL.path
                 } catch {
                     await emitFailed(.ioError(error.localizedDescription))
                     return DestWriterResult(

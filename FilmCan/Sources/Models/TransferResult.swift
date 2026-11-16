@@ -29,6 +29,9 @@ struct TransferResult: Identifiable {
     var organizationPresetName: String? = nil
     var duplicatePolicy: OrganizationPreset.DuplicatePolicy? = nil
     var duplicateHits: Int = 0
+    /// What the engine enumerated for this run and which unreadable items were ignored.
+    /// Set on the aggregate fan-out result only; nil when the engine never got that far.
+    var runPlan: RunPlan? = nil
 
     var isAlreadyAtDestination: Bool {
         if filesTransferred > 0 {
@@ -41,16 +44,6 @@ struct TransferResult: Identifiable {
             return true
         }
         return false
-    }
-
-    /// Copied and checked at this destination: Fast (the written stream hashed
-    /// against the source) or Paranoid (the copy re-read from disk). The card seal
-    /// accepts both, like the Catalog's "verified" count; `wasVerified` stays
-    /// Paranoid-only for history and reports.
-    var isCheckedCopy: Bool {
-        guard success else { return false }
-        if wasVerified { return true }
-        return !destinationResults.isEmpty && destinationResults.allSatisfy { $0.verifyMode != .off }
     }
 
     var isAlreadyAtDestinationAndVerified: Bool {

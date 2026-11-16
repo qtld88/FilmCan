@@ -18,6 +18,8 @@ enum DestFailureReason: Equatable {
     case verify
     case userCancel
     case sourceUnavailable
+    /// A different file with the same name was already at the destination (Skip policy).
+    case conflict
 
     var displayMessage: String {
         switch self {
@@ -27,6 +29,7 @@ enum DestFailureReason: Equatable {
         case .verify: return "Verification mismatch"
         case .userCancel: return "Cancelled by user"
         case .sourceUnavailable: return "Source unavailable"
+        case .conflict: return "A different file with the same name is already there"
         }
     }
 }
