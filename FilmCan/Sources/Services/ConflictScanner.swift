@@ -13,10 +13,18 @@ enum ConflictScanner {
     }
 
     struct Conflict: Sendable {
+        enum Kind: Sendable, Equatable {
+            /// A file with this name is there but no manifest lists it.
+            case unmanifested
+            /// The manifest lists this file, but the source no longer matches it
+            /// (other size or other hash): copying would replace the backed-up file.
+            case differsFromManifest
+        }
         let destPath: String
         let rootName: String
         let fileName: String
         let resolvedPath: String
+        var kind: Kind = .unmanifested
     }
 
     static func key(destPath: String, rootName: String) -> String { "\(destPath)\0\(rootName)" }

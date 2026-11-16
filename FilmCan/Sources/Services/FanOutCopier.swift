@@ -203,7 +203,9 @@ actor FanOutCopier {
         var reVerifyExistingOnResume: Bool = false
         var duplicatePolicy: OrganizationPreset.DuplicatePolicy = .overwrite
         var duplicateCounterTemplate: String = "_001"
-        var duplicateResolver: (@Sendable ([ConflictScanner.Conflict]) async -> OrganizationPreset.DuplicatePolicy)?
+        /// Asked once with every pre-flight conflict. Returns one decision per conflict,
+        /// keyed by `Conflict.resolvedPath`; a conflict left out is skipped.
+        var duplicateResolver: (@Sendable ([ConflictScanner.Conflict]) async -> [String: ConflictDecision])?
         /// Called when enumeration finds unreadable items. Receives the list of unreadable paths.
         /// Return true to continue (skipping those items), false to abort.
         /// When nil and unreadable items exist, run throws `Error.sourceReadFailed`.
@@ -217,6 +219,13 @@ actor FanOutCopier {
         var _testForceDestReadHashNil: Bool = false
         var _testForceMHLAppendFailure: Bool = false
         #endif
+    }
+
+    /// The user's answer for one pre-flight conflict.
+    struct ConflictDecision: Sendable, Equatable {
+        var policy: OrganizationPreset.DuplicatePolicy
+        /// Counter style for `.increment`; nil ⇒ the run's template.
+        var counterTemplate: String? = nil
     }
 
     /// Describes a cross-run roll-name clash for the UI prompt: a roll with this name
@@ -240,6 +249,7 @@ actor FanOutCopier {
         case insufficientSpace(destPath: String, available: Int64, required: Int64)
         case destinationUnwritable(String)
         case duplicateSourceNames([String])
+        case duplicateTargetPaths([String])
 
         var errorDescription: String? {
             switch self {
@@ -260,6 +270,8 @@ actor FanOutCopier {
                 return "Cannot write to \"\((path as NSString).lastPathComponent)\". Check the drive is connected and not read-only."
             case .duplicateSourceNames(let names):
                 return "Two or more sources resolve to the same destination folder: \(names.joined(separator: ", ")). Rename one so each lands in its own folder."
+            case .duplicateTargetPaths(let names):
+                return "Two or more files would be copied to the same place: \(names.joined(separator: ", ")). Nothing was copied."
             }
         }
     }
@@ -1165,7 +1177,7 @@ actor FanOutCopier {
         if !conflicts.isEmpty {
             let resolvedPolicy: OrganizationPreset.DuplicatePolicy
             if let resolver = config.duplicateResolver {
-                resolvedPolicy = await resolver(conflicts)
+                resolvedPolicy = (await resolver(conflicts)).values.first?.policy ?? config.duplicatePolicy
             } else {
                 resolvedPolicy = config.duplicatePolicy
             }

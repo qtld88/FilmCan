@@ -8,6 +8,12 @@ struct DuplicatePrompt: Identifiable {
     let counterTemplate: String
     let canVerifyWithHashList: Bool
     let hashListMissing: Bool
+    /// How many files are in conflict in this run, and their destination paths, so
+    /// the user sees the whole list before choosing.
+    var conflictCount: Int = 1
+    var conflictNames: [String] = []
+    /// Index of the file this prompt asks about, in `conflictNames`.
+    var position: Int = 0
 
     var sourceName: String {
         (sourcePath as NSString).lastPathComponent

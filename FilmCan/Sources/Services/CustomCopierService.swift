@@ -112,7 +112,7 @@ class CustomCopierService: ObservableObject, TransferService {
         fanOutConfig.rollIdentityHandler = rollIdentityHandler
         if let duplicateResolver {
             fanOutConfig.duplicateResolver = { @Sendable conflicts in
-                guard let first = conflicts.first else { return duplicatePolicy }
+                guard let first = conflicts.first else { return [:] }
                 let prompt = DuplicatePrompt(
                     sourcePath: first.fileName,
                     destinationPath: first.resolvedPath,
@@ -120,7 +120,10 @@ class CustomCopierService: ObservableObject, TransferService {
                     counterTemplate: duplicateCounterTemplate,
                     canVerifyWithHashList: false,
                     hashListMissing: false)
-                return await duplicateResolver(prompt).action
+                let action = await duplicateResolver(prompt).action
+                return Dictionary(uniqueKeysWithValues: conflicts.map {
+                    ($0.resolvedPath, FanOutCopier.ConflictDecision(policy: action))
+                })
             }
         }
 
