@@ -34,7 +34,7 @@ struct LogsOptionsView: View {
     private var reportInfo: InfoPopoverContent {
         InfoPopoverContent(
             title: "PDF report",
-            description: "Writes a PDF next to each log with one thumbnail per clip, sizes, durations and checksums.",
+            description: "Writes a PDF per destination, next to its log (or where the log would go), with thumbnails, sizes, durations, and each file's checksum and status.",
             cons: ["Takes extra time after the copy (runs in the background)"],
             notes: [
                 "MXF clips need Apple's free Pro Video Formats package, otherwise they show an icon.",
@@ -66,7 +66,6 @@ struct LogsOptionsView: View {
             .scaleEffect(0.8)
             .tint(FilmCanTheme.toggleTint)
         }
-        .disabled(!viewModel.logEnabled)
-        .help(viewModel.logEnabled ? "" : "Turn on “Create log file” first")
+        // The PDF does not need the log: with the log off it goes where the log would.
     }
 }

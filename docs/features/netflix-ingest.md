@@ -85,8 +85,9 @@ When a movie uses the Netflix Ingest folders, FilmCan pre-flights your roll (sou
 folder) names against Netflix's prohibited-character set and uniqueness rule. If a
 name is invalid or duplicated, a sheet offers:
 
-- **Auto-fix & run**, renames the source folders (prohibited chars → `_`, duplicates
-  get a numeric suffix) and runs.
+- **Auto-fix & run**, names the rolls correctly at the destinations (prohibited chars → `_`,
+  duplicates get a numeric suffix) and runs. The card itself is never renamed.
+  A roll name set by automatic numbering is kept.
 - **Run anyway**, proceeds unchanged.
 - **Cancel**.
 
@@ -200,8 +201,9 @@ Lorsque le préréglage Netflix Ingest est actif, FilmCan précontrôle les noms
 par rapport à l'ensemble de caractères interdits de Netflix et à la règle d'unicité. Si un
 nom n'est pas valide ou est dupliqué, une feuille offre :
 
-- **Auto-fix & run**, renomme les dossiers source (caractères interdits → `_`, les doublons
-  obtiennent un suffixe numérique) et s'exécute.
+- **Auto-fix & run**, nomme correctement les rolls sur les destinations (caractères interdits → `_`,
+  les doublons obtiennent un suffixe numérique) et s'exécute. La carte n'est jamais renommée.
+  Un nom donné par la numérotation automatique est conservé.
 - **Run anyway**, poursuit sans modifications.
 - **Cancel**.
 
@@ -314,8 +316,9 @@ Wenn die Netflix Ingest-Voreinstellung aktiv ist, prüft FilmCan Ihre Roll-Namen
 gegen Netflixs verbotene Zeichensätze und Eindeutigkeitsregel vor. Wenn ein
 Name ungültig oder dupliziert ist, bietet ein Blatt:
 
-- **Auto-fix & run**, benennt die Quellordner um (verbotene Zeichen → `_`, Duplikate
-  erhalten ein numerisches Suffix) und wird ausgeführt.
+- **Auto-fix & run**, benennt die Rolls auf den Zielen korrekt (verbotene Zeichen → `_`,
+  Duplikate erhalten ein numerisches Suffix) und wird ausgeführt. Die Karte selbst wird nie umbenannt.
+  Ein Name aus der automatischen Nummerierung bleibt erhalten.
 - **Run anyway**, wird unverändert fortgesetzt.
 - **Cancel**.
 
@@ -429,8 +432,9 @@ Cuando el preset de Netflix Ingest está activo, FilmCan precontrola los nombres
 contra el conjunto de caracteres prohibidos de Netflix y la regla de unicidad. Si un
 nombre no es válido o duplicado, una hoja ofrece:
 
-- **Auto-fix & run**, renombra las carpetas de origen (caracteres prohibidos → `_`, los duplicados
-  obtienen un sufijo numérico) y se ejecuta.
+- **Auto-fix & run**, nombra correctamente los rolls en los destinos (caracteres prohibidos → `_`,
+  los duplicados obtienen un sufijo numérico) y se ejecuta. La tarjeta nunca se renombra.
+  Se conserva un nombre dado por la numeración automática.
 - **Run anyway**, continúa sin cambios.
 - **Cancel**.
 
