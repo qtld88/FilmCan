@@ -653,22 +653,43 @@ actor FanOutCopier {
     /// Prefers the ASC MHL at the roll root; falls back to the legacy hidden manifest so
     /// pre-1.3 backups still resume once. `fileName` == the path recorded in the manifest
     /// (relPath for directory roots, basename for flat-file roots).
+    ///
+    /// Only xxh128 entries count: FilmCan compares xxh128, so an md5/xxh64 entry from
+    /// another tool proves nothing and the file is handled as unmanifested.
     nonisolated static func loadExistingMHLEntries(
         destPath: String, rootName: String, rollFolder: String
     ) -> [(fileName: String, hash: String, size: Int64, mtime: Int64?)] {
+        resumeEntries(loadManifestEntries(destPath: destPath, rootName: rootName, rollFolder: rollFolder))
+    }
+
+    /// The resume view of a manifest: xxh128 entries only.
+    nonisolated static func resumeEntries(
+        _ entries: [MHLEntry]
+    ) -> [(fileName: String, hash: String, size: Int64, mtime: Int64?)] {
+        entries.filter { $0.algorithm == MHLEntry.xxh128 }
+            .map { (fileName: $0.relPath, hash: $0.hash, size: $0.size, mtime: $0.mtime) }
+    }
+
+    /// Every entry of the latest READABLE manifest for one root at one dest, whatever
+    /// its algorithm, as carried writer seeds. Generations are tried newest first (sealed
+    /// or partial, so a run resumes after a cancelled one); a damaged generation is
+    /// skipped for the previous one rather than losing the whole resume state.
+    nonisolated static func loadManifestEntries(
+        destPath: String, rootName: String, rollFolder: String
+    ) -> [MHLEntry] {
         let ascDir = ascMHLDir(rollFolder: rollFolder)
-        // Use the latest manifest ON DISK (sealed or partial) so a run resumes after
-        // a cancelled run whose generation was written but not chained.
-        if let latest = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir),
-           let entries = try? ASCMHLReader.read(url: ascDir.appendingPathComponent(latest)) {
-            return entries.map { (fileName: $0.relPath, hash: $0.hash, size: $0.size ?? 0, mtime: $0.mtime) }
+        for url in ASCMHLChain.manifestFilesNewestFirst(ascmhlDir: ascDir) {
+            if let entries = try? ASCMHLReader.read(url: url) {
+                return entries.map(\.carried)
+            }
+            DebugLog.error("Unreadable hash list \(url.path); falling back to the previous generation")
         }
         let legacy = URL(fileURLWithPath: destPath)
             .appendingPathComponent(".filmcan").appendingPathComponent("hashlists")
             .appendingPathComponent("\(rootName).mhl")
         if FileManager.default.fileExists(atPath: legacy.path),
            let entries = try? SimpleMHLReader.read(url: legacy) {
-            return entries.map { (fileName: $0.relPath, hash: $0.hash, size: $0.size, mtime: $0.mtime) }
+            return entries.map { e in var c = e; c.isCarried = true; return c }
         }
         return []
     }
@@ -884,6 +905,8 @@ actor FanOutCopier {
             allPlannedFiles.first(where: { $0.rootName == rootName })?.rootPath ?? rootName
         }
         var existingMHLByDest: [String: [String: [(fileName: String, hash: String, size: Int64, mtime: Int64?)]]] = [:]
+        // Every entry of the same manifests (any algorithm), carried into the new one.
+        var carriedMHLByDest: [String: [String: [MHLEntry]]] = [:]
         // Directory roll folders get a recursive sweep (copy writes temps into their
         // subtrees). A flat-file root's "roll folder" is the dest root (or a dated preset
         // folder), so recursing it would re-walk the whole volume — the exact cost this
@@ -904,7 +927,9 @@ actor FanOutCopier {
                 } else {
                     shallowFolders.insert(rf)
                 }
-                byRoot[root] = Self.loadExistingMHLEntries(destPath: dest.destPath, rootName: root, rollFolder: rf)
+                let manifest = Self.loadManifestEntries(destPath: dest.destPath, rootName: root, rollFolder: rf)
+                carriedMHLByDest[dest.destPath, default: [:]][root] = manifest
+                byRoot[root] = Self.resumeEntries(manifest)
                 rollFolderByDestRoot[dest.destPath, default: [:]][root] = rf
                 if ledgerAtStart[rf] == nil { ledgerAtStart[rf] = UnverifiedLedger.load(rollFolder: rf) }
             }
@@ -1206,13 +1231,13 @@ actor FanOutCopier {
         // a file deleted out-of-band must not stay certified in the manifest.
         for (destPath, byRoot) in sharedMHLsByDest {
             for (rootName, writer) in byRoot {
-                guard let existing = existingMHLByDest[destPath]?[rootName], !existing.isEmpty else { continue }
+                guard let existing = carriedMHLByDest[destPath]?[rootName], !existing.isEmpty else { continue }
                 let isDir = directoryRoots.contains(rootName)
                 let rp = rootPathsByName[rootName] ?? rootName
                 let present = existing.filter { entry in
                     let destFile = Self.resolveDestFilePath(
                         destRoot: destPath, rootName: rootName, rootPath: rp,
-                        relPath: isDir ? entry.fileName : "",
+                        relPath: isDir ? entry.relPath : "",
                         preset: config.organizationPreset,
                         copyFolderContents: config.copyFolderContents,
                         date: jobStartTime, metadata: config.shootMetadata,
@@ -1220,7 +1245,7 @@ actor FanOutCopier {
                     return FileManager.default.fileExists(atPath: destFile)
                 }
                 if !present.isEmpty {
-                    await writer.seed(present.map { MHLEntry(relPath: $0.fileName, size: $0.size, hash: $0.hash, mtime: $0.mtime) })
+                    await writer.seed(present)
                 }
             }
         }

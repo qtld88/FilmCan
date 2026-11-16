@@ -11,7 +11,7 @@ xcodebuild build -project FilmCan/FilmCan.xcodeproj -scheme FilmCan -configurati
 open FilmCan/build/qc/Build/Products/Debug/FilmCan.app
 ```
 
-Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (branche `claude/filmcan-audit-overwrite-safety-qt79u8`).
+Statut des sessions : 1 = finalisation des fichiers (fusionnée) · 2 = preuve de vérification et seal (fusionnée) · 3 = écrasement et collisions (fusionnée) · 4 = hash lists conformes et robustes (fusionnée).
 
 ---
 
@@ -123,3 +123,39 @@ Prérequis : une carte (ou un dossier) avec 3 clips de plus de 1 Mo, deux disque
 - [ ] Taper `../Jour 1` : le nom affiché devient `_Jour 1` (pas de point de tête : pas de dossier caché), un seul dossier sous la destination.
 - [ ] Noms accentués (`Bobine é`) : les caractères hors ASCII deviennent `_`, comme dans les modèles de dossiers. Attendu.
 - [ ] Préfixes de numérotation (Options › Number rolls) : seules des lettres sont acceptées, `.` et `/` ignorés.
+
+---
+
+## Session 4 : hash lists correctes, conformes ASC MHL, robustes à un manifest abîmé ou étranger
+
+Objectif : une reprise retrouve toujours ce qui est déjà sauvegardé, le dossier `ascmhl/` est accepté par l'outil de référence, et un manifest abîmé ou venu d'un autre outil n'efface ni ne falsifie rien.
+Tests automatiques : `HashListIntegrityTests` (13 tests), `ASCMHLConformanceTests` (2 tests, validés par le CLI `ascmhl` sur la CI), `OverwriteSafetyTests` (cas liste simple).
+
+Prérequis : une carte (ou un dossier) avec 3 à 5 clips, deux disques de destination, film réel. Outil de référence : `pipx install ascmhl`.
+
+### Liste « simple » (constat 1)
+- [ ] Options › hash list = **simple**. Run 1 complet, puis run 2 sans rien changer : « déjà sauvegardé », aucun clip recopié.
+- [ ] Ouvrir `<destination>/.filmcan/hashlists/<roll>.mhl` : chaque ligne porte `name="…"` et `mtime="…"`.
+- [ ] Carte réutilisée (voir session 3) en liste simple : le prompt présente le clip comme **modifié depuis la sauvegarde**, pas comme un fichier inconnu.
+
+### Conformité ASC MHL (constat 2)
+- [ ] Après un run : dans le manifest, `lastmodificationdate="2026-…T…+00:00"` (date lisible, plus un nombre).
+- [ ] `ascmhl diff <dossier du roll>` : code de sortie 0, aucun « new file ».
+- [ ] Ajouter un clip à la carte, run 2 : la génération 0002 garde, pour les anciens clips, la `hashdate` de la 0001. Seul le nouveau clip porte la date du jour.
+- [ ] Stop en pleine copie, puis relancer jusqu'au bout : `ascmhl/` ne contient que des générations **contiguës** (0001, 0002…), toutes listées dans `ascmhl_chain.xml`. Le manifest partiel du run arrêté a disparu. `ascmhl diff` : code 0.
+- [ ] Ancien roll sauvegardé avant cette version (dates en nombre) : la reprise marche, rien n'est recopié.
+
+### Manifest d'un autre outil (constat 3)
+- [ ] Roll sauvegardé par un autre outil en **md5** ou **xxh64** (Silverstack, ShotPut…), puis run FilmCan sur la même carte : les clips ne sont **pas** sautés sur la seule foi du md5. Ils sont recopiés ou comparés selon la politique doublons.
+- [ ] Dans la nouvelle génération, un fichier que FilmCan n'a pas recopié garde sa balise d'origine (`<md5>`), jamais une valeur md5 sous `<xxh128>`.
+
+### Chaîne ou manifest illisible (constat 4)
+- [ ] Remplacer le contenu de `ascmhl_chain.xml` par du texte quelconque, puis run : la copie réussit, la destination affiche l'avertissement « manifest non scellé ». L'ancienne chaîne est conservée telle quelle sous `ascmhl_chain.xml.unreadable-<date>Z`. Aucune nouvelle chaîne qui ne contiendrait que la dernière génération.
+- [ ] Texte de l'avertissement lisible dans la carte de destination et dans l'historique.
+- [ ] Tronquer le dernier manifest de `ascmhl/` (garder la moitié du fichier), puis run : la reprise s'appuie sur la génération précédente, seuls les clips absents de celle-ci sont recopiés. Le manifest tronqué n'est ni supprimé ni écrasé.
+
+### Régression à surveiller
+- [ ] Netflix Ingest, caméra + son : chaque roll a son `ascmhl/` valide (`ascmhl diff` code 0 sur chacun).
+- [ ] Réparation depuis une destination sœur (Retry › copier depuis l'autre disque) : la génération écrite porte `action="original"` et la date du jour pour les fichiers réparés.
+- [ ] Rapport PDF et recréation de rapport : les checksums affichés sont inchangés.
+- [ ] Connu, non corrigé : une entrée `action="failed"` d'un autre outil compte encore pour la reprise ; le rapport, l'archive de rapport et `HashListVerifier` lisent toujours le dernier manifest sans repli.

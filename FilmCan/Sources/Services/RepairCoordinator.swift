@@ -85,7 +85,10 @@ enum RepairCoordinator {
             let ascDir = URL(fileURLWithPath: failedRoll).appendingPathComponent("ascmhl")
             let rollName = (failedRoll as NSString).lastPathComponent
             if let writer = try? ASCMHLWriter(ascmhlDir: ascDir, rollName: rollName) {
-                await writer.seed(copied)
+                // Each file was hash-checked by this repair: fresh entries, not carried.
+                for e in copied {
+                    try? await writer.append(relPath: e.relPath, size: e.size, hash: e.hash, mtime: e.mtime)
+                }
                 try? await writer.seal()
             }
         }
