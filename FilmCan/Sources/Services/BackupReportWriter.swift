@@ -182,6 +182,24 @@ enum BackupReportWriter {
         }
     }
 
+    /// "xxh128: <hash>", followed by what this backup says about the file.
+    private static func checksumLine(_ clip: BackupReport.Clip, _ sum: String) -> String {
+        let line = "\(clip.checksumAlgorithm ?? "hash"): \(sum)"
+        guard let status = clip.status else { return line }
+        return "\(line)  ·  \(status.text)"
+    }
+
+    private static func noteLine(_ clip: BackupReport.Clip) -> String? {
+        switch (clip.status, clip.note) {
+        case (.copiedNotVerified?, let note?): return "Copied, not verified: \(note)"
+        case (.copiedNotVerified?, nil): return "Copied, not verified"
+        case (_, let note?): return note
+        default: return nil
+        }
+    }
+
+    /// Safe off the main thread: draws only into its own PDF `CGContext`, through an
+    /// `NSGraphicsContext` made for it and set as current on the calling thread only.
     static func render(_ report: BackupReport, thumbnails: [String: [NSImage]],
                        durations: [String: TimeInterval], to url: URL) throws {
         var box = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
@@ -218,11 +236,8 @@ enum BackupReportWriter {
         } else {
             y = page.text("\(df.string(from: report.startedAt)) → \(df.string(from: report.endedAt))  (\(formatClock(secs)))",
                           x: margin, y: y, w: contentW, size: 10)
-            status = !report.success
-                ? ("Failed", red)
-                : report.verified
-                    ? ("Verified ✓", green)
-                    : ("Copied, not verified", .darkGray)
+            // Counted per file: never one "verified" for files the run did not check.
+            status = (report.statusLine, !report.success ? red : report.verified ? green : .darkGray)
         }
         y = page.text(status.0, x: margin, y: y + 2, w: contentW, h: 16, size: 12, bold: true, color: status.1)
         if let w = report.warning, !w.isEmpty {
@@ -278,9 +293,9 @@ enum BackupReportWriter {
                     page.text(formatBytes(clip.size), x: pageWidth - margin - 80, y: top + 3, w: 80,
                               size: 8, color: .darkGray, align: .right)
                     if let sum = clip.checksum {
-                        page.text("\(clip.checksumAlgorithm ?? "hash"): \(sum)", x: margin, y: top + 14,
+                        page.text(checksumLine(clip, sum), x: margin, y: top + 14,
                                   w: contentW, size: 7, mono: true, color: .gray)
-                    } else if let note = clip.note {
+                    } else if let note = noteLine(clip) {
                         page.text(note, x: margin, y: top + 14, w: contentW, size: 7, color: .orange)
                     }
                     page.y = top + height
@@ -301,9 +316,9 @@ enum BackupReportWriter {
                               size: 9, color: .darkGray, align: .right)
                 }
                 if let sum = clip.checksum {
-                    page.text("\(clip.checksumAlgorithm ?? "hash"): \(sum)", x: margin, y: top + stillH + 8,
+                    page.text(checksumLine(clip, sum), x: margin, y: top + stillH + 8,
                               w: contentW, size: 7, mono: true, color: .darkGray)
-                } else if let note = clip.note {
+                } else if let note = noteLine(clip) {
                     page.text(note, x: margin, y: top + stillH + 8, w: contentW, size: 8, color: .orange)
                 }
                 page.y = top + rowHeight
@@ -317,11 +332,30 @@ enum BackupReportWriter {
 
     // MARK: - Entry point
 
-    static func generate(result: TransferResult, config: BackupConfiguration) async -> String? {
-        guard let logPath = result.logFilePath else { return nil }
+    /// Writes the report next to the log, or where the log would have gone when the
+    /// log is off (falls back to the app's log folder when that place is not writable).
+    static func generate(result: TransferResult, config: BackupConfiguration,
+                         preset: OrganizationPreset? = nil, sources: [String] = []) async -> String? {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let report = BackupReport.build(result: result, config: config, appVersion: version)
-        return await write(report, toPath: reportPath(forLog: logPath))
+        return await write(report, toPath: reportPath(for: result, config: config,
+                                                      preset: preset, sources: sources))
+    }
+
+    static func reportPath(for result: TransferResult, config: BackupConfiguration,
+                           preset: OrganizationPreset?, sources: [String]) -> String {
+        if let log = result.logFilePath { return reportPath(forLog: log) }
+        let destination = result.destinationResults.first?.destinationPath ?? result.destination
+        let planned = reportPath(forLog: BackupLogWriter.plannedLogPath(
+            config: config, destination: destination, sources: sources, preset: preset))
+        let dir = (planned as NSString).deletingLastPathComponent
+        let fm = FileManager.default
+        if (try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)) != nil,
+           fm.isWritableFile(atPath: dir) {
+            return planned
+        }
+        return (BackupLogWriter.appSupportLogDirectory() as NSString)
+            .appendingPathComponent((planned as NSString).lastPathComponent)
     }
 
     /// Creates a report after the fact for one roll of the catalog on one connected
@@ -382,9 +416,9 @@ enum BackupReportWriter {
         let finalURL = URL(fileURLWithPath: finalPath)
         let renderedThumbs = thumbs, renderedDurs = durs
         do {
-            try await MainActor.run {
-                try render(report, thumbnails: renderedThumbs, durations: renderedDurs, to: tmpURL)
-            }
+            // Rendered on this (background) task, never on the main thread: a report
+            // of hundreds of clips would otherwise freeze the window.
+            try render(report, thumbnails: renderedThumbs, durations: renderedDurs, to: tmpURL)
             if FileManager.default.fileExists(atPath: finalPath) {
                 _ = try FileManager.default.replaceItemAt(finalURL, withItemAt: tmpURL)
             } else {

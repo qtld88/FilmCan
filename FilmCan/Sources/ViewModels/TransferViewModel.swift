@@ -98,9 +98,12 @@ class TransferViewModel: ObservableObject {
     /// `recordAs`: the saved film a Quick Copy run is filed under in history and the
     /// catalog. Only the records carry it — the run itself keeps the temporary config,
     /// because a stored id would make the lookup below swap in the film's own sources.
+    /// `rollNameFallbacks`: roll names for sources that get none from numbering or a
+    /// generic-card name (Netflix auto-fix). Applied at the destination only.
     func startTransfer(config: BackupConfiguration,
                        organizationPresetOverride: OrganizationPreset? = nil,
-                       recordAs: (id: UUID, name: String)? = nil) async {
+                       recordAs: (id: UUID, name: String)? = nil,
+                       rollNameFallbacks: [String: String] = [:]) async {
         if !isBackgroundWorker, isTransferring, activeConfigId != config.id {
             startConcurrentTransfer(config: config)
             return
@@ -114,6 +117,7 @@ class TransferViewModel: ObservableObject {
         // and saved before the copy starts, so a cancelled run resumes into the same roll.
         let activeConfig = applyRollNumberingAndDay(to: storedConfig.restrictedToIncluded())
             .withGenericRollNames(keyFor: { RollNumberer.cardKey(forPath: $0) })
+            .withRollNameFallbacks(rollNameFallbacks)
         self.config = activeConfig
         activeConfigId = activeConfig.id
         // Every run (main, concurrent worker, Quick Copy) passes here: hold its drives
@@ -216,6 +220,21 @@ class TransferViewModel: ObservableObject {
             var groupPlans: [RunPlan?] = []
             for group in destinationGroups {
                 if isCancellingAll { break }
+                // Sequential: a destination stopped while it was still waiting is not
+                // copied. The running one is the current destination (Stop on it
+                // cancels the current pass only).
+                if group.count == 1, let only = group.first {
+                    if cancelledDestinations.contains(only) {
+                        let skipped = Self.cancelledBeforeStartResult(
+                            destination: only, configName: activeConfig.name,
+                            startedAt: transferStartTime ?? Date())
+                        markCancelledBeforeStart(only)
+                        results.append(skipped)
+                        perDestResults.append(skipped)
+                        continue
+                    }
+                    currentDestination = only
+                }
                 let passStart = Date()
                 defer {
                     if group.count == 1 { passSeconds[group[0]] = Date().timeIntervalSince(passStart) }
@@ -236,6 +255,8 @@ class TransferViewModel: ObservableObject {
                 results.append(contentsOf: groupResults)
                 perDestResults.append(contentsOf: groupResults)
             }
+
+            currentDestination = ""
 
             // One plan for the run: nil as soon as one pass never produced one (the
             // engine failed before it enumerated), so nothing is sealed or called verified.
@@ -296,7 +317,12 @@ class TransferViewModel: ObservableObject {
                     sources: sources,
                     destinations: perDestResults.map { $0.destination },
                     fileCount: perDestResults.map { $0.filesSkipped }.max() ?? 0,
-                    date: transferStartTime ?? Date()
+                    date: transferStartTime ?? Date(),
+                    rollNames: activeConfig.runRollNames,
+                    preset: organizationPreset,
+                    metadata: ShootMetadata(config: activeConfig),
+                    mediaKinds: effectiveKinds,
+                    copyFolderContents: activeConfig.copyFolderContents
                 )
             } else {
                 BackupLogWriter.writeFanOutLogs(
@@ -310,7 +336,9 @@ class TransferViewModel: ObservableObject {
                     config: recordConfig,
                     sources: sources,
                     results: perDestResults,
-                    preset: organizationPreset
+                    preset: organizationPreset,
+                    // The run's own tokens: a Quick Copy filed under a film keeps its own.
+                    shootMetadata: ShootMetadata(config: activeConfig)
                 )
                 await MediaCatalogStore.shared.record(
                     config: recordConfig, sources: sources,
@@ -332,9 +360,14 @@ class TransferViewModel: ObservableObject {
                 if activeConfig.reportEnabled {
                     let reportResults = perDestResults
                     let reportConfig = activeConfig
+                    let reportPreset = organizationPreset
+                    let reportSources = sources
+                    // One PDF per destination that holds a roll of this run, log on or off.
                     Task.detached(priority: .utility) {
-                        for result in reportResults where result.logFilePath != nil {
-                            if let pdf = await BackupReportWriter.generate(result: result, config: reportConfig) {
+                        for result in reportResults where result.destinationResults.first?.rollFolders.isEmpty == false {
+                            if let pdf = await BackupReportWriter.generate(
+                                result: result, config: reportConfig,
+                                preset: reportPreset, sources: reportSources) {
                                 ReportArchive.archive(pdfPath: pdf, result: result, config: reportConfig)
                             }
                         }
@@ -864,34 +897,72 @@ class TransferViewModel: ObservableObject {
     /// Re-verify an already-backed-up config against its hash lists (the same
     /// check as "Check data" in History). Runs off the main thread.
     func verifyAlreadyBackedUp(_ info: AlreadyBackedUpInfo) async -> (total: Int, missing: Int, mismatched: Int) {
-        let sources = info.sources
-        let dests = info.destinations
-        let preset = config.map { resolveOrganizationPreset(for: $0) } ?? nil
-        let copyContents = config?.copyFolderContents ?? false
-        let metadata = ShootMetadata(episode: config?.episode ?? "", day: config?.day ?? "",
-                                     unit: config?.unit ?? "", cameraFormat: config?.cameraFormat ?? "",
-                                     movie: config?.name ?? "")
-        let kinds = config.map { effectiveSourceMediaKinds(for: $0, sources: sources) } ?? [:]
+        await Task.detached(priority: .utility) { Self.verifyBackedUp(info) }.value
+    }
 
-        return await Task.detached(priority: .utility) {
-            var total = 0, missing = 0, mismatched = 0
-            for dest in dests {
-                for src in sources {
-                    let rollFolder = FanOutCopier.resolveRollFolder(
-                        destRoot: dest, rootName: (src as NSString).lastPathComponent, rootPath: src,
-                        isDirectoryRoot: true, preset: preset, copyFolderContents: copyContents,
-                        date: info.date, metadata: metadata, mediaKind: kinds[src] ?? .camera)
-                    let ascDir = FanOutCopier.ascMHLDir(rollFolder: rollFolder)
-                    guard let name = ASCMHLChain.latestManifestFileName(ascmhlDir: ascDir) else { continue }
-                    if let r = HashListVerifier.verify(
-                        hashListPath: ascDir.appendingPathComponent(name).path,
-                        rootsFallback: [rollFolder]) {
+    /// Reads every roll the run placed (same names, preset, tokens and Camera/Sound
+    /// routing as the run itself) and checks the files against its newest readable
+    /// ASC MHL generation. Blocking: call off the main thread.
+    nonisolated static func verifyBackedUp(_ info: AlreadyBackedUpInfo) -> (total: Int, missing: Int, mismatched: Int) {
+        let fm = FileManager.default
+        let dirSources = info.sources.filter { path in
+            var isDir: ObjCBool = false
+            return fm.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+        }
+        let names = FanOutCopier.plannedRootNames(directorySources: dirSources, rollNames: info.rollNames)
+        var total = 0, missing = 0, mismatched = 0
+        for dest in info.destinations {
+            for src in info.sources {
+                let isDir = dirSources.contains(src)
+                let rollFolder = FanOutCopier.resolveRollFolder(
+                    destRoot: dest, rootName: names[src] ?? (src as NSString).lastPathComponent,
+                    rootPath: src, isDirectoryRoot: isDir, preset: info.preset,
+                    copyFolderContents: info.copyFolderContents,
+                    date: info.date, metadata: info.metadata, mediaKind: info.mediaKinds[src] ?? .camera,
+                    rollNameIsAssigned: isDir
+                        && info.rollNames[src].flatMap(OrganizationTemplate.rollNameAsWritten) != nil)
+                let ascDir = FanOutCopier.ascMHLDir(rollFolder: rollFolder)
+                // A damaged newest generation falls back to the previous readable one.
+                for manifest in ASCMHLChain.manifestFilesNewestFirst(ascmhlDir: ascDir) {
+                    if let r = HashListVerifier.verify(hashListPath: manifest.path, rootsFallback: [rollFolder]) {
                         total += r.total; missing += r.missing; mismatched += r.mismatched
+                        break
                     }
                 }
             }
-            return (total, missing, mismatched)
-        }.value
+        }
+        return (total, missing, mismatched)
+    }
+
+    /// The result of a destination the user stopped before its turn came (sequential
+    /// copy): nothing was written there, it is a cancellation.
+    nonisolated static func cancelledBeforeStartResult(destination: String, configName: String,
+                                                       startedAt: Date) -> TransferResult {
+        let message = DestFailureReason.userCancel.displayMessage
+        var result = TransferResult(
+            configurationName: configName, destination: destination,
+            startTime: startedAt, endTime: Date(), success: false,
+            errorMessage: message, warningMessage: nil,
+            filesTransferred: 0, bytesTransferred: 0, totalBytes: 0, filesSkipped: 0,
+            errors: [message], hashListPath: nil, wasVerified: false)
+        result.destinationResults = [DestResult(
+            destinationPath: destination,
+            displayName: (destination as NSString).lastPathComponent,
+            success: false, failureReason: .userCancel)]
+        return result
+    }
+
+    /// Flip a waiting destination's card to "cancelled".
+    private func markCancelledBeforeStart(_ destination: String) {
+        let cancelled = DestStatus.failed(.userCancel)
+        if let idx = progress.perDestProgress.firstIndex(where: { $0.id == destination }) {
+            progress.perDestProgress[idx].status = cancelled
+        } else {
+            progress.perDestProgress.append(DestProgress(
+                id: destination, displayName: (destination as NSString).lastPathComponent,
+                status: cancelled))
+        }
+        progress.syncFromPerDest()
     }
 
     static func manifestUnsealedWarning(_ reason: String?) -> String? {
@@ -987,7 +1058,6 @@ class TransferViewModel: ObservableObject {
                 copyFolderContents: config.copyFolderContents,
                 useHashListPrecheck: config.engineOptions.customVerifyEnabled,
                 hashListPath: nil,
-                fileOrdering: config.engineOptions.fileOrdering,
                 duplicatePolicy: config.duplicatePolicy,
                 duplicateCounterTemplate: config.duplicateCounterTemplate,
                 duplicateResolver: (config.duplicatePolicy == .ask || config.duplicatePolicy == .verify)
@@ -1095,13 +1165,21 @@ class TransferViewModel: ObservableObject {
         }
     }
 
-    /// `.complete` is sticky within a run: progress emits reach the main actor
-    /// through unordered Tasks, so a stale `.active` can land after the final
-    /// `.complete` and leave the card stuck at 99%. Only a failure overrides it.
+    /// `.complete` and `.failed` are sticky within a run: progress emits reach the
+    /// main actor through unordered Tasks, so a stale `.active` can land after the
+    /// final `.complete` (card stuck at 99%) or after a `.failed` (red card turned
+    /// back into a running one). Only a failure overrides `.complete`; a failure
+    /// keeps its first cause.
     nonisolated static func mergedStatus(previous: DestStatus, incoming: DestStatus) -> DestStatus {
-        guard case .complete = previous else { return incoming }
-        if case .failed = incoming { return incoming }
-        return .complete
+        switch previous {
+        case .failed:
+            return previous
+        case .complete:
+            if case .failed = incoming { return incoming }
+            return .complete
+        default:
+            return incoming
+        }
     }
 
     private func countVisibleFiles(sources: [String]) async -> Int {
@@ -1123,7 +1201,8 @@ class TransferViewModel: ObservableObject {
         config: BackupConfiguration,
         sources: [String],
         results: [TransferResult],
-        preset: OrganizationPreset?
+        preset: OrganizationPreset?,
+        shootMetadata: ShootMetadata? = nil
     ) async {
         guard !results.isEmpty else { return }
         let ctx = await historyRecorder.record(
@@ -1132,7 +1211,8 @@ class TransferViewModel: ObservableObject {
             results: results,
             preset: preset,
             transferStartTime: transferStartTime,
-            retentionLimit: historyRetentionLimit
+            retentionLimit: historyRetentionLimit,
+            shootMetadata: shootMetadata
         )
         lastRunContext = ctx
     }
@@ -1270,7 +1350,8 @@ class TransferViewModel: ObservableObject {
                 duplicatePolicy: repairCtx?.duplicatePolicy ?? .ask,
                 sourceMediaKinds: repairCtx?.sourceMediaKinds ?? [:],
                 hashListStyle: repairCtx?.hashListStyle ?? .ascMHL,
-                rollNames: repairCtx?.rollNames ?? [:]
+                rollNames: repairCtx?.rollNames ?? [:],
+                shootMetadata: repairCtx?.shootMetadata ?? .empty
             )
             if outcome.allOK {
                 patchDestResultToSuccess(

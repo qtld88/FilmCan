@@ -6,6 +6,9 @@ struct EngineOptions: Equatable, Codable {
     var useHashListPrecheck: Bool = false
     var reuseOrganizedFiles: Bool = false
     var allowResume: Bool = true
+    /// Retired: the copy order was never applied by the engine and the option was
+    /// removed from Options. Kept only so saved configs still read and older
+    /// FilmCan versions can still open configs written by this one.
     var fileOrdering: FileOrdering = .defaultOrder
     var parallelCopyEnabled: Bool = true
     var customVerifyEnabled: Bool = true

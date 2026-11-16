@@ -264,54 +264,6 @@ struct BasicOptionsView: View {
                 }
                 .buttonStyle(.plain)
             }
-
-            let fileOrderInfo = InfoPopoverContent(
-                title: "Copy order",
-                description: "The order FilmCan copies files in.",
-                options: [
-                    .init("Default", good: ["Preserves the filesystem order"]),
-                    .init("Smallest first",
-                          good: ["Can speed up cards with lots of tiny files"],
-                          bad: ["May not help on all drives"]),
-                    .init("Largest first",
-                          good: ["Can stabilize throughput on big files"]),
-                    .init("Creation date",
-                          good: ["Keeps footage order consistent"])
-                ]
-            )
-
-            HStack(spacing: OptionsLayout.spacing) {
-                Image(systemName: "arrow.up.arrow.down.circle")
-                    .font(.title3)
-                    .foregroundColor(FilmCanTheme.textSecondary)
-                    .frame(width: OptionsLayout.iconWidth)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("Copy order")
-                            .font(FCType.itemTitle)
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                        InfoPopoverButton(content: fileOrderInfo)
-                    }
-                }
-                .frame(width: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), alignment: .leading)
-                Menu {
-                    ForEach(FileOrdering.allCases) { ordering in
-                        Button(ordering.displayName) { viewModel.engineOptions.fileOrdering = ordering }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(viewModel.engineOptions.fileOrdering.displayName)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                    }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(FilmCanTheme.card)
-                    .cornerRadius(6)
-                    .frame(width: optionsResolvedMenuWidth(OptionsLayout.menuWidth + 100, textWidth: optionsResolvedTextWidth(OptionsLayout.basicTextWidth, availableWidth: availableWidth), availableWidth: availableWidth), alignment: .leading)
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 

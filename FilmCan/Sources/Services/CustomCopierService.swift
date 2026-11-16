@@ -58,7 +58,6 @@ class CustomCopierService: ObservableObject, TransferService {
         copyFolderContents: Bool,
         useHashListPrecheck: Bool,
         hashListPath: String?,
-        fileOrdering: FileOrdering,
         duplicatePolicy: OrganizationPreset.DuplicatePolicy,
         duplicateCounterTemplate: String,
         duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?,

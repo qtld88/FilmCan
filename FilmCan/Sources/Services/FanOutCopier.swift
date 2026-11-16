@@ -48,6 +48,9 @@ struct DestResultBuilder {
     var success: Bool = true
     var failures: [DestFailureReason] = []
     var mhlPaths: [String] = []
+    /// One manifest per roll this destination holds in this run (set once the hash
+    /// lists are finalized). Every roll, including one whose files were all skipped.
+    var rollManifestPaths: [String] = []
     var totalDuration: TimeInterval = 0
     var verificationFailed: Bool = false
     /// Set when seal() failed after a clean copy+verify — surfaces as a non-fatal
@@ -71,7 +74,7 @@ struct DestResultBuilder {
                 failures.append(reason)
             }
         }
-        if let mhl = result.mhlPath {
+        if let mhl = result.mhlPath, !mhl.isEmpty, !mhlPaths.contains(mhl) {
             mhlPaths.append(mhl)
         }
         if result.success, let name = result.transferredRelPath {
@@ -107,6 +110,7 @@ struct DestResultBuilder {
             bytesTransferred: totalBytes,
             failureReason: verificationFailed ? .verify : failures.first,
             mhlPath: mhlPaths.first,
+            mhlPaths: rollManifestPaths.isEmpty ? mhlPaths : rollManifestPaths,
             manifestUnsealedReason: manifestUnsealedReason,
             durationSec: totalDuration,
             verifyMode: verifyMode,
@@ -124,6 +128,9 @@ struct PerSourceOutcome: Sendable {
     let writerResults: [DestWriterResult]
     let verifyFailedDestPaths: Set<String>
     let sourceCorrupted: Bool
+    /// Destinations whose verification never happened because the user stopped the
+    /// run. A cancellation, never a verification failure.
+    var cancelledDestPaths: Set<String> = []
 }
 
 /// Result of the copy phase for one source file, handed to the verify lane so
@@ -452,6 +459,16 @@ actor FanOutCopier {
             result[root] = name
         }
         return result
+    }
+
+    /// The roll name the engine gives each DIRECTORY source in one run: the assigned
+    /// name (as written on disk) or the folder name, made unique within the run. Same
+    /// rule as `run()`, before any cross-run "-N" decision.
+    nonisolated static func plannedRootNames(directorySources: [String],
+                                             rollNames: [String: String]) -> [String: String] {
+        disambiguatedRootNames(
+            sourceRoots: directorySources,
+            overrides: rollNames.compactMapValues(OrganizationTemplate.rollNameAsWritten))
     }
 
     /// The source volume's stable UUID, or nil if the filesystem doesn't expose one.
@@ -1432,6 +1449,7 @@ actor FanOutCopier {
                 // in this run (copied, then checked — never a Verification-Off write).
                 if w.success, w.filesTransferred > 0,
                    !outcome.verifyFailedDestPaths.contains(w.destPath),
+                   !outcome.cancelledDestPaths.contains(w.destPath),
                    w.verifyMode != .off, config.verifyMode != .off {
                     builders[w.destPath]?.verifiedSourcePaths.insert(
                         PlannedSourceFile.proofKey(outcome.sourcePath))
@@ -1439,6 +1457,9 @@ actor FanOutCopier {
             }
             for dp in outcome.verifyFailedDestPaths {
                 builders[dp]?.markVerificationFailed()
+            }
+            for dp in outcome.cancelledDestPaths {
+                builders[dp]?.markCancelled()
             }
         }
 
@@ -1479,6 +1500,9 @@ actor FanOutCopier {
             }
         }
 
+        for (destPath, destMHLs) in sharedMHLsByDest {
+            builders[destPath]?.rollManifestPaths = destMHLs.values.map { $0.manifestPath }.sorted()
+        }
         persistUnverifiedLedgers(existingMHLByDest: existingMHLByDest)
         let results = config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
         if !wasCancelled {
@@ -1543,7 +1567,8 @@ actor FanOutCopier {
             // deleted (nil hash, hash mismatch, source corruption) no entry is written.
             if !outcome.sourceCorrupted {
                 var appendFailed = outcome.verifyFailedDestPaths
-                for r in c.writerResults where r.success && r.filesTransferred > 0 && !appendFailed.contains(r.destPath) {
+                for r in c.writerResults where r.success && r.filesTransferred > 0
+                    && !appendFailed.contains(r.destPath) && !outcome.cancelledDestPaths.contains(r.destPath) {
                     #if DEBUG
                     if config._testForceMHLAppendFailure {
                         appendFailed.insert(r.destPath)
@@ -1577,7 +1602,8 @@ actor FanOutCopier {
                         sourcePath: outcome.sourcePath,
                         writerResults: outcome.writerResults,
                         verifyFailedDestPaths: appendFailed,
-                        sourceCorrupted: outcome.sourceCorrupted))
+                        sourceCorrupted: outcome.sourceCorrupted,
+                        cancelledDestPaths: outcome.cancelledDestPaths))
                     continue
                 }
             }
@@ -2114,7 +2140,8 @@ actor FanOutCopier {
             let cancelled = await emitCancelled()
             return PerSourceOutcome(
                 sourcePath: c.sourcePath, writerResults: c.writerResults,
-                verifyFailedDestPaths: cancelled, sourceCorrupted: false
+                verifyFailedDestPaths: [], sourceCorrupted: false,
+                cancelledDestPaths: cancelled
             )
         }
 
@@ -2161,10 +2188,13 @@ actor FanOutCopier {
 
             // Cancel can land during the settle delay.
             if config.shouldCancel?() == true {
+                // A stream mismatch found before the stop stays a verification
+                // failure; the rest were stopped, not checked.
                 let cancelled = await emitCancelled()
                 return PerSourceOutcome(
                     sourcePath: c.sourcePath, writerResults: c.writerResults,
-                    verifyFailedDestPaths: verifyFailed.union(cancelled), sourceCorrupted: false
+                    verifyFailedDestPaths: verifyFailed, sourceCorrupted: false,
+                    cancelledDestPaths: cancelled.subtracting(verifyFailed)
                 )
             }
 

@@ -15,6 +15,8 @@ class BackupEditorViewModel: ObservableObject {
     @Published var config: BackupConfiguration
     @Published var showValidationError: Bool = false
     @Published var validationMessage: String = ""
+    /// Netflix auto-fix: destination roll names for the next run (source path → name).
+    var netflixRollNameFixes: [String: String] = [:]
     
     private let storage: ConfigurationStorage
     private var isSyncingFromPreset = false

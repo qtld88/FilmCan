@@ -1,7 +1,7 @@
 import Foundation
 
 /// Per-shoot metadata feeding the Netflix folder tokens ({episode}/{day}/{unit}/{cameraFormat}).
-struct ShootMetadata: Equatable {
+struct ShootMetadata: Equatable, Codable {
     var episode: String = ""
     var day: String = ""
     var unit: String = ""
@@ -9,6 +9,14 @@ struct ShootMetadata: Equatable {
     /// The film's name, for the `{movie}` token.
     var movie: String = ""
     static let empty = ShootMetadata()
+}
+
+extension ShootMetadata {
+    /// The run's tokens, from the run's own copy of the config (shoot day already advanced).
+    init(config: BackupConfiguration) {
+        self.init(episode: config.episode, day: config.day, unit: config.unit,
+                  cameraFormat: config.cameraFormat, movie: config.name)
+    }
 }
 
 enum OrganizationTemplate {

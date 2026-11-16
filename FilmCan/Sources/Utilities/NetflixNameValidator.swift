@@ -32,4 +32,23 @@ enum NetflixNameValidator {
     static func sanitize(_ name: String) -> String {
         String(name.map { prohibited.contains($0) ? "_" : $0 })
     }
+
+    /// "Auto-fix": the roll name each source gets AT THE DESTINATION, prohibited
+    /// characters replaced and duplicates numbered (`_001`…). Only sources whose name
+    /// changes are listed. Pure: the card is never renamed (FilmCan writes nothing on
+    /// a card but `.filmcan/seal.json`).
+    static func fixedRollNames(sources: [String]) -> [String: String] {
+        var used = Set<String>()
+        var out: [String: String] = [:]
+        for path in sources {
+            let original = (path as NSString).lastPathComponent
+            let base = sanitize(original)
+            var candidate = base
+            var n = 1
+            while used.contains(candidate) { candidate = "\(base)_\(String(format: "%03d", n))"; n += 1 }
+            used.insert(candidate)
+            if candidate != original { out[path] = candidate }
+        }
+        return out
+    }
 }

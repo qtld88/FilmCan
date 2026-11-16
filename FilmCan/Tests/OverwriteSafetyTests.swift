@@ -249,7 +249,7 @@ final class OverwriteSafetyTests: XCTestCase {
         _ = try await CustomCopierService().runCopyFanOut(
             sources: [card.path], fanOutDestinations: [destConfig(dest)], configName: "",
             organizationPreset: nil, copyFolderContents: false, useHashListPrecheck: false,
-            hashListPath: nil, fileOrdering: .defaultOrder, duplicatePolicy: .ask,
+            hashListPath: nil, duplicatePolicy: .ask,
             duplicateCounterTemplate: "_001", duplicateResolver: resolver,
             verifyMode: .fast, dryRun: false, hashListStyle: .ascMHL, progressHandler: nil)
     }

@@ -255,4 +255,139 @@ final class HonestOutcomeTests: XCTestCase {
         XCTAssertNotNil(PDFDocument(url: URL(fileURLWithPath: pdfPath)))
         XCTAssertTrue(pdfPath.hasPrefix(dest.path), "the report goes where the log would have gone")
     }
+
+    /// The report lists each file with its own status: copied and checked this run.
+    func test_report_perFileStatus_andStatusLine() async throws {
+        let card = try makeCard("A001", files: ["A.mov"])
+        let dest = try makeDir("dest")
+        _ = try await run(sources: [card], dests: [dest])
+        try randomData(48 * 1024).write(to: card.appendingPathComponent("B.mov"))
+        let second = try await run(sources: [card], dests: [dest])
+        let dr = try XCTUnwrap(second.first)
+        var config = BackupConfiguration()
+        config.name = "Proj"
+        let report = BackupReport.build(result: transferResult(dr), config: config, appVersion: "1")
+        let clips = report.rolls[0].clips
+        XCTAssertEqual(clips.first { $0.relPath == "A.mov" }?.status, .fromEarlierBackup)
+        XCTAssertEqual(clips.first { $0.relPath == "B.mov" }?.status, .verifiedThisRun)
+        XCTAssertTrue(report.verified)
+        XCTAssertTrue(report.statusLine.contains("1 verified this run"), report.statusLine)
+        XCTAssertTrue(report.statusLine.contains("1 from an earlier backup"), report.statusLine)
+    }
+
+    /// Verification Off: the file was copied but never checked. No checksum, not verified.
+    func test_report_verificationOff_isNotVerified() async throws {
+        let card = try makeCard("A001", files: ["A.mov"])
+        let dest = try makeDir("dest")
+        let dr = try XCTUnwrap(try await run(sources: [card], dests: [dest], verify: .off).first)
+        var config = BackupConfiguration()
+        config.name = "Proj"
+        let report = BackupReport.build(result: transferResult(dr), config: config, appVersion: "1")
+        let a = try XCTUnwrap(report.rolls.first?.clips.first)
+        XCTAssertEqual(a.status, .copiedNotVerified)
+        XCTAssertNil(a.checksum)
+        XCTAssertFalse(report.verified)
+    }
+
+    // MARK: - Finding 1: the repaired copy is read back from disk
+
+    func test_siblingCheckOnDisk_rejectsAndRemovesADifferentFile() throws {
+        let file = tmpDir.appendingPathComponent("x.bin")
+        try randomData(4096).write(to: file)
+        XCTAssertThrowsError(try SiblingDestSource.checkOnDisk(
+            path: file.path, fileName: "x.bin", expectedHash: String(repeating: "0", count: 32)))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    // MARK: - Finding 2: repair from source keeps the shoot tokens
+
+    func test_runContext_keepsShootMetadata_andReadsOldEntries() throws {
+        var ctx = RunContext(organizationPresetId: nil, cameraFolderTemplate: nil, soundFolderTemplate: nil,
+                             copyFolderContents: false, sourceMediaKinds: [:], duplicatePolicy: .ask,
+                             hashListStyle: .ascMHL)
+        ctx.shootMetadata = ShootMetadata(episode: "EP01", day: "D02", unit: "U1", cameraFormat: "ARRI", movie: "M")
+        let back = try JSONDecoder().decode(RunContext.self, from: JSONEncoder().encode(ctx))
+        XCTAssertEqual(back.shootMetadata, ctx.shootMetadata)
+
+        let old = #"{"copyFolderContents":false,"sourceMediaKinds":{},"duplicatePolicy":"ask","hashListStyle":"ascMHL"}"#
+        let decoded = try? JSONDecoder().decode(RunContext.self, from: Data(old.utf8))
+        if let decoded { XCTAssertNil(decoded.shootMetadata) }
+    }
+
+    /// Netflix layout: the repair writes into the same episode/day/unit folder as the
+    /// backup, not an empty-token one.
+    func test_repairFromSource_netflix_usesShootMetadata() async throws {
+        let fm = FileManager.default
+        let card = try makeCard("A001", files: ["C0001.MOV"])
+        let dest = try makeDir("dest")
+        let preset = OrganizationPreset.netflixIngest()
+        let meta = ShootMetadata(episode: "EP01", day: "D02", unit: "U1", cameraFormat: "ARRI", movie: "M")
+        let failed = DestResult(destinationPath: dest.path, displayName: "dest", success: false,
+                                failureReason: .ioError("x"), verifyMode: .fast)
+
+        let outcome = await RepairCoordinator.repairFromSource(
+            failed: failed, sources: [card.path], organizationPreset: preset,
+            copyFolderContents: false, duplicatePolicy: .overwrite, sourceMediaKinds: [:],
+            hashListStyle: .ascMHL, shootMetadata: meta)
+
+        XCTAssertTrue(outcome.allOK)
+        let all = (fm.enumerator(atPath: dest.path)?.allObjects as? [String]) ?? []
+        let copied = try XCTUnwrap(all.first { $0.hasSuffix("C0001.MOV") }, "file not copied")
+        XCTAssertTrue(copied.contains("EP01") && copied.contains("D02") && copied.contains("ARRI"), copied)
+    }
+
+    // MARK: - Finding 3: Verify data follows the assigned roll names
+
+    func test_verifyBackedUp_withAssignedRollName_checksTheFiles() async throws {
+        let card = try makeCard("Untitled", files: ["C0001.MP4", "C0002.MP4"])
+        let dest = try makeDir("dest")
+        let results = try await run(sources: [card], dests: [dest], rollNames: [card.path: "A001"])
+        XCTAssertTrue(results[0].success)
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: dest.appendingPathComponent("A001/C0001.MP4").path))
+
+        let info = AlreadyBackedUpInfo(sources: [card.path], destinations: [dest.path],
+                                       fileCount: 2, date: Date(), rollNames: [card.path: "A001"])
+        let r = TransferViewModel.verifyBackedUp(info)
+        XCTAssertEqual(r.total, 2)
+        XCTAssertEqual(r.missing, 0)
+        XCTAssertEqual(r.mismatched, 0)
+    }
+
+    // MARK: - Finding 5: Netflix auto-fix never touches the card
+
+    func test_netflixFix_namesTheDestination_andLeavesTheCardAlone() async throws {
+        let fm = FileManager.default
+        let card1 = try makeCard("A#01", files: ["C0001.MP4"])
+        let card2 = try makeCard("A_01", files: ["C0002.MP4"])
+        let fixes = NetflixNameValidator.fixedRollNames(sources: [card1.path, card2.path])
+        XCTAssertEqual(fixes[card1.path], "A_01")
+        XCTAssertEqual(fixes[card2.path], "A_01_001")
+        XCTAssertTrue(fm.fileExists(atPath: card1.path), "the card folder is never renamed")
+
+        var config = BackupConfiguration()
+        config.sourcePaths = [card1.path, card2.path]
+        config.runRollNames = [card2.path: "B001"]  // numbering wins
+        let applied = config.withRollNameFallbacks(fixes)
+        XCTAssertEqual(applied.runRollNames[card1.path], "A_01")
+        XCTAssertEqual(applied.runRollNames[card2.path], "B001")
+
+        let dest = try makeDir("dest")
+        _ = try await run(sources: [card1], dests: [dest], rollNames: [card1.path: "A_01"])
+        XCTAssertTrue(fm.fileExists(atPath: dest.appendingPathComponent("A_01/C0001.MP4").path))
+        XCTAssertTrue(fm.fileExists(atPath: card1.appendingPathComponent("C0001.MP4").path))
+        let onCard = try fm.contentsOfDirectory(atPath: card1.path)
+        XCTAssertEqual(onCard.filter { !$0.hasPrefix(".") }, ["C0001.MP4"])
+    }
+
+    // MARK: - Finding 6: a waiting destination stopped in sequential mode
+
+    func test_cancelledBeforeStart_isACancellationNotACopy() {
+        let r = TransferViewModel.cancelledBeforeStartResult(
+            destination: "/Volumes/B", configName: "Film", startedAt: Date())
+        XCTAssertFalse(r.success)
+        XCTAssertEqual(r.filesTransferred, 0)
+        XCTAssertEqual(r.destinationResults.first?.failureReason, .userCancel)
+        XCTAssertEqual(r.errorMessage, DestFailureReason.userCancel.displayMessage)
+    }
 }
