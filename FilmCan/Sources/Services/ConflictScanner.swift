@@ -1,7 +1,8 @@
 import Foundation
 
-/// Pure pre-flight detection of destination files that would be overwritten but are
-/// NOT recorded in that destination's manifest (an "unmanifested collision"). The
+/// Pure pre-flight detection of destination files that would be overwritten: either NOT
+/// recorded in that destination's manifest (an "unmanifested collision"), or recorded
+/// but no longer matching the source (a reused card, a source changed in place). The
 /// engine resolves these by `DuplicatePolicy` before any copy begins, so the
 /// fan-out never blind-overwrites and never prompts mid-copy.
 enum ConflictScanner {
@@ -13,27 +14,44 @@ enum ConflictScanner {
     }
 
     struct Conflict: Sendable {
+        enum Kind: Sendable, Equatable {
+            /// A file with this name is there but no manifest lists it.
+            case unmanifested
+            /// The manifest lists this file, but the source no longer matches it
+            /// (other size or other hash): copying would replace the backed-up file.
+            case differsFromManifest
+        }
         let destPath: String
         let rootName: String
         let fileName: String
         let resolvedPath: String
+        var kind: Kind = .unmanifested
     }
 
     static func key(destPath: String, rootName: String) -> String { "\(destPath)\0\(rootName)" }
 
     /// `manifestedRelPathsByDestRoot` maps `key(destPath:rootName:)` to the set of
     /// manifest-relative names already recorded for that roll at that destination.
+    /// `changedManifestedPaths` lists resolved paths of manifested files the source no
+    /// longer matches: those are conflicts too (`.differsFromManifest`).
     static func scan(
         plannedTargets: [Target],
-        manifestedRelPathsByDestRoot: [String: Set<String>]
+        manifestedRelPathsByDestRoot: [String: Set<String>],
+        changedManifestedPaths: Set<String> = []
     ) -> [Conflict] {
         var out: [Conflict] = []
         for t in plannedTargets {
             guard FileManager.default.fileExists(atPath: t.resolvedPath) else { continue }
             let recorded = manifestedRelPathsByDestRoot[key(destPath: t.destPath, rootName: t.rootName)] ?? []
-            if recorded.contains(t.fileName) { continue }
+            let kind: Conflict.Kind
+            if recorded.contains(t.fileName) {
+                guard changedManifestedPaths.contains(t.resolvedPath) else { continue }
+                kind = .differsFromManifest
+            } else {
+                kind = .unmanifested
+            }
             out.append(Conflict(destPath: t.destPath, rootName: t.rootName,
-                                fileName: t.fileName, resolvedPath: t.resolvedPath))
+                                fileName: t.fileName, resolvedPath: t.resolvedPath, kind: kind))
         }
         return out
     }

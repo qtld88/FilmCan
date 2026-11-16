@@ -112,15 +112,8 @@ class CustomCopierService: ObservableObject, TransferService {
         fanOutConfig.rollIdentityHandler = rollIdentityHandler
         if let duplicateResolver {
             fanOutConfig.duplicateResolver = { @Sendable conflicts in
-                guard let first = conflicts.first else { return duplicatePolicy }
-                let prompt = DuplicatePrompt(
-                    sourcePath: first.fileName,
-                    destinationPath: first.resolvedPath,
-                    isDirectory: false,
-                    counterTemplate: duplicateCounterTemplate,
-                    canVerifyWithHashList: false,
-                    hashListMissing: false)
-                return await duplicateResolver(prompt).action
+                await CustomCopierService.resolveConflicts(conflicts, counterTemplate: duplicateCounterTemplate,
+                                            ask: duplicateResolver)
             }
         }
 
@@ -170,6 +163,43 @@ class CustomCopierService: ObservableObject, TransferService {
         return result
     }
 
+}
+
+extension CustomCopierService {
+    /// Asks about each conflict in turn. Every prompt carries the full list, so the
+    /// user sees how many files are concerned before choosing. "Apply to all" answers
+    /// the current file and every remaining one; otherwise the next file is asked.
+    nonisolated static func resolveConflicts(
+        _ conflicts: [ConflictScanner.Conflict],
+        counterTemplate: String,
+        ask: @Sendable (DuplicatePrompt) async -> DuplicateResolution
+    ) async -> [String: FanOutCopier.ConflictDecision] {
+        let names = conflicts.map(\.resolvedPath)
+        var decisions: [String: FanOutCopier.ConflictDecision] = [:]
+        var index = 0
+        while index < conflicts.count {
+            let c = conflicts[index]
+            let prompt = DuplicatePrompt(
+                sourcePath: c.fileName,
+                destinationPath: c.resolvedPath,
+                isDirectory: false,
+                counterTemplate: counterTemplate,
+                canVerifyWithHashList: false,
+                hashListMissing: false,
+                conflictCount: conflicts.count,
+                conflictNames: names,
+                position: index)
+            let answer = await ask(prompt)
+            let decision = FanOutCopier.ConflictDecision(
+                policy: answer.action, counterTemplate: answer.counterTemplate)
+            let answered = answer.applyToAll ? conflicts[index...] : conflicts[index...index]
+            for a in answered where decisions[a.resolvedPath] == nil {
+                decisions[a.resolvedPath] = decision
+            }
+            index += answered.count
+        }
+        return decisions
+    }
 }
 
 // MARK: - Fan-out progress accumulator

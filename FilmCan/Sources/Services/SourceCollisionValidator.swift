@@ -13,3 +13,30 @@ enum SourceCollisionValidator {
             .map { ($0 as NSString).lastPathComponent }.sorted()
     }
 }
+
+/// Rejects a plan where two different source files resolve to the same destination
+/// file. Paths compare case- and normalization-insensitively, as on APFS and exFAT
+/// by default: "A001.MOV" and "a001.mov" are one file there.
+enum TargetPathValidator {
+    /// `targets`: one (source file, resolved destination file) per planned file.
+    /// Returns the clashing destination paths relative to `destRoot`, sorted.
+    static func collisions(targets: [(source: String, target: String)], destRoot: String) -> [String] {
+        var firstSourceByKey: [String: String] = [:]
+        var clashes = Set<String>()
+        for t in targets {
+            let key = (t.target as NSString).standardizingPath
+                .precomposedStringWithCanonicalMapping.lowercased()
+            if let other = firstSourceByKey[key] {
+                if other != t.source { clashes.insert(display(t.target, destRoot: destRoot)) }
+            } else {
+                firstSourceByKey[key] = t.source
+            }
+        }
+        return clashes.sorted()
+    }
+
+    private static func display(_ path: String, destRoot: String) -> String {
+        let root = destRoot.hasSuffix("/") ? destRoot : destRoot + "/"
+        return path.hasPrefix(root) ? String(path.dropFirst(root.count)) : path
+    }
+}

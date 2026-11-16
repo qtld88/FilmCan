@@ -264,6 +264,15 @@ enum OrganizationTemplate {
         return collapsed.isEmpty ? nil : collapsed
     }
 
+    /// A roll name typed by the user or assigned by numbering, as one folder name:
+    /// `folderNameAsWritten`, then no leading dot (a ".foo" roll folder would be
+    /// hidden in Finder). Nil when nothing usable is left (e.g. "..").
+    static func rollNameAsWritten(_ name: String) -> String? {
+        guard let clean = folderNameAsWritten(name) else { return nil }
+        let visible = String(clean.drop(while: { $0 == "." }))
+        return visible.isEmpty ? nil : visible
+    }
+
     private static func sanitizePathComponent(_ name: String) -> String? {
         if name == "." || name == ".." { return nil }
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_. ()")

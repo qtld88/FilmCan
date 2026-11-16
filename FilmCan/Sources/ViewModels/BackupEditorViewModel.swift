@@ -366,8 +366,9 @@ class BackupEditorViewModel: ObservableObject {
 
     func setRollNameOverride(_ name: String, for path: String) {
         let key = RollNumberer.cardKey(forPath: path)
-        let cleaned = name.replacingOccurrences(of: "/", with: "_")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // The name becomes one folder at every destination: same cleaning as the
+        // folder templates ("/" and ".." can never escape the destination).
+        let cleaned = OrganizationTemplate.rollNameAsWritten(name) ?? ""
         userEditedGenericCards.insert(key)
         autoWrittenGenericCards.remove(key)
         if cleaned.isEmpty {
@@ -1086,6 +1087,19 @@ class BackupEditorViewModel: ObservableObject {
                 showValidationError = true
                 return false
             }
+        }
+
+        // Several loose files would each open their own hash list in the same
+        // ascmhl/ folder, and the last one replaces the others. Quick Copy blocks
+        // this too (QuickCopyFormModel.Blocker.multipleFiles).
+        let looseFiles = config.includedSourcePaths.filter { path in
+            var isDir: ObjCBool = false
+            return fm.fileExists(atPath: path, isDirectory: &isDir) && !isDir.boolValue
+        }
+        if looseFiles.count > 1 {
+            validationMessage = "Several loose files can't be copied together yet — put them in a folder and add the folder, or copy the files one at a time."
+            showValidationError = true
+            return false
         }
 
         func normalizedPath(_ path: String) -> String {

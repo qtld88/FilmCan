@@ -21,6 +21,12 @@ enum UIStrings {
         static let sourceLabel = "Source"
         static let destinationLabel = "Destination"
         static let applyToAll = "Apply to all duplicates in this transfer"
+        static func applyToRemaining(_ n: Int) -> String {
+            n == 1 ? "Apply to this file only" : "Apply to this file and the \(n - 1) after it"
+        }
+        static func conflictCount(_ n: Int, current: Int) -> String {
+            "\(n) files are already at the destination — file \(current) of \(n):"
+        }
         static let skip = "Skip"
         static let verifyHashList = "Verify using hash list"
         static let overwrite = "Overwrite"
