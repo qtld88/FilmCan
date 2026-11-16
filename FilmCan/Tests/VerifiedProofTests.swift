@@ -11,7 +11,8 @@ final class VerifiedProofTests: XCTestCase {
     private let fm = FileManager.default
 
     override func setUpWithError() throws {
-        tmp = fm.temporaryDirectory.appendingPathComponent("proof-\(UUID().uuidString)")
+        // Resolved: the enumerator reports /private/var paths, not the /var symlink.
+        tmp = fm.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("proof-\(UUID().uuidString)")
         card = tmp.appendingPathComponent("CARD")
         dest = tmp.appendingPathComponent("dest")
         try fm.createDirectory(at: card, withIntermediateDirectories: true)
