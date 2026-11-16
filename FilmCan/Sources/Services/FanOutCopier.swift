@@ -213,6 +213,13 @@ actor FanOutCopier {
         #if DEBUG
         var _testForceDestReadHashNil: Bool = false
         var _testForceMHLAppendFailure: Bool = false
+        /// Source files (by last path component) whose copy-time read throws EIO
+        /// once the first chunk has been sent to the writers.
+        var _testSourceReadFailsFileNames: Set<String> = []
+        /// Source files whose paranoid source re-read yields no hash.
+        var _testNilSourceRereadFileNames: Set<String> = []
+        /// Source files whose paranoid source re-read yields a different hash.
+        var _testCorruptSourceRereadFileNames: Set<String> = []
         #endif
     }
 
@@ -1640,10 +1647,21 @@ actor FanOutCopier {
                 throw Error.sourceReadFailed("xxhash unavailable for \(sourcePath)")
             }
 
+            #if DEBUG
+            var chunksSent = 0
+            let failReadAfterFirstChunk = config._testSourceReadFailsFileNames
+                .contains(sourceURL.lastPathComponent)
+            #endif
             while true {
                 // User cancel: stop reading; channels are finished below so the
                 // writer tasks drain and abort before finalizing (no partial file).
                 if config.shouldCancel?() == true { break }
+                #if DEBUG
+                if failReadAfterFirstChunk && chunksSent >= 1 {
+                    throw POSIXError(.EIO)
+                }
+                chunksSent += 1
+                #endif
                 let readStart = DispatchTime.now()
                 guard let chunkData = try Self.readChunk(sourceHandle, upTo: chunkSz)
                 else { break }
@@ -1823,9 +1841,16 @@ actor FanOutCopier {
             }
 
             await emitSourceRereadProgress(read: 0)
-            let sourceHashFromDisk = await rereadHash(
+            var sourceHashFromDisk = await rereadHash(
                 url: c.sourceURL, chunkSz: c.chunkSz, perfKey: "source re-read",
                 onProgress: { read in await emitSourceRereadProgress(read: read) })
+            #if DEBUG
+            let seamName = c.sourceURL.lastPathComponent
+            if config._testNilSourceRereadFileNames.contains(seamName) { sourceHashFromDisk = nil }
+            if config._testCorruptSourceRereadFileNames.contains(seamName) {
+                sourceHashFromDisk = String(repeating: "0", count: 32)
+            }
+            #endif
             if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
                 corrupted = true
                 for r in c.writerResults where r.success {
