@@ -30,6 +30,16 @@
 	<string></string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>FilmCan sends notifications when backups complete or encounter errors, so you can work on other tasks without watching the transfer.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>FilmCan reads your camera cards and writes verified copies to your backup drives. Nothing leaves your Mac.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>FilmCan copies and verifies files on the network drives you pick as a source or a destination.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>FilmCan copies and verifies files in the Documents folders you pick as a source or a destination.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>FilmCan copies and verifies files in the Desktop folders you pick as a source or a destination.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>FilmCan copies and verifies files in the Downloads folders you pick as a source or a destination.</string>
 	<key>SUFeedURL</key>
 	<string>https://www.filmcan.eu/appcast.xml</string>
 	<key>SUPublicEDKey</key>

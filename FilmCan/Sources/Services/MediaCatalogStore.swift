@@ -30,7 +30,8 @@ final class MediaCatalogStore: ObservableObject {
             let data = try Data(contentsOf: fileURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            rolls = try decoder.decode([CatalogRoll].self, from: data)
+            rolls = MediaCatalog.mergingSameCards(
+                Self.groupingLegacyQuickCopy(try decoder.decode([CatalogRoll].self, from: data)))
         } catch {
             let stamp = Int(Date().timeIntervalSince1970)
             let quarantine = fileURL.deletingLastPathComponent()
@@ -38,6 +39,17 @@ final class MediaCatalogStore: ObservableObject {
             try? fm.moveItem(at: fileURL, to: quarantine)
             DebugLog.warn("Catalog unreadable, quarantined to \(quarantine.lastPathComponent): \(error)")
             rolls = []
+        }
+    }
+
+    /// Quick Copy used to file each run as its own project ("Quick Copy — <folder>");
+    /// the typed project was not recorded, so those rolls fold into one "Quick Copy".
+    nonisolated static func groupingLegacyQuickCopy(_ rolls: [CatalogRoll]) -> [CatalogRoll] {
+        rolls.map { roll in
+            guard roll.projectName.hasPrefix("Quick Copy — ") else { return roll }
+            var grouped = roll
+            grouped.projectName = "Quick Copy"
+            return grouped
         }
     }
 
@@ -61,6 +73,13 @@ final class MediaCatalogStore: ObservableObject {
 
     func forget(rollId: UUID) {
         rolls.removeAll { $0.id == rollId }
+        save()
+    }
+
+    /// Removes every roll recorded for one movie (used when the demo is stopped).
+    func forget(configId: UUID) {
+        guard rolls.contains(where: { $0.configId == configId }) else { return }
+        rolls.removeAll { $0.configId == configId }
         save()
     }
 
@@ -108,7 +127,10 @@ final class MediaCatalogStore: ObservableObject {
                 Self.listFiles(inRollFolder: listFolder)
             }.value
             let standardized = (sourcePath as NSString).standardizingPath
-            let roll = CatalogRoll(
+            let clipKeys = await Task.detached(priority: .utility) {
+                CardFingerprint.keys(forSource: standardized)
+            }.value
+            var roll = CatalogRoll(
                 configId: config.id,
                 projectName: config.name,
                 shootDay: config.day.isEmpty ? fallbackDay : config.day,
@@ -120,9 +142,16 @@ final class MediaCatalogStore: ObservableObject {
                 files: files,
                 copies: copies
             )
+            roll.clipKeys = clipKeys.isEmpty ? nil : clipKeys
             rolls = MediaCatalog.merge(roll, into: rolls)
         }
         if !order.isEmpty { save() }
+    }
+
+    /// Earlier copies of the card at `sourcePath`, found by its clips (not its name).
+    func earlierCopies(ofSource sourcePath: String, mediaKind: SourceMediaKind) -> [CatalogEarlierCopy] {
+        MediaCatalog.earlierCopies(ofClipKeys: CardFingerprint.keys(forSource: sourcePath),
+                                   mediaKind: mediaKind, in: rolls)
     }
 
     /// Currently mounted volume UUIDs.

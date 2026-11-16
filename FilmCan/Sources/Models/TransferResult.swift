@@ -43,6 +43,16 @@ struct TransferResult: Identifiable {
         return false
     }
 
+    /// Copied and checked at this destination: Fast (the written stream hashed
+    /// against the source) or Paranoid (the copy re-read from disk). The card seal
+    /// accepts both, like the Catalog's "verified" count; `wasVerified` stays
+    /// Paranoid-only for history and reports.
+    var isCheckedCopy: Bool {
+        guard success else { return false }
+        if wasVerified { return true }
+        return !destinationResults.isEmpty && destinationResults.allSatisfy { $0.verifyMode != .off }
+    }
+
     var isAlreadyAtDestinationAndVerified: Bool {
         success && wasVerified && isAlreadyAtDestination
     }

@@ -149,6 +149,27 @@ struct CopyResult: Sendable {
 // MARK: - FanOutCopier
 
 actor FanOutCopier {
+
+    /// One chunk of a source file, read inside its own autorelease pool.
+    ///
+    /// `FileHandle.read` returns autoreleased Data. The source read loop is async,
+    /// and its pool only drains when `channel.send` actually suspends — which never
+    /// happens while every destination is faster than the card. Without this pool,
+    /// every chunk read during the run stayed in memory (observed: >40 GB a few
+    /// minutes into a card copy to one fast SSD). The returned Data keeps its own
+    /// reference, so the chunk is freed as soon as the writers drop it.
+    static func readChunk(_ handle: FileHandle, upTo count: Int) throws -> Data? {
+        try autoreleasepool { () throws -> Data? in
+            if #available(macOS 10.15.4, *) {
+                guard let data = try handle.read(upToCount: count), !data.isEmpty else { return nil }
+                return data
+            } else {
+                let data = handle.readData(ofLength: count)
+                return data.isEmpty ? nil : data
+            }
+        }
+    }
+
     struct Configuration: Sendable {
         var sources: [String]
         var destinations: [DestWriter.Config]
@@ -230,6 +251,9 @@ actor FanOutCopier {
                 let req = FilmCanFormatters.bytes(required, style: .file)
                 return "Not enough space on \"\(dest)\" — needs \(req), only \(av) is writable right now. Finder may show more free space, but most of it is held by local snapshots or caches that couldn't be reclaimed. Free space (empty Trash, remove files, or delete snapshots) or pick another drive."
             case .destinationUnwritable(let path):
+                if let driveName = DriveUtilities.disconnectedDriveName(for: path) {
+                    return DriveUtilities.driveNotConnectedMessage(driveName: driveName)
+                }
                 return "Cannot write to \"\((path as NSString).lastPathComponent)\". Check the drive is connected and not read-only."
             case .duplicateSourceNames(let names):
                 return "Two or more sources resolve to the same destination folder: \(names.joined(separator: ", ")). Rename one so each lands in its own folder."
@@ -306,6 +330,12 @@ actor FanOutCopier {
     private func recordVerifyInFlight(destPath: String, bytesThisFile: Int64) -> Int64 {
         verifyInFlightByDest[destPath] = bytesThisFile
         return (verifiedBytesByDest[destPath] ?? 0) + bytesThisFile
+    }
+
+    /// Copy-phase emits must use this too, or they pull the green bar back while
+    /// the verify lane is mid-file.
+    private func verifyShownForDest(_ destPath: String) -> Int64 {
+        (verifiedBytesByDest[destPath] ?? 0) + (verifyInFlightByDest[destPath] ?? 0)
     }
 
     /// Resets in-flight verify bytes for `destPath` to 0 (call as the file's
@@ -1201,7 +1231,37 @@ actor FanOutCopier {
             }
         }
 
-        return config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
+        let results = config.destinations.compactMap { builders[$0.destPath]?.build(skipped: skippedByDest[$0.destPath] ?? 0) }
+        if !wasCancelled {
+            emitFinalComplete(results: results, bytesTotalByDest: bytesTotalByDest,
+                              filesTotalByDest: filesTotalByDest, skippedByDest: skippedByDest)
+        }
+        return results
+    }
+
+    /// One authoritative `.complete` per successful destination once everything
+    /// (copy, verify, MHL seal) is done. The per-file counters can miss the last
+    /// step (e.g. a file skipped on a duplicate conflict never counts), which left
+    /// the card at 99% with no Complete state.
+    private func emitFinalComplete(results: [DestResult],
+                                   bytesTotalByDest: [String: Int64],
+                                   filesTotalByDest: [String: Int],
+                                   skippedByDest: [String: Int]) {
+        for r in results where r.success {
+            guard let dest = config.destinations.first(where: { $0.destPath == r.destinationPath }) else { continue }
+            let total = bytesTotalByDest[dest.destPath] ?? 0
+            let files = filesTotalByDest[dest.destPath] ?? 0
+            var prog = DestProgress(
+                id: dest.destPath, displayName: dest.displayName,
+                status: .complete, bytesTotal: total, filesTotal: files,
+                verifyMode: dest.verifyMode)
+            prog.bytesCompleted = total
+            prog.filesCompleted = files
+            prog.verifyBytesTotal = dest.verifyMode == .off ? 0 : total
+            prog.verifyBytesCompleted = dest.verifyMode == .off ? 0 : total
+            prog.filesSkipped = skippedByDest[dest.destPath] ?? 0
+            config.progressHandler?(prog)
+        }
     }
 
     /// Single serial verify lane: pulls copied files in order and verifies each,
@@ -1412,7 +1472,6 @@ actor FanOutCopier {
                                         status: .active, bytesTotal: destBytesTotal,
                                         filesTotal: destFilesTotal, verifyMode: destCfg.verifyMode
                                     )
-                                    let paranoid = destCfg.verifyMode == .paranoid
                                     prog.bytesCompleted = copiedSoFar
                                     prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                                     prog.currentFile = sourceName
@@ -1422,12 +1481,12 @@ actor FanOutCopier {
                                     // single file, yellow fills first, then green fills behind
                                     // it — a visible two-phase copy→verify progression.
                                     prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
-                                    prog.verifyBytesCompleted = await self.verifiedBytesForDest(destCfg.destPath)
+                                    prog.verifyBytesCompleted = await self.verifyShownForDest(destCfg.destPath)
                                     let se = await self.combinedThroughputETA(
                                         destPath: destCfg.destPath,
                                         copyDoneNow: prog.bytesCompleted,
                                         copyTotal: destBytesTotal,
-                                        paranoid: paranoid,
+                                        verifyMode: destCfg.verifyMode,
                                         jobStart: jobStartTime)
                                     prog.speedBytesPerSecond = se.speed
                                     prog.estimatedTimeRemaining = se.eta
@@ -1511,23 +1570,24 @@ actor FanOutCopier {
                 let copiedAtDone = await self.recordFinalizedBytes(
                     destPath: destCfg.destPath, adding: sourceSize)
                 let isLastFile = await self.recordFileCompletion(destPath: destCfg.destPath, totalFiles: destFilesTotal)
-                let copyStatus: DestStatus = isLastFile ? .complete : .active
+                // With verify on, the verify lane still re-reads this file — only it
+                // may declare the destination complete.
+                let copyStatus: DestStatus = (isLastFile && destCfg.verifyMode == .off) ? .complete : .active
                 var prog = DestProgress(
                     id: destCfg.destPath, displayName: destCfg.displayName,
                     status: copyStatus, bytesTotal: destBytesTotal,
                     filesTotal: destFilesTotal, verifyMode: destCfg.verifyMode
                 )
-                let paranoidDone = destCfg.verifyMode == .paranoid
                 prog.bytesCompleted = copiedAtDone
                 prog.filesCompleted = await self.completedFilesForDest(destCfg.destPath)
                 prog.currentFile = sourceName
                 prog.verifyBytesTotal = destCfg.verifyMode == .off ? 0 : destBytesTotal
-                prog.verifyBytesCompleted = await self.verifiedBytesForDest(destCfg.destPath)
+                prog.verifyBytesCompleted = await self.verifyShownForDest(destCfg.destPath)
                 let se = await self.combinedThroughputETA(
                     destPath: destCfg.destPath,
                     copyDoneNow: prog.bytesCompleted,
                     copyTotal: destBytesTotal,
-                    paranoid: paranoidDone,
+                    verifyMode: destCfg.verifyMode,
                     jobStart: jobStartTime)
                 prog.speedBytesPerSecond = se.speed
                 prog.estimatedTimeRemaining = se.eta
@@ -1585,16 +1645,8 @@ actor FanOutCopier {
                 // writer tasks drain and abort before finalizing (no partial file).
                 if config.shouldCancel?() == true { break }
                 let readStart = DispatchTime.now()
-                let chunkData: Data
-                if #available(macOS 10.15.4, *) {
-                    guard let data = try sourceHandle.read(upToCount: chunkSz), !data.isEmpty
-                    else { break }
-                    chunkData = data
-                } else {
-                    let data = sourceHandle.readData(ofLength: chunkSz)
-                    if data.isEmpty { break }
-                    chunkData = data
-                }
+                guard let chunkData = try Self.readChunk(sourceHandle, upTo: chunkSz)
+                else { break }
                 IOPerfProbe.shared.record(
                     .sourceRead, key: "source",
                     nanos: DispatchTime.now().uptimeNanoseconds &- readStart.uptimeNanoseconds,
@@ -1740,34 +1792,46 @@ actor FanOutCopier {
                 )
             }
 
-            // Emit verify-start progress for each successful destination.
-            for r in c.writerResults where r.success {
-                let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
-                var prog = DestProgress(
-                    id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
-                    status: .active, bytesTotal: dTotal,
-                    filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: .paranoid
-                )
-                prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
-                prog.filesCompleted = await self.completedFilesForDest(r.destPath)
-                prog.verifyBytesTotal = dTotal
-                prog.verifyBytesCompleted = await self.verifiedBytesForDest(r.destPath)
-                prog.currentFile = "Verifying \(c.sourceName)…"
-                let se = await self.combinedThroughputETA(
-                    destPath: r.destPath, copyDoneNow: nil,
-                    copyTotal: dTotal, paranoid: r.verifyMode == .paranoid, jobStart: c.jobStartTime)
-                prog.speedBytesPerSecond = se.speed
-                prog.estimatedTimeRemaining = se.eta
-                prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
-                config.progressHandler?(prog)
+            @Sendable func emitSourceRereadProgress(read: Int64) async {
+                for r in c.writerResults where r.success {
+                    let dTotal = c.bytesTotalByDest[r.destPath] ?? c.totalBytesAllSources
+                    var prog = DestProgress(
+                        id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
+                        status: .active, bytesTotal: dTotal,
+                        filesTotal: c.filesTotalByDest[r.destPath] ?? c.totalSources, verifyMode: r.verifyMode
+                    )
+                    prog.bytesCompleted = await self.finalizedBytesForDest(r.destPath)
+                    prog.filesCompleted = await self.completedFilesForDest(r.destPath)
+                    prog.verifyBytesTotal = r.verifyMode == .off ? 0 : dTotal
+                    if r.verifyMode == .paranoid {
+                        prog.verifyBytesCompleted = await self.recordVerifyInFlight(
+                            destPath: r.destPath,
+                            bytesThisFile: Self.paranoidVerifyInFlight(
+                                pass: .sourceReread, bytesRead: read, fileSize: c.sourceSize))
+                    } else {
+                        prog.verifyBytesCompleted = await self.verifyShownForDest(r.destPath)
+                    }
+                    prog.currentFile = "Verifying \(c.sourceName)…"
+                    let se = await self.combinedThroughputETA(
+                        destPath: r.destPath, copyDoneNow: nil,
+                        copyTotal: dTotal, verifyMode: r.verifyMode, jobStart: c.jobStartTime)
+                    prog.speedBytesPerSecond = se.speed
+                    prog.estimatedTimeRemaining = se.eta
+                    prog.filesSkipped = c.skippedByDest[r.destPath] ?? 0
+                    self.config.progressHandler?(prog)
+                }
             }
 
-            let sourceHashFromDisk = await rereadHash(url: c.sourceURL, chunkSz: c.chunkSz, perfKey: "source re-read")
+            await emitSourceRereadProgress(read: 0)
+            let sourceHashFromDisk = await rereadHash(
+                url: c.sourceURL, chunkSz: c.chunkSz, perfKey: "source re-read",
+                onProgress: { read in await emitSourceRereadProgress(read: read) })
             if let diskHash = sourceHashFromDisk, diskHash != c.verifiedSourceHash {
                 corrupted = true
                 for r in c.writerResults where r.success {
                     try? fm.removeItem(atPath: r.writtenFilePath)
                     verifyFailed.insert(r.destPath)
+                    await self.clearVerifyInFlight(destPath: r.destPath)
                     // Flip the card to red now; the run also aborts with a corruption error.
                     var prog = DestProgress(
                         id: r.destPath, displayName: (r.destPath as NSString).lastPathComponent,
@@ -1793,6 +1857,9 @@ actor FanOutCopier {
             let verifyModeByDest: [String: VerifyMode] = Dictionary(
                 uniqueKeysWithValues: c.writerResults.map { ($0.destPath, $0.verifyMode) }
             )
+            for r in c.writerResults where !(r.success && r.filesTransferred > 0 && !verifyFailed.contains(r.destPath)) {
+                await self.clearVerifyInFlight(destPath: r.destPath)
+            }
             await withTaskGroup(of: (String, String?).self) { group in
                 for r in c.writerResults where r.success && r.filesTransferred > 0 && !verifyFailed.contains(r.destPath) {
                     let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
@@ -1808,8 +1875,12 @@ actor FanOutCopier {
                             url: destFileURL, chunkSz: c.chunkSz,
                             perfKey: (destPath as NSString).lastPathComponent,
                             onProgress: { read in
+                                let inFlight = mode == .paranoid
+                                    ? Self.paranoidVerifyInFlight(
+                                        pass: .destReread, bytesRead: read, fileSize: c.sourceSize)
+                                    : read
                                 let combined = await self.recordVerifyInFlight(
-                                    destPath: destPath, bytesThisFile: read)
+                                    destPath: destPath, bytesThisFile: inFlight)
                                 var prog = DestProgress(
                                     id: destPath,
                                     displayName: (destPath as NSString).lastPathComponent,
@@ -1822,7 +1893,7 @@ actor FanOutCopier {
                                 prog.currentFile = "Verifying \(c.sourceName)…"
                                 let se = await self.combinedThroughputETA(
                                     destPath: destPath, copyDoneNow: nil,
-                                    copyTotal: dTotal, paranoid: mode == .paranoid, jobStart: c.jobStartTime)
+                                    copyTotal: dTotal, verifyMode: mode, jobStart: c.jobStartTime)
                                 prog.speedBytesPerSecond = se.speed
                                 prog.estimatedTimeRemaining = se.eta
                                 prog.filesSkipped = c.skippedByDest[destPath] ?? 0
@@ -1872,7 +1943,7 @@ actor FanOutCopier {
                     prog.currentFile = hashMatchesExpected ? "✓ \(c.sourceName)" : "✗ \(c.sourceName)"
                     let se = await self.combinedThroughputETA(
                         destPath: destPath, copyDoneNow: nil,
-                        copyTotal: dTotal, paranoid: destVerifyMode == .paranoid, jobStart: c.jobStartTime)
+                        copyTotal: dTotal, verifyMode: destVerifyMode, jobStart: c.jobStartTime)
                     prog.speedBytesPerSecond = se.speed
                     prog.estimatedTimeRemaining = se.eta
                     prog.filesSkipped = c.skippedByDest[destPath] ?? 0
@@ -1892,7 +1963,7 @@ actor FanOutCopier {
     // Combined-throughput speed/ETA per destination.
     //
     // ETA = remaining combined work ÷ throughput. Total work is known up front
-    // (copy in fast; copy + verify ≈ 2x in paranoid — see `combinedWork`). Verify
+    // (copy + verify ≈ 2x when verifying, copy only when off — see `combinedWork`). Verify
     // overlaps copy via the pipeline and steals bandwidth in waves, so the raw rate
     // ripples; at low % with huge remaining those ripples become large ETA swings.
     //
@@ -1917,7 +1988,7 @@ actor FanOutCopier {
     /// verify emits). Reads live verified bytes from `verifiedBytesByDest`.
     private func combinedThroughputETA(
         destPath: String, copyDoneNow: Int64?, copyTotal: Int64,
-        paranoid: Bool, jobStart: Date
+        verifyMode: VerifyMode, jobStart: Date
     ) -> (speed: Double, eta: TimeInterval?) {
         if let c = copyDoneNow {
             copyDoneByDest[destPath] = max(copyDoneByDest[destPath] ?? 0, c)
@@ -1926,7 +1997,7 @@ actor FanOutCopier {
         let verifyDoneRaw = (verifiedBytesByDest[destPath] ?? 0) + (verifyInFlightByDest[destPath] ?? 0)
         let work = Self.combinedWork(
             copyDone: copyDone, copyTotal: copyTotal,
-            verifyDone: verifyDoneRaw, paranoid: paranoid)
+            verifyDone: verifyDoneRaw, verifyMode: verifyMode)
         let combinedDone = work.done
         let combinedTotal = work.total
         let now = Date()
@@ -1964,22 +2035,44 @@ actor FanOutCopier {
             raw: Double(db) / dt, alphaUp: emaAlphaUp, alphaDown: emaAlphaDown)
         etaSmoothedThroughputByDest[destPath] = smoothed
 
+        let inVerifyTail = verifyMode != .off && copyDone >= copyTotal
         let result = Self.computeCombinedSpeedETA(
             combinedDone: combinedDone, combinedTotal: combinedTotal,
-            copyTotal: copyTotal, throughput: smoothed)
+            copyTotal: copyTotal, throughput: smoothed,
+            verifyTailReadPasses: inVerifyTail ? (verifyMode == .paranoid ? 2 : 1) : nil)
         etaEmitByDest[destPath] = (now, result.speed, result.eta)
         return result
     }
 
-    /// Combined copy+verify work for the ETA model. Verify is counted in BOTH the
-    /// done and total figures only in paranoid mode; in fast mode it is excluded
-    /// from both (otherwise `done` inflates past `total` as verify trails copy).
+    /// Combined copy+verify work for the ETA model. Fast and Paranoid both run a
+    /// verify pass (Fast re-reads every destination), so verify counts in BOTH the
+    /// done and total figures; only `.off` is copy-only. Leaving it out made the
+    /// ETA hit zero at copy end and show "Estimating…" through a long verify tail.
     static func combinedWork(
-        copyDone: Int64, copyTotal: Int64, verifyDone: Int64, paranoid: Bool
+        copyDone: Int64, copyTotal: Int64, verifyDone: Int64, verifyMode: VerifyMode
     ) -> (done: Int64, total: Int64) {
-        let vDone: Int64 = paranoid ? verifyDone : 0
-        let vTotal: Int64 = paranoid ? copyTotal : 0
-        return (copyDone + vDone, copyTotal + vTotal)
+        guard verifyMode != .off else { return (copyDone, copyTotal) }
+        return (copyDone + verifyDone, copyTotal * 2)
+    }
+
+    enum ParanoidVerifyPass { case sourceReread, destReread }
+
+    /// Paranoid verifies a file in two serial passes (source re-read, then
+    /// destination re-read). Each pass fills half of the file's green-bar share,
+    /// so the bar and ETA keep moving during the source pass of a big file
+    /// instead of freezing until the destination pass starts.
+    static func paranoidVerifyInFlight(
+        pass: ParanoidVerifyPass, bytesRead: Int64, fileSize: Int64
+    ) -> Int64 {
+        let firstHalf = fileSize / 2
+        switch pass {
+        case .sourceReread:
+            return min(bytesRead, fileSize) / 2
+        case .destReread:
+            let secondHalf = fileSize - firstHalf
+            guard fileSize > 0 else { return 0 }
+            return firstHalf + Int64(Double(secondHalf) * Double(min(bytesRead, fileSize)) / Double(fileSize))
+        }
     }
 
     /// Asymmetric exponential moving average of throughput. First sample seeds the
@@ -2000,13 +2093,16 @@ actor FanOutCopier {
     /// `throughput` is the measured combined (copy+verify) bytes/sec. Speed =
     /// throughput ÷ verify factor (effective copy rate, predicts the verify
     /// slowdown). ETA = remaining combined work ÷ throughput (counts the verify
-    /// pass from the start).
+    /// pass from the start). Once copy is done (`verifyTailReadPasses` non-nil)
+    /// the effective copy rate means nothing, so speed is the raw read rate:
+    /// Paranoid reads each verified byte twice (source + dest passes).
     static func computeCombinedSpeedETA(
-        combinedDone: Int64, combinedTotal: Int64, copyTotal: Int64, throughput: Double
+        combinedDone: Int64, combinedTotal: Int64, copyTotal: Int64, throughput: Double,
+        verifyTailReadPasses: Int? = nil
     ) -> (speed: Double, eta: TimeInterval?) {
         guard throughput > 0, combinedDone > 0, copyTotal > 0 else { return (0, nil) }
         let verifyFactor = Double(combinedTotal) / Double(copyTotal)
-        let speed = throughput / verifyFactor
+        let speed = verifyTailReadPasses.map { throughput * Double($0) } ?? throughput / verifyFactor
         let remaining = combinedTotal - combinedDone
         let eta = remaining > 0 ? Double(remaining) / throughput : nil
         return (speed, eta)

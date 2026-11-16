@@ -197,7 +197,7 @@ extension DriveSpeedClassifier {
         return prop >= 5_000_000_000 ? .usb3plus : .usb2
     }
 
-    private static func bsdNameForVolume(url: URL) -> String? {
+    static func bsdNameForVolume(url: URL) -> String? {
         var fsInfo = statfs()
         guard statfs(url.path, &fsInfo) == 0 else { return nil }
         let mntfromname = withUnsafePointer(to: &fsInfo.f_mntfromname) {

@@ -105,6 +105,9 @@ class ConfigurationStorage: ObservableObject {
         let configurations: [BackupConfiguration]
         let transferHistory: [TransferHistoryEntry]
         let lastUsedConfigId: UUID?
+        /// Each exported movie's own settings (absent in exports made before movies
+        /// owned their settings).
+        var filmPresets: [OrganizationPreset]? = nil
     }
     
     private init() {
@@ -145,12 +148,40 @@ class ConfigurationStorage: ObservableObject {
     
     func delete(_ config: BackupConfiguration) {
         configurations.removeAll { $0.id == config.id }
+        organizationPresets = FilmPresetOwnership.removingCopies(ownedBy: config.id, from: organizationPresets)
         save()
     }
     
     func delete(at indexSet: IndexSet) {
+        let removed = indexSet.filter { configurations.indices.contains($0) }.map { configurations[$0].id }
         configurations.remove(atOffsets: indexSet)
+        for id in removed {
+            organizationPresets = FilmPresetOwnership.removingCopies(ownedBy: id, from: organizationPresets)
+        }
         save()
+    }
+
+    /// Gives every film that still points at a shared preset its own copy.
+    /// Does nothing (and writes nothing) when every film already owns its settings.
+    @discardableResult
+    func adoptPresetCopies() -> Bool {
+        let adoption = FilmPresetOwnership.adopt(configurations: configurations, presets: organizationPresets)
+        guard adoption.changed else { return false }
+        organizationPresets = adoption.presets
+        configurations = adoption.configurations
+        return true
+    }
+
+    /// The one-time "movies only" migration (see `FilmPresetOwnership.migrateToFilmsOnly`).
+    /// Writes nothing; returns whether anything changed.
+    @discardableResult
+    func migrateToFilmsOnly() -> Bool {
+        let result = FilmPresetOwnership.migrateToFilmsOnly(
+            configurations: configurations, presets: organizationPresets)
+        guard result.changed else { return false }
+        organizationPresets = result.presets
+        configurations = result.configurations
+        return true
     }
 
     func moveConfig(from sourceId: UUID, to destinationId: UUID) {
@@ -206,6 +237,7 @@ class ConfigurationStorage: ObservableObject {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        var configsLoaded = false
         if let loadedConfigs: [BackupConfiguration] = decodeWithFallback(
             type: [BackupConfiguration].self,
             primaryURL: configFileURL,
@@ -213,6 +245,7 @@ class ConfigurationStorage: ObservableObject {
             decoder: decoder
         ) {
             configurations = loadedConfigs
+            configsLoaded = true
         } else if fileManager.fileExists(atPath: configFileURL.path) {
             quarantine(configFileURL)
             noteLoadFailure("configs.json")
@@ -259,6 +292,12 @@ class ConfigurationStorage: ObservableObject {
             transferHistory = []
         }
         seedTotalTransferCountIfNeeded()
+        // Movies only: each movie keeps its own settings record, shared presets go
+        // (after every movie pointing at one got its own copy), and so do records of
+        // movies that no longer exist. Skipped when the movies did not load: every
+        // record would look orphaned. `save` refuses to write while a quarantined file
+        // is unresolved.
+        if configsLoaded, migrateToFilmsOnly() { save() }
 
         // Load last used
         if let lastUsedIdString = userDefaults.string(forKey: lastUsedKey),
@@ -356,33 +395,7 @@ class ConfigurationStorage: ObservableObject {
         set { userDefaults.set(newValue, forKey: lastDestKey) }
     }
 
-    // MARK: - Organization Presets
-
-    func addPreset(_ preset: OrganizationPreset) {
-        organizationPresets.append(preset)
-        save()
-    }
-
-    func updatePreset(_ preset: OrganizationPreset) {
-        if let index = organizationPresets.firstIndex(where: { $0.id == preset.id }) {
-            organizationPresets[index] = preset
-            save()
-        }
-    }
-
-    func deletePreset(_ preset: OrganizationPreset) {
-        organizationPresets.removeAll { $0.id == preset.id }
-        save()
-    }
-
     // MARK: - Import / Export
-
-    func exportPresetsData() throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(organizationPresets)
-    }
 
     func exportMoviesHistoryData() throws -> Data {
         let allIds = Set(configurations.map(\.id))
@@ -401,25 +414,10 @@ class ConfigurationStorage: ObservableObject {
         let payload = MoviesHistoryExport(
             configurations: filteredConfigs,
             transferHistory: filteredHistory,
-            lastUsedConfigId: filteredLastUsed
+            lastUsedConfigId: filteredLastUsed,
+            filmPresets: organizationPresets.filter { $0.ownerFilmId.map(configIds.contains) ?? false }
         )
         return try encoder.encode(payload)
-    }
-
-    func importPresets(from data: Data) throws {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let incoming = try decoder.decode([OrganizationPreset].self, from: data)
-        var updated = organizationPresets
-        for preset in incoming {
-            if let index = updated.firstIndex(where: { $0.id == preset.id }) {
-                updated[index] = preset
-            } else {
-                updated.append(preset)
-            }
-        }
-        organizationPresets = updated
-        save()
     }
 
     func importMoviesHistory(from data: Data, retentionLimit: Int) throws {
@@ -438,7 +436,8 @@ class ConfigurationStorage: ObservableObject {
         let filteredPayload = MoviesHistoryExport(
             configurations: filteredConfigs,
             transferHistory: filteredHistory,
-            lastUsedConfigId: filteredLastUsed
+            lastUsedConfigId: filteredLastUsed,
+            filmPresets: payload.filmPresets?.filter { $0.ownerFilmId.map(selectedConfigIds.contains) ?? false }
         )
         applyMoviesHistoryImport(filteredPayload, retentionLimit: retentionLimit)
     }
@@ -448,6 +447,7 @@ class ConfigurationStorage: ObservableObject {
     }
 
     private func decodeMoviesHistoryPayload(from data: Data) throws -> MoviesHistoryExport {
+        if MovieSettingsFile.looksLikeOldPresetsFile(data) { throw MovieSettingsFile.ImportError.presetsFile }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(MoviesHistoryExport.self, from: data)
@@ -463,6 +463,18 @@ class ConfigurationStorage: ObservableObject {
             }
         }
         configurations = updatedConfigs
+
+        // The movies' own settings come with them.
+        let importedIds = Set(payload.configurations.map(\.id))
+        var updatedPresets = organizationPresets
+        for preset in payload.filmPresets ?? [] where preset.ownerFilmId.map(importedIds.contains) ?? false {
+            if let index = updatedPresets.firstIndex(where: { $0.id == preset.id }) {
+                updatedPresets[index] = preset
+            } else {
+                updatedPresets.append(preset)
+            }
+        }
+        organizationPresets = updatedPresets
 
         var updatedHistory = transferHistory
         for entry in payload.transferHistory {
@@ -484,6 +496,7 @@ class ConfigurationStorage: ObservableObject {
         }
 
         seedTotalTransferCountIfNeeded()
+        adoptPresetCopies()
         save()
     }
 

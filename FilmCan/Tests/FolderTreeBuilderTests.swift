@@ -52,4 +52,21 @@ final class FolderTreeBuilderTests: XCTestCase {
         XCTAssertEqual(lines.map(\.name), ["A001"])
         XCTAssertEqual(lines.first?.role, .copiedFolder)
     }
+
+    func test_rollName_replacesTheCardName() {
+        var o = FolderTreeBuilder.Options()
+        o.pathExists = { _ in false }
+        let sources = [FolderTreeBuilder.Source(path: "/Volumes/Untitled", isDirectory: true, rollName: "Untitled_01")]
+        let lines = FolderTreeBuilder.lines(for: "/Volumes/SSD", sources: sources, options: o)
+        XCTAssertEqual(lines.map(\.name), ["Untitled_01"])
+        XCTAssertEqual(lines.first?.role, .copiedFolder)
+    }
+
+    func test_rollName_inContentsMode_keepsTheRollFolder() {
+        let sources = [FolderTreeBuilder.Source(path: "/Volumes/Untitled", isDirectory: true, rollName: "Untitled_01")]
+        let lines = FolderTreeBuilder.lines(for: "/Volumes/SSD", sources: sources,
+                                            options: options(copyContents: true))
+        XCTAssertTrue(lines.contains { $0.name == "Untitled_01" && $0.role == .copiedFolder })
+        XCTAssertFalse(lines.contains { $0.role == .contents })
+    }
 }

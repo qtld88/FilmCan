@@ -2,20 +2,6 @@ import SwiftUI
 import Foundation
 
 extension BackupEditorView {
-    private var selectedOrganizationPresetName: String {
-        let presets = viewModel.organizationPresets
-        if let id = viewModel.selectedOrganizationPresetId,
-           let preset = presets.first(where: { $0.id == id }) {
-            return preset.name
-        }
-        return "Off"
-    }
-
-    private var selectedPresetDifferences: [PresetDifference] {
-        guard let preset = selectedOrganizationPreset else { return [] }
-        return viewModel.config.differences(from: preset)
-    }
-
     var selectedOrganizationPreset: OrganizationPreset? {
         let presets = viewModel.organizationPresets
         guard let id = viewModel.selectedOrganizationPresetId else { return nil }
@@ -36,8 +22,9 @@ extension BackupEditorView {
     }
 
     var previewShootMetadata: ShootMetadata {
-        ShootMetadata(episode: viewModel.episode, day: viewModel.day,
-                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat)
+        ShootMetadata(episode: viewModel.episode, day: viewModel.effectiveShootDay(),
+                      unit: viewModel.unit, cameraFormat: viewModel.cameraFormat,
+                      movie: viewModel.config.name)
     }
 
     var effectiveOrganizationPreset: OrganizationPreset? {
@@ -64,21 +51,6 @@ extension BackupEditorView {
         viewModel.selectedOrganizationPresetId == nil
     }
 
-    private var selectedPresetBinding: Binding<OrganizationPreset>? {
-        guard let id = viewModel.selectedOrganizationPresetId,
-              let index = viewModel.organizationPresets.firstIndex(where: { $0.id == id }) else { return nil }
-        return Binding(
-            get: { viewModel.organizationPresets[index] },
-            set: { newValue in
-                var presets = viewModel.organizationPresets
-                if index < presets.count {
-                    presets[index] = newValue
-                    viewModel.organizationPresets = presets
-                }
-            }
-        )
-    }
-
     private func hasCustomFilterPatterns(_ preset: OrganizationPreset) -> Bool {
         SourceFilterMatching.hasCustomFilterPatterns(
             include: preset.includePatterns,
@@ -87,17 +59,6 @@ extension BackupEditorView {
         )
     }
 
-    private func startEditingPresetName() {
-        isEditingPresetName = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            isPresetNameFocused = true
-        }
-    }
-
-    private func finishEditingPresetName() {
-        isEditingPresetName = false
-        isPresetNameFocused = false
-    }
     
     private func optionRow(
         icon: String,
@@ -175,231 +136,157 @@ extension BackupEditorView {
         .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
 
+    /// The movie settings, stacked: the preset menu, then one folding group per area
+    /// (Basic, Source, Destinations, Logs), each opened or closed on its title.
     func optionsSection() -> some View {
-        optionsTabCard
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear { optionsAvailableWidth = proxy.size.width }
-                        .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
-                }
-            )
-            .padding(.horizontal, optionsHorizontalPadding)
-    }
-
-    private var optionsTabCard: some View {
-        let isWide = effectiveOptionsWidth >= 600
-        return VStack(alignment: .leading, spacing: isOptionsCollapsed ? 0 : 16) {
-            optionsTabBar
-            // Keep the tab content mounted and just hide it (height 0) when collapsed.
-            // The Destinations tab carries the heavy organization editor (TextEditor-
-            // backed pattern editors, 26 draggable token chips); mounting/unmounting it
-            // on every open/close was the slowness. Staying mounted makes toggling free.
-            VStack(alignment: .leading, spacing: 16) {
-                Divider()
-                    .background(FilmCanTheme.cardStroke)
-                optionsTabContent
+        VStack(alignment: .leading, spacing: 0) {
+            presetSelector
+                .padding(.horizontal, MovieSettingsSections.contentInset)
+                .padding(.bottom, 12)
+            Divider().background(FilmCanTheme.cardStroke)
+            ForEach(OptionsTab.allCases) { tab in
+                settingsGroup(tab)
+                Divider().background(FilmCanTheme.cardStroke)
             }
-            .frame(height: isOptionsCollapsed ? 0 : nil, alignment: .top)
-            .clipped()
-            .opacity(isOptionsCollapsed ? 0 : 1)
-            .allowsHitTesting(!isOptionsCollapsed)
         }
-        .onAppear { if selectedOptionsTab == .destinations { scheduleDestinationsLoad() } }
-        .onChange(of: selectedOptionsTab) { if $0 == .destinations { scheduleDestinationsLoad() } }
-        .fcCardSurface(role: .settings)
-        .frame(minWidth: isWide ? 600 : nil, maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { optionsAvailableWidth = proxy.size.width }
+                    .onChange(of: proxy.size.width) { optionsAvailableWidth = $0 }
+            }
+        )
+        .onAppear { if isGroupOpen(.destinations) { scheduleDestinationsLoad() } }
     }
 
-    private var optionsTabBar: some View {
-        let isWide = effectiveOptionsWidth >= 600
-        return Group {
-            if isWide {
+    func isGroupOpen(_ tab: OptionsTab) -> Bool {
+        MovieSettingsSections.isOpen(tab.sectionKey, stored: openSettingsGroups)
+    }
+
+    private func toggleGroup(_ tab: OptionsTab) {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            openSettingsGroups = MovieSettingsSections.toggling(tab.sectionKey, in: openSettingsGroups)
+        }
+        if isGroupOpen(.destinations) { scheduleDestinationsLoad() }
+    }
+
+    @ViewBuilder
+    private func settingsGroup(_ tab: OptionsTab) -> some View {
+        let open = isGroupOpen(tab)
+        VStack(alignment: .leading, spacing: 0) {
+            Button { toggleGroup(tab) } label: {
                 HStack(spacing: 8) {
-                    ForEach(availableOptionsTabs) { tab in
-                        let isSelected = selectedOptionsTab == tab
-                        Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(tab.shortTitle)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(FilmCanTheme.textTertiary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                        .frame(width: 12)
+                    Text(tab.shortTitle)
+                        .font(FCType.itemTitle)
+                        .foregroundColor(open ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
                     Spacer(minLength: 0)
-                    presetSelector
                 }
-                .tourAnchor("optionsTabs")
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(availableOptionsTabs) { tab in
-                        let isSelected = selectedOptionsTab == tab
-                        Button {
-                            if isSelected {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    isOptionsCollapsed.toggle()
-                                }
-                            } else {
-                                selectedOptionsTab = tab
-                                if isOptionsCollapsed {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        isOptionsCollapsed = false
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(tab.shortTitle)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                                .foregroundColor(isSelected ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? FilmCanTheme.card : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isSelected ? FilmCanTheme.cardStrokeStrong : FilmCanTheme.cardStroke, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    presetSelector
-                }
-                .tourAnchor("optionsTabs")
-            }
-        }
-    }
-
-    private var presetSelector: some View {
-        HStack(spacing: 8) {
-            Text("Preset:")
-                .font(.subheadline)
-                .foregroundColor(FilmCanTheme.textSecondary)
-            Menu {
-                Button("Off") {
-                    viewModel.applyOffOrganizationSettings()
-                    expandOptionsIfNeeded()
-                }
-                Button("Netflix Ingest (built-in)") {
-                    viewModel.applyNetflixIngestPreset()
-                    expandOptionsIfNeeded()
-                }
-                ForEach(viewModel.organizationPresets) { preset in
-                    Button(preset.name) {
-                        viewModel.applyPreset(preset)
-                        expandOptionsIfNeeded()
-                    }
-                }
-                Divider()
-                Button("Create new preset") {
-                    viewModel.saveCurrentSettingsAsPreset()
-                    expandOptionsIfNeeded()
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(selectedOrganizationPresetName)
-                    if !selectedPresetDifferences.isEmpty {
-                        Text("(modified)")
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                            .help(selectedPresetDifferences.map(\.summary).joined(separator: "\n"))
-                    }
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(FilmCanTheme.card)
-                .cornerRadius(6)
+                .padding(.horizontal, MovieSettingsSections.contentInset)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(tab.shortTitle)
+            .accessibilityValue(open ? "Open" : "Closed")
+            .help(open ? "Close \(tab.shortTitle)" : "Open \(tab.shortTitle)")
 
-            if let presetBinding = selectedPresetBinding {
-                if isEditingPresetName {
-                    TextField("Preset name", text: presetBinding.name)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($isPresetNameFocused)
-                        .onSubmit { finishEditingPresetName() }
-                        .onChange(of: isPresetNameFocused) { focused in
-                            if !focused { finishEditingPresetName() }
-                        }
-                        .frame(width: 160)
-                } else {
-                    Button(action: { startEditingPresetName() }) {
-                        Image(systemName: "pencil")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                }
-
-                Button(role: .destructive) {
-                    viewModel.deleteOrganizationPreset(id: presetBinding.wrappedValue.id)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .help("Delete preset")
-            }
-        }
-        .help("Presets auto-update when you make any change.")
-    }
-
-    private func expandOptionsIfNeeded() {
-        guard isOptionsCollapsed else { return }
-        withAnimation(.easeInOut(duration: 0.15)) {
-            isOptionsCollapsed = false
+            groupContent(tab)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, MovieSettingsSections.contentInset)
+                .padding(.bottom, open ? 14 : 0)
+                .frame(height: open ? nil : 0, alignment: .top)
+                .clipped()
+                .opacity(open ? 1 : 0)
+                .allowsHitTesting(open)
+                .accessibilityHidden(!open)
         }
     }
 
     @ViewBuilder
-    private var optionsTabContent: some View {
-        ZStack(alignment: .topLeading) {
-            // Light tabs build on demand (cheap).
-            if selectedOptionsTab != .destinations {
-                nonDestinationsContent
+    private func groupContent(_ tab: OptionsTab) -> some View {
+        switch tab {
+        case .basic:
+            if isGroupOpen(.basic) {
+                BasicOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
             }
-            // Destinations carries the heavy organization editor. Its first-display
-            // build + AppKit constraint layout is the felt nav lag, so mounting is
-            // deferred one runloop (scheduleDestinationsLoad) — the tab highlights and
-            // this spinner paint instantly, then the heavy form fades in next frame.
-            if selectedOptionsTab == .destinations && !didLoadDestinations {
-                destinationsLoadingPlaceholder
+        case .source:
+            if isGroupOpen(.source) {
+                SourceOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
             }
-            // Build it once on first visit and keep it mounted (height 0 when not
-            // selected) so later tab switches and open/close toggles don't re-pay
-            // the mount/teardown cost.
+        case .logs:
+            if isGroupOpen(.logs) {
+                LogsOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
+            }
+        case .destinations:
+            // Destinations carries the heavy organization editor: built one runloop after
+            // it is first opened (spinner meanwhile), then kept mounted so folding it
+            // closed and open again costs nothing.
             if didLoadDestinations {
                 DestinationsOptionsView(model: organizationModel, viewModel: viewModel, availableWidth: effectiveOptionsWidth, destinationCount: viewModel.destinations.count)
-                    .frame(height: selectedOptionsTab == .destinations ? nil : 0, alignment: .top)
-                    .clipped()
-                    .opacity(selectedOptionsTab == .destinations ? 1 : 0)
-                    .allowsHitTesting(selectedOptionsTab == .destinations)
+            } else if isGroupOpen(.destinations) {
+                destinationsLoadingPlaceholder
             }
         }
+    }
+
+    /// Folder organization on/off, the Netflix Ingest model and the settings export.
+    private var presetSelector: some View {
+        HStack(spacing: 12) {
+            Toggle("Organize folders", isOn: Binding(
+                get: { viewModel.folderOrganizationIsOn },
+                set: { on in
+                    viewModel.setFolderOrganization(on)
+                    if on { expandOptionsIfNeeded() }
+                }))
+                .toggleStyle(.switch)
+                .help("On: this movie creates folders and names files from its own settings. Off: it copies as is; its settings are kept aside.")
+            Button("Use Netflix Ingest folders") { confirmNetflixIngest = true }
+                .help("Replaces this movie's folder and naming settings with the Netflix Ingest ones.")
+            Button("Export Settings\u{2026}") { exportMovieSettings() }
+                .help("Saves this movie's settings to a file another movie can start from.")
+            Spacer(minLength: 0)
+        }
+        .alert("Use Netflix Ingest folders?", isPresented: $confirmNetflixIngest) {
+            Button("Replace", role: .destructive) {
+                viewModel.applyNetflixIngestPreset()
+                expandOptionsIfNeeded()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Replaces this movie's folder and naming settings.")
+        }
+        .fileExporter(
+            isPresented: $showSettingsExport,
+            document: settingsExportDocument,
+            contentType: MovieSettingsFile.contentType,
+            defaultFilename: viewModel.config.name
+        ) { result in
+            if case .failure(let error) = result {
+                viewModel.validationMessage = "Failed to export settings: \(error.localizedDescription)"
+                viewModel.showValidationError = true
+            }
+        }
+    }
+
+    private func exportMovieSettings() {
+        do {
+            settingsExportDocument = JSONExportDocument(
+                data: try AppState.shared.settingsFileData(for: viewModel.config))
+            showSettingsExport = true
+        } catch {
+            viewModel.validationMessage = "Failed to export settings: \(error.localizedDescription)"
+            viewModel.showValidationError = true
+        }
+    }
+
+    private func expandOptionsIfNeeded() {
+        if !isMovieSettingsShown { openMovieSettings() }
     }
 
     private var destinationsLoadingPlaceholder: some View {
@@ -420,34 +307,10 @@ extension BackupEditorView {
         DispatchQueue.main.async { didLoadDestinations = true }
     }
 
-    @ViewBuilder
-    private var nonDestinationsContent: some View {
-        switch selectedOptionsTab {
-        case .basic:
-            BasicOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
-        case .source:
-            SourceOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
-        case .logs:
-            LogsOptionsView(viewModel: viewModel, availableWidth: effectiveOptionsWidth)
-        case .destinations:
-            EmptyView()
-        }
-    }
-
-    private var availableOptionsTabs: [OptionsTab] {
-        OptionsTab.allCases
-    }
-
-    private var optionsHorizontalPadding: CGFloat {
-        let width = effectiveOptionsWidth
-        if width <= 0 { return 24 }
-        let padding = width * 0.05
-        return min(50, max(10, padding))
-    }
-
+    /// Width the rows of a group may use: inside the group's inset, never the panel's
+    /// outer width (sizing rows from the outer width pushed them past the edge).
     private var effectiveOptionsWidth: CGFloat {
-        let historyWidth = isHistoryVisible ? historyPanelWidth : 0
-        return max(0, optionsAvailableWidth - historyWidth)
+        MovieSettingsSections.contentWidth(panelWidth: optionsAvailableWidth)
     }
 
     private func resolvedTextWidth(_ base: CGFloat) -> CGFloat {
@@ -468,19 +331,29 @@ extension BackupEditorView {
         return min(base, maxForMenu)
     }
 
-    var nameRow: some View {
+    func nameRow(runSubtitle: String) -> some View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 if isEditingName {
-                    TextField("Backup name", text: $viewModel.name)
-                        .textFieldStyle(.plain)
-                        .focused($isNameFocused)
+                    // A bare TextField takes all the free width and pushes the day
+                    // stepper to the far right. Size it to its text instead, using a
+                    // hidden copy of the name, so the stepper stays next to the title.
+                    Text(viewModel.name.isEmpty ? "Backup name" : viewModel.name)
                         .font(FilmCanFont.title(24))
-                        .foregroundColor(FilmCanTheme.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .onSubmit { confirmEditingName(shouldAdvanceTour: true) }
-                        .onChange(of: isNameFocused) { focused in
-                            if !focused { confirmEditingName() }
+                        .lineLimit(1)
+                        .padding(.trailing, 12)
+                        .hidden()
+                        .overlay(alignment: .leading) {
+                            TextField("Backup name", text: $viewModel.name)
+                                .textFieldStyle(.plain)
+                                .focused($isNameFocused)
+                                .font(FilmCanFont.title(24))
+                                .foregroundColor(FilmCanTheme.textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .onSubmit { confirmEditingName(shouldAdvanceTour: true) }
+                                .onChange(of: isNameFocused) { focused in
+                                    if !focused { confirmEditingName() }
+                                }
                         }
                 } else {
                     Text(viewModel.name.isEmpty ? "Untitled Backup" : viewModel.name)
@@ -493,7 +366,14 @@ extension BackupEditorView {
                 }
             }
             .tourAnchor("backupName")
-            
+
+            if ShootDayStepper.usesShootDay(previewOrganizationPreset) {
+                ShootDayStepperView(day: viewModel.effectiveShootDay()) { newDay in
+                    viewModel.setShootDayFromHeader(newDay)
+                }
+                .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
+            }
+
             Spacer()
 
             if let customDateStatusText {
@@ -520,7 +400,15 @@ extension BackupEditorView {
             .cornerRadius(8)
             .help("Refresh drives")
 
-            Button("Run Now") { startTransfer() }
+            Button(action: { startTransfer() }) {
+                VStack(spacing: 1) {
+                    Text("Run Now")
+                    Text(runSubtitle)
+                        .font(FilmCanFont.body(10))
+                        .opacity(0.75)
+                        .lineLimit(1)
+                }
+            }
             .buttonStyle(FCPrimaryButtonStyle())
             .disabled(transferViewModel.isTransferActive(for: viewModel.config.id))
         }

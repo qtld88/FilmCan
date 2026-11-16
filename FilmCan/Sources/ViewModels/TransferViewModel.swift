@@ -95,8 +95,12 @@ class TransferViewModel: ObservableObject {
     
     /// `organizationPresetOverride`: a fully-built preset for this run (Quick Copy).
     /// When nil the preset is resolved from the config + stored presets as usual.
+    /// `recordAs`: the saved film a Quick Copy run is filed under in history and the
+    /// catalog. Only the records carry it — the run itself keeps the temporary config,
+    /// because a stored id would make the lookup below swap in the film's own sources.
     func startTransfer(config: BackupConfiguration,
-                       organizationPresetOverride: OrganizationPreset? = nil) async {
+                       organizationPresetOverride: OrganizationPreset? = nil,
+                       recordAs: (id: UUID, name: String)? = nil) async {
         if !isBackgroundWorker, isTransferring, activeConfigId != config.id {
             startConcurrentTransfer(config: config)
             return
@@ -109,11 +113,19 @@ class TransferViewModel: ObservableObject {
         // Roll numbers and the shoot day are fixed before anything else reads the config,
         // and saved before the copy starts, so a cancelled run resumes into the same roll.
         let activeConfig = applyRollNumberingAndDay(to: storedConfig.restrictedToIncluded())
+            .withGenericRollNames(keyFor: { RollNumberer.cardKey(forPath: $0) })
         self.config = activeConfig
         activeConfigId = activeConfig.id
+        // Every run (main, concurrent worker, Quick Copy) passes here: hold its drives
+        // so neither the app nor Finder can eject them until the run has fully ended.
+        let volumeLease = VolumesInUse.shared.acquire(
+            paths: activeConfig.sourcePaths + activeConfig.destinationPaths)
+        defer { VolumesInUse.shared.release(volumeLease) }
         if !isBackgroundWorker {
             activeTransferConfigIds.insert(activeConfig.id)
             tabProgressByConfig[activeConfig.id] = 0
+            progressBinding?.cancel()
+            progressBinding = trackTabProgress(of: progress, configId: activeConfig.id)
         }
         captureDriveSnapshot(paths: activeConfig.sourcePaths + activeConfig.destinationPaths)
         verifiedDestinationsByConfig.removeValue(forKey: activeConfig.id)
@@ -192,9 +204,21 @@ class TransferViewModel: ObservableObject {
                 ? destinations.map { [$0] }
                 : [destinations]
 
+            // Speed note after the copy: only for a movie's own run (not Quick Copy).
+            let measuresSpeed = recordAs == nil
+                && AppState.shared.storage.configurations.contains(where: { $0.id == activeConfig.id })
+            if measuresSpeed { SpeedNoteStore.shared.set(nil, for: activeConfig.id) }
+            let runStart = Date()
+            let promptsBefore = promptsAsked
+            var passSeconds: [String: TimeInterval] = [:]
+
             var perDestResults: [TransferResult] = []
             for group in destinationGroups {
                 if isCancellingAll { break }
+                let passStart = Date()
+                defer {
+                    if group.count == 1 { passSeconds[group[0]] = Date().timeIntervalSince(passStart) }
+                }
                 let fanOutResult = await runFanOut(
                     destinations: group,
                     sources: sources,
@@ -218,6 +242,37 @@ class TransferViewModel: ObservableObject {
                 preset: organizationPreset
             )
 
+            let wallSeconds = Date().timeIntervalSince(runStart)
+            let cancelled = isCancellingAll || perDestResults.count < destinations.count
+            if measuresSpeed, !cancelled, promptsAsked == promptsBefore,
+               !perDestResults.isEmpty, perDestResults.allSatisfy({ $0.success }),
+               (perDestResults.map(\.bytesTransferred).max() ?? 0) >= SpeedNote.minBytes {
+                let results = perDestResults.map { (path: $0.destination, bytes: $0.bytesTransferred, success: $0.success) }
+                let rereads = activeConfig.engineOptions.verificationMode == .paranoid
+                let sequential = copySequentially
+                let seconds = passSeconds
+                let configId = activeConfig.id
+                let sourcePaths = sources
+                // Drive facts read off the main thread: a slow volume must not stall the window.
+                let note = await Task.detached(priority: .utility) { () -> String? in
+                    let measure = SpeedRunMeasure(
+                        sources: sourcePaths.map { SpeedAdviceProbe.drive(path: $0, role: .source) },
+                        destinations: results.map { result in
+                            SpeedRunMeasure.Dest(
+                                drive: SpeedAdviceProbe.drive(path: result.path, role: .destination),
+                                bytes: result.bytes,
+                                seconds: sequential ? (seconds[result.path] ?? 0) : 0,
+                                success: result.success)
+                        },
+                        sequential: sequential,
+                        wallSeconds: wallSeconds,
+                        rereads: rereads,
+                        cancelled: false)
+                    return SpeedNote.sentence(for: measure)
+                }.value
+                SpeedNoteStore.shared.set(note, for: configId)
+            }
+
             // Re-run of an already-complete backup: every destination skipped
             // every file (nothing copied). Don't add a history card — show an
             // "already backed up" popup instead.
@@ -239,20 +294,21 @@ class TransferViewModel: ObservableObject {
                     results: &perDestResults,
                     preset: organizationPreset
                 )
+                let recordConfig = Self.recordConfig(activeConfig, recordAs: recordAs)
                 await recordHistory(
-                    config: activeConfig,
+                    config: recordConfig,
                     sources: sources,
                     results: perDestResults,
                     preset: organizationPreset
                 )
                 await MediaCatalogStore.shared.record(
-                    config: activeConfig, sources: sources,
+                    config: recordConfig, sources: sources,
                     results: perDestResults, runDate: transferStartTime ?? Date())
                 await NotificationDispatcher.sendSource(
                     source: sources.first ?? "",
                     config: activeConfig,
                     results: perDestResults,
-                    settings: makeNotificationSettings(),
+                    settings: makeNotificationSettings(for: activeConfig.id),
                     summaryFor: { [self] result in
                         await self.destinationNotificationSummary(
                             source: sources.first ?? "",
@@ -266,7 +322,9 @@ class TransferViewModel: ObservableObject {
                     let reportConfig = activeConfig
                     Task.detached(priority: .utility) {
                         for result in reportResults where result.logFilePath != nil {
-                            _ = await BackupReportWriter.generate(result: result, config: reportConfig)
+                            if let pdf = await BackupReportWriter.generate(result: result, config: reportConfig) {
+                                ReportArchive.archive(pdfPath: pdf, result: result, config: reportConfig)
+                            }
                         }
                     }
                 }
@@ -325,9 +383,29 @@ class TransferViewModel: ObservableObject {
 
     func tabProgress(for configId: UUID) -> Double {
         if activeConfigId == configId, isTransferring {
-            return progress.overallProgress
+            return progress.jobFraction
+        }
+        if let worker = concurrentWorkers[configId], worker.isTransferring {
+            return worker.progress.jobFraction
         }
         return tabProgressByConfig[configId] ?? 0
+    }
+
+    /// `progress` is a class mutated in place, so `@Published progress` never fires
+    /// during a run and the movie tabs (which observe this view model, not the
+    /// progress object) never redrew their bar. Mirror the job fraction into
+    /// `tabProgressByConfig`, twice a second and only when it moved, so tabs follow.
+    private func trackTabProgress(of progress: TransferProgress, configId: UUID) -> AnyCancellable {
+        progress.objectWillChange
+            .throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self, weak progress] _ in
+                guard let self, let progress else { return }
+                let value = progress.jobFraction
+                let previous = self.tabProgressByConfig[configId] ?? -1
+                if abs(value - previous) >= 0.005 || (value >= 1 && previous < 1) {
+                    self.tabProgressByConfig[configId] = value
+                }
+            }
     }
 
     func hasActiveTransfers() -> Bool {
@@ -343,16 +421,26 @@ class TransferViewModel: ObservableObject {
         guard concurrentWorkers[configId] == nil else { return }
 
         let worker = TransferViewModel(isBackgroundWorker: true)
+        registerConcurrentWorker(worker, configId: configId)
+
+        Task { [weak self, worker] in
+            await worker.startTransfer(config: activeConfig)
+            await MainActor.run {
+                self?.finishConcurrentTransfer(configId: configId, worker: worker)
+            }
+        }
+    }
+
+    func registerConcurrentWorker(_ worker: TransferViewModel, configId: UUID) {
         concurrentWorkers[configId] = worker
         activeTransferConfigIds.insert(configId)
         tabProgressByConfig[configId] = 0
 
         var cancellables = Set<AnyCancellable>()
-        worker.$progress
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] progress in
-                self?.tabProgressByConfig[configId] = progress.overallProgress
-            }
+        worker.duplicates.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        trackTabProgress(of: worker.progress, configId: configId)
             .store(in: &cancellables)
 
         worker.$isTransferring
@@ -366,17 +454,10 @@ class TransferViewModel: ObservableObject {
             .store(in: &cancellables)
 
         concurrentWorkerCancellables[configId] = cancellables
-
-        Task { [weak self, worker] in
-            await worker.startTransfer(config: activeConfig)
-            await MainActor.run {
-                self?.finishConcurrentTransfer(configId: configId, worker: worker)
-            }
-        }
     }
 
     private func finishConcurrentTransfer(configId: UUID, worker: TransferViewModel) {
-        tabProgressByConfig[configId] = worker.progress.overallProgress
+        tabProgressByConfig[configId] = worker.progress.jobFraction
         activeTransferConfigIds.remove(configId)
         concurrentWorkerCancellables[configId]?.forEach { $0.cancel() }
         concurrentWorkerCancellables.removeValue(forKey: configId)
@@ -406,7 +487,7 @@ class TransferViewModel: ObservableObject {
                                      preset: OrganizationPreset?) async {
         guard CardSealService.shouldSeal(plannedDestinations: plannedDestinations, results: results)
         else { return }
-        let verified = Array(Set(results.filter { $0.success && $0.wasVerified }.map { $0.destination }))
+        let verified = Array(CardSealService.checkedDestinations(results))
         let mhlRef = results.first(where: { $0.hashListPath != nil })?.hashListPath
         for source in sources {
             do {
@@ -507,28 +588,62 @@ class TransferViewModel: ObservableObject {
         )
     }
 
-    var activeDuplicatePrompt: DuplicatePrompt? {
-        get { duplicates.activeDuplicatePrompt }
-        set { duplicates.activeDuplicatePrompt = newValue }
+    // Only the main view model is bound to the sheets, so it also shows the
+    // prompts of concurrent workers: one run's prompts at a time, its own first.
+    private var promptOwner: TransferViewModel {
+        if duplicates.hasActivePrompt { return self }
+        return concurrentWorkers.values.first(where: { $0.duplicates.hasActivePrompt }) ?? self
     }
 
-    var pendingUnreadableFiles: [String] {
-        get { duplicates.pendingUnreadableFiles }
-        set { duplicates.pendingUnreadableFiles = newValue }
+    private var allPromptCoordinators: [DuplicatePromptCoordinator] {
+        [duplicates] + concurrentWorkers.values.map(\.duplicates)
     }
 
-    var activeRollIdentityPrompt: RollIdentityPrompt? {
-        get { duplicates.activeRollIdentityPrompt }
-        set { duplicates.activeRollIdentityPrompt = newValue }
+    var activeDuplicatePrompt: DuplicatePrompt? { promptOwner.duplicates.activeDuplicatePrompt }
+
+    var pendingUnreadableFiles: [String] { promptOwner.duplicates.pendingUnreadableFiles }
+
+    var activeRollIdentityPrompt: RollIdentityPrompt? { promptOwner.duplicates.activeRollIdentityPrompt }
+
+    // Dismiss-by-identity: a stale sheet binding writing nil after its prompt was
+    // already answered must not answer whichever prompt is showing now.
+    func dismissDuplicatePrompt(id: UUID) {
+        allPromptCoordinators.forEach { $0.dismissDuplicatePrompt(id: id) }
+    }
+
+    func dismissRollIdentityPrompt(id: UUID) {
+        allPromptCoordinators.forEach { $0.dismissRollIdentityPrompt(id: id) }
+    }
+
+    func dismissUnreadablePrompt(paths: [String]) {
+        promptOwner.duplicates.dismissUnreadablePrompt(paths: paths)
+    }
+
+    /// Counts questions put to the user during runs; a run that waited on one is not
+    /// timed for the speed note.
+    private var promptsAsked = 0
+
+    func resolveRollIdentity(prompt: RollIdentityPrompt) async -> Bool {
+        promptsAsked += 1
+        return await duplicates.resolveRollIdentity(prompt: prompt)
+    }
+
+    func resolveUnreadable(paths: [String]) async -> Bool {
+        guard !paths.isEmpty else { return true }
+        promptsAsked += 1
+        return await withCheckedContinuation { continuation in
+            duplicates.setUnreadableContinuation(continuation, paths: paths)
+        }
     }
 
     @MainActor
     func submitRollIdentity(isResume: Bool) {
-        duplicates.submitRollIdentity(isResume: isResume)
+        promptOwner.duplicates.submitRollIdentity(isResume: isResume)
     }
 
     func resolveDuplicate(prompt: DuplicatePrompt) async -> DuplicateResolution {
-        await duplicates.resolveDuplicate(prompt: prompt)
+        promptsAsked += 1
+        return await duplicates.resolveDuplicate(prompt: prompt)
     }
 
     @MainActor
@@ -537,7 +652,7 @@ class TransferViewModel: ObservableObject {
         applyToAll: Bool,
         counterTemplate: String? = nil
     ) {
-        duplicates.submitDuplicateResolution(action: action, applyToAll: applyToAll, counterTemplate: counterTemplate)
+        promptOwner.duplicates.submitDuplicateResolution(action: action, applyToAll: applyToAll, counterTemplate: counterTemplate)
     }
 
     private func resolveOrganizationPreset(for config: BackupConfiguration) -> OrganizationPreset? {
@@ -692,16 +807,30 @@ class TransferViewModel: ObservableObject {
         )
     }
 
+    /// The demo movie never sends a phone or webhook message.
+    private func makeNotificationSettings(for configId: UUID) -> NotificationSettings {
+        let settings = makeNotificationSettings()
+        return DemoSession.isDemo(configId) ? DemoSession.muted(settings) : settings
+    }
+
     private func makeNotificationSettings() -> NotificationSettings {
-        NotificationSettings(
+        // Generated phone topic or the user's own topic URL: see `PhonePush`.
+        let ntfyTarget = PhonePush.target()
+        return NotificationSettings(
             notifyOnComplete: notifyOnComplete, notifyOnError: notifyOnError,
-            ntfyEnabled: ntfyEnabled, ntfyURL: ntfyURL,
+            ntfyEnabled: ntfyEnabled, ntfyURL: ntfyTarget?.url ?? "",
             ntfyTitleTemplate: ntfyTitleTemplate, ntfyMessageTemplate: ntfyMessageTemplate,
             webhookEnabled: webhookEnabled, webhookURL: webhookURL,
-            webhookIncludeFullPaths: webhookIncludeFullPaths)
+            webhookIncludeFullPaths: webhookIncludeFullPaths,
+            ntfySendsToken: ntfyTarget?.sendsToken ?? true)
     }
 
     func cancelRunFromDuplicatePrompt() {
+        let owner = promptOwner
+        if owner !== self, let workerId = concurrentWorkers.first(where: { $0.value === owner })?.key {
+            cancelAll(for: workerId)
+            return
+        }
         duplicatePromptCancelled = true
         cancelAll()
         duplicates.submitDuplicateResolution(action: .skip, applyToAll: true, counterTemplate: nil)
@@ -709,7 +838,7 @@ class TransferViewModel: ObservableObject {
 
     @MainActor
     func resolveUnreadable(proceed: Bool) {
-        duplicates.resolveUnreadable(proceed: proceed)
+        promptOwner.duplicates.resolveUnreadable(proceed: proceed)
     }
 
     /// Re-verify an already-backed-up config against its hash lists (the same
@@ -720,7 +849,8 @@ class TransferViewModel: ObservableObject {
         let preset = config.map { resolveOrganizationPreset(for: $0) } ?? nil
         let copyContents = config?.copyFolderContents ?? false
         let metadata = ShootMetadata(episode: config?.episode ?? "", day: config?.day ?? "",
-                                     unit: config?.unit ?? "", cameraFormat: config?.cameraFormat ?? "")
+                                     unit: config?.unit ?? "", cameraFormat: config?.cameraFormat ?? "",
+                                     movie: config?.name ?? "")
         let kinds = config.map { effectiveSourceMediaKinds(for: $0, sources: sources) } ?? [:]
 
         return await Task.detached(priority: .utility) {
@@ -789,18 +919,17 @@ class TransferViewModel: ObservableObject {
         mode: DestinationCopyMode,
         destinations: [String]
     ) -> Bool {
-        guard destinations.count > 1 else { return false }
-        switch mode {
-        case .parallel:   return false
-        case .sequential: return true
-        case .automatic:
-            let infos = destinations.map { DriveSpeedClassifier.info(for: $0) }
-            if infos.contains(where: { $0.isNetwork }) { return true }
-            // Two+ destinations sharing one physical volume → serialize.
-            let uuids = infos.compactMap { $0.volumeUUID }
-            if Set(uuids).count < uuids.count { return true }
-            return false
+        // Drives are only probed when the answer depends on them.
+        guard mode == .automatic, destinations.count > 1 else {
+            return DestinationCopyPlan.isSequential(
+                mode: mode,
+                destinations: destinations.map { _ in DriveInfo(isSSD: false, bus: .unknown, filesystem: .unknown,
+                                                               isInternal: false, isExFAT: false, isNetwork: false,
+                                                               volumeUUID: nil) })
         }
+        return DestinationCopyPlan.isSequential(
+            mode: mode,
+            destinations: destinations.map { DriveSpeedClassifier.info(for: $0) })
     }
 
     private func runFanOut(
@@ -853,19 +982,15 @@ class TransferViewModel: ObservableObject {
                 dryRun: false,
                 forceRecopy: config.forceRecopy,
                 shootMetadata: ShootMetadata(episode: config.episode, day: config.day,
-                                             unit: config.unit, cameraFormat: config.cameraFormat),
+                                             unit: config.unit, cameraFormat: config.cameraFormat,
+                                             movie: config.name),
                 sourceMediaKinds: effectiveSourceMediaKinds(for: config, sources: sources),
                 rollNames: config.runRollNames,
                 hashListStyle: config.hashListStyle,
                 reVerifyExistingOnResume: config.reVerifyExistingOnResume,
                 unreadableHandler: { [weak self] paths async -> Bool in
                     guard let self else { return false }
-                    return await withCheckedContinuation { continuation in
-                        Task { @MainActor [weak self] in
-                            guard let self else { continuation.resume(returning: false); return }
-                            self.duplicates.setUnreadableContinuation(continuation, paths: paths)
-                        }
-                    }
+                    return await self.resolveUnreadable(paths: paths)
                 },
                 rollIdentityHandler: { [weak self] query async -> Bool in
                     guard let self else { return true }
@@ -876,7 +1001,7 @@ class TransferViewModel: ObservableObject {
                         recordedVolumeName: query.recordedVolumeName,
                         recordedLastSeen: query.recordedLastSeen,
                         proposedNewName: query.proposedNewName)
-                    return await self.duplicates.resolveRollIdentity(prompt: prompt)
+                    return await self.resolveRollIdentity(prompt: prompt)
                 },
                 progressHandler: { [weak self] progresses in
                     guard let self else { return }
@@ -900,6 +1025,7 @@ class TransferViewModel: ObservableObject {
                                     prog.bytesCompleted = max(prog.bytesCompleted, prev.bytesCompleted)
                                     prog.verifyBytesCompleted = max(prog.verifyBytesCompleted, prev.verifyBytesCompleted)
                                 }
+                                prog.status = Self.mergedStatus(previous: prev.status, incoming: prog.status)
                                 self.progress.perDestProgress[idx] = prog
                             } else {
                                 self.progress.perDestProgress.append(prog)
@@ -949,8 +1075,28 @@ class TransferViewModel: ObservableObject {
         }
     }
 
+    /// `.complete` is sticky within a run: progress emits reach the main actor
+    /// through unordered Tasks, so a stale `.active` can land after the final
+    /// `.complete` and leave the card stuck at 99%. Only a failure overrides it.
+    nonisolated static func mergedStatus(previous: DestStatus, incoming: DestStatus) -> DestStatus {
+        guard case .complete = previous else { return incoming }
+        if case .failed = incoming { return incoming }
+        return .complete
+    }
+
     private func countVisibleFiles(sources: [String]) async -> Int {
         await HistoryRecorder.countVisibleFiles(sources: sources)
+    }
+
+    /// The config history and the catalog are written with: the run's own, or the
+    /// film a Quick Copy was filed under (its id and name only).
+    nonisolated static func recordConfig(_ config: BackupConfiguration,
+                                         recordAs: (id: UUID, name: String)?) -> BackupConfiguration {
+        guard let owner = recordAs else { return config }
+        var record = config
+        record.id = owner.id
+        record.name = owner.name
+        return record
     }
 
     private func recordHistory(
@@ -1043,6 +1189,7 @@ class TransferViewModel: ObservableObject {
         } else {
             currentService?.cancel()
         }
+        duplicates.close()
     }
 
     func cancelAll(for configId: UUID) {

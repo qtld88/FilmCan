@@ -25,7 +25,7 @@ struct LogSettingsView: View {
                     "Creates extra files"
                 ],
                 notes: [
-                    "The per-file list is taken from the destination hash list, so it's included only with Fast or Paranoid verification.",
+                    "The per-file list is taken from the destination hash list, so it's included only with the fast or the full check.",
                     "With Verification set to Off there is no hash list — the log records status and counts only, not individual files."
                 ]
             )

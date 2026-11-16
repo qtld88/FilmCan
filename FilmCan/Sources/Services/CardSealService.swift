@@ -83,11 +83,16 @@ enum CardSealService {
     }
 
     /// Decision C: a card is safe to seal only if every planned destination
-    /// reported a verified success (covers fresh copies and already-verified re-runs).
+    /// reported a checked success — Fast or Paranoid (covers fresh copies and
+    /// already-verified re-runs). Verification Off never seals.
     static func shouldSeal(plannedDestinations: [String], results: [TransferResult]) -> Bool {
         guard !plannedDestinations.isEmpty else { return false }
-        let verified = Set(results.filter { $0.success && $0.wasVerified }.map { $0.destination })
-        return Set(plannedDestinations).isSubset(of: verified)
+        return Set(plannedDestinations).isSubset(of: checkedDestinations(results))
+    }
+
+    /// Destinations that hold a checked copy of the card.
+    static func checkedDestinations(_ results: [TransferResult]) -> Set<String> {
+        Set(results.filter(\.isCheckedCopy).map(\.destination))
     }
 
     // MARK: - Helpers

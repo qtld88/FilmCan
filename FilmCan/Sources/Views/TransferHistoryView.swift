@@ -3,7 +3,7 @@ import SwiftUI
 struct TransferHistoryView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var transferViewModel: TransferViewModel
-    @AppStorage("historyListView") private var historyListView: Bool = false
+    @AppStorage("historyListView") private var historyListView: Bool = true
     @State private var verificationSheet: VerificationAlert? = nil
     @State private var verifyingHashPaths: Set<String> = []
     @State private var verificationStatusByDestination: [String: VerificationStatus] = [:]
@@ -1215,12 +1215,6 @@ struct TransferHistoryView: View {
         engineOpts.onlyCopyChanged = entry.options.onlyCopyChanged
         engineOpts.allowResume = entry.options.allowResume
         config.engineOptions = engineOpts
-
-        if let presetName = entry.options.organizationPresetName {
-            if let preset = appState.storage.organizationPresets.first(where: { $0.name == presetName }) {
-                config.selectedOrganizationPresetId = preset.id
-            }
-        }
 
         appState.storage.add(config)
         appState.selectConfig(config)

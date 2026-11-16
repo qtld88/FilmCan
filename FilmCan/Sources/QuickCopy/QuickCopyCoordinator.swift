@@ -63,6 +63,20 @@ final class QuickCopyCoordinator: NSObject, NSWindowDelegate {
         present(session)
     }
 
+    /// File › New Window: the user wants the real app, so never auto-quit under it.
+    func userOpenedMainWindow() {
+        launchedForQuickCopy = false
+    }
+
+    /// File › New Quick Copy Window: an empty form. A user menu action, so it never
+    /// counts as a launch-for-quick-copy (no main-window hiding, no auto-quit).
+    func openEmpty() {
+        let session = QuickCopySession(paths: [])
+        session.onFinished = { [weak self] in self?.reap() }
+        sessions[session.id] = session
+        present(session)
+    }
+
     // MARK: Windows
 
     private func present(_ session: QuickCopySession) {

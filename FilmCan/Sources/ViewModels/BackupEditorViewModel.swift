@@ -2,17 +2,27 @@ import Foundation
 import Combine
 import SwiftUI
 
+struct GenericCardWarning: Identifiable, Equatable {
+    /// Card key (volume UUID + relative path).
+    let id: String
+    let path: String
+    let name: String
+    let suggested: String
+}
+
 @MainActor
 class BackupEditorViewModel: ObservableObject {
     @Published var config: BackupConfiguration
     @Published var showValidationError: Bool = false
     @Published var validationMessage: String = ""
     
-    private let storage = AppState.shared.storage
+    private let storage: ConfigurationStorage
     private var isSyncingFromPreset = false
     
-    init(config: BackupConfiguration) {
+    /// `storage`: the app's storage unless a test passes its own (a temp directory).
+    init(config: BackupConfiguration, storage: ConfigurationStorage? = nil) {
         self.config = config
+        self.storage = storage ?? AppState.shared.storage
     }
 
     func syncFromStorage(_ updated: BackupConfiguration) {
@@ -33,6 +43,7 @@ class BackupEditorViewModel: ObservableObject {
             config.excludedSourcePaths.subtract(removed)
             save()
             if !removed.isEmpty { keepReaddedSourcesUnchecked(removed, previous: previous) }
+            refreshGenericCards()
         }
     }
 
@@ -65,6 +76,7 @@ class BackupEditorViewModel: ObservableObject {
         config.sourcePaths.append(path)
         storage.lastSourcePath = path
         save()
+        refreshGenericCards()
     }
     
     func removeSource(at index: Int) {
@@ -87,6 +99,7 @@ class BackupEditorViewModel: ObservableObject {
             config.excludedDestinationPaths.subtract(removed)
             save()
             if !removed.isEmpty { keepReaddedDestinationsUnchecked(removed, previous: previous) }
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -115,6 +128,7 @@ class BackupEditorViewModel: ObservableObject {
             config.destinationPaths.append(path)
             storage.lastDestinationPath = path
             save()
+            refreshGenericCards(recompute: true)
         }
     }
     
@@ -125,6 +139,17 @@ class BackupEditorViewModel: ObservableObject {
         save()
     }
     
+    /// "Copy to … first": one destination at a time, those drives first. The movie keeps
+    /// this choice (visible in its options) until the user changes it.
+    func applySpeedAdvice(_ action: SpeedAdvice.Action) {
+        switch action {
+        case .copyFirst(let paths, _):
+            config.destinationCopyMode = .sequential
+            config.destinationPaths = SpeedAdvisor.reordered(config.destinationPaths, first: paths)
+            save()
+        }
+    }
+
     func moveDestinations(from source: IndexSet, to destination: Int) {
         config.destinationPaths.move(fromOffsets: source, toOffset: destination)
         save()
@@ -250,7 +275,189 @@ class BackupEditorViewModel: ObservableObject {
         set {
             config.copyFolderContents = newValue
             save()
+            refreshGenericCards(recompute: true)
         }
+    }
+
+    // MARK: - Generic card names (Untitled, DJI ...)
+
+    /// Single guard: with automatic roll numbering on, none of the generic-name handling applies.
+    var genericCardSupportActive: Bool { !config.rollNumbering.enabled }
+
+    @Published var genericCardWarning: GenericCardWarning?
+    private var dismissedGenericCards: Set<String> = []
+    /// Card keys whose name the user typed (or cleared): never auto-written again.
+    private var userEditedGenericCards: Set<String> = []
+    /// Card keys whose name this session suggested: the only ones recomputed.
+    private var autoWrittenGenericCards: Set<String> = []
+
+    func isGenericSource(_ path: String) -> Bool {
+        genericCardSupportActive && Self.isDirectory(path)
+            && GenericCardName.isGeneric((path as NSString).lastPathComponent)
+    }
+
+    private var genericSourcePaths: [String] { config.sourcePaths.filter { isGenericSource($0) } }
+
+    private func effectiveRunPreset() -> OrganizationPreset? {
+        var preset: OrganizationPreset?
+        if let id = config.selectedOrganizationPresetId,
+           let selected = storage.organizationPresets.first(where: { $0.id == id }) {
+            preset = selected
+        } else {
+            let local = localOrganizationPreset
+            let hasTemplate = local.useFolderTemplate
+                && !local.folderTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasRename = local.useRenameTemplate
+                && !local.renameTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let hasPatterns = SourceFilterMatching.hasCustomFilterPatterns(
+                include: local.includePatterns, exclude: local.excludePatterns, copyOnly: local.copyOnlyPatterns)
+            if hasTemplate || hasRename || hasPatterns || local.useCustomDate { preset = local }
+        }
+        guard var result = preset else { return nil }
+        if result.name == OrganizationPreset.netflixIngestName {
+            let cam = config.cameraFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cam.isEmpty { result.folderTemplate = config.cameraFolderTemplate }
+            let snd = config.soundFolderTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !snd.isEmpty { result.soundFolderTemplate = config.soundFolderTemplate }
+        }
+        return result
+    }
+
+    private func existingGenericNames(for path: String) -> [String] {
+        GenericRollNameScanner.existingNames(
+            source: path, destinations: config.destinationPaths,
+            preset: effectiveRunPreset(), date: Date(),
+            metadata: ShootMetadata(episode: config.episode, day: config.day,
+                                    unit: config.unit, cameraFormat: config.cameraFormat,
+                                    movie: config.name),
+            mediaKind: mediaKind(for: path))
+    }
+
+    private func genericNamesOfOtherSources(excluding path: String, names: [String: String]) -> [String] {
+        let own = RollNumberer.cardKey(forPath: path)
+        return config.sourcePaths.compactMap { other in
+            guard other != path else { return nil }
+            let key = RollNumberer.cardKey(forPath: other)
+            return key == own ? nil : names[key]
+        }
+    }
+
+    /// Next free numbered name for a generic card, e.g. `Untitled_01`.
+    func suggestedRollName(for path: String) -> String {
+        suggestedRollName(for: path, names: config.genericRollNames)
+    }
+
+    private func suggestedRollName(for path: String, names: [String: String]) -> String {
+        GenericCardName.nextNumberedName(
+            base: GenericCardName.baseName((path as NSString).lastPathComponent),
+            taken: existingGenericNames(for: path) + genericNamesOfOtherSources(excluding: path, names: names))
+    }
+
+    /// Roll folder name the next run gives this source: numbering, a saved card name,
+    /// else the source's own name. Does not save anything.
+    func plannedRollName(for path: String) -> String {
+        rollNamePreview(for: path) ?? rollNameOverride(for: path) ?? (path as NSString).lastPathComponent
+    }
+
+    func rollNameOverride(for path: String) -> String? {
+        guard genericCardSupportActive else { return nil }
+        return config.genericRollNames[RollNumberer.cardKey(forPath: path)]
+    }
+
+    func setRollNameOverride(_ name: String, for path: String) {
+        let key = RollNumberer.cardKey(forPath: path)
+        let cleaned = name.replacingOccurrences(of: "/", with: "_")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        userEditedGenericCards.insert(key)
+        autoWrittenGenericCards.remove(key)
+        if cleaned.isEmpty {
+            config.genericRollNames[key] = nil
+            dismissedGenericCards.insert(key)
+        } else {
+            config.genericRollNames[key] = cleaned
+        }
+        save()
+        updateGenericCardWarning()
+    }
+
+    /// Folder mode: gives each generic card without a name its suggestion. `recompute`
+    /// (destinations, preset or copy mode changed) also refreshes the suggestions made this session.
+    func ensureGenericRollNames(recompute: Bool = false) {
+        guard genericCardSupportActive, !config.copyFolderContents else { return }
+        var changed = false
+        if recompute {
+            for path in genericSourcePaths {
+                let key = RollNumberer.cardKey(forPath: path)
+                if autoWrittenGenericCards.contains(key), !userEditedGenericCards.contains(key),
+                   config.genericRollNames.removeValue(forKey: key) != nil {
+                    changed = true
+                }
+            }
+        }
+        let added = GenericRollNaming.namesToFill(
+            sources: genericSourcePaths, isGeneric: { _ in true },
+            keyFor: RollNumberer.cardKey(forPath:),
+            existing: config.genericRollNames, userEdited: userEditedGenericCards,
+            // Names given earlier in this pass count as taken, like the stored ones.
+            suggest: { path, names in self.suggestedRollName(for: path, names: names) })
+        for (key, name) in added {
+            config.genericRollNames[key] = name
+            autoWrittenGenericCards.insert(key)
+            changed = true
+        }
+        if changed { save() }
+    }
+
+    /// A drive was mounted or ejected. Auto-detect may leave the source list as it was
+    /// (a new "Untitled" card mounts at the same path as the one ejected), but the card
+    /// under a path can be a different one: its roll name is looked up again.
+    func drivesDidChange() {
+        refreshAutoDetectedSources()
+        refreshAutoDetectedSoundSources()
+        refreshAutoDetectedCards()
+        refreshAutoDetectedDestinations()
+        refreshGenericCards()
+    }
+
+    /// Fills missing names (folder mode) and raises the contents-mode warning when needed.
+    func refreshGenericCards(recompute: Bool = false) {
+        ensureGenericRollNames(recompute: recompute)
+        updateGenericCardWarning()
+    }
+
+    private func updateGenericCardWarning() {
+        guard genericCardSupportActive, config.copyFolderContents else {
+            genericCardWarning = nil
+            return
+        }
+        if let current = genericCardWarning,
+           config.sourcePaths.contains(current.path), config.genericRollNames[current.id] == nil,
+           !dismissedGenericCards.contains(current.id) {
+            return
+        }
+        genericCardWarning = nil
+        for path in genericSourcePaths {
+            let key = RollNumberer.cardKey(forPath: path)
+            guard config.genericRollNames[key] == nil, !dismissedGenericCards.contains(key) else { continue }
+            genericCardWarning = GenericCardWarning(
+                id: key, path: path,
+                name: GenericCardName.baseName((path as NSString).lastPathComponent),
+                suggested: suggestedRollName(for: path))
+            return
+        }
+    }
+
+    func acceptGenericCardWarning() {
+        guard let warning = genericCardWarning else { return }
+        genericCardWarning = nil
+        setRollNameOverride(warning.suggested, for: warning.path)
+    }
+
+    func dismissGenericCardWarning() {
+        guard let warning = genericCardWarning else { return }
+        dismissedGenericCards.insert(warning.id)
+        genericCardWarning = nil
+        updateGenericCardWarning()
     }
 
     var sourceAutoDetectEnabled: Bool {
@@ -302,6 +509,11 @@ class BackupEditorViewModel: ObservableObject {
     var soundAutoDetectPatterns: [String] {
         get { config.soundAutoDetectPatterns }
         set { config.soundAutoDetectPatterns = newValue; save() }
+    }
+
+    var soundDayFolderAutoDetect: Bool {
+        get { config.soundDayFolderAutoDetect }
+        set { config.soundDayFolderAutoDetect = newValue; save() }
     }
 
     // MARK: - Card recognition and roll numbering
@@ -361,9 +573,41 @@ class BackupEditorViewModel: ObservableObject {
         return "Next camera roll: \(cam) · next sound roll: \(snd)"
     }
 
-    /// Shoot day the next run will use when auto-advance is on.
+    /// Shoot day a run started now would use — same computation as
+    /// `TransferViewModel.applyRollNumberingAndDay`, so the folder preview matches the copy.
+    func effectiveShootDay(now: Date = Date()) -> String {
+        guard config.dayAutoAdvance else { return config.day }
+        let state = RollNumberingStore.shared.state(for: config.id)
+        return ShootDayCounter.advance(
+            day: state.currentDay ?? config.day, lastRun: state.lastRunDate,
+            now: now, calendar: .current)
+    }
+
+    /// Day change made from the film header. With the day counter on it is today's
+    /// override (tomorrow's first run advances from it); otherwise it is the film's day.
+    func setShootDayFromHeader(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != effectiveShootDay() else { return }
+        if config.dayAutoAdvance {
+            shootDayToday = trimmed
+        } else {
+            day = trimmed
+        }
+    }
+
+    /// Today's shoot day when auto-advance is on. Setting it overrides the counter for
+    /// today; tomorrow's first run advances from the edited value.
     var shootDayToday: String {
-        RollNumberingStore.shared.state(for: config.id).currentDay ?? config.day
+        get { effectiveShootDay() }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return }
+            var state = RollNumberingStore.shared.state(for: config.id)
+            state.currentDay = trimmed
+            state.lastRunDate = Date()
+            RollNumberingStore.shared.update(state, for: config.id)
+            objectWillChange.send()
+        }
     }
 
     func resetRollNumbering() {
@@ -384,7 +628,7 @@ class BackupEditorViewModel: ObservableObject {
     /// Correct the detector for one drive and remember it (by volume UUID).
     func setCardRole(_ role: CardRole?, for path: String) {
         if let uuid = volumeUUID(for: path) {
-            CardRoleOverrides.set(role, forVolumeUUID: uuid)
+            CardRoleOverrides.set(role, forVolumeUUID: uuid, driveName: FanOutCopier.sourceVolumeName(path))
         }
         if role == .sound { setMediaKind(.sound, for: path) }
         else if role == .camera { setMediaKind(.camera, for: path) }
@@ -407,7 +651,7 @@ class BackupEditorViewModel: ObservableObject {
         for volumeURL in mountedExternalVolumes() {
             let path = volumeURL.path
             if config.destinationPaths.contains(where: { $0 == path || $0.hasPrefix(path + "/") }) { continue }
-            if sources.contains(path) { continue }
+            if sources.contains(path) && !config.soundDayFolderAutoDetect { continue }
             let override = FanOutCopier.sourceVolumeUUID(path).flatMap { CardRoleOverrides.role(forVolumeUUID: $0) }
             if override == .notACard { continue }
             let role: CardRole
@@ -418,14 +662,20 @@ class BackupEditorViewModel: ObservableObject {
             } else {
                 continue
             }
-            sources.append(path)
-            if role == .sound { kinds[path] = .sound }
-            changed = true
+            if role != .sound && FolderPick.hasDeeperPick(under: path, in: sources) { continue }
+            let added = role == .sound ? soundDayPaths(path) : [path]
+            let updated = keepingOnlyToday(sources + added.filter { !sources.contains($0) },
+                                           volumePath: path, resolved: added)
+            if updated != sources { sources = updated; changed = true }
+            if role == .sound {
+                for day in added where kinds[day] != .sound { kinds[day] = .sound; changed = true }
+            }
         }
         if changed {
             config.sourcePaths = sources
             config.sourceMediaKinds = kinds
             save()
+            refreshGenericCards()
         }
     }
 
@@ -460,9 +710,11 @@ class BackupEditorViewModel: ObservableObject {
                 let (pattern, subpath) = splitRule(rule)
                 if matches(volumeName, pattern: pattern) {
                     let resolvedMatches = resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
-                    for resolved in resolvedMatches where !updated.contains(resolved) {
+                    for resolved in resolvedMatches
+                    where !updated.contains(resolved) && !FolderPick.hasDeeperPick(under: resolved, in: updated) {
                         updated.append(resolved)
                     }
+                    updated = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
                 }
             }
         }
@@ -470,6 +722,7 @@ class BackupEditorViewModel: ObservableObject {
         if updated != config.sourcePaths {
             config.sourcePaths = updated
             save()
+            refreshGenericCards()
         }
     }
 
@@ -491,10 +744,21 @@ class BackupEditorViewModel: ObservableObject {
             for rule in rules {
                 let (pattern, subpath) = splitRule(rule)
                 guard matches(volumeName, pattern: pattern) else { continue }
-                for resolved in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                var resolvedMatches: [String] = []
+                for match in resolveSubpathMatches(rootURL: volumeURL, subpath: subpath) {
+                    let days = soundDayPaths(match)
+                    if days != [match], let index = updated.firstIndex(of: match) {
+                        updated.remove(at: index)
+                        changed = true
+                    }
+                    resolvedMatches += days
+                }
+                for resolved in resolvedMatches {
                     if !updated.contains(resolved) { updated.append(resolved); changed = true }
                     if kinds[resolved] != .sound { kinds[resolved] = .sound; changed = true }
                 }
+                let pruned = keepingOnlyToday(updated, volumePath: volumeURL.path, resolved: resolvedMatches)
+                if pruned != updated { updated = pruned; changed = true }
             }
         }
 
@@ -502,6 +766,7 @@ class BackupEditorViewModel: ObservableObject {
             config.sourcePaths = updated
             config.sourceMediaKinds = kinds
             save()
+            refreshGenericCards()
         }
     }
 
@@ -520,7 +785,8 @@ class BackupEditorViewModel: ObservableObject {
                 let (pattern, subpath) = splitRule(rule)
                 if matches(volumeName, pattern: pattern) {
                     let resolvedMatches = resolveSubpathMatches(rootURL: volumeURL, subpath: subpath)
-                    for resolved in resolvedMatches where !updated.contains(resolved) {
+                    for resolved in resolvedMatches
+                    where !updated.contains(resolved) && !FolderPick.hasDeeperPick(under: resolved, in: updated) {
                         updated.append(resolved)
                     }
                 }
@@ -533,6 +799,7 @@ class BackupEditorViewModel: ObservableObject {
                 storage.lastDestinationPath = first
             }
             save()
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -553,89 +820,30 @@ class BackupEditorViewModel: ObservableObject {
     }
 
     private func mountedExternalVolumes() -> [URL] {
-        let volumesURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(at: volumesURL, includingPropertiesForKeys: [.volumeIsInternalKey], options: [.skipsHiddenFiles]) else {
-            return []
-        }
-        return entries.filter { url in
-            let values = try? url.resourceValues(forKeys: [.volumeIsInternalKey])
-            return values?.volumeIsInternal != true
-        }
+        FilmDriveDetector.mountedExternalVolumes()
     }
 
     private func splitRule(_ rule: String) -> (String, String) {
-        guard let separatorIndex = rule.firstIndex(of: "/") else {
-            return (rule, "")
-        }
-        let drive = String(rule[..<separatorIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let folder = String(rule[rule.index(after: separatorIndex)...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return (drive, folder)
+        FilmDriveDetector.splitRule(rule)
     }
 
     private func matches(_ name: String, pattern: String) -> Bool {
-        let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        if trimmed.contains("*") {
-            let escaped = NSRegularExpression.escapedPattern(for: trimmed)
-            let regex = "^" + escaped.replacingOccurrences(of: "\\*", with: ".*") + "$"
-            return name.range(of: regex, options: [.regularExpression, .caseInsensitive]) != nil
-        }
-        return name.compare(trimmed, options: [.caseInsensitive]) == .orderedSame
+        FilmDriveDetector.matches(name, pattern: pattern)
+    }
+
+    private func soundDayPaths(_ path: String) -> [String] {
+        guard config.soundDayFolderAutoDetect else { return [path] }
+        let days = DayFolderResolver.findDayFolders(in: path)
+        return days.isEmpty ? [path] : days
+    }
+
+    private func keepingOnlyToday(_ sources: [String], volumePath: String, resolved: [String]) -> [String] {
+        let days = resolved.filter { DayFolderResolver.dayKey(($0 as NSString).lastPathComponent) != nil }
+        return DayFolderResolver.replacingStaleDays(in: sources, volumePath: volumePath, fresh: days)
     }
 
     private func resolveSubpathMatches(rootURL: URL, subpath: String) -> [String] {
-        let trimmed = subpath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return [rootURL.path] }
-
-        if !trimmed.contains("*") {
-            let resolvedURL = rootURL.appendingPathComponent(trimmed)
-            var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDirectory),
-               isDirectory.boolValue {
-                return [resolvedURL.path]
-            }
-            return []
-        }
-
-        let components = trimmed
-            .split(separator: "/")
-            .map(String.init)
-            .filter { !$0.isEmpty }
-        guard !components.isEmpty else { return [rootURL.path] }
-
-        var currentURLs: [URL] = [rootURL]
-        let fm = FileManager.default
-
-        for (index, componentPattern) in components.enumerated() {
-            let isLast = index == components.count - 1
-            var nextURLs: [URL] = []
-
-            for baseURL in currentURLs {
-                guard let children = try? fm.contentsOfDirectory(
-                    at: baseURL,
-                    includingPropertiesForKeys: [.isDirectoryKey],
-                    options: [.skipsHiddenFiles]
-                ) else { continue }
-
-                for child in children where matches(child.lastPathComponent, pattern: componentPattern) {
-                    let isDirectory = (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-                    if isLast {
-                        if isDirectory {
-                            nextURLs.append(child)
-                        }
-                    } else if isDirectory {
-                        nextURLs.append(child)
-                    }
-                }
-            }
-
-            currentURLs = nextURLs
-            if currentURLs.isEmpty { break }
-        }
-
-        return currentURLs.map { $0.path }
+        FilmDriveDetector.resolveSubpathMatches(rootURL: rootURL, subpath: subpath)
     }
 
     var organizationPresets: [OrganizationPreset] {
@@ -647,11 +855,80 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    /// Makes the film's own copy a copy of `preset` and returns its id (stable once the
+    /// film has a copy). The shared preset itself is never linked to the film.
+    private func replaceOwnCopy(with preset: OrganizationPreset) -> UUID {
+        objectWillChange.send()
+        let placed = FilmPresetOwnership.settingOwnCopy(
+            of: preset, for: config.id, in: storage.organizationPresets)
+        storage.organizationPresets = placed.presets
+        return placed.copy.id
+    }
+
+    /// Makes sure the film has its own settings record (a film on "Off" that never had
+    /// one), carrying exactly what it runs with today. Needed before saving anything the
+    /// plain "Off" fields cannot hold, such as a separate sound folder.
+    func ensureOwnSettingsCopy() {
+        // Settings kept aside while the film is on "Off" are never replaced from here.
+        guard config.selectedOrganizationPresetId == nil, parkedOwnCopy == nil else { return }
+        var preset = localOrganizationPreset
+        preset.copyFolderContents = config.copyFolderContents
+        preset.runInParallel = config.runInParallel
+        preset.engineOptions = config.engineOptions
+        preset.logEnabled = config.logEnabled
+        preset.logLocation = config.logLocation
+        preset.customLogPath = config.customLogPath
+        preset.logFileNameTemplate = config.logFileNameTemplate
+        preset.duplicatePolicy = config.duplicatePolicy
+        preset.duplicateCounterTemplate = config.duplicateCounterTemplate
+        isSyncingFromPreset = true
+        config.mirrorOrganization(from: preset)
+        config.selectedOrganizationPresetId = replaceOwnCopy(with: preset)
+        save()
+        isSyncingFromPreset = false
+    }
+
+    /// The film's own settings while the film is switched to "Off": kept, so switching
+    /// back does not lose them.
+    var parkedOwnCopy: OrganizationPreset? {
+        guard config.selectedOrganizationPresetId == nil else { return nil }
+        return storage.organizationPresets.first { $0.ownerFilmId == config.id }
+    }
+
+    /// Back from "Off" to the film's own settings.
+    func useParkedOwnCopy() {
+        guard let parked = parkedOwnCopy else { return }
+        isSyncingFromPreset = true
+        config.mirrorOrganization(from: parked)
+        config.selectedOrganizationPresetId = parked.id
+        save()
+        isSyncingFromPreset = false
+        refreshGenericCards(recompute: true)
+    }
+
     var selectedOrganizationPresetId: UUID? {
         get { config.selectedOrganizationPresetId }
         set {
             config.selectedOrganizationPresetId = newValue
             save()
+            refreshGenericCards(recompute: true)
+        }
+    }
+
+    /// True while the movie's folder and naming settings are on (not "Off").
+    var folderOrganizationIsOn: Bool { config.selectedOrganizationPresetId != nil }
+
+    /// The on/off switch for folder organization. Off keeps the movie's settings aside;
+    /// On brings them back (or creates the movie's settings from what it runs with).
+    func setFolderOrganization(_ on: Bool) {
+        guard on != folderOrganizationIsOn else { return }
+        if !on {
+            applyOffOrganizationSettings()
+        } else if parkedOwnCopy != nil {
+            useParkedOwnCopy()
+        } else {
+            ensureOwnSettingsCopy()
+            refreshGenericCards(recompute: true)
         }
     }
 
@@ -698,6 +975,8 @@ class BackupEditorViewModel: ObservableObject {
         }
     }
 
+    /// "Off": the film stops using its folder and file settings. Its own copy is kept
+    /// aside (see `parkedOwnCopy`); only the trash button deletes it.
     func applyOffOrganizationSettings() {
         config.selectedOrganizationPresetId = nil
         config.organizationFolderTemplate = config.offOrganizationFolderTemplate
@@ -713,63 +992,32 @@ class BackupEditorViewModel: ObservableObject {
         save()
     }
 
-    func applyPreset(_ preset: OrganizationPreset) {
-        config.copyFolderContents = preset.copyFolderContents
-        config.runInParallel = preset.runInParallel
-        config.engineOptions = preset.engineOptions
-        config.logEnabled = preset.logEnabled
-        config.logLocation = preset.logLocation
-        config.customLogPath = preset.customLogPath
-        config.logFileNameTemplate = preset.logFileNameTemplate
-        config.duplicatePolicy = preset.duplicatePolicy
-        config.duplicateCounterTemplate = preset.duplicateCounterTemplate
-        applyPresetOrganizationSettings(preset)
-        config.selectedOrganizationPresetId = preset.id
-        // Netflix's approved layout puts per-roll reports in a Reports/ folder at the
-        // shoot-day root. Pre-fill that as a changeable default (don't clobber a path
-        // the user already chose).
-        if preset.name == OrganizationPreset.netflixIngestName, config.customLogPath.isEmpty {
-            config.logLocation = .custom
-            config.customLogPath = "Reports"
-        }
-        save()
-    }
-
-    /// Apply the built-in Netflix Ingest preset, persisting it to storage (once) so it
-    /// behaves like a normal selectable preset with a stable id/name.
+    /// Puts the built-in Netflix Ingest folder settings into this movie's own settings
+    /// (replacing its folder and naming settings). Nothing is stored apart from the
+    /// movie's own record.
     func applyNetflixIngestPreset() {
         objectWillChange.send()
-        let preset: OrganizationPreset
-        if let existing = storage.organizationPresets.first(where: { $0.name == OrganizationPreset.netflixIngestName }) {
-            preset = existing
-        } else {
-            let p = OrganizationPreset.netflixIngest()
-            storage.organizationPresets.append(p)
-            preset = p
+        let model = OrganizationPreset.netflixIngest()
+        config.takeSettings(from: model)
+        config.selectedOrganizationPresetId = replaceOwnCopy(with: model)
+        // Same log folder in the record as in the movie (Netflix pre-fills "Reports").
+        if let id = config.selectedOrganizationPresetId,
+           let index = storage.organizationPresets.firstIndex(where: { $0.id == id }) {
+            storage.organizationPresets[index].logLocation = config.logLocation
+            storage.organizationPresets[index].customLogPath = config.customLogPath
         }
-        applyPreset(preset)
+        storage.save()
+        save()
+        refreshGenericCards(recompute: true)
     }
 
     func syncFromSelectedPresetIfNeeded() {
         guard let selectedId = config.selectedOrganizationPresetId,
               let preset = storage.organizationPresets.first(where: { $0.id == selectedId }) else { return }
         isSyncingFromPreset = true
-        applyPresetOrganizationSettings(preset)
+        config.mirrorOrganization(from: preset)
         save()
         isSyncingFromPreset = false
-    }
-
-    private func applyPresetOrganizationSettings(_ preset: OrganizationPreset) {
-        config.organizationFolderTemplate = preset.folderTemplate
-        config.organizationRenameTemplate = preset.renameTemplate
-        config.organizationUseFolderTemplate = preset.useFolderTemplate
-        config.organizationUseRenameTemplate = preset.useRenameTemplate
-        config.organizationRenameOnlyPatterns = preset.renameOnlyPatterns
-        config.organizationIncludePatterns = preset.includePatterns
-        config.organizationExcludePatterns = preset.excludePatterns
-        config.organizationCopyOnlyPatterns = preset.copyOnlyPatterns
-        config.organizationUseCustomDate = preset.useCustomDate
-        config.organizationCustomDate = preset.customDate
     }
 
     func updateSelectedPresetFromCurrent() {
@@ -799,63 +1047,6 @@ class BackupEditorViewModel: ObservableObject {
         storage.save()
     }
 
-    func saveCurrentSettingsAsPreset() {
-        objectWillChange.send()
-        var preset = OrganizationPreset()
-        preset.name = "Preset \(storage.organizationPresets.count + 1)"
-
-        preset.folderTemplate = config.organizationFolderTemplate
-        preset.renameTemplate = config.organizationRenameTemplate
-        preset.useFolderTemplate = config.organizationUseFolderTemplate
-        preset.useRenameTemplate = config.organizationUseRenameTemplate
-        preset.renameOnlyPatterns = config.organizationRenameOnlyPatterns
-        preset.includePatterns = config.organizationIncludePatterns
-        preset.excludePatterns = config.organizationExcludePatterns
-        preset.copyOnlyPatterns = config.organizationCopyOnlyPatterns
-        preset.useCustomDate = config.organizationUseCustomDate
-        preset.customDate = config.organizationCustomDate
-
-        preset.copyFolderContents = config.copyFolderContents
-        preset.runInParallel = config.runInParallel
-        preset.engineOptions = config.engineOptions
-        preset.logEnabled = config.logEnabled
-        preset.logLocation = config.logLocation
-        preset.customLogPath = config.customLogPath
-        preset.logFileNameTemplate = config.logFileNameTemplate
-        preset.duplicatePolicy = config.duplicatePolicy
-        preset.duplicateCounterTemplate = config.duplicateCounterTemplate
-
-        storage.organizationPresets.append(preset)
-        config.selectedOrganizationPresetId = preset.id
-        storage.save()
-        save()
-    }
-
-    func addOrganizationPreset() {
-        objectWillChange.send()
-        var preset = OrganizationPreset()
-        preset.name = "Preset \(storage.organizationPresets.count + 1)"
-        preset.folderTemplate = ""
-        preset.renameTemplate = ""
-        preset.useFolderTemplate = false
-        preset.useRenameTemplate = false
-        preset.renameOnlyPatterns = []
-        storage.organizationPresets.append(preset)
-        config.selectedOrganizationPresetId = preset.id
-        storage.save()
-        save()
-    }
-    
-    func deleteOrganizationPreset(id: UUID) {
-        objectWillChange.send()
-        storage.organizationPresets.removeAll { $0.id == id }
-        if config.selectedOrganizationPresetId == id {
-            config.selectedOrganizationPresetId = storage.organizationPresets.first?.id
-        }
-        storage.save()
-        save()
-    }
-    
     // Validation
     func validate() -> Bool {
         if config.sourceAutoDetectEnabled {
@@ -929,6 +1120,13 @@ class BackupEditorViewModel: ObservableObject {
         
         // Validate destinations
         for dest in config.includedDestinationPaths {
+            // A missing /Volumes/<name> means the drive is unplugged: say so before
+            // trying to create the folder (macOS would answer "permission denied").
+            if let driveName = DriveUtilities.disconnectedDriveName(for: dest) {
+                validationMessage = DriveUtilities.driveNotConnectedMessage(driveName: driveName)
+                showValidationError = true
+                return false
+            }
             let summary = DriveUtilities.summary(for: dest)
             if summary.isReadOnly == true {
                 let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""

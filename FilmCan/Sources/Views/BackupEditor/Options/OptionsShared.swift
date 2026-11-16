@@ -6,6 +6,7 @@ enum OptionsLayout {
     static let spacing: CGFloat = 20
     static let toggleWidth: CGFloat = 60
     static let menuWidth: CGFloat = 140
+    static let menuMinWidth: CGFloat = 120
     static let textWidth: CGFloat = 320
     static let basicTextWidth: CGFloat = 268
 }
@@ -15,7 +16,10 @@ enum OptionsLayout {
 func optionsResolvedTextWidth(_ base: CGFloat, availableWidth: CGFloat) -> CGFloat {
     guard availableWidth > 0 else { return base }
     let minWidth: CGFloat = 180
-    let reserved = OptionsLayout.iconWidth + OptionsLayout.toggleWidth + OptionsLayout.spacing * 2 + 24
+    // Leave room for the narrowest menu, not just a switch: a row with a menu must fit
+    // too (the movie settings panel is narrow enough for that to matter).
+    let reserved = OptionsLayout.iconWidth + max(OptionsLayout.toggleWidth, OptionsLayout.menuMinWidth)
+        + OptionsLayout.spacing * 2 + 24
     let maxForText = max(minWidth, availableWidth - reserved)
     return min(base, maxForText)
 }
@@ -24,7 +28,7 @@ func optionsResolvedTextWidth(_ base: CGFloat, availableWidth: CGFloat) -> CGFlo
 /// the resolved text width, and reserved room for icon and spacing.
 func optionsResolvedMenuWidth(_ base: CGFloat, textWidth: CGFloat, availableWidth: CGFloat) -> CGFloat {
     guard availableWidth > 0 else { return base }
-    let minWidth: CGFloat = 120
+    let minWidth = OptionsLayout.menuMinWidth
     let reserved = OptionsLayout.iconWidth + OptionsLayout.spacing * 2 + textWidth + 16
     let maxForMenu = max(minWidth, availableWidth - reserved)
     return min(base, maxForMenu)

@@ -14,8 +14,12 @@ struct MainView: View {
     @ObservedObject private var storage = ConfigurationStorage.shared
     @ObservedObject private var catalogStore = MediaCatalogStore.shared
     @State private var rightPane: RightPane = .history
+    @State private var demoError: String?
+    @State private var showNewMovieChoice = false
     @State private var catalogDragStartWidth: Double?
     @AppStorage("catalogPaneWidth") private var catalogPaneWidth: Double = 380
+    /// Shared with `BackupEditorView`: the movie settings panel is open.
+    @AppStorage("movieSettingsPanelOpen") private var wantsMovieSettings = false
     @State private var showQuickTour: Bool = false
     @State private var quickTourIndex: Int = 0
     @State private var quickTourNameConfirmed: Bool = false
@@ -25,6 +29,7 @@ struct MainView: View {
     @State private var donationPromptTransferCount: Int = 0
     @State private var pendingDonationPromptCheck: Bool = false
     @State private var workspaceObservers: [NSObjectProtocol] = []
+    @State private var hostWindow: NSWindow?
     @AppStorage("didShowQuickTour") private var didShowQuickTour: Bool = false
     @AppStorage("donationPromptSuppressed") private var donationPromptSuppressed: Bool = false
     @AppStorage("donationLastPromptCount") private var donationLastPromptCount: Int = 0
@@ -38,6 +43,7 @@ struct MainView: View {
     
     var body: some View {
         decoratedContent
+            .background(MainWindowReader(window: $hostWindow))
             .onAppear {
                 if !didShowQuickTour {
                     startTour()
@@ -76,11 +82,19 @@ struct MainView: View {
                     advanceTour(by: 1)
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .filmCanNewMovie)) { _ in
+                guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
+                showNewMovieChoice = true
+            }
+            .sheet(isPresented: $showNewMovieChoice) {
+                NewMovieChoice(appState: appState) { showNewMovieChoice = false }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanShowCatalogPane)) { _ in
-                guard rightPane != .catalog else { return }
+                guard MainWindowTarget.shouldHandle(in: hostWindow), rightPane != .catalog else { return }
                 withAnimation(.easeInOut(duration: 0.2)) { rightPane = .catalog }
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanRestartTour)) { _ in
+                guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
                 didShowQuickTour = false
                 startTour()
             }
@@ -167,16 +181,21 @@ struct MainView: View {
         CGFloat(min(max(catalogPaneWidth, 250), 420))
     }
 
+    /// The Catalog follows the selected movie tab.
+    private var catalogScope: CatalogScope? {
+        CatalogScope.selected(in: appState)
+    }
+
     private var catalogPane: some View {
         VStack(spacing: 0) {
-            Text("Catalog — all movies")
+            Text(catalogScope.map { "Catalog — \($0.movieName)" } ?? "Catalog — all movies")
                 .font(FCType.itemTitle)
                 .foregroundColor(FilmCanTheme.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
             Divider().background(FilmCanTheme.cardStroke)
-            CatalogView(paneWidth: clampedCatalogWidth)
+            CatalogView(paneWidth: clampedCatalogWidth, scope: catalogScope)
                 .environmentObject(catalogStore)
         }
         .frame(width: clampedCatalogWidth)
@@ -211,14 +230,22 @@ struct MainView: View {
     private var editorPanel: some View {
         if let configId = appState.selectedConfigId,
            let config = appState.storage.configurations.first(where: { $0.id == configId }) {
-            BackupEditorView(
-                config: config,
-                transferViewModel: transferViewModel,
-                isHistoryVisible: rightPane != .none,
-                rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
-                onToggleHistory: { togglePane(.history) }
-            )
-            .id(config.id)
+            VStack(spacing: 0) {
+                if DemoSession.isDemo(config.id) {
+                    DemoBanner(canStop: !transferViewModel.isTransferActive(for: config.id), onStop: stopDemo)
+                }
+                BackupEditorView(
+                    config: config,
+                    transferViewModel: transferViewModel,
+                    isHistoryVisible: rightPane != .none,
+                    rightPaneWidth: rightPane == .catalog ? clampedCatalogWidth : 250,
+                    onToggleHistory: { togglePane(.history) },
+                    onCloseRightPane: {
+                        withAnimation(.easeInOut(duration: 0.2)) { rightPane = .none }
+                    }
+                )
+                .id(config.id)
+            }
         } else {
             emptyStateView
         }
@@ -234,6 +261,7 @@ struct MainView: View {
             )
 
             HStack(spacing: 4) {
+                movieSettingsButton
                 historyButton
                 catalogButton
             }
@@ -296,7 +324,7 @@ struct MainView: View {
                     .multilineTextAlignment(.center)
             }
             
-            HoverButton(action: { _ = appState.createNewConfig() }) {
+            HoverButton(action: { showNewMovieChoice = true }) {
                 Label(appState.storage.configurations.isEmpty ? "Create First Movie" : "Create New Movie", systemImage: "plus.circle.fill")
                     .font(FCType.cardTitle)
                     .foregroundColor(.black)
@@ -304,12 +332,52 @@ struct MainView: View {
             .buttonStyle(.borderedProminent)
             .tint(FilmCanTheme.brandYellow)
             .controlSize(.large)
+
+            if !DemoSession.isRunning(storage: appState.storage) {
+                VStack(spacing: 6) {
+                    Button("Try with made-up cards", action: startDemo)
+                        .controlSize(.large)
+                    Text("Creates a demo movie with two made-up cards and two made-up drives, as folders on this Mac. The copy is real. \u{201C}Stop the demo\u{201D} removes everything.")
+                        .font(FCType.meta)
+                        .foregroundColor(FilmCanTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
+                }
+            }
             
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
         .background(FilmCanTheme.backgroundGradient)
+        .alert("The demo could not be prepared", isPresented: Binding(
+            get: { demoError != nil }, set: { if !$0 { demoError = nil } })
+        ) {
+            Button("OK", role: .cancel) { demoError = nil }
+        } message: {
+            Text(demoError ?? "")
+        }
+    }
+
+    private func startDemo() {
+        do {
+            let config = try DemoSession.start(storage: appState.storage, catalog: MediaCatalogStore.shared,
+                                               rollStore: RollNumberingStore.shared,
+                                               isCopying: { transferViewModel.isTransferActive(for: $0) })
+            appState.selectedConfigId = config.id
+        } catch {
+            demoError = error.localizedDescription
+        }
+    }
+
+    private func stopDemo() {
+        let demoId = DemoSession.demoConfigId()
+        let stopped = DemoSession.stop(storage: appState.storage, catalog: MediaCatalogStore.shared,
+                                       rollStore: RollNumberingStore.shared,
+                                       isCopying: { transferViewModel.isTransferActive(for: $0) })
+        if stopped, appState.selectedConfigId == demoId {
+            appState.selectedConfigId = appState.storage.configurations.first?.id
+        }
     }
 
     private func registerDriveObservers() {
@@ -342,6 +410,41 @@ struct MainView: View {
         .help("Catalog — where every roll is")
         .accessibilityLabel(active ? "Hide catalog" : "Show catalog")
         .accessibilityValue(atRisk ? "Some rolls are on one drive only" : "")
+    }
+
+    /// Opens the selected movie's settings in the side panel, in place of history or
+    /// the catalog (one side pane at a time).
+    private var movieSettingsButton: some View {
+        let active = isMovieSettingsOpen
+        return Button(action: toggleMovieSettings) {
+            Image(systemName: "gearshape")
+                .symbolVariant(active ? .fill : .none)
+                .foregroundColor(active ? FilmCanTheme.textPrimary : FilmCanTheme.textSecondary)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(6)
+        }
+        .frame(width: 28, height: 28)
+        .buttonStyle(.plain)
+        .disabled(selectedConfig == nil)
+        .help(SettingsWording.movieSettings)
+        .accessibilityLabel(active ? "Hide movie settings" : "Show movie settings")
+        .tourAnchor("optionsTabs")
+    }
+
+    private var isMovieSettingsOpen: Bool {
+        selectedConfig != nil
+            && MovieSettingsPanel.isShown(wantsOpen: wantsMovieSettings, otherPaneOpen: rightPane != .none)
+    }
+
+    private func toggleMovieSettings() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if isMovieSettingsOpen {
+                wantsMovieSettings = false
+            } else {
+                rightPane = .none
+                wantsMovieSettings = true
+            }
+        }
     }
 
     private var historyButton: some View {

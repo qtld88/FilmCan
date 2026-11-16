@@ -39,11 +39,104 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | Q7 | Start a quick copy, **Stop**, run it again to the same destination. | Second run resumes and copies only what is missing. (Stop, not Pause — Pause does not exist in Quick Copy) | ☐ |
 | Q8 | During a quick copy press ⌘Q; and close the window. | Quit alert / "Stop the copy?" alert; Continue keeps copying. | ☐ |
 | Q9 | After a completed quick copy. | macOS notification (and ntfy if configured) received; entry present in `history.json`. | ☐ |
-| Q10 | Preset = a saved preset with `Ask each time`. | The preset chips show *Skip existing files* (tooltip explains the mapping); no prompt appears. | ☐ |
+| Q10 | Pick a movie whose duplicate policy is `Ask each time`. | The chips show *Skip existing files* (tooltip explains the mapping); no prompt appears. | ☐ |
 | Q11 | After a Services-launched quick copy, quit, then open FilmCan normally. | Main window opens at its usual size/position (not the Quick Copy window's frame); no Quick Copy window. | ☐ |
 | Q12 | Close the main window, click the Dock icon (no quick copy involved). | Exactly one main window reopens, as before this feature. | ☐ |
 | Q13 | Quick Copy window → "Edit in FilmCan…" with the main window closed/hidden. | Main window appears; closing the quick copy afterwards does NOT quit FilmCan. | ☐ |
-| Q14 | Netflix Ingest preset, source folder named with a prohibited character (e.g. `A001 (copy)`). | Run disabled with a message naming the characters. | ☐ |
+| Q14 | Pick a movie using the Netflix Ingest folders, source folder named with a prohibited character (e.g. `A001 (copy)`). | Run disabled with a message naming the characters. | ☐ |
+| Q15 | File › New Window (⌥⌘N), then ⌘B in the front window. | A second main window opens; only ONE backup starts (front window's film). | ☐ |
+| Q16 | File › New Quick Copy Window (⇧⌘N) right after launching FilmCan normally. | Empty Quick Copy window; main window stays visible; closing it does NOT quit FilmCan. | ☐ |
+| Q17 | Eject icon next to a source/destination (main window card and Quick Copy row), no copy running. | Drive ejects; unsealed card asks first; Quick Copy drops every row on that drive. | ☐ |
+| Q18 | During a copy: eject icon, context-menu Eject, and Finder's eject button on the card and on the backup drive. | App icons greyed (tooltip says why); Finder refuses ("in use"). After the run ends, Finder ejects normally. | ☐ |
+| Q19 | Quick Copy settings card. | No Preset row and no "Save as preset" panel. The Movie picker lists "No movie" first. | ☐ |
+
+### First-launch defaults gate (run when new-film defaults or Info.plist usage texts changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| F1 | In Terminal: `tccutil reset All com.filmcan.app`. Launch FilmCan, add a camera card as a source. | The macOS dialog "FilmCan would like to access files on a removable volume" shows a sentence explaining why. | ☐ |
+| F2 | Same reset, then pick a folder inside Documents, then Desktop, then Downloads. | Each macOS dialog shows its own explaining sentence. | ☐ |
+| F3 | Plug a camera card. Click "+" to create a new movie. | The card appears in Copy From by itself, tagged Camera (a sound recorder card: Sound). | ☐ |
+| F4 | In the new movie: Options › Source and Options › Logs. | "Detect camera and sound cards automatically" is on; "PDF report with thumbnails" is on. | ☐ |
+| F5 | Open a movie that existed before this build. | Both switches are as you left them. | ☐ |
+| F6 | New movie, one real card, one drive, run the backup. Time it. Switch the PDF report off, wipe the destination folder, run again, time it. | A `_report.pdf` sits next to the log after the first run. Note the time difference (thumbnail extraction). | ☐ |
+| F7 | Finder › right-click a folder › Services › FilmCan Copy. Run it once with Movie = a movie whose « PDF report with thumbnails » is on, once with Movie = None. | With the movie: a PDF report is written next to the log, as in the main window. With None: no PDF. | ☐ |
+| F8 | Back up a card named « Untitled » (roll folder proposed: `Untitled_01`). Eject it, plug in another card also named « Untitled ». | The new card sits in the same source slot and its Roll folder reads `Untitled_02`, not empty. Plug the first card back: it shows `Untitled_01` again. | ☐ |
+
+### Phone notifications gate (run when Settings › Push or the `/phone/` site page changed)
+
+The QR code opens `https://www.filmcan.eu/phone/`. That page is only online once `website/phone/index.html` has reached `main`.
+
+| # | Check (real .app, one iPhone, one Android phone if available) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| P1 | Fresh preferences (`defaults delete com.filmcan.app ntfyURL; defaults delete com.filmcan.app ntfyUseCustomServer; defaults delete com.filmcan.app phonePushTopic`). Settings › Push. | One switch "Send notifications to my phone", off. "Advanced" is folded. No QR code yet. | ☐ |
+| P2 | Turn the switch on. | A QR code appears, with the server (`https://ntfy.sh`) above a channel name starting with `filmcan-`. | ☐ |
+| P3 | Scan the code with a phone that does not have ntfy. | The FilmCan page opens in the phone's language, shows the same channel name, and offers the right store. | ☐ |
+| P4 | Install ntfy, subscribe (button "Open in ntfy", else copy and paste the name). Click "Send a test" in FilmCan. | The phone receives "FilmCan test". From P2 to here: under 2 minutes. Note whether "Open in ntfy" worked on iPhone and on Android. | ☐ |
+| P5 | Run a small backup. | The phone receives the end-of-backup message. | ☐ |
+| P6 | Click "New code…", confirm. Send a test. | The code and the name change; the phone no longer receives until it scans again. | ☐ |
+| P7 | Quit and relaunch FilmCan (and, when possible, install an update over it). | Same code, notifications still arrive, nothing to redo. | ☐ |
+| P8 | A Mac where a Topic URL (and token) was already configured before this build. Open Settings › Push. | "Advanced" is open, "Use my own ntfy server or topic" is on, the URL and token are intact, no QR code. A backup notifies the same topic as before. | ☐ |
+| P9 | In Advanced, switch "Use my own ntfy server or topic" off, then on again. | Off: the QR code appears. On: the own URL is used again, still filled in. | ☐ |
+| P10 | `defaults write com.filmcan.app ntfyEnabled -bool true` with no Topic URL and no `phonePushTopic`. Open Settings › Push. | No QR code yet, a "Create my QR code" button instead; nothing was sent anywhere. Clicking it shows the code. | ☐ |
+| P11 | Open `https://www.filmcan.eu/phone/` without anything after `#`. | The page asks to scan the code again; no error. | ☐ |
+
+### Card families gate (run when `CameraCardDetector` changed; needs real cards or copies of their folder layout)
+
+| # | Check (real .app, "Detect camera and sound cards automatically" on) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| C1 | Plug a photo camera, drone or phone card with a `DCIM` folder holding video. | Added to Copy From, badge "Camera card", tagged Camera. | ☐ |
+| C2 | Plug a `DCIM` card holding photos only. | Not added, no badge. | ☐ |
+| C3 | Plug an Insta360 card. | Badge "Insta360 card". | ☐ |
+| C4 | Plug an AVCHD camcorder card (`PRIVATE/AVCHD` or `AVCHD` at the root). | Badge "AVCHD card". A Panasonic card with `PANA_GRP` still says "Panasonic card"; a Sony card with `M4ROOT` still says "Sony card". | ☐ |
+| C5 | Plug a Panasonic P2 card. | Badge "Panasonic card". | ☐ |
+| C6 | Plug ARRI, RED, Sony, Canon, Blackmagic, GoPro, DJI and sound recorder cards you have. | Same badge as before this build. | ☐ |
+| C7 | Plug a backup drive that happens to have a `DCIM` folder with video at its root. | It is proposed as a camera card (expected). Right-click › "Not a camera card": it leaves and does not come back. | ☐ |
+
+### Report copies gate (run when `ReportArchive` or the report flow changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Settings › History. | A "Reports" section: switch on, path `~/Documents/FilmCan Reports`. | ☐ |
+| R2 | A movie with "PDF report with thumbnails" on, shoot day set (e.g. Day02), two drives. Run a backup. Wait for the report (a few seconds after the end). | `~/Documents/FilmCan Reports/<movie>/Day02/<drive A>/` and `/<drive B>/` each hold the PDF and one `.mhl` per roll. macOS may ask once for access to Documents. | ☐ |
+| R3 | Eject both drives. Open the PDF from that folder. | It opens, with thumbnails. | ☐ |
+| R4 | A movie with no shoot day. Run a backup. | The day folder is today's date (`2026-11-11`). | ☐ |
+| R5 | A movie with the PDF report off. Run a backup. | Nothing new in `FilmCan Reports`. | ☐ |
+| R6 | "Choose…" another folder, run a backup. Then "Reset". | Copies go to the chosen folder; after Reset the path is back to Documents. | ☐ |
+| R7 | Switch "Keep a copy of every report on this Mac" off, run a backup. | No copy is made; the report on the drive is still written. | ☐ |
+| R8 | Compare the destination drive before and after this build for the same backup. | Same folders and files on the drive. | ☐ |
+
+### Main screen gate (run when the main window layout changed)
+
+| # | Check (real .app, window at 1280 × 800) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| M1 | A movie whose folder template uses `{day}` (e.g. Netflix Ingest). | `‹ Day02 ›` next to the title. A movie without `{day}`: no stepper at all. Double-click the title to rename it: the stepper stays next to the title while you type. | ☐ |
+| M2 | Click `›`, then `‹`. | The day changes in the stepper and in the Save To folder preview, in one click. Options › Source shows the same day. | ☐ |
+| M3 | Turn on the automatic day counter, click `›`. | The "Today:" field in Options › Source › Cards & rolls changes at once; the next calendar day's first backup advances from it. | ☐ |
+| M4 | Type a text-only day ("Pickups") in Options › Source. | The stepper shows it with both arrows greyed. | ☐ |
+| M5 | 1 card, 2 drives, ready to copy. | No summary line above the columns: the header row is followed directly by Copy From / Save To. | ☐ |
+| M6 | 3 cards, 2 drives. | Everything fits without scrolling at 1280 × 800; the flow links between the columns are where they were. | ☐ |
+| M7 | Look under "Run Now" with no card, then no drive, then both, then after a completed backup. | "Add a card or a folder to copy", "Add a drive to save to", "N folders will be created" (one drive) or "N folders per drive will be created" (several drives getting the same folders), "Folders already exist: only missing files are copied". The button is not clipped. | ☐ |
+| M8 | A whole card as source, then a subfolder of a card. | The card shows no path line (hover its name: tooltip with the path). The subfolder still shows its path. | ☐ |
+| M9 | One source and one drive, then two of each. | No order number with one row; 1, 2 with two. Checkboxes stay aligned. | ☐ |
+| M10 | After a completed backup, same cards and drives still plugged. | Save To shows one folded line "Folders already on every drive"; clicking it opens the tree. | ☐ |
+| M11 | `defaults delete com.filmcan.app historyListView`, relaunch, open History. | Compact list. Switch to cards, relaunch: still cards. | ☐ |
+| M12 | Start a backup. | The stepper (day text and both arrows) is visibly greyed during the copy and comes back after it; subtitle says "Backup in progress". | ☐ |
+
+### Demo gate (run when the demo or the empty screen changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| D1 | First launch with no movie (or close every movie tab). | Under "Create First Movie": a "Try with made-up cards" button and two lines of explanation. | ☐ |
+| D2 | Click it. | A "Demo" movie opens with two sources (Demo card A001, Demo sound S001 tagged Sound) and two destinations (Demo drive 1, Demo drive 2). A yellow band on top says it is a demo, with "Stop the demo". | ☐ |
+| D3 | Start the backup. | A real copy runs for a few seconds on both drives: yellow bar, then green check bar, both to 100 %. | ☐ |
+| D4 | While it runs, look at "Stop the demo". | Greyed until the backup has finished or been stopped. | ☐ |
+| D5 | Open History and the Catalog. | The demo run and its two rolls are there, under "Demo". | ☐ |
+| D6 | Click "Stop the demo". | The Demo tab is gone, as are its history entries and catalog rolls. `~/Library/Application Support/FilmCan/Demo` no longer exists. Other movies are untouched. | ☐ |
+| D7 | With phone notifications configured, run the demo backup. | No message on the phone, no webhook call; the Mac's own notification may show. | ☐ |
+| D8 | Start the demo, quit FilmCan, relaunch. | The Demo movie and its band are still there; "Stop the demo" still removes everything. | ☐ |
+| D9 | Start the demo, close the Demo tab by hand (delete the movie), go to the empty screen. | "Try with made-up cards" is offered again; clicking it starts a clean demo. | ☐ |
+| D10 | Start a copy of another movie, then start the demo copy while it runs. | "Stop the demo" stays greyed while the demo copies, even after the other movie has finished. | ☐ |
 
 ## Setup
 
@@ -79,6 +172,89 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
 | 19 | Resume — deleted file | #2, delete one file from SSD-B | SSD-A, SSD-B | fast | Only the deleted file is re-copied to SSD-B (presence check, not just MHL) | ☐ |
 | 20 | Force re-copy | #2 with Force re-copy ON | SSD-A, SSD-B | fast | Every file re-copied; nothing skipped | ☐ |
 
+### Movie settings gate (run when presets or movie creation changed)
+
+Before the first launch of this build, keep a copy of `configs.json` and `presets.json` (Application Support › FilmCan).
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| S1 | Launch on existing data where two movies used the same preset. | Both movies show the same folder preview as before; each now has its own settings. No preset anywhere. | ☐ |
+| S2 | Run a backup of an existing movie with an existing card. | Same folders and files as with the previous build (resume finds everything). | ☐ |
+| S3 | In movie A, change the folder template. Open movie B. | B's template and folder preview are unchanged. | ☐ |
+| S4 | Look for a Preset menu in a movie's settings (Destinations) and anywhere else. | No Preset menu anywhere. Destinations has the folder organization switch and a "Use Netflix Ingest folders" button (it asks before replacing the movie's folder and naming settings). | ☐ |
+| S4b | Click "+" in the tab bar (and File › New Backup, ⌘N). | It asks what to start from: Blank movie, Netflix Ingest, Like <movie> (newest first), From a settings file…. Each creates and selects a movie; closing the popover creates nothing. With no movie yet ("Create First Movie") the same choice shows, without the "Like" list. | ☐ |
+| S4c | Export Settings… (right-click on a tab, or the movie settings), then "+" › From a settings file… on a test copy. | A new movie (never an overwrite) with the same folder settings, no drives, no day, no episode carried over; a name already taken gets " 2". An old presets file shows "Presets no longer exist. Create a movie and export its settings instead." | ☐ |
+| S4d | Update with your current settings (keep a copy of `configs.json` and `presets.json` first), then back up with each movie. | Each movie copies to the same folders and files as before the update. | ☐ |
+| S7 | Switch folder organization off, then on again. | The movie's own folders return unchanged. | ☐ |
+| S9 | "+" › "Like <movie>". | A new movie with the same options, no cards, no drives, empty shoot day and episode. Unit and camera format are kept. | ☐ |
+| S10 | Movie "Citizen K" with template `CITIZENK/{day}`; create a movie like it and rename it "Citizen L". | The new movie's template starts with `{movie}`; the preview shows `Citizen L/…`. The old movie still writes to `CITIZENK/…`. | ☐ |
+| S11 | Type `{movie}` in a folder template (it is in the token list). | The preview shows the movie's name. | ☐ |
+| S12 | Delete a movie, quit, open `presets.json`. | No record with that movie's `ownerFilmId` remains. | ☐ |
+| S13 | Quick Copy: pick a movie, then another, then No movie. | There is no Preset row and no Save as preset panel. The movie's folder settings, project and day load; No movie goes back to the basic options. Nothing is written to the movie. | ☐ |
+| S15 | Export a movie, delete it, import it back. | Same preset name, same folder preview as before the export. | ☐ |
+
+### Settings layout gate (run when the settings panel or the Settings window changed)
+
+| # | Check (real .app, window at 1280 × 800) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| L1 | Look under Copy From / Save To, then at the top right. | Nothing under the columns (no line, no Options card). A gear sits left of the History and Catalog icons. | ☐ |
+| L2 | Click the gear. | A panel opens on the right: the Preset menu, then Basic, Source, Destinations and Logs stacked as titles with a chevron. Click a title: its group opens or closes; several can be open. Copy From and Save To are still visible and readable. | ☐ |
+| L3 | In the panel, change the folder layout. | The folder preview in Save To follows at once. | ☐ |
+| L4 | Open all four groups, at 1280 × 800 and in a full-screen window. | Every setting that was in the Options card is there; every switch and menu on the right of a row stays inside the panel, nothing clipped or past the edge. Quit and relaunch: the same groups are open. | ☐ |
+| L5 | With the panel open, open History, then Catalog. Then click the gear again. | The panel closes when History or Catalog opens; clicking the gear closes that pane and opens the panel. | ☐ |
+| L6 | Panel open, switch movie tab; quit and relaunch. | The panel stays open and shows the current movie's settings. | ☐ |
+| L8 | Narrow the window to its minimum with the panel open. | The panel takes the whole window (close button top right); closing it shows the cards again. | ☐ |
+| L9 | Run the quick tour. | The former "Options Tabs" step highlights the gear. | ☐ |
+| L10 | Open Settings (Cmd+,). | A sidebar with Appearance, Notifications, Phone & webhooks, History, Drives, Recognition, Shortcuts, About; each page shows what its tab showed. Reopen Settings: the last page is selected. | ☐ |
+| L11 | Read the labels in Basic and Destinations. | "Full check (re-reads every file)", "If a file already exists", "Checksum list format", "Folder layout", "Rename files", "Custom date in names". | ☐ |
+| L12 | Run a backup; open its log and history entry. | Same wording as before in logs and history (only the settings labels changed). | ☐ |
+
+### Folder layout gate (run when the folder editor or the folder preview changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| T1 | Movie settings › Destinations, a new movie. | "Start from" with four choices (One day, Several days, Netflix Ingest, Free), then a small tree starting at "Drive". | ☐ |
+| T2 | Click "Several days". | Tree: Movie name › Shoot day › Camera ("Cards go here") and Sound ("Sound goes here"). The folder preview in Save To shows the movie's name and the day. The text field below shows `{movie}/{day}/Camera`. | ☐ |
+| T3 | "…" on "Camera" › Rename, type RUSHES, Return. | The tree, the text field and the preview all show RUSHES. | ☐ |
+| T4 | "…" on a folder › Add a folder inside › Date; then Move up / Move down; then Remove. | Each action shows at once in the tree and the preview; Move is greyed when it cannot apply. | ☐ |
+| T5 | "Put sound with the cards", then "Give sound its own folder". | One folder carries both marks; then a Sound folder appears next to the cards' folder. | ☐ |
+| T6 | With a layout in place, click another "Start from" choice. | A confirmation is asked before replacing. | ☐ |
+| T7 | Type `ARRI/{sourceDriveName}/CARD_{source}` in the text field. | The tree is replaced by one sentence saying the layout is edited as text; the preview still follows the text. | ☐ |
+| T8 | A movie using Netflix Ingest. | The tree shows the Netflix layout; an edit in the tree changes the Camera folder / Sound folder fields above, and the reverse. | ☐ |
+| T9 | An existing movie with its own layout, untouched. | Same folder preview and same folders written as before this build. | ☐ |
+| T10 | Folder preview (Save To and Quick Copy) with a card never copied, then after its backup. | Folders to be created carry a small "new" mark; after the backup the mark is gone. Files and "contents of…" lines never carry it. | ☐ |
+| T11 | Tree at the panel's narrowest width. | The four starting choices wrap; names, marks and the "…" button stay visible. | ☐ |
+| T12 | A movie with a layout: switch "Folder layout" off. | The tree is replaced by "The folder layout is switched off. Switch it on to edit it here."; switching it on brings the same layout back. | ☐ |
+| T13 | A movie with its own settings: Preset menu › Off. | The tree is replaced by a sentence saying the movie's settings are set aside; choosing "This movie's settings" in the Preset menu brings them back unchanged. | ☐ |
+| T14 | Rename a folder in the tree to `Café`. | The folder is named `Caf` everywhere (tree, text, preview): the name a backup would write. | ☐ |
+
+### Recognition page gate (run when the Recognition page or card memory changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| R1 | Open Settings (Cmd+,), click Recognition. | Four groups: how a card is recognised, cards it knows, your corrections, roll names. Nothing clipped, sentences wrap. | ☐ |
+| R2 | Read "Cards it knows". | One line per family (ARRI … Sound recorder), each with a short reason. | ☐ |
+| R3 | Plug a card, right-click it in Copy From › "Not a camera card". Go back to Settings › Recognition. | The drive is listed by name with "Not a card" and today's date. | ☐ |
+| R4 | Click Forget on that line. Go back to the main window. | The line is gone; the card is proposed again in Copy From (detection on). | ☐ |
+| R5 | Eject a corrected drive, reopen the page. | The drive keeps its name and reads "not connected". | ☐ |
+| R6 | With roll numbering on, run a backup, open the page. | The movie is listed with its card count and last backup date; opening it shows the roll name and the drive. | ☐ |
+| R7 | Forget one roll name, plug the same card again in that movie. | The card gets a new roll name, higher than every name used so far (its old name is not reused); other cards keep theirs. | ☐ |
+| R8 | A correction made before this version (if you have one). | Listed as "Drive not connected (…)" until the drive is plugged, then by its name. | ☐ |
+
+### Report-after-the-fact gate (run when report creation from the Catalog changed)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| G1 | Back up a card with the PDF report switched off. Open the Catalog, right-click the roll. | "Create report from <drive>" and the same with "re-reading every file (slow)", one pair per connected drive. | ☐ |
+| G2 | Choose "Create report from <drive>". | A line "Creating the report for…" shows, then Finder opens on `<roll>_report_recreated.pdf` in the reports folder on the Mac. | ☐ |
+| G3 | Open the PDF. | Thumbnails, sizes, checksums. Under the title: backed-up date, "Report created after the backup, on …". Status reads "Checksums from the backup's list. Files were not re-read". No "Verified". | ☐ |
+| G4 | On the drive, delete one clip and add a text file to the roll; create the report again. | The deleted clip is under "missing from the drive"; the text file reads "Not in the checksum list"; status is red. | ☐ |
+| G5 | Choose the "re-reading every file (slow)" entry on an intact roll. | Status: "Re-checked: N of N listed files match the checksum list" in green. Slower. | ☐ |
+| G6 | Eject the drive, right-click the roll. | One greyed entry asking to connect a drive that holds the roll. | ☐ |
+| G7 | Rename the drive in Finder, right-click the roll, create the report. | Works: the drive is found although its name changed. | ☐ |
+| G8 | Look at the roll folder on the drive after G2–G5. | Nothing added on the drive. | ☐ |
+| G9 | A movie set to the simple hidden checksum list: back up, then create the report. | Report without checksums; status says there is no ASC MHL checksum list. | ☐ |
+
 ## Post-run sanity checks
 
 - `find /Volumes/<dest> -name ".filmcan-*"` returns nothing after a clean job.
@@ -92,3 +268,19 @@ If any Gate row fails, the release is blocked — fix and re-run, do not ship.
   1.2.0). There is no engine picker to test; rsync code is dormant.
 - Sandbox stays disabled (entitlement file `com.apple.security.app-sandbox = false`).
 - Drive speed classifier still flags exFAT external as "slow flush required" so the `DO NOT UNPLUG` banner appears.
+
+### Speed advice gate (run when the speed advice changed; needs real drives)
+
+| # | Check (real .app) | Expected | Pass? |
+|---|-------------------|----------|-------|
+| V1 | A movie with a USB 3 SSD and a USB 3 spinning hard drive as destinations, copy mode Automatic, a card loaded. | A band under the columns: "‘<hard drive>’ sets the pace for every drive", with "Copy to ‘<SSD>’ first" and "Dismiss". | ☐ |
+| V2 | Click "Copy to ‘<SSD>’ first". | The SSD moves to the top of Save To; Options › copy mode shows "One destination at a time"; the band is gone. | ☐ |
+| V3 | Put the hard drive back on top (drag). | A band "‘<SSD>’ waits behind ‘<hard drive>’" appears. | ☐ |
+| V4 | Click "Dismiss", unplug and replug both drives. | The band does not come back for these two drives. | ☐ |
+| V5 | Plug a card reader or drive into a USB 2 port or through a USB 2 cable. | A band "‘<name>’ is connected over USB 2". | ☐ |
+| V6 | Plug two drives into the same external USB hub. | A band "‘A’ and ‘B’ share one USB hub". Plugged straight into the Mac: no band. | ☐ |
+| V7 | An SSD destination that this copy would fill above 90 %. | A band "‘<SSD>’ will be over 90 % full after this copy". | ☐ |
+| V8 | Two USB 3 SSDs (no hard drive). | No band about slow drives (macOS may call an external SSD "not solid state"; that alone must not trigger a band). | ☐ |
+| V9 | While a copy runs. | No band shown. | ☐ |
+| V10 | After a copy of at least 1 GB (one destination at a time, SSD + hard drive). | Under the columns: "‘<hard drive>’ was the slowest drive: … MB/s, against … MB/s for ‘<SSD>’." Gone when the next copy of this movie starts. | ☐ |
+| V11 | Quick Copy of at least 1 GB. | No speed sentence appears for any movie. | ☐ |

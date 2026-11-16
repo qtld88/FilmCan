@@ -28,22 +28,37 @@ struct DestinationsOptionsView: View {
 
     @ViewBuilder
     private var netflixMetadataSection: some View {
-        if model.selectedOrganizationPresetName == OrganizationPreset.netflixIngestName {
+        let netflix = model.isNetflixPresetSelected
+        let showEpisode = netflix || model.activeTemplatesContain("{episode}")
+        let showDay = netflix || model.activeTemplatesContain("{day}")
+        let showUnit = netflix || model.activeTemplatesContain("{unit}")
+        let showFormat = netflix || model.activeTemplatesContain("{cameraFormat}")
+        if showEpisode || showDay || showUnit || showFormat {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Shoot metadata")
                     .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
-                netflixMetaField("Episode / Block", placeholder: "EP103 / B01",
-                                 text: model.binding(\.episode))
-                netflixMetaField("Day", placeholder: "Day05 / D05",
-                                 text: model.binding(\.day))
-                netflixMetaField("Unit", placeholder: "MU / 2U",
-                                 text: model.binding(\.unit))
-                netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
-                                 text: model.binding(\.cameraFormat))
+                if showEpisode {
+                    netflixMetaField(netflix ? "Episode / Block" : "Project", placeholder: "EP103 / B01",
+                                     text: model.binding(\.episode))
+                }
+                if showDay {
+                    netflixMetaField("Day", placeholder: "Day05 / D05",
+                                     text: model.binding(\.day))
+                }
+                if showUnit {
+                    netflixMetaField("Unit", placeholder: "MU / 2U",
+                                     text: model.binding(\.unit))
+                }
+                if showFormat {
+                    netflixMetaField("Camera format", placeholder: "ARRI / RED (optional)",
+                                     text: model.binding(\.cameraFormat))
+                }
 
-                folderTemplatesSection
-                netflixReadinessHint
+                if netflix {
+                    folderTemplatesSection
+                    netflixReadinessHint
+                }
             }
             .padding(.bottom, 8)
         }
@@ -67,11 +82,11 @@ struct DestinationsOptionsView: View {
     private var folderTemplatesSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text("Folder templates")
+                Text(SettingsWording.folderLayout)
                     .font(FCType.itemTitle)
                     .foregroundColor(FilmCanTheme.textPrimary)
                 InfoPopoverButton(content: InfoPopoverContent(
-                    title: "Folder templates",
+                    title: SettingsWording.folderLayout,
                     description: "Where each source lands at the destination, by media type. The roll folder is appended automatically.",
                     notes: ["Camera sources use the Camera folder; Sound-tagged sources use the Sound folder.",
                             "Tokens: {date} {episode} {day} {unit} {cameraFormat}.",
@@ -112,12 +127,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("Folder template")
+                                Text(SettingsWording.folderLayout)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "Folder template",
+                                        title: SettingsWording.folderLayout,
                                         description: "Creates the folder structure inside the destination.",
                                         notes: [
                                             "Use \"/\" for subfolders.",
@@ -137,7 +152,23 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.toggleWidth, alignment: .leading)
                     }
 
+                    Group {
+                        let treeState = model.folderTreeState
+                        if let structure = treeState.structure {
+                            FolderStructureEditor(structure: structure) { model.setFolderStructure($0) }
+                        } else {
+                            Text(treeState.explanation ?? "")
+                                .font(FCType.meta)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                        }
+                    }
+                    .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
+
                     if presetBinding.useFolderTemplate.wrappedValue {
+                        Text("The same layout as text")
+                            .font(FCType.meta)
+                            .foregroundColor(FilmCanTheme.textSecondary)
+                            .padding(.leading, OptionsLayout.iconWidth + OptionsLayout.spacing)
                         TextField("RUSHES/DAY_{counter}_{date}/CARD_{source}", text: presetBinding.folderTemplate)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.body, design: .monospaced))
@@ -166,12 +197,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("File Rename Template")
+                                Text(SettingsWording.renameFiles)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "File Rename Template",
+                                        title: SettingsWording.renameFiles,
                                         description: "Renames each copied item before it is placed in the destination.",
                                         notes: [
                                             "Use tokens like `{filename}` and `{counter}`.",
@@ -247,12 +278,12 @@ struct DestinationsOptionsView: View {
                             .frame(width: OptionsLayout.iconWidth)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("Custom date for tokens")
+                                Text(SettingsWording.customDateInNames)
                                     .font(FCType.itemTitle)
                                     .foregroundColor(FilmCanTheme.textPrimary)
                                 InfoPopoverButton(
                                     content: InfoPopoverContent(
-                                        title: "Custom date for tokens",
+                                        title: SettingsWording.customDateInNames,
                                         description: "Use a specific date for {date}, {time}, and {datetime}.",
                                         pros: [
                                             "Keeps folder names aligned with shoot day",

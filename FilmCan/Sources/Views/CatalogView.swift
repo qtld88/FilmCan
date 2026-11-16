@@ -6,9 +6,19 @@ struct CatalogView: View {
     @State private var query = ""
     @State private var mounted: Set<String> = []
     @State private var rollToForget: CatalogRoll?
+    /// "A001 on SSD_1" while a report is being created; one at a time.
+    @State private var reportInProgress: String?
+    @State private var reportFailure: String?
 
     /// Set when hosted in the main window's right pane; nil in the standalone window.
     var paneWidth: CGFloat? = nil
+    /// The selected movie tab. Nil shows every movie (no tab selected).
+    var scope: CatalogScope? = nil
+
+    /// The rolls this Catalog shows: the selected movie's only, when one is selected.
+    private var rolls: [CatalogRoll] {
+        scope.map { $0.rolls(in: store.rolls) } ?? store.rolls
+    }
 
     private var isCompact: Bool { (paneWidth ?? .infinity) < 420 }
 
@@ -24,6 +34,17 @@ struct CatalogView: View {
         VStack(spacing: 0) {
             searchField
             Divider().background(FilmCanTheme.cardStroke)
+            if let reportInProgress {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Creating the report for \(reportInProgress)…")
+                        .font(FCType.metaStrong)
+                        .foregroundColor(FilmCanTheme.textSecondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
             if trimmedQuery.isEmpty {
                 coverageList
             } else {
@@ -51,6 +72,14 @@ struct CatalogView: View {
         } message: {
             Text("The roll is removed from the catalog only. No file is deleted.")
         }
+        .alert("The report could not be created", isPresented: Binding(
+            get: { reportFailure != nil },
+            set: { if !$0 { reportFailure = nil } })
+        ) {
+            Button("OK", role: .cancel) { reportFailure = nil }
+        } message: {
+            Text(reportFailure ?? "")
+        }
     }
 
     private var searchField: some View {
@@ -67,10 +96,12 @@ struct CatalogView: View {
     // MARK: Coverage mode
 
     private var coverageList: some View {
-        let atRisk = MediaCatalog.atRisk(store.rolls)
+        let atRisk = MediaCatalog.atRisk(rolls)
         return Group {
-            if store.rolls.isEmpty {
-                placeholder("No roll recorded yet. Rolls appear here after their first backup.")
+            if rolls.isEmpty {
+                placeholder(scope == nil
+                    ? "No roll recorded yet. Rolls appear here after their first backup."
+                    : "No roll recorded for this movie yet. Rolls appear here after their first backup.")
             } else {
                 List {
                     if !atRisk.isEmpty {
@@ -102,7 +133,7 @@ struct CatalogView: View {
     private struct ProjectGroup { var name: String; var days: [DayGroup] }
 
     private var projectGroups: [ProjectGroup] {
-        let byProject = Dictionary(grouping: store.rolls, by: \.projectName)
+        let byProject = Dictionary(grouping: rolls, by: \.projectName)
         return byProject.keys.sorted().map { name in
             let byDay = Dictionary(grouping: byProject[name] ?? [], by: \.shootDay)
             let days = byDay.map { day, rolls in
@@ -143,6 +174,8 @@ struct CatalogView: View {
         .contextMenu {
             revealMenu(roll.copies, relPath: nil)
             Divider()
+            reportMenu(roll)
+            Divider()
             Button("Forget this roll") { rollToForget = roll }
         }
     }
@@ -167,6 +200,42 @@ struct CatalogView: View {
             } else {
                 Button("Reveal on \(copy.destVolumeName) (not connected)") {}
                     .disabled(true)
+            }
+        }
+    }
+
+    /// One pair of entries per connected drive that holds the roll.
+    @ViewBuilder
+    private func reportMenu(_ roll: CatalogRoll) -> some View {
+        let connected = distinctDrives(roll.copies).filter { isMounted($0) }
+        if connected.isEmpty {
+            Button("Create report (connect a drive that holds this roll)") {}
+                .disabled(true)
+        }
+        ForEach(connected, id: \.driveKey) { copy in
+            Button("Create report from \(copy.destVolumeName)") {
+                createReport(roll, copy, recheck: false)
+            }
+            .disabled(reportInProgress != nil)
+            Button("Create report from \(copy.destVolumeName), re-reading every file (slow)") {
+                createReport(roll, copy, recheck: true)
+            }
+            .disabled(reportInProgress != nil)
+        }
+    }
+
+    private func createReport(_ roll: CatalogRoll, _ copy: CatalogCopy, recheck: Bool) {
+        guard reportInProgress == nil else { return }
+        reportInProgress = "\(roll.rollName) on \(copy.destVolumeName)"
+        Task.detached(priority: .userInitiated) {
+            let path = await BackupReportWriter.recreate(roll: roll, copy: copy, recheck: recheck)
+            await MainActor.run {
+                reportInProgress = nil
+                if let path {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                } else {
+                    reportFailure = "\(roll.rollName) was not found on \(copy.destVolumeName), or the PDF could not be written to the reports folder."
+                }
             }
         }
     }
@@ -237,14 +306,14 @@ struct CatalogView: View {
 
     private var resultsList: some View {
         let limit = 200
-        let hits = MediaCatalog.search(trimmedQuery, in: store.rolls, limit: limit)
+        let hits = MediaCatalog.search(trimmedQuery, in: rolls, limit: limit)
         return Group {
             if hits.isEmpty {
                 placeholder("No clip matches “\(trimmedQuery)”.")
             } else {
                 List {
                     ForEach(hits) { hit in
-                        let hitCoverage = store.rolls.first(where: { $0.id == hit.rollId })?.coverage
+                        let hitCoverage = rolls.first(where: { $0.id == hit.rollId })?.coverage
                         HStack(alignment: .top, spacing: 10) {
                             VStack(alignment: .leading, spacing: 4) {
                                 VStack(alignment: .leading, spacing: 2) {

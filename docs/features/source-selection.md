@@ -42,15 +42,24 @@ and sound folders (e.g. **Netflix Ingest**).
 
 ## Card recognition
 
-Options › Source › **Detect camera and sound cards automatically** (off by default).
+Options › Source › **Detect camera and sound cards automatically** (on for a new movie; movies you already had keep their setting).
 FilmCan recognises a card from the folders the camera writes: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. A drive holding only WAV/BWF files is a sound card and is
 tagged Sound. Recognised cards get a badge ("Sony card") on their source row and are added to
 the sources when they are plugged in. Destinations are never added.
 
+Also recognised: Panasonic P2 cards, Insta360, AVCHD camcorders, and any other card with a
+standard `DCIM` folder that holds at least one video file (photo cameras, drones, phones);
+those show a plain "Camera card" badge. A `DCIM` card with photos only is not proposed.
+
 A wrong guess is corrected with a right-click on the source: **Camera card**, **Sound card**,
 **Not a camera card** or **Reset recognition**. The correction is remembered per drive
 (volume UUID).
+
+Settings › **Recognition** says in plain sentences what FilmCan looks at, lists every card
+family it knows, and shows what it has remembered: your corrections (per drive) and the roll
+names given to cards (per movie). **Forget** removes one entry: a forgotten correction lets
+FilmCan guess again, a forgotten roll name gives the card a new one the next time.
 
 See [Roll numbering](./roll-numbering.md) for automatic roll names.
 
@@ -142,11 +151,15 @@ caméra et son séparés (par exemple **Netflix Ingest**).
 
 ## Reconnaissance des cartes
 
-Options › Source › **Detect camera and sound cards automatically** (désactivé par défaut).
+Options › Source › **Detect camera and sound cards automatically** (activé sur un nouveau film ; les films déjà créés gardent leur réglage).
 FilmCan reconnaît une carte d'après les dossiers écrits par la caméra : ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. Un disque ne contenant que des fichiers WAV/BWF est une carte son et est
 marqué Sound. Les cartes reconnues reçoivent un badge (« Sony card ») sur leur ligne de source et sont ajoutées aux
 sources quand elles sont branchées. Les destinations ne sont jamais ajoutées.
+
+Sont aussi reconnues : les cartes Panasonic P2, Insta360, les caméscopes AVCHD, et toute autre carte avec un
+dossier `DCIM` standard contenant au moins un fichier vidéo (appareils photo, drones, téléphones) ;
+celles-ci portent un simple badge « Camera card ». Une carte `DCIM` qui ne contient que des photos n'est pas proposée.
 
 Une mauvaise détection se corrige par un clic droit sur la source : **Camera card**, **Sound card**,
 **Not a camera card** ou **Reset recognition**. La correction est mémorisée par disque
@@ -242,11 +255,15 @@ und Sound-Ordnern (z. B. **Netflix Ingest**).
 
 ## Kartenerkennung
 
-Options › Source › **Detect camera and sound cards automatically** (standardmäßig aus).
+Options › Source › **Detect camera and sound cards automatically** (bei einem neuen Film an; bereits vorhandene Filme behalten ihre Einstellung).
 FilmCan erkennt eine Karte an den Ordnern, die die Kamera schreibt: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. Ein Laufwerk mit nur WAV/BWF-Dateien ist eine Soundkarte und wird
 als Sound markiert. Erkannte Karten erhalten ein Badge („Sony card“) in ihrer Quellzeile und werden den
 Quellen hinzugefügt, sobald sie angesteckt werden. Ziele werden nie hinzugefügt.
+
+Ebenfalls erkannt: Panasonic-P2-Karten, Insta360, AVCHD-Camcorder und jede andere Karte mit einem
+Standard-`DCIM`-Ordner, der mindestens eine Videodatei enthält (Fotokameras, Drohnen, Telefone);
+diese tragen ein einfaches „Camera card“-Badge. Eine `DCIM`-Karte nur mit Fotos wird nicht vorgeschlagen.
 
 Eine falsche Erkennung korrigieren Sie mit einem Rechtsklick auf die Quelle: **Camera card**, **Sound card**,
 **Not a camera card** oder **Reset recognition**. Die Korrektur wird pro Laufwerk
@@ -342,11 +359,15 @@ y carpetas de sonido (por ejemplo, **Netflix Ingest**).
 
 ## Reconocimiento de tarjetas
 
-Options › Source › **Detect camera and sound cards automatically** (desactivado por defecto).
+Options › Source › **Detect camera and sound cards automatically** (activado en una película nueva; las películas que ya tenía conservan su ajuste).
 FilmCan reconoce una tarjeta por las carpetas que escribe la cámara: ARRI, RED, Sony, Canon,
 Panasonic, Blackmagic, DJI, GoPro. Una unidad que solo contiene archivos WAV/BWF es una tarjeta de sonido y se
 marca como Sound. Las tarjetas reconocidas reciben una insignia («Sony card») en su fila de origen y se añaden a los
 orígenes al conectarse. Los destinos nunca se añaden.
+
+También se reconocen: tarjetas Panasonic P2, Insta360, videocámaras AVCHD y cualquier otra tarjeta con una
+carpeta `DCIM` estándar que contenga al menos un archivo de vídeo (cámaras de fotos, drones, teléfonos);
+estas muestran una insignia simple «Camera card». Una tarjeta `DCIM` solo con fotos no se propone.
 
 Una detección errónea se corrige con clic derecho en el origen: **Camera card**, **Sound card**,
 **Not a camera card** o **Reset recognition**. La corrección se recuerda por unidad

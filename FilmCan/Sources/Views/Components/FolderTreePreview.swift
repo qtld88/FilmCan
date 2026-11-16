@@ -75,6 +75,7 @@ private struct FolderTreeRow: View {
                     .onChange(of: focused) { if !$0, !text.isEmpty { isEditing = false } }
             } else if let editing, line.togglesCopyMode {
                 Text(line.name).font(mono)
+                newBadge
                 Button { editing.onSetCopyContents(!editing.copyContents) } label: {
                     Image(systemName: "pencil").font(.system(size: 10))
                 }
@@ -89,6 +90,7 @@ private struct FolderTreeRow: View {
                 }
             } else {
                 Text(line.name).font(mono)
+                newBadge
                 if let editing, line.isEditable {
                     Button(action: startEditing) {
                         Image(systemName: "pencil").font(.system(size: 10))
@@ -107,6 +109,19 @@ private struct FolderTreeRow: View {
         }
         .foregroundColor(line.isNew ? FilmCanTheme.brandYellow : FilmCanTheme.textSecondary)
         .onAppear { if needsName && (editing?.autoEdit ?? false) { startEditing() } }
+    }
+
+    /// Says in words what the colour says: this folder does not exist yet.
+    @ViewBuilder
+    private var newBadge: some View {
+        if FolderTreeLine.showsNewBadge(line) {
+            Text("new")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.black)
+                .padding(.horizontal, 5)
+                .background(Capsule().fill(FilmCanTheme.brandYellow))
+                .accessibilityLabel("will be created")
+        }
     }
 
     private func startEditing() {

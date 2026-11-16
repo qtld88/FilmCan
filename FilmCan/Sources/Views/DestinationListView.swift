@@ -24,6 +24,8 @@ struct DestinationListView: View {
     /// Camera/Sound tag per source path, so the preview shows the Camera_Media /
     /// Sound_Media path the source will actually land in.
     var mediaKind: (String) -> SourceMediaKind = { _ in .camera }
+    /// Roll folder given to a generic-named card (Untitled_01), shown in the folder tree.
+    var rollName: (String) -> String? = { _ in nil }
     var shootMetadata: ShootMetadata = .empty
     var copyFolderContents: Bool = true
     var configId: UUID
@@ -32,7 +34,8 @@ struct DestinationListView: View {
     /// Checkbox per drive: unchecked drives stay listed, greyed, but get no copy.
     var isIncluded: (String) -> Bool = { _ in true }
     var setIncluded: (([String], Bool) -> Void)? = nil
-    private let previewDate = Date()
+    @ObservedObject private var todayClock = TodayClock.shared
+    @State private var showExistingFolders = false
     private var isActiveTransfer: Bool {
         transferViewModel.isTransferActive(for: configId)
     }
@@ -76,11 +79,23 @@ struct DestinationListView: View {
                 }
 
                 if sharedTree, let first = treeDestinations.first {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Folders on every drive")
-                            .font(FCType.metaStrong)
-                            .foregroundColor(FilmCanTheme.textSecondary)
-                        FolderTreePreview(lines: treeLines(for: first))
+                    let sharedLines = treeLines(for: first)
+                    if MainScreenChrome.treeStartsCollapsed(sharedLines) {
+                        // Nothing new to create: one line, the tree is a click away.
+                        DisclosureGroup(isExpanded: $showExistingFolders) {
+                            FolderTreePreview(lines: sharedLines)
+                        } label: {
+                            Text("Folders already on every drive")
+                                .font(FCType.metaStrong)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Folders on every drive")
+                                .font(FCType.metaStrong)
+                                .foregroundColor(FilmCanTheme.textSecondary)
+                            FolderTreePreview(lines: sharedLines)
+                        }
                     }
                 }
                 
@@ -153,7 +168,7 @@ struct DestinationListView: View {
     private var driveBlocks: some View {
         let summaries = driveSummaries(for: destinations)
         let fulfilled = fulfilledDestinationsForCurrentConfig()
-        let numbers = DriveIncludeColumn.numbers(for: summaries.map(\.id)) { id in
+        let numbers = MainScreenChrome.displayNumbers(for: summaries.map(\.id)) { id in
             summaries.first { $0.id == id }?.paths.contains { isIncluded($0.path) } ?? true
         }
         return VStack(alignment: .leading, spacing: 12) {
@@ -183,7 +198,11 @@ struct DestinationListView: View {
                                 .foregroundColor(FilmCanTheme.textPrimary)
                                 .lineLimit(1)
                             Spacer()
+                            if summary.isConnected, let first = summary.paths.first?.path {
+                                EjectButton(path: first, onError: { ejectErrorMessage = $0 })
+                            }
                         }
+                        sharedDriveNote(paths: paths)
                         .contentShape(Rectangle())
                         .contextMenu {
                             Button("Remove drive from this backup") {
@@ -206,7 +225,8 @@ struct DestinationListView: View {
                             .padding(.leading, 26)
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { destination in
-                                    destinationPathRow(destination: destination, isExternal: summary.isExternal)
+                                    destinationPathRow(destination: destination, isExternal: summary.isExternal,
+                                                       sharesDrive: summary.paths.count > 1)
                                 }
                             }
                             .padding(.leading, 26)
@@ -214,7 +234,8 @@ struct DestinationListView: View {
                         } else {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(summary.paths) { destination in
-                                    destinationPathRow(destination: destination, isExternal: summary.isExternal)
+                                    destinationPathRow(destination: destination, isExternal: summary.isExternal,
+                                                       sharesDrive: summary.paths.count > 1)
                                 }
                                 Text(summary.connectionMessage)
                                     .font(FCType.meta)
@@ -261,7 +282,8 @@ struct DestinationListView: View {
         }
     }
 
-    private func destinationPathRow(destination: DestinationPath, isExternal: Bool) -> some View {
+    private func destinationPathRow(destination: DestinationPath, isExternal: Bool,
+                                    sharesDrive: Bool = false) -> some View {
         let icon = DriveUtilities.iconName(
             isExternal: isExternal,
             isRoot: destination.isRoot,
@@ -282,20 +304,19 @@ struct DestinationListView: View {
         let status = presentation.status
         let progressLabelWidth: CGFloat = 120
         let percentLabelWidth: CGFloat = 42
-        let rowHasContent = !destination.isRoot || treeSources.isEmpty || showProgress
+        // A row on a shared drive always shows: it carries that destination's own
+        // checkbox and name, so each place a run writes to is visible and choosable.
+        let rowHasContent = sharesDrive || !destination.isRoot || treeSources.isEmpty || showProgress
             || (!sharedTree && isIncluded(destination.path))
+        let pathIncluded = isIncluded(destination.path)
         return VStack(alignment: .leading, spacing: 6) {
             if rowHasContent || status != .pending {
             HStack(spacing: 10) {
+                placeCheckbox(path: destination.path, shown: sharesDrive)
                 statusOrDriveIcon(status: status, systemIcon: icon)
                     .frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 4) {
-                    if !destination.isRoot {
-                        Text((destination.path as NSString).lastPathComponent)
-                            .font(FCType.bodyStrong)
-                            .foregroundColor(FilmCanTheme.textPrimary)
-                            .lineLimit(1)
-                    }
+                    placeTitle(destination: destination, sharesDrive: sharesDrive)
                     if treeSources.isEmpty {
                         Text("→ \(rootLabel)")
                             .font(FCType.meta)
@@ -382,7 +403,7 @@ struct DestinationListView: View {
             }
 
             if isFanOutActive {
-                if let destProg = progress.perDestProgress.first(where: { $0.id == destination.path }) {
+                if let destProg = progress.perDestProgress.sharedTimingRow(for: destination.path) {
                     InlineFanOutProgress(progress: destProg, showPill: true,
                                          multiDestination: progress.perDestProgress.count > 1)
                         .padding(.leading, 28)
@@ -392,8 +413,14 @@ struct DestinationListView: View {
                     .padding(.leading, 28)
             }
         }
+        .opacity(sharesDrive && !pathIncluded ? 0.45 : 1)
         .contentShape(Rectangle())
         .contextMenu {
+            Button("Choose a Folder on This Drive…") {
+                chooseFolder(replacing: destination.path)
+            }
+            .disabled(isActiveTransfer)
+            Divider()
             Button("Remove destination from this backup") {
                 removeDestination(destination.path)
             }
@@ -431,7 +458,8 @@ struct DestinationListView: View {
         sourcePaths.map { path in
             var isDir: ObjCBool = false
             FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path))
+            return FolderTreeBuilder.Source(path: path, isDirectory: isDir.boolValue, kind: mediaKind(path),
+                                       rollName: isDir.boolValue ? rollName(path) : nil)
         }
     }
 
@@ -442,7 +470,7 @@ struct DestinationListView: View {
             $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
         } ?? false
         o.copyContents = copyFolderContents
-        o.date = previewDate
+        o.date = todayClock.today
         o.metadata = shootMetadata
         o.mediaIndexPreset = organizationPreset
         return o
@@ -464,6 +492,62 @@ struct DestinationListView: View {
         guard !treeSources.isEmpty, let first = treeDestinations.first else { return false }
         let reference = treeLines(for: first)
         return treeDestinations.dropFirst().allSatisfy { treeLines(for: $0) == reference }
+    }
+
+    /// Own checkbox for one place on a drive that holds several destinations.
+    @ViewBuilder
+    private func placeCheckbox(path: String, shown: Bool) -> some View {
+        if shown, let setIncluded {
+            let included = isIncluded(path)
+            Toggle("", isOn: Binding(get: { included }, set: { setIncluded([path], $0) }))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .disabled(isActiveTransfer)
+                .help(included
+                      ? "Copied here — uncheck to skip only this place on the drive"
+                      : "Skipped — check to also copy here")
+        }
+    }
+
+    /// Name of a destination row: the folder's name, or "Top of the drive" for the
+    /// drive itself when it shares the card with folders on it.
+    @ViewBuilder
+    private func placeTitle(destination: DestinationPath, sharesDrive: Bool) -> some View {
+        let skipped = sharesDrive && !isIncluded(destination.path)
+        let name: String? = destination.isRoot
+            ? (sharesDrive ? "Top of the drive" : nil)
+            : (destination.path as NSString).lastPathComponent
+        if let name {
+            Text(skipped ? "\(name) · Skipped" : name)
+                .font(FCType.bodyStrong)
+                .foregroundColor(FilmCanTheme.textPrimary)
+                .lineLimit(1)
+        }
+    }
+
+    /// Several destinations on one drive share a card; say so, or a run writes to
+    /// places nobody expected. Empty for a drive with a single destination.
+    @ViewBuilder
+    private func sharedDriveNote(paths: [String]) -> some View {
+        if paths.count > 1 {
+            let included = paths.filter { isIncluded($0) }.count
+            Text(Self.placesOnDriveText(included: included, total: paths.count))
+                .font(FCType.metaStrong)
+                .foregroundColor(FilmCanTheme.brandOrange)
+                .padding(.leading, 26)
+        }
+    }
+
+    /// Note on a drive card that holds several destinations, e.g. "Copies to 2 places
+    /// on this drive". Each place gets the whole backup, so it also needs the space.
+    static func placesOnDriveText(included: Int, total: Int) -> String {
+        if included == total {
+            return "Copies to \(total) places on this drive — each gets the full backup"
+        }
+        if included == 0 {
+            return "\(total) places on this drive, none checked"
+        }
+        return "Copies to \(included) of \(total) places on this drive"
     }
 
     private func destinationRootLabel(_ path: String) -> String {
@@ -514,7 +598,7 @@ struct DestinationListView: View {
                 sourcePath: sourcePath,
                 destinationRoot: destinationRoot,
                 counter: counter,
-                date: previewDate,
+                date: todayClock.today,
                 metadata: shootMetadata,
                 mediaKind: mediaKind(sourcePath)
             )
@@ -1000,7 +1084,7 @@ struct DestinationListView: View {
     }
 
     private func connectionStatus(for path: String, summary: DriveUtilities.Summary, cached: DriveInfoSnapshot) -> (isConnected: Bool, message: String) {
-        if volumeRootPath(for: path) != nil {
+        if VolumesInUse.volumeRoot(for: path) != nil {
             if cached.rootExists {
                 if summary.isReadOnly == true {
                     let formatLabel = summary.formatLabel.map { " (\($0))" } ?? ""
@@ -1018,12 +1102,6 @@ struct DestinationListView: View {
             return (true, "")
         }
         return (false, "Destination path not found")
-    }
-
-    private func volumeRootPath(for path: String) -> String? {
-        let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
-        guard components.count >= 3, components[1] == "Volumes" else { return nil }
-        return "/Volumes/\(components[2])"
     }
 
     private func removeDestination(_ path: String) {
@@ -1056,18 +1134,11 @@ struct DestinationListView: View {
     }
 
     private func ejectVolume(for path: String, onSuccess: (() -> Void)? = nil) {
-        guard let root = volumeRootPath(for: path) else {
-            ejectErrorMessage = "This destination isn't on an ejectable volume."
-            return
-        }
-        let url = URL(fileURLWithPath: root)
         Task { @MainActor in
-            switch await DriveEjector.eject(volumeURL: url) {
-            case .success:
-                onSuccess?()
-            case .failure(let error):
-                ejectErrorMessage = error.errorDescription
-                DebugLog.warn("Eject failed for \(root): \(error)")
+            switch await VolumeEjectFlow.eject(path: path, warnIfUnsealed: false) {
+            case .ejected: onSuccess?()
+            case .cancelled: break
+            case .failed(let message): ejectErrorMessage = message
             }
         }
     }
@@ -1191,19 +1262,12 @@ struct DestinationListView: View {
         DriveUtilities.driveId(for: path)
     }
 
-    private func selectDestination(at index: Int) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            if index < destinations.count {
-                destinations[index] = url.path
-            }
-        }
+    private func chooseFolder(replacing path: String) {
+        guard let picked = FolderPick.chooseFolder(
+            startingAt: path, message: "Choose the folder to save to") else { return }
+        destinations = FolderPick.replacing(path, with: picked, in: destinations)
     }
-    
+
     private func addDestination() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false

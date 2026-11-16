@@ -108,6 +108,7 @@ extension Notification.Name {
     static let filmCanRestartTour = Notification.Name("FilmCanRestartTour")
     static let filmCanTourNameConfirmed = Notification.Name("FilmCanTourNameConfirmed")
     static let filmCanTourNameSubmitted = Notification.Name("FilmCanTourNameSubmitted")
+    static let filmCanNewMovie = Notification.Name("FilmCanNewMovie")
     static let filmCanHotkeyRunNow = Notification.Name("FilmCanHotkeyRunNow")
     static let filmCanHotkeyAddSource = Notification.Name("FilmCanHotkeyAddSource")
     static let filmCanHotkeyAddDestination = Notification.Name("FilmCanHotkeyAddDestination")

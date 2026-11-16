@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Root
 
@@ -45,6 +46,53 @@ private struct QCPanel<Content: View>: View {
         case .settings:
             FCCard(title: title, trailing: trailing, role: .settings, icon: "slider.horizontal.3") { content }
         }
+    }
+}
+
+/// Accepts Finder file/folder drops and hands the paths over in one batch.
+/// Highlights the card with a dashed yellow border while a drag hovers it.
+private struct QCFileDrop: ViewModifier {
+    let onPaths: ([String]) -> Void
+    @State private var isTargeted = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: FCRadius.card)
+                    .strokeBorder(FilmCanTheme.brandYellow, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .opacity(isTargeted ? 1 : 0)
+                    .allowsHitTesting(false)
+            )
+            .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
+                load(providers)
+                return true
+            }
+    }
+
+    private func load(_ providers: [NSItemProvider]) {
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var urls: [Int: URL] = [:]
+        for (index, provider) in providers.enumerated()
+        where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                defer { group.leave() }
+                guard let data = item as? Data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                lock.lock(); urls[index] = url; lock.unlock()
+            }
+        }
+        group.notify(queue: .main) {
+            let paths = urls.sorted { $0.key < $1.key }.map { $0.value.standardizedFileURL.path }
+            if !paths.isEmpty { onPaths(paths) }
+        }
+    }
+}
+
+private extension View {
+    func qcFileDrop(_ onPaths: @escaping ([String]) -> Void) -> some View {
+        modifier(QCFileDrop(onPaths: onPaths))
     }
 }
 
@@ -152,7 +200,6 @@ struct QuickCopySetupView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sourcesPanel
                         settingsPanel
-                        if session.form.selectedPresetId == nil { savePresetPanel }
                     }
                     .frame(minWidth: 300, idealWidth: 340, maxWidth: 380)
                     flowArrow
@@ -210,10 +257,16 @@ struct QuickCopySetupView: View {
                             if session.form.showsMediaKind {
                                 CameraSoundSwitch(kind: item.kind) { session.form.items[index].kind = $0 }
                             }
-                            if session.form.items.count > 1 {
-                                Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
-                                    .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
-                                    .help("Remove source")
+                            EjectButton(path: item.path, warnIfUnsealed: true,
+                                        onEjected: { session.removeEjectedVolume(containing: item.path) },
+                                        onError: session.showEjectError)
+                            Button { session.removeSource(item.path) } label: { Image(systemName: "xmark") }
+                                .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
+                                .help("Remove source")
+                        }
+                        if let rollName = session.form.rollFolderFieldValue(for: item) {
+                            RollFolderField(value: rollName) {
+                                session.form.setRollNameOverride($0, for: item.path)
                             }
                         }
                     }
@@ -223,6 +276,22 @@ struct QuickCopySetupView: View {
                 Label("Add source", systemImage: "plus")
             }
             .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+            .help("Or drop files and folders on this card")
+        }
+        .qcFileDrop { session.addSources($0) }
+        .alert(
+            "\"\(session.form.pendingGenericWarning.map { GenericCardName.baseName($0.name) } ?? "")\" is a generic card name",
+            isPresented: Binding(
+                get: { session.form.pendingGenericWarning != nil },
+                set: { _ in }),
+            presenting: session.form.pendingGenericWarning
+        ) { item in
+            Button("Copy into \"\(session.form.suggestedRollName(for: item))\"") {
+                session.form.acceptGenericWarning()
+            }
+            Button("Continue anyway", role: .cancel) { session.form.dismissGenericWarning() }
+        } message: { _ in
+            Text("Copying the contents puts every card's files in the same folder. If you copy several cards, their files will mix (C0001.MP4 exists on each card).")
         }
     }
 
@@ -247,6 +316,9 @@ struct QuickCopySetupView: View {
                         }
                     }
                     Spacer()
+                    EjectButton(path: path,
+                                onEjected: { session.removeEjectedVolume(containing: path) },
+                                onError: session.showEjectError)
                     Button { session.removeDestination(path) } label: { Image(systemName: "xmark") }
                         .buttonStyle(.plain).foregroundColor(FilmCanTheme.textSecondary)
                         .help("Remove destination")
@@ -257,6 +329,7 @@ struct QuickCopySetupView: View {
                 Label("Add destination", systemImage: "plus")
             }
             .buttonStyle(.plain).foregroundColor(FilmCanTheme.brandYellow)
+            .help("Or drop folders or drives on this card")
             if sharedTree, let first = session.form.destinations.first {
                 Divider().padding(.vertical, 2)
                 Text("Folders on every drive")
@@ -264,6 +337,7 @@ struct QuickCopySetupView: View {
                 folderTree(for: first, autoEdit: true)
             }
         }
+        .qcFileDrop { session.addDestinations($0) }
     }
 
     /// One tree stands for every destination unless they would differ (a folder that
@@ -278,12 +352,15 @@ struct QuickCopySetupView: View {
     // Settings
     private var settingsPanel: some View {
         QCPanel(title: "SETTINGS") {
-            QCSettingRow(label: "Preset") {
-                Picker("", selection: $session.form.selectedPresetId) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(session.form.savedPresets) { Text($0.name).tag(UUID?.some($0.id)) }
+            QCSettingRow(label: "Movie") {
+                Picker("", selection: Binding(
+                    get: { session.form.selectedFilmId },
+                    set: { session.selectFilm($0) })) {
+                    Text("No movie").tag(UUID?.none)
+                    ForEach(session.form.savedFilms) { Text($0.name).tag(UUID?.some($0.id)) }
                 }
             }
+            .help("A movie loads its folder settings and files this copy under it in history and the catalog. A change made here is for this copy only.")
             if let chips = session.form.presetChips {
                 QCChipFlow(chips: chips).help(session.form.presetChipsHelp ?? "")
                 Button("Edit in FilmCan…") { QuickCopyCoordinator.shared.showMainWindow() }
@@ -348,14 +425,6 @@ struct QuickCopySetupView: View {
                     if line.isRoot { session.form.rootFolderName = nil }
                     else if let kind = line.mediaKind { session.form.mediaFolderNames[kind] = nil }
                 }))
-    }
-
-    // Save as preset
-    private var savePresetPanel: some View {
-        QCPanel(title: "SAVE AS PRESET") {
-            TextField("Preset name (empty = don't save)", text: $session.form.savePresetName)
-                .textFieldStyle(.roundedBorder)
-        }
     }
 
     // Footer
@@ -426,7 +495,7 @@ struct QuickCopyProgressView: View {
             Divider()
             footer
         }
-        .sheet(item: $worker.activeDuplicatePrompt) { prompt in
+        .sheet(item: duplicatePromptBinding) { prompt in
             DuplicatePromptSheet(
                 prompt: prompt,
                 onDecision: { action, applyToAll, counterTemplate in
@@ -442,22 +511,45 @@ struct QuickCopyProgressView: View {
             )
             .interactiveDismissDisabled()
         }
-        .sheet(item: $worker.activeRollIdentityPrompt) { prompt in
+        .sheet(item: rollIdentityPromptBinding) { prompt in
             RollIdentitySheet(prompt: prompt) { isResume in
                 worker.submitRollIdentity(isResume: isResume)
             }
             .interactiveDismissDisabled()
         }
-        .sheet(isPresented: Binding(
-            get: { !worker.pendingUnreadableFiles.isEmpty },
-            set: { if !$0 { worker.resolveUnreadable(proceed: false) } }
-        )) {
+        .sheet(isPresented: unreadablePromptBinding) {
             UnreadableFilesSheet(
                 paths: worker.pendingUnreadableFiles,
                 onContinue: { worker.resolveUnreadable(proceed: true) },
                 onCancel: { worker.resolveUnreadable(proceed: false) }
             )
         }
+    }
+
+    // Each binding captures the prompt it was built for, so a late dismissal write
+    // answers that prompt (never a newer one) and the engine is always resumed.
+    private var duplicatePromptBinding: Binding<DuplicatePrompt?> {
+        let shown = worker.activeDuplicatePrompt?.id
+        return Binding(
+            get: { worker.activeDuplicatePrompt },
+            set: { if $0 == nil, let shown { worker.dismissDuplicatePrompt(id: shown) } }
+        )
+    }
+
+    private var rollIdentityPromptBinding: Binding<RollIdentityPrompt?> {
+        let shown = worker.activeRollIdentityPrompt?.id
+        return Binding(
+            get: { worker.activeRollIdentityPrompt },
+            set: { if $0 == nil, let shown { worker.dismissRollIdentityPrompt(id: shown) } }
+        )
+    }
+
+    private var unreadablePromptBinding: Binding<Bool> {
+        let shown = worker.pendingUnreadableFiles
+        return Binding(
+            get: { !worker.pendingUnreadableFiles.isEmpty },
+            set: { if !$0 { worker.dismissUnreadablePrompt(paths: shown) } }
+        )
     }
 
     private var header: some View {
@@ -500,7 +592,7 @@ struct QuickCopyProgressView: View {
                 Label(fallback ?? "Not completed", systemImage: "xmark.circle.fill")
                     .foregroundColor(FilmCanTheme.dangerText)
             } else {
-                let live = worker.progress.perDestProgress.first { $0.id == destination }
+                let live = worker.progress.perDestProgress.sharedTimingRow(for: destination)
                     ?? DestProgress(id: destination, displayName: name, status: .preparing,
                                     verifyMode: session.form.effectiveVerification)
                 InlineFanOutProgress(progress: live, showPill: true,

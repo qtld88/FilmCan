@@ -52,6 +52,9 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
     /// Quick Copy only: hash-list format for runs started from the Quick Copy
     /// window. Main-app backups keep using `BackupConfiguration.hashListStyle`.
     var hashListStyle: HashListStyle = .ascMHL
+    /// Set on a film's own copy of its settings: the id of the film that owns it.
+    /// Nil for a shared preset (a starting point any film or Quick Copy can pick).
+    var ownerFilmId: UUID?
 
     private enum CodingKeys: String, CodingKey {
         case id, name, folderTemplate, soundFolderTemplate, renameTemplate
@@ -61,7 +64,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         case copyFolderContents, runInParallel, engineOptions
         case logEnabled, logLocation, customLogPath, logFileNameTemplate
         case useCustomDate, customDate
-        case projectName, hashListStyle
+        case projectName, hashListStyle, ownerFilmId
     }
     
     init() {}
@@ -93,7 +96,8 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         customDate = try c.decodeIfPresent(Date.self, forKey: .customDate) ?? Date()
         projectName = try c.decodeIfPresent(String.self, forKey: .projectName) ?? ""
         hashListStyle = try c.decodeIfPresent(HashListStyle.self, forKey: .hashListStyle) ?? .ascMHL
-        
+        ownerFilmId = try c.decodeIfPresent(UUID.self, forKey: .ownerFilmId)
+
         duplicateCounterTemplate = try c.decodeIfPresent(String.self, forKey: .duplicateCounterTemplate) ?? "_001"
     }
     
@@ -123,6 +127,7 @@ struct OrganizationPreset: Codable, Identifiable, Equatable {
         try c.encode(customDate, forKey: .customDate)
         try c.encode(projectName, forKey: .projectName)
         try c.encode(hashListStyle, forKey: .hashListStyle)
+        try c.encodeIfPresent(ownerFilmId, forKey: .ownerFilmId)
     }
 }
 

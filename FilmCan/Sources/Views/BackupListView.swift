@@ -10,6 +10,7 @@ struct BackupListView: View {
     var trailingInset: CGFloat = 0
     @ObservedObject private var storage = ConfigurationStorage.shared
     @State private var draggingConfigId: UUID? = nil
+    @State private var showNewMovieChoice = false
     
     var body: some View {
         HStack(spacing: 0) {
@@ -56,6 +57,9 @@ struct BackupListView: View {
                             },
                             onShowDestination: {
                                 showInFinder(paths: config.destinationPaths)
+                            },
+                            onExportSettings: {
+                                exportSettings(of: config)
                             }
                         )
                         .onDrag {
@@ -73,7 +77,7 @@ struct BackupListView: View {
                     }
 
                     Button(action: {
-                        _ = appState.createNewConfig()
+                        showNewMovieChoice = true
                     }) {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .bold))
@@ -85,6 +89,9 @@ struct BackupListView: View {
                     .clipShape(Circle())
                     .help("New movie")
                     .tourAnchor("addBackup")
+                    .popover(isPresented: $showNewMovieChoice, arrowEdge: .bottom) {
+                        NewMovieChoice(appState: appState) { showNewMovieChoice = false }
+                    }
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 10)
@@ -109,6 +116,7 @@ private struct MovieTabButton: View {
     let onShowLogs: () -> Void
     let onShowSource: () -> Void
     let onShowDestination: () -> Void
+    let onExportSettings: () -> Void
 
     @State private var isHovered = false
     @State private var isEditingTitle = false
@@ -155,8 +163,8 @@ private struct MovieTabButton: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .stroke(borderColor, lineWidth: isSelected ? 1.5 : 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(progressOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture {
             onSelect()
@@ -167,6 +175,7 @@ private struct MovieTabButton: View {
             Button("Rename") { beginEditingTitle() }
             Button("Run Now") { onRun() }
             Button("Duplicate") { onDuplicate() }
+            Button("Export Settings\u{2026}") { onExportSettings() }
             Button("Show Source") { onShowSource() }
             Button("Show Destination") { onShowDestination() }
             Button("Show Logs") { onShowLogs() }
@@ -240,15 +249,23 @@ private struct MovieTabButton: View {
         isActiveTransfer ? progressValue : 0
     }
 
+    /// Thin bar along the tab's bottom edge, drawn inside the rounded clip so it
+    /// follows the corners, with a faint track so 0% still reads as "running".
     @ViewBuilder
     private var progressOverlay: some View {
         if isActiveTransfer {
             GeometryReader { geo in
                 let clamped = max(0, min(activeTransferProgress, 1))
-                Rectangle()
-                    .fill(FilmCanTheme.brandGreen)
-                    .frame(width: max(6, geo.size.width * clamped), height: 2)
-                    .offset(x: 0, y: geo.size.height - 2)
+                ZStack(alignment: .bottomLeading) {
+                    Rectangle()
+                        .fill(FilmCanTheme.brandGreen.opacity(0.2))
+                        .frame(width: geo.size.width, height: 3)
+                    Rectangle()
+                        .fill(FilmCanTheme.brandGreen)
+                        .frame(width: geo.size.width * clamped, height: 3)
+                        .animation(.linear(duration: 0.4), value: clamped)
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottomLeading)
             }
             .allowsHitTesting(false)
         }
@@ -297,4 +314,23 @@ private func showInFinder(paths: [String]) {
     }
     guard !urls.isEmpty else { return }
     NSWorkspace.shared.activateFileViewerSelecting(urls)
+}
+
+/// Saves one movie's settings as `<Movie name>.filmcan-movie`.
+@MainActor
+private func exportSettings(of config: BackupConfiguration) {
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [MovieSettingsFile.contentType]
+    panel.nameFieldStringValue = "\(config.name).\(MovieSettingsFile.fileExtension)"
+    panel.message = "Save this movie's settings"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+        try AppState.shared.settingsFileData(for: config).write(to: url, options: .atomic)
+    } catch {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn't export the settings"
+        alert.informativeText = error.localizedDescription
+        alert.runModal()
+    }
 }

@@ -36,7 +36,10 @@ struct LogsOptionsView: View {
             title: "PDF report",
             description: "Writes a PDF next to each log with one thumbnail per clip, sizes, durations and checksums.",
             cons: ["Takes extra time after the copy (runs in the background)"],
-            notes: ["ARRI, RED and BRAW clips show an icon unless a QuickLook plugin is installed."]
+            notes: [
+                "MXF clips need Apple's free Pro Video Formats package, otherwise they show an icon.",
+                "ARRI, RED and BRAW clips show an icon unless a QuickLook plugin is installed."
+            ]
         )
     }
 

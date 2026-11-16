@@ -1,9 +1,14 @@
 import XCTest
 @testable import FilmCan
 
-private actor VerifyEmitCollector {
-    var verify: [Int64] = []
-    func add(_ v: Int64) { verify.append(v) }
+/// Records emits in the order the engine makes them. (An actor fed by one `Task`
+/// per emit recorded them in whatever order those tasks happened to run, which
+/// made the monotonic check below fail now and then with the engine in order.)
+private final class VerifyEmitCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Int64] = []
+    func add(_ v: Int64) { lock.lock(); values.append(v); lock.unlock() }
+    var verify: [Int64] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
 private actor ETACollector {
@@ -1053,16 +1058,14 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             mhlBasePath: tmpDir.path,
             dryRun: false,
             progressHandler: { prog in
-                Task { await emits.add(prog.verifyBytesCompleted) }
+                emits.add(prog.verifyBytesCompleted)
             }
         )
 
         let results = try await FanOutCopier(config: config).run()
         XCTAssertTrue(results.allSatisfy { $0.success })
 
-        // Allow the detached emit Tasks to drain.
-        try await Task.sleep(for: .milliseconds(200))
-        let verify = await emits.verify
+        let verify = emits.verify
 
         // Distinct increasing verify values BETWEEN 0 and the full file size prove
         // the signal is continuous, not a single whole-file jump.
@@ -1139,5 +1142,93 @@ final class FanOutCopierIntegrationTests: XCTestCase {
         let second = try await FanOutCopier(config: resumeConfig(card: card, dest: dest)).run()
         XCTAssertEqual(second.first?.filesTransferred, 0, "a legacy-size manifest must still resume")
         XCTAssertGreaterThan(second.first?.filesSkipped ?? 0, 0)
+    }
+    // MARK: - Final state is Complete at 100%
+
+    private func runAndCaptureEmits(mode: VerifyMode, tag: String) async throws -> [DestProgress] {
+        let src1 = tmpDir.appendingPathComponent("\(tag)-a.bin")
+        let src2 = tmpDir.appendingPathComponent("\(tag)-b.bin")
+        let d1 = Data((0..<200 * 1024).map { _ in UInt8.random(in: 0...255) })
+        let d2 = Data((0..<150 * 1024).map { _ in UInt8.random(in: 0...255) })
+        try d1.write(to: src1); try d2.write(to: src2)
+        let dest = tmpDir.appendingPathComponent("\(tag)-dest")
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let lock = NSLock()
+        var emits: [DestProgress] = []
+        let handler: @Sendable (DestProgress) -> Void = { prog in
+            lock.lock(); emits.append(prog); lock.unlock()
+        }
+        let config = FanOutCopier.Configuration(
+            sources: [src1.path, src2.path],
+            destinations: [
+                DestWriter.Config(destPath: dest.path, displayName: tag,
+                                  verifyMode: mode, requiresFullFsync: false,
+                                  chunkSize: 65536)
+            ],
+            verifyMode: mode, mhlBasePath: nil, dryRun: false,
+            progressHandler: handler)
+        let results = try await FanOutCopier(config: config).run()
+        XCTAssertTrue(results[0].success)
+        lock.lock(); defer { lock.unlock() }
+        return emits
+    }
+
+    func test_lastEmit_isCompleteAtFullBytes_everyVerifyMode() async throws {
+        for mode in VerifyMode.allCases {
+            let emits = try await runAndCaptureEmits(mode: mode, tag: "final-\(mode.rawValue)")
+            let last = try XCTUnwrap(emits.last, "\(mode): no emits")
+            XCTAssertEqual(last.status, .complete, "\(mode): last emit not complete")
+            XCTAssertGreaterThan(last.bytesTotal, 0)
+            XCTAssertEqual(last.bytesCompleted, last.bytesTotal, "\(mode): copy bytes not at 100%")
+            if mode != .off {
+                XCTAssertEqual(last.verifyBytesCompleted, last.verifyBytesTotal, "\(mode): verify bytes not at 100%")
+            }
+        }
+    }
+
+    func test_completeIsNeverEmittedBeforeVerifyFinishes() async throws {
+        for mode in [VerifyMode.fast, .paranoid] {
+            let emits = try await runAndCaptureEmits(mode: mode, tag: "early-\(mode.rawValue)")
+            for e in emits where e.status == .complete {
+                XCTAssertEqual(e.verifyBytesCompleted, e.verifyBytesTotal,
+                               "\(mode): .complete emitted while verify still pending")
+            }
+        }
+    }
+
+    func test_mergedStatus_completeIsStickyAgainstStaleEmits() {
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .complete, incoming: .active), .complete)
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .complete, incoming: .preparing), .complete)
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .complete, incoming: .failed(.verify)), .failed(.verify))
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .active, incoming: .complete), .complete)
+        XCTAssertEqual(TransferViewModel.mergedStatus(previous: .active, incoming: .active), .active)
+    }
+
+    func test_twoUntitledCards_contentsMode_withRollNames_stayInSeparateFolders() async throws {
+        let fm = FileManager.default
+        var cards: [String] = []
+        for parent in ["cardA", "cardB"] {
+            let card = tmpDir.appendingPathComponent(parent).appendingPathComponent("Untitled")
+            try fm.createDirectory(at: card, withIntermediateDirectories: true)
+            try Data(parent.utf8).write(to: card.appendingPathComponent("C0001.MP4"))
+            cards.append(card.path)
+        }
+        let dest = tmpDir.appendingPathComponent("dest")
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        let config = FanOutCopier.Configuration(
+            sources: cards,
+            destinations: [DestWriter.Config(destPath: dest.path, displayName: "D", verifyMode: .fast,
+                                             requiresFullFsync: false, chunkSize: 32768)],
+            verifyMode: .fast, mhlBasePath: nil, dryRun: false, progressHandler: nil,
+            copyFolderContents: true,
+            rollNames: [cards[0]: "Untitled_01", cards[1]: "Untitled_02"])
+        let results = try await FanOutCopier(config: config).run()
+
+        XCTAssertTrue(results.allSatisfy { $0.success })
+        XCTAssertEqual(try String(contentsOf: dest.appendingPathComponent("Untitled_01/C0001.MP4")), "cardA")
+        XCTAssertEqual(try String(contentsOf: dest.appendingPathComponent("Untitled_02/C0001.MP4")), "cardB")
+        XCTAssertFalse(fm.fileExists(atPath: dest.appendingPathComponent("C0001.MP4").path))
     }
 }

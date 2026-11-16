@@ -314,8 +314,8 @@ extension QuickTourStep {
             requirement: .none
         ),
         QuickTourStep(
-            title: "Options Tabs",
-            message: "Basic, Destinations, Logs, and Refinements control copy behavior, organization templates, logging, and safety options.",
+            title: "Movie settings",
+            message: "Click the gear, next to History and Catalog, to open the movie's settings beside the cards and drives: copy and verification, sources, folder layout and logs. Each group opens or closes on its title.",
             targetId: "optionsTabs",
             placement: .bottom,
             requirement: .none

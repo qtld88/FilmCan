@@ -62,6 +62,8 @@ enum NtfyOutcome: Equatable {
                 : "HTTP 403 — this topic requires a token and none is set. Enter the bearer token."
         case .httpFailure(404, _):
             return "HTTP 404 — no such topic at that URL. Check the topic name."
+        case .httpFailure(429, _):
+            return "HTTP 429 — too many notifications were sent from this network. Wait a while and try again."
         case .httpFailure(let status, _):
             return "HTTP \(status) — the server rejected the push."
         }

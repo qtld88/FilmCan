@@ -26,70 +26,76 @@ struct SettingsView: View {
     @AppStorage("appearancePanelHex") private var appearancePanelHex: String = AppearanceDefaults.panelHex
     @AppStorage("appearanceTextHex") private var appearanceTextHex: String = AppearanceDefaults.textHex
 
-    var body: some View {
-        TabView {
-            AppearanceSettingsView(
-                accentHex: $appearanceAccentHex,
-                accentMode: $appearanceAccentMode,
-                successHex: $appearanceSuccessHex,
-                backgroundHex: $appearanceBackgroundHex,
-                sidebarHex: $appearanceSidebarHex,
-                panelHex: $appearancePanelHex,
-                textHex: $appearanceTextHex
-            )
-                .tabItem {
-                    Label("Appearance", systemImage: "paintpalette")
-                }
+    @AppStorage("settingsPage") private var settingsPageRaw: String = SettingsPage.appearance.rawValue
 
-            NotificationsSettingsView(
-                notifyOnComplete: $notifyOnComplete,
-                notifyOnError: $notifyOnError
-            )
-            .tabItem {
-                Label("Notifications", systemImage: "bell")
-            }
+    private var selectedPage: Binding<SettingsPage?> {
+        Binding(get: { SettingsPage.page(for: settingsPageRaw) },
+                set: { if let page = $0 { settingsPageRaw = page.rawValue } })
+    }
 
-            PushSettingsView(
-                ntfyEnabled: $ntfyEnabled,
-                ntfyURL: $ntfyURL,
-                ntfyBearerToken: $ntfyBearerToken,
-                ntfyTitleTemplate: $ntfyTitleTemplate,
-                ntfyMessageTemplate: $ntfyMessageTemplate,
-                webhookEnabled: $webhookEnabled,
-                webhookURL: $webhookURL,
-                webhookHeaders: $webhookHeaders,
-                webhookIncludeFullPaths: $webhookIncludeFullPaths,
-                legacyWebhookSecret: $webhookSecret
-            )
-            .tabItem {
-                Label("Push", systemImage: "paperplane")
-            }
-
-            HistorySettingsView(
-                historyRetentionLimit: $historyRetentionLimit
-            )
-            .tabItem {
-                Label("History", systemImage: "clock")
-            }
-
-            DriveSettingsView(
-                disableSpotlightIndexing: $disableSpotlightIndexing
-            )
-            .tabItem {
-                Label("Drives", systemImage: "externaldrive")
-            }
-
-            HotkeysSettingsView()
-                .tabItem {
-                    Label("Hotkeys", systemImage: "keyboard")
-                }
-
-            AboutView()
-                .tabItem {
-                    Label("About", systemImage: "info.circle")
-                }
+    /// One page per kind of app-wide setting; the sidebar replaces the former top tabs.
+    @ViewBuilder
+    private func pageContent(_ page: SettingsPage) -> some View {
+        switch page {
+        case .appearance:
+                AppearanceSettingsView(
+                    accentHex: $appearanceAccentHex,
+                    accentMode: $appearanceAccentMode,
+                    successHex: $appearanceSuccessHex,
+                    backgroundHex: $appearanceBackgroundHex,
+                    sidebarHex: $appearanceSidebarHex,
+                    panelHex: $appearancePanelHex,
+                    textHex: $appearanceTextHex
+                )
+        case .notifications:
+                NotificationsSettingsView(
+                    notifyOnComplete: $notifyOnComplete,
+                    notifyOnError: $notifyOnError
+                )
+        case .push:
+                PushSettingsView(
+                    ntfyEnabled: $ntfyEnabled,
+                    ntfyURL: $ntfyURL,
+                    ntfyBearerToken: $ntfyBearerToken,
+                    ntfyTitleTemplate: $ntfyTitleTemplate,
+                    ntfyMessageTemplate: $ntfyMessageTemplate,
+                    webhookEnabled: $webhookEnabled,
+                    webhookURL: $webhookURL,
+                    webhookHeaders: $webhookHeaders,
+                    webhookIncludeFullPaths: $webhookIncludeFullPaths,
+                    legacyWebhookSecret: $webhookSecret
+                )
+        case .history:
+                HistorySettingsView(
+                    historyRetentionLimit: $historyRetentionLimit
+                )
+        case .drives:
+                DriveSettingsView(
+                    disableSpotlightIndexing: $disableSpotlightIndexing
+                )
+        case .recognition:
+                RecognitionSettingsView()
+        case .hotkeys:
+                HotkeysSettingsView()
+        case .about:
+                AboutView()
         }
-        .frame(minWidth: 560, idealWidth: 560, minHeight: 660, idealHeight: 660)
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            List(selection: selectedPage) {
+                ForEach(SettingsPage.allCases) { page in
+                    Label(page.title, systemImage: page.icon).tag(page)
+                }
+            }
+            .listStyle(.sidebar)
+            .frame(width: 180)
+            Divider()
+            pageContent(SettingsPage.page(for: settingsPageRaw))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(minWidth: 740, idealWidth: 740, minHeight: 660, idealHeight: 660)
         .modifier(SettingsWindowSizer())
         .onAppear {
             let store = KeychainStore()
@@ -123,7 +129,7 @@ private struct SettingsWindowSizer: ViewModifier {
         guard !didApply else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else { return }
-            let newSize = NSSize(width: 560, height: 660)
+            let newSize = NSSize(width: 740, height: 660)
             let frame = window.frame
             let newOrigin = NSPoint(
                 x: frame.midX - newSize.width / 2,
@@ -311,17 +317,39 @@ struct PushSettingsView: View {
 
     @State private var ntfyTesting = false
     @State private var ntfyTestResult: NtfyOutcome?
+    @AppStorage(PhonePush.DefaultsKey.topic) private var phoneTopic: String = ""
+    /// Own server / own topic instead of the QR code. Loaded in `onAppear` because an
+    /// absent preference has a meaning (`PhonePush.mode`).
+    @State private var useCustomServer = false
+    @State private var advancedOpen = false
+
+    private var ntfyTarget: PhonePush.Target? {
+        PhonePush.target(
+            mode: useCustomServer ? .custom : .simple, topic: phoneTopic, customURL: ntfyURL)
+    }
+
+    private var useCustomServerBinding: Binding<Bool> {
+        Binding(
+            get: { useCustomServer },
+            set: { newValue in
+                useCustomServer = newValue
+                UserDefaults.standard.set(newValue, forKey: PhonePush.DefaultsKey.useCustomServer)
+                ntfyTestResult = nil
+                if !newValue, ntfyEnabled { PhonePush.ensureTopic() }
+            })
+    }
 
     /// Exercises the real ntfy path with what is currently in the fields, so a bad
     /// token or topic surfaces here instead of silently failing after a backup.
     private func sendNtfyTest() {
+        guard let target = ntfyTarget else { return }
         ntfyTesting = true
         ntfyTestResult = nil
         WebhookService.sendNtfy(
-            urlString: ntfyURL,
-            bearerToken: ntfyBearerToken,
+            urlString: target.url,
+            bearerToken: target.sendsToken ? ntfyBearerToken : nil,
             title: "FilmCan test",
-            message: "If you can read this, ntfy push is configured correctly.",
+            message: "If you can read this, FilmCan can reach your phone.",
             fields: [:]
         ) { outcome in
             DispatchQueue.main.async {
@@ -333,35 +361,28 @@ struct PushSettingsView: View {
 
     var body: some View {
         Form {
-            Section("NTFY") {
-                Toggle("Send ntfy push notifications", isOn: $ntfyEnabled)
+            Section("Phone") {
+                Toggle("Send notifications to my phone", isOn: $ntfyEnabled)
                     .tint(FilmCanTheme.toggleTint)
                     .onChange(of: ntfyEnabled) { enabled in
                         if enabled {
                             NotificationService.shared.ensureAuthorized()
+                            if !useCustomServer { PhonePush.ensureTopic() }
                         }
                     }
-                TextField("Topic URL", text: $ntfyURL)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!ntfyEnabled)
-                SecureField("Bearer token", text: $ntfyBearerToken)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!ntfyEnabled)
-
-                // The field is secure, so a bad paste is invisible. Say so.
-                if !WebhookService.looksLikeNtfyToken(ntfyBearerToken) {
-                    Label(
-                        "This does not look like an ntfy access token. They start with "
-                        + "tk_ and contain no spaces.",
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .font(FCType.meta)
-                    .foregroundColor(.orange)
+                if ntfyEnabled, !useCustomServer, PhonePush.isValidTopic(phoneTopic) {
+                    PhonePushQRBlock(topic: phoneTopic) {
+                        PhonePush.renewTopic()
+                        ntfyTestResult = nil
+                    }
+                } else if ntfyEnabled, !useCustomServer {
+                    // The switch was already on but nothing was set up (older preferences):
+                    // a channel is only ever created by a click, never by opening this page.
+                    Button("Create my QR code") { PhonePush.ensureTopic() }
                 }
-
                 HStack(spacing: 10) {
-                    Button(ntfyTesting ? "Sending…" : "Send test push") { sendNtfyTest() }
-                        .disabled(!ntfyEnabled || ntfyTesting || ntfyURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(ntfyTesting ? "Sending…" : "Send a test") { sendNtfyTest() }
+                        .disabled(!ntfyEnabled || ntfyTesting || ntfyTarget == nil)
                     if let outcome = ntfyTestResult {
                         Label(
                             outcome.userMessage,
@@ -371,6 +392,35 @@ struct PushSettingsView: View {
                         .foregroundColor(outcome.isSuccess ? .green : .red)
                         .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+                Text(useCustomServer
+                     ? "FilmCan sends a message to your own ntfy address (see Advanced) when a backup finishes or fails."
+                     : "FilmCan sends a message to your phone when a backup finishes or fails. No account needed: it uses the free ntfy app and a private channel name that only this Mac and your phone know.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section {
+              DisclosureGroup("Advanced", isExpanded: $advancedOpen) {
+                Toggle("Use my own ntfy server or topic", isOn: useCustomServerBinding)
+                    .tint(FilmCanTheme.toggleTint)
+                TextField("Topic URL", text: $ntfyURL)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!ntfyEnabled || !useCustomServer)
+                SecureField("Bearer token", text: $ntfyBearerToken)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!ntfyEnabled || !useCustomServer)
+
+                // The field is secure, so a bad paste is invisible. Say so.
+                if useCustomServer, !WebhookService.looksLikeNtfyToken(ntfyBearerToken) {
+                    Label(
+                        "This does not look like an ntfy access token. They start with "
+                        + "tk_ and contain no spaces.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(FCType.meta)
+                    .foregroundColor(.orange)
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Custom notification title")
@@ -415,6 +465,7 @@ struct PushSettingsView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
+                    Text("To use your own topic or a self-hosted server:")
                     Text("• Create a free account at https://ntfy.sh (or self-hosted version).")
                     Text("• Click “Subscribe to topic”.")
                     Text("• Choose a unique topic name (avoid common names so others can’t read your notifications if you're on the free plan).")
@@ -423,6 +474,7 @@ struct PushSettingsView: View {
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
+              }
             }
 
             Section("Webhook") {
@@ -462,6 +514,8 @@ struct PushSettingsView: View {
         .padding(.top, 30)
         .onAppear {
             migrateLegacyWebhookSecretIfNeeded()
+            useCustomServer = PhonePush.mode() == .custom
+            advancedOpen = useCustomServer
         }
     }
 
@@ -534,13 +588,10 @@ private struct NotificationTokenChip: View {
 struct HistorySettingsView: View {
     @Binding var historyRetentionLimit: Int
     @ObservedObject private var storage = ConfigurationStorage.shared
-    @State private var showPresetExport = false
-    @State private var showPresetImport = false
     @State private var showHistoryExport = false
     @State private var showHistoryImport = false
     @State private var showHistoryExportPicker = false
     @State private var showHistoryImportPicker = false
-    @State private var presetExportDocument = JSONExportDocument(data: Data())
     @State private var historyExportDocument = JSONExportDocument(data: Data())
     @State private var historyExportSelection = Set<UUID>()
     @State private var historyImportSelection = Set<UUID>()
@@ -556,23 +607,9 @@ struct HistorySettingsView: View {
                 }
             }
 
-            Section("Import & Export") {
-                HStack {
-                    Text("Presets")
-                    Spacer()
-                    Button("Export") {
-                        do {
-                            presetExportDocument = JSONExportDocument(data: try storage.exportPresetsData())
-                            showPresetExport = true
-                        } catch {
-                            importErrorMessage = "Failed to export presets: \(error.localizedDescription)"
-                        }
-                    }
-                    Button("Import") {
-                        showPresetImport = true
-                    }
-                }
+            ReportArchiveSettingsSection()
 
+            Section("Import & Export") {
                 HStack {
                     Text("Movies & History")
                     Spacer()
@@ -595,16 +632,6 @@ struct HistorySettingsView: View {
         .padding()
         .padding(.top, 30)
         .fileExporter(
-            isPresented: $showPresetExport,
-            document: presetExportDocument,
-            contentType: .json,
-            defaultFilename: "filmcan-presets"
-        ) { result in
-            if case .failure(let error) = result {
-                importErrorMessage = "Failed to export presets: \(error.localizedDescription)"
-            }
-        }
-        .fileExporter(
             isPresented: $showHistoryExport,
             document: historyExportDocument,
             contentType: .json,
@@ -612,22 +639,6 @@ struct HistorySettingsView: View {
         ) { result in
             if case .failure(let error) = result {
                 importErrorMessage = "Failed to export movies and history: \(error.localizedDescription)"
-            }
-        }
-        .fileImporter(
-            isPresented: $showPresetImport,
-            allowedContentTypes: [.json]
-        ) { result in
-            switch result {
-            case .success(let url):
-                do {
-                    let data = try Data(contentsOf: url)
-                    try storage.importPresets(from: data)
-                } catch {
-                    importErrorMessage = "Failed to import presets: \(error.localizedDescription)"
-                }
-            case .failure(let error):
-                importErrorMessage = "Failed to import presets: \(error.localizedDescription)"
             }
         }
         .fileImporter(
@@ -711,23 +722,6 @@ struct HistorySettingsView: View {
         } message: {
             Text(importErrorMessage ?? "")
         }
-    }
-}
-
-private struct JSONExportDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-    var data: Data
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        data = configuration.file.regularFileContents ?? Data()
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
     }
 }
 

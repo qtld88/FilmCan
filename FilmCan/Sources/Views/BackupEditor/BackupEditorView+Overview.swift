@@ -4,14 +4,70 @@ import Foundation
 extension BackupEditorView {
     func overviewSection(isWide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            nameRow
-            
+            nameRow(runSubtitle: runSubtitle())
+
             if isWide {
                 overviewRowLayout
             } else {
                 overviewColumnLayout
             }
+
+            SpeedAdviceSection(
+                viewModel: viewModel,
+                transferViewModel: transferViewModel,
+                bytesToCopy: includedRequiredBytes,
+                refreshToken: driveRefreshCounter
+            )
         }
+    }
+
+    // MARK: - Run subtitle (logic in `MainScreenSummary.swift`)
+
+    private var subtitleSources: [FolderTreeBuilder.Source] {
+        viewModel.includedSourcePaths.map { path in
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+            return FolderTreeBuilder.Source(
+                path: path, isDirectory: isDir.boolValue, kind: viewModel.mediaKind(for: path),
+                rollName: isDir.boolValue ? viewModel.rollNameOverride(for: path) : nil)
+        }
+    }
+
+    /// Same options as the Save To folder preview, so the count names the same folders.
+    private var subtitleOptions: FolderTreeBuilder.Options {
+        var o = FolderTreeBuilder.Options()
+        let preset = previewOrganizationPreset
+        o.preset = preset
+        o.organizationActive = preset.map {
+            $0.useFolderTemplate && !FolderTreeBuilder.isBlank($0.folderTemplate)
+        } ?? false
+        o.copyContents = viewModel.copyFolderContents
+        o.date = TodayClock.shared.today
+        o.metadata = previewShootMetadata
+        o.mediaIndexPreset = preset
+        return o
+    }
+
+    /// The sentence under Run Now. A running copy re-renders this view on every
+    /// progress tick, so it touches no disk then: the sentence only says a copy runs.
+    func runSubtitle() -> String {
+        let destinations = viewModel.config.includedDestinationPaths
+        if transferViewModel.isTransferActive(for: viewModel.config.id) {
+            return RunSubtitle.text(sourceCount: 1, driveCount: destinations.count,
+                                    newFoldersPerDrive: [], isRunning: true)
+        }
+        let sources = subtitleSources
+        guard !sources.isEmpty, !destinations.isEmpty else {
+            return RunSubtitle.text(sourceCount: sources.count, driveCount: destinations.count,
+                                    newFoldersPerDrive: [], isRunning: false)
+        }
+        let options = subtitleOptions
+        let perDrive = destinations.map { destination in
+            RunSubtitle.newFolderCount(
+                in: FolderTreeBuilder.lines(for: destination, sources: sources, options: options))
+        }
+        return RunSubtitle.text(sourceCount: sources.count, driveCount: destinations.count,
+                                newFoldersPerDrive: perDrive, isRunning: false)
     }
 
     private var overviewRowLayout: some View {
@@ -34,6 +90,16 @@ extension BackupEditorView {
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
                 setMediaKind: { viewModel.setMediaKind($1, for: $0) },
+                genericRollName: { path in
+                    guard viewModel.isGenericSource(path) else { return nil }
+                    let override = viewModel.rollNameOverride(for: path)
+                    return viewModel.copyFolderContents && override == nil ? nil : (override ?? "")
+                },
+                setGenericRollName: { viewModel.setRollNameOverride($1, for: $0) },
+                genericCardWarning: viewModel.genericCardWarning,
+                resolveGenericCardWarning: { accept in
+                    if accept { viewModel.acceptGenericCardWarning() } else { viewModel.dismissGenericCardWarning() }
+                },
                 cardSignature: { viewModel.detectedCard(for: $0) },
                 rollNamePreview: { viewModel.rollNamePreview(for: $0) },
                 setCardRole: { viewModel.setCardRole($1, for: $0) },
@@ -70,6 +136,7 @@ extension BackupEditorView {
                 organizationPreset: previewOrganizationPreset,
                 sourcePaths: viewModel.includedSourcePaths,
                 mediaKind: { viewModel.mediaKind(for: $0) },
+                rollName: { viewModel.rollNameOverride(for: $0) },
                 shootMetadata: previewShootMetadata,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
@@ -127,6 +194,16 @@ extension BackupEditorView {
                 footerView: sourcePreviewFooter,
                 mediaKind: { viewModel.mediaKind(for: $0) },
                 setMediaKind: { viewModel.setMediaKind($1, for: $0) },
+                genericRollName: { path in
+                    guard viewModel.isGenericSource(path) else { return nil }
+                    let override = viewModel.rollNameOverride(for: path)
+                    return viewModel.copyFolderContents && override == nil ? nil : (override ?? "")
+                },
+                setGenericRollName: { viewModel.setRollNameOverride($1, for: $0) },
+                genericCardWarning: viewModel.genericCardWarning,
+                resolveGenericCardWarning: { accept in
+                    if accept { viewModel.acceptGenericCardWarning() } else { viewModel.dismissGenericCardWarning() }
+                },
                 cardSignature: { viewModel.detectedCard(for: $0) },
                 rollNamePreview: { viewModel.rollNamePreview(for: $0) },
                 setCardRole: { viewModel.setCardRole($1, for: $0) },
@@ -165,6 +242,7 @@ extension BackupEditorView {
                 organizationPreset: previewOrganizationPreset,
                 sourcePaths: viewModel.includedSourcePaths,
                 mediaKind: { viewModel.mediaKind(for: $0) },
+                rollName: { viewModel.rollNameOverride(for: $0) },
                 shootMetadata: previewShootMetadata,
                 copyFolderContents: viewModel.copyFolderContents,
                 configId: viewModel.config.id,
@@ -183,13 +261,13 @@ extension BackupEditorView {
     private var includedRequiredBytes: Int64 { previewInfo.totalBytes }
 
     /// Per-card sizes cover every listed source; the totals only the checked ones.
-    func refreshPreview() {
+    func refreshPreview(bypassCache: Bool = false) {
         let sources = viewModel.sourcePaths
         let included = viewModel.includedSourcePaths
         previewInfo.isLoading = true
 
         Task.detached(priority: .utility) {
-            var (bytes, files, folders, sizes, itemCounts) = PreviewCalculator.calculateTotalsAndSizes(for: sources)
+            var (bytes, files, folders, sizes, itemCounts) = PreviewCalculator.calculateTotalsAndSizes(for: sources, bypassCache: bypassCache)
             if included.count != sources.count {
                 (bytes, files, folders, _, _) = PreviewCalculator.calculateTotalsAndSizes(for: included)
             }

@@ -14,6 +14,11 @@ struct FolderTreeLine: Equatable {
     var togglesCopyMode: Bool { role == .copiedFolder || role == .contents }
 
     enum Role: Equatable { case folder, copiedFolder, copiedFile, contents }
+
+    /// A folder that will be created gets a "new" mark; files and "contents of" lines do not.
+    static func showsNewBadge(_ line: FolderTreeLine) -> Bool {
+        line.isNew && !line.name.isEmpty && (line.role == .folder || line.role == .copiedFolder)
+    }
 }
 
 /// Resolves, with the engine's own path function, the folders a copy creates under
@@ -24,6 +29,8 @@ enum FolderTreeBuilder {
         let path: String
         let isDirectory: Bool
         var kind: SourceMediaKind = .camera
+        /// Roll folder given to a generic-named card (Untitled_01); nil ⇒ the card's own name.
+        var rollName: String? = nil
         var name: String { (path as NSString).lastPathComponent }
     }
 
@@ -64,9 +71,10 @@ enum FolderTreeBuilder {
             .map { $0.hasSuffix("/") ? $0 : $0 + "/" }
         return sources.map { source in
             let full = FanOutCopier.resolveDestFilePath(
-                destRoot: destination, rootName: source.name, rootPath: source.path, relPath: "",
+                destRoot: destination, rootName: source.rollName ?? source.name, rootPath: source.path, relPath: "",
                 preset: options.preset, copyFolderContents: false,
-                date: options.date, metadata: options.metadata, mediaKind: source.kind)
+                date: options.date, metadata: options.metadata, mediaKind: source.kind,
+                rollNameIsAssigned: source.rollName != nil)
             guard let prefix = prefixes.first(where: { full.hasPrefix($0) }) else { return source.name }
             return String(full.dropFirst(prefix.count))
         }
@@ -79,7 +87,7 @@ enum FolderTreeBuilder {
         for (source, rel) in zip(sources, relativePaths(for: destination, sources: sources, options: o)) {
             var components = rel.split(separator: "/").map(String.init)
             var rollName: String?
-            if o.copyContents && source.isDirectory {
+            if o.copyContents && source.isDirectory && source.rollName == nil {
                 // Contents land flat in the parent; the roll folder only holds the hash list.
                 rollName = components.popLast()
             }

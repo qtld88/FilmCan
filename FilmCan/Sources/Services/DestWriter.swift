@@ -105,8 +105,10 @@ actor DestWriter {
         guard let handle = writeHandle else {
             throw WriterError.writeFailed("No write handle (already finalized?)")
         }
+        // Own pool: called from an async loop that may not suspend between chunks,
+        // so anything the write bridges or autoreleases must not pile up for the run.
         try IOPerfProbe.shared.measure(.destWrite, key: displayName, bytes: Int64(data.count)) {
-            try handle.write(contentsOf: data)
+            try autoreleasepool { try handle.write(contentsOf: data) }
         }
     }
 
