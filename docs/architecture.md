@@ -41,7 +41,7 @@ Fan-out engine internals (`FanOutCopier`, a Swift actor):
 
 After a run:
 - `CardSealService` — writes `<source>/.filmcan/seal.json` (schema 2: path + size + mtime) listing the files the engine planned, only when every planned destination holds a hash-compared copy of every one of them (`DestResult.verifiedSourcePaths`: checked this run, or skipped on resume and trusted/re-hashed); Verification Off, ignored unreadable items and the demo movie never seal; best-effort. `UnverifiedLedger` (`<roll>/.filmcan/unverified.json`) marks entries a Verification-Off run wrote, so a later verified run re-hashes them instead of skipping
-- `MediaCatalogStore` — per-movie catalog of rolls (`catalog.json`); cards recognised by `CardFingerprint` (clip name + size + mtime)
+- `MediaCatalogStore` — per-movie catalog of rolls (`catalog.json`); cards recognised by `CardFingerprint` (clip name + size + mtime; files ≥ 1 MiB, else ≥ 64 KiB; one whole-hour mtime shift tolerated for time-zone/DST changes on FAT32/exFAT)
 - `BackupReportWriter` — PDF report with stills (AVFoundation; MXF needs Pro Video Formats); `ReportArchive` keeps a local copy; `ReportRecreation` rebuilds one later from the drive's checksum list
 - `HistoryRecorder` — writes the history entry; `RepairCoordinator` — retry from source / sibling
 
