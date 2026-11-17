@@ -138,13 +138,15 @@ enum MediaCatalog {
         return result
     }
 
-    /// The same card: identical clip keys, or — when either roll predates clip keys —
-    /// identical names and sizes of at least two large files. A formatted and refilled
-    /// card never matches: its clips differ in size and modification time.
+    /// The same card: the same clips (dates equal, or all shifted by one whole number
+    /// of hours: `CardFingerprint.matchingClipCount`), or — when either roll predates
+    /// clip keys — identical names and sizes of at least two large files. A formatted
+    /// and refilled card never matches: its clips differ in size and modification time.
     static func sameCard(_ a: CatalogRoll, _ b: CatalogRoll) -> Bool {
         guard a.mediaKind == b.mediaKind else { return false }
         if let ka = a.clipKeys, let kb = b.clipKeys, !ka.isEmpty, !kb.isEmpty {
-            return Set(ka) == Set(kb)
+            let clips = Set(ka).count
+            return clips == Set(kb).count && CardFingerprint.matchingClipCount(ka, kb) == clips
         }
         let la = a.legacyClipKeys
         return la.count >= 2 && la == b.legacyClipKeys
@@ -179,7 +181,7 @@ enum MediaCatalog {
         for roll in rolls where roll.mediaKind == mediaKind && !roll.copies.isEmpty {
             let matching: Int
             if let keys = roll.clipKeys, !keys.isEmpty {
-                matching = card.intersection(keys).count
+                matching = CardFingerprint.matchingClipCount(clipKeys, keys)
             } else {
                 let legacy = roll.legacyClipKeys
                 matching = (legacy.count >= 2 && legacy == cardLegacy) ? legacy.count : 0
