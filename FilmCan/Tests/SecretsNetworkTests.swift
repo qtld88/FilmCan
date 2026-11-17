@@ -126,6 +126,28 @@ final class SecretsNetworkTests: XCTestCase {
         XCTAssertNil(defaults.string(forKey: "webhookSecret"))
     }
 
+    func test_secretsMigration_movesLegacyWebhookSecretIntoAuthorizationHeader() {
+        let (defaults, store, suite) = migrationFixture()
+        defer { cleanUp(defaults, store, suite) }
+
+        // A secret from the old single-field UI, no headers yet: it becomes the header.
+        store.set("s3cret", for: "webhookSecret")
+        SecretsMigration.run(defaults: defaults, store: store)
+        XCTAssertEqual(store.get("webhookHeaders"), "Authorization: Bearer s3cret")
+        XCTAssertNil(store.get("webhookSecret"), "the legacy slot is emptied once moved")
+    }
+
+    func test_secretsMigration_keepsHeadersTheUserAlreadySet() {
+        let (defaults, store, suite) = migrationFixture()
+        defer { cleanUp(defaults, store, suite) }
+
+        store.set("X-Token: abc", for: "webhookHeaders")
+        store.set("s3cret", for: "webhookSecret")
+        SecretsMigration.run(defaults: defaults, store: store)
+        XCTAssertEqual(store.get("webhookHeaders"), "X-Token: abc")
+        XCTAssertEqual(store.get("webhookSecret"), "s3cret", "not moved, so not deleted")
+    }
+
     // MARK: - ntfy token shape + outcome messages
 
     func test_ntfyTokenShape_flagsPastedProse() {
