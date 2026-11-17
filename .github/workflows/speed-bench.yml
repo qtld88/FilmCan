@@ -1,0 +1,119 @@
+name: Speed bench
+
+# Manual only. Compares two engine versions (and cp / ditto) on virtual disks.
+# Measurement only: nothing under FilmCan/Sources/ is touched. Numbers from a shared
+# VM are relative within one job; they are never a real disk's speed.
+on:
+  workflow_dispatch:
+    inputs:
+      ref_a:
+        description: 'Ref A (commit or branch), the baseline'
+        required: true
+        default: '3aece5f'
+      ref_b:
+        description: 'Ref B (commit or branch), compared to A'
+        required: true
+        default: '9fda565'
+      reps:
+        description: 'Repetitions per cell (A,B,A,B...)'
+        required: true
+        default: '5'
+      dataset:
+        description: 'card = 80 x 150 MB, small = 5000 x 1 MB, mix, all'
+        required: true
+        default: 'card'
+        type: choice
+        options: [card, small, mix, all]
+      dests:
+        description: 'Destinations, comma list of exfat,apfs,hfsx'
+        required: true
+        default: 'exfat,apfs,hfsx'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: speed-bench
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    runs-on: macos-15
+    timeout-minutes: 350
+    steps:
+      - name: Checkout (bench branch, full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build tools
+        run: brew install xcodegen rsync
+
+      - name: Prepare both refs side by side
+        env:
+          REF_A: ${{ inputs.ref_a }}
+          REF_B: ${{ inputs.ref_b }}
+        run: |
+          set -euo pipefail
+          SHA_A=$(git rev-parse --verify "$REF_A^{commit}" 2>/dev/null || git rev-parse --verify "origin/$REF_A^{commit}")
+          SHA_B=$(git rev-parse --verify "$REF_B^{commit}" 2>/dev/null || git rev-parse --verify "origin/$REF_B^{commit}")
+          echo "SHA_A=$SHA_A" >> "$GITHUB_ENV"; echo "SHA_B=$SHA_B" >> "$GITHUB_ENV"
+          BENCH_TEST=FilmCan/Tests/SpeedBenchTests.swift
+          for L in A B; do
+            SHA=$([ $L = A ] && echo "$SHA_A" || echo "$SHA_B")
+            git worktree add --detach "$RUNNER_TEMP/wt_$L" "$SHA"
+            # The bench test lives on this branch; the same file is dropped into both refs.
+            cp "$BENCH_TEST" "$RUNNER_TEMP/wt_$L/$BENCH_TEST"
+            (cd "$RUNNER_TEMP/wt_$L/FilmCan" && xcodegen generate)
+          done
+
+      # Release configuration (what ships), testability on so @testable import works.
+      - name: Build both refs
+        run: |
+          set -euo pipefail
+          for L in A B; do
+            xcodebuild build-for-testing \
+              -project "$RUNNER_TEMP/wt_$L/FilmCan/FilmCan.xcodeproj" \
+              -scheme FilmCan -destination 'platform=macOS' \
+              -configuration Release ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES \
+              -derivedDataPath "$RUNNER_TEMP/dd_$L" > "$RUNNER_TEMP/build_$L.log" 2>&1 \
+              || { tail -60 "$RUNNER_TEMP/build_$L.log"; exit 1; }
+            echo "built $L"
+          done
+          df -h "$RUNNER_TEMP"
+
+      - name: Run the bench
+        run: |
+          set -uo pipefail
+          sudo -n true && echo "passwordless sudo: purge available" || echo "no sudo: caches will not be purged"
+          mkdir -p "$RUNNER_TEMP/out"
+          python3 FilmCan/scripts/speed_bench.py run \
+            --a-dir "$RUNNER_TEMP/wt_A" --b-dir "$RUNNER_TEMP/wt_B" \
+            --a-dd "$RUNNER_TEMP/dd_A" --b-dd "$RUNNER_TEMP/dd_B" \
+            --ref-a "$SHA_A" --ref-b "$SHA_B" \
+            --reps "${{ inputs.reps }}" --dataset "${{ inputs.dataset }}" \
+            --dests "${{ inputs.dests }}" --max-minutes 300 \
+            --out "$RUNNER_TEMP/out"
+          echo "bench exit: $?"
+          test -f "$RUNNER_TEMP/out/bench.json"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/out/bench.json" ]; then
+            python3 FilmCan/scripts/speed_bench.py report --json "$RUNNER_TEMP/out/bench.json" \
+              --summary "$GITHUB_STEP_SUMMARY" > /dev/null
+          else
+            echo "No bench.json produced; see the logs artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload raw measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: speed-bench-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/out
+            ${{ runner.temp }}/build_A.log
+            ${{ runner.temp }}/build_B.log
+          retention-days: 30
