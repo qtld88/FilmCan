@@ -11,9 +11,13 @@ private final class VerifyEmitCollector: @unchecked Sendable {
     var verify: [Int64] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
-private actor ETACollector {
-    var values: [TimeInterval] = []
-    func add(_ v: TimeInterval) { values.append(v) }
+/// Filled synchronously from the progress handler, so every emit is recorded by the
+/// time `run()` returns (no wait needed before reading it).
+private final class ETACollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [TimeInterval] = []
+    func add(_ v: TimeInterval) { lock.lock(); stored.append(v); lock.unlock() }
+    var values: [TimeInterval] { lock.lock(); defer { lock.unlock() }; return stored }
 }
 
 final class FanOutCopierIntegrationTests: XCTestCase {
@@ -1101,16 +1105,16 @@ final class FanOutCopierIntegrationTests: XCTestCase {
             dryRun: false,
             progressHandler: { prog in
                 if let eta = prog.estimatedTimeRemaining {
-                    Task { await emits.add(eta) }
+                    emits.add(eta)
                 }
             }
         )
 
         let results = try await FanOutCopier(config: config).run()
         XCTAssertTrue(results.allSatisfy { $0.success })
-        try await Task.sleep(for: .milliseconds(200))
 
-        let etas = await emits.values
+        let etas = emits.values
+        XCTAssertFalse(etas.isEmpty, "the run must report an ETA at least once")
         XCTAssertTrue(etas.allSatisfy { $0 > 0 }, "no non-positive ETA, got: \(etas)")
     }
 

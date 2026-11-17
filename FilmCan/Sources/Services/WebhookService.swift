@@ -121,6 +121,25 @@ struct WebhookService {
         return headers
     }
 
+    /// What a log line may say about a URL: scheme and host, never the path or query
+    /// (an ntfy topic is the secret) nor any user:password part.
+    static func logSafe(url: String) -> String {
+        guard let parts = URLComponents(string: url), let scheme = parts.scheme else {
+            return "(unparsable URL)"
+        }
+        return "\(scheme)://\(parts.host ?? "")"
+    }
+
+    /// HTTP header values are ASCII. ntfy decodes RFC 2047 encoded words in any header
+    /// (`maybeDecodeHeader` on the server; docs.ntfy.sh "Message title"), so a title with
+    /// an emoji or an accent is sent as `=?UTF-8?B?<base64>?=`. Plain ASCII is unchanged.
+    static func ntfyHeaderValue(_ value: String) -> String {
+        guard !value.allSatisfy({ $0.isASCII && !$0.isNewline }) else { return value }
+        let oneLine = value.replacingOccurrences(of: "\r", with: " ").replacingOccurrences(of: "\n", with: " ")
+        guard !oneLine.allSatisfy(\.isASCII) else { return oneLine }
+        return "=?UTF-8?B?\(Data(oneLine.utf8).base64EncodedString())?="
+    }
+
     /// `completion` is optional so the fire-and-forget notification paths are unchanged.
     /// It is called on a background queue; hop to the main actor before touching UI.
     static func sendNtfy(
@@ -129,14 +148,15 @@ struct WebhookService {
     ) {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isAllowedURL(trimmed), let url = URL(string: trimmed) else {
-            DebugLog.warn("ntfy URL rejected (must be https or localhost): \(trimmed)")
+            // The URL path is the phone-push topic, i.e. the secret: never log it.
+            DebugLog.warn("ntfy URL rejected (must be https or localhost): \(logSafe(url: trimmed))")
             completion?(.rejectedURL)
             return
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 15
-        request.setValue(title, forHTTPHeaderField: "Title")
+        request.setValue(ntfyHeaderValue(title), forHTTPHeaderField: "Title")
         let token = bearerToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let tokenWasSent = !token.isEmpty
         if tokenWasSent {
@@ -186,69 +206,5 @@ struct WebhookService {
                 DebugLog.warn("webhook send HTTP \(code)")
             }
         }.resume()
-    }
-
-    /// Send a per-destination result notification
-    static func sendDestNotification(
-        urlString: String,
-        bearerToken: String?,
-        result: DestResult,
-        sourceName: String,
-        includeFullPaths: Bool = false
-    ) {
-        let icon = result.success ? "✅" : "❌"
-        let title = "\(icon) Copy \(result.success ? "complete" : "failed"): \(sourceName)"
-        let byteStr = ByteCountFormatter.string(fromByteCount: result.bytesTransferred, countStyle: .file)
-        let message = "\(result.filesTransferred) files (\(byteStr)) → \(result.displayName)"
-        sendNtfy(
-            urlString: urlString,
-            bearerToken: bearerToken,
-            title: title,
-            message: message,
-            fields: [
-                "Destination": result.displayName,
-                "Path": maskedField(path: result.destinationPath, includeFull: includeFullPaths),
-                "Status": result.success ? "OK" : "FAILED",
-                "Bytes": byteStr,
-                "Verify": result.verifyMode.rawValue
-            ]
-        )
-    }
-
-    /// Send a single aggregated webhook for a whole multi-destination job (v2 template).
-    static func sendAggregatedNotification(
-        urlString: String,
-        bearerToken: String?,
-        results: [DestResult],
-        sourceName: String,
-        configName: String,
-        includeFullPaths: Bool = false
-    ) {
-        let anyFailed = results.contains { !$0.success }
-        let allSucceeded = results.allSatisfy { $0.success }
-        let icon = anyFailed ? "⚠️" : "✅"
-        let summary = results.map { r in
-            let mark = r.success ? "✓" : "✗"
-            return "\(r.displayName) \(mark)"
-        }.joined(separator: ", ")
-        let totalBytes = results.reduce(Int64(0)) { $0 + $1.bytesTransferred }
-        let byteStr = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
-        let title = "\(icon) \(configName): \(sourceName)"
-        let message = "\(summary) — \(byteStr)"
-        sendNtfy(
-            urlString: urlString,
-            bearerToken: bearerToken,
-            title: title,
-            message: message,
-            fields: [
-                "Source": sourceName,
-                "Config": configName,
-                "DestinationsSummary": summary,
-                "AnyFailed": anyFailed ? "true" : "false",
-                "AllSucceeded": allSucceeded ? "true" : "false",
-                "TotalBytes": byteStr,
-                "DestinationCount": "\(results.count)"
-            ]
-        )
     }
 }

@@ -248,8 +248,8 @@ final class OverwriteSafetyTests: XCTestCase {
                             resolver: @escaping @Sendable (DuplicatePrompt) async -> DuplicateResolution) async throws {
         _ = try await CustomCopierService().runCopyFanOut(
             sources: [card.path], fanOutDestinations: [destConfig(dest)], configName: "",
-            organizationPreset: nil, copyFolderContents: false, useHashListPrecheck: false,
-            hashListPath: nil, duplicatePolicy: .ask,
+            organizationPreset: nil, copyFolderContents: false,
+            duplicatePolicy: .ask,
             duplicateCounterTemplate: "_001", duplicateResolver: resolver,
             verifyMode: .fast, dryRun: false, hashListStyle: .ascMHL, progressHandler: nil)
     }

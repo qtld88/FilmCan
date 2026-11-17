@@ -94,8 +94,7 @@ final class FanOutCopierReadFailureTests: XCTestCase {
         let dir = try makeDir("w")
         let target = dir.appendingPathComponent("clip.mov")
         let writer = try await DestWriter(destPath: target.path, displayName: "w",
-                                          verifyMode: .paranoid, requiresFullFsync: false,
-                                          sharedMHLWriter: nil)
+                                          verifyMode: .paranoid, requiresFullFsync: false)
         try await writer.write(data: Data(repeating: 0xAB, count: 3))
         do {
             _ = try await writer.finalize(fileHash: "", sourceSize: 10)
@@ -114,8 +113,7 @@ final class FanOutCopierReadFailureTests: XCTestCase {
         try fm.createDirectory(at: target, withIntermediateDirectories: true)
         try Data([0x01]).write(to: target.appendingPathComponent("inside.txt"))
         let writer = try await DestWriter(destPath: target.path, displayName: "w",
-                                          verifyMode: .paranoid, requiresFullFsync: false,
-                                          sharedMHLWriter: nil)
+                                          verifyMode: .paranoid, requiresFullFsync: false)
         try await writer.write(data: Data(repeating: 0xAB, count: 3))
         do {
             _ = try await writer.finalize(fileHash: "", sourceSize: 3)

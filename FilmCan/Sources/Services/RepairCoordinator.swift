@@ -159,8 +159,6 @@ enum RepairCoordinator {
                 configName: "repair",
                 organizationPreset: organizationPreset,
                 copyFolderContents: copyFolderContents,
-                useHashListPrecheck: false,
-                hashListPath: nil,
                 duplicatePolicy: duplicatePolicy,
                 duplicateCounterTemplate: "",
                 duplicateResolver: nil,

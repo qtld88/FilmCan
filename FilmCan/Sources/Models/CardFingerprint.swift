@@ -38,6 +38,16 @@ enum CardFingerprint {
         return keys.sorted()
     }
 
+    /// Clip keys of several sources, read off the main thread (a full card walk can
+    /// take seconds on a slow reader). Keyed by the path as given.
+    static func keys(forSources paths: [String]) async -> [String: [String]] {
+        await Task.detached(priority: .userInitiated) {
+            var out: [String: [String]] = [:]
+            for path in paths { out[path] = CardFingerprint.keys(forSource: path) }
+            return out
+        }.value
+    }
+
     private static func clipKey(for url: URL, props: [URLResourceKey]) -> String? {
         guard let values = try? url.resourceValues(forKeys: Set(props)),
               values.isDirectory != true,

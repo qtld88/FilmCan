@@ -38,7 +38,6 @@ actor DestWriter {
     private let displayName: String
     private let verifyMode: VerifyMode
     private let requiresFullFsync: Bool
-    private let mhlWriter: (any MHLWriting)?
 
     private var tempFileURL: URL?
     private var tempName: String?
@@ -50,22 +49,18 @@ actor DestWriter {
 
     private let fm = FileManager.default
 
-    /// Accepts a pre-built MHL writer so multiple DestWriter instances writing into
-    /// the same source root share one aggregator (avoids the last-writer-wins race
-    /// over a single manifest file). The writer is either an `ASCMHLWriter` or a
-    /// `SimpleMHLWriter` depending on the configured hash-list style.
+    /// Writes one file. Hash lists are recorded by the verify lane in `FanOutCopier`,
+    /// not here.
     init(
         destPath: String,
         displayName: String,
         verifyMode: VerifyMode,
-        requiresFullFsync: Bool,
-        sharedMHLWriter: (any MHLWriting)?
+        requiresFullFsync: Bool
     ) async throws {
         self.destPath = destPath
         self.displayName = displayName
         self.verifyMode = verifyMode
         self.requiresFullFsync = requiresFullFsync
-        self.mhlWriter = sharedMHLWriter
 
         try await setupTempFile()
     }
@@ -170,8 +165,32 @@ actor DestWriter {
             effectiveDestURL = destURL
         }
 
+        // Any failure from here on (flush, close, rename) must not leave the temp
+        // behind: it is removed and unregistered before the error propagates.
+        // `finalized` is set only once the file is under its final name.
+        do {
+            try flushCloseAndRename(handle: handle, tempURL: tempURL, to: effectiveDestURL)
+        } catch {
+            abandonTemp(tempURL)
+            throw error
+        }
         finalized = true
+        tempFileURL = nil
 
+        if let n = tempName { Task { await OrphanCleaner.shared.unregisterActive(n) } }
+        return effectiveDestURL.path
+    }
+
+    private func abandonTemp(_ tempURL: URL) {
+        finalized = true
+        try? writeHandle?.close()
+        writeHandle = nil
+        try? fm.removeItem(at: tempURL)
+        tempFileURL = nil
+        if let n = tempName { Task { await OrphanCleaner.shared.unregisterActive(n) } }
+    }
+
+    private func flushCloseAndRename(handle: FileHandle, tempURL: URL, to effectiveDestURL: URL) throws {
         try IOPerfProbe.shared.measure(.flush, key: displayName) {
             if requiresFullFsync {
                 let fd = handle.fileDescriptor
@@ -206,9 +225,6 @@ actor DestWriter {
         guard ok else {
             throw WriterError.finalizeFailed("rename(2) failed for \(effectiveDestURL.path)")
         }
-
-        if let n = tempName { Task { await OrphanCleaner.shared.unregisterActive(n) } }
-        return effectiveDestURL.path
     }
 
     private static func findUnusedPath(base: URL, template: String) -> URL {
@@ -225,12 +241,6 @@ actor DestWriter {
             counter += 1
             if counter > 999 { return candidate }
         }
-    }
-
-    /// Append this file's hash to the per-destination MHL.
-    func appendMHL(hash: String, fileName: String, size: Int64, mtime: Int64?) async throws {
-        try await mhlWriter?.append(relPath: fileName, size: size, hash: hash, mtime: mtime)
-        try await mhlWriter?.flush()
     }
 
     deinit {

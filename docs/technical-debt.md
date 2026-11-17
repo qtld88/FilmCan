@@ -137,7 +137,7 @@ requires Homebrew rsync. (The build still bundles the rsync binary solely to shi
      the view-tree built/laid-out on first display — defer heavy sub-sections of
      the Destinations content (e.g. the two `TokenFlowLayout` chip grids behind a
      disclosure; build org options lazily), flatten deep `VStack` nesting, and
-     reconsider `.id(config.id)` in `MainView.swift:153` (full editor rebuild per
+     reconsider `.id(config.id)` on the editor in `MainView.swift` (`editorPanel`; full editor rebuild per
      tab switch). `LazyVStack` at the editor scroll won't help — it has only 2
      children; the cost is inside the options card.
    - Tools: DEBUG `MainThreadWatchdog`/`PerfSignpost` harness + `sample <pid> 5`

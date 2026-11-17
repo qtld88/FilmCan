@@ -56,8 +56,6 @@ class CustomCopierService: ObservableObject, TransferService {
         configName: String,
         organizationPreset: OrganizationPreset?,
         copyFolderContents: Bool,
-        useHashListPrecheck: Bool,
-        hashListPath: String?,
         duplicatePolicy: OrganizationPreset.DuplicatePolicy,
         duplicateCounterTemplate: String,
         duplicateResolver: (@Sendable (DuplicatePrompt) async -> DuplicateResolution)?,
@@ -71,12 +69,9 @@ class CustomCopierService: ObservableObject, TransferService {
         reVerifyExistingOnResume: Bool = false,
         unreadableHandler: (@Sendable ([String]) async -> Bool)? = nil,
         rollIdentityHandler: (@Sendable (FanOutCopier.RollIdentityQuery) async -> Bool)? = nil,
-        progressHandler: (@Sendable ([DestProgress]) -> Void)?,
-        webhookHandler: (@Sendable (DestResult, String) -> Void)? = nil,
-        aggregatedWebhookHandler: (@Sendable ([DestResult], String) -> Void)? = nil
+        progressHandler: (@Sendable ([DestProgress]) -> Void)?
     ) async throws -> TransferResult {
         let startTime = Date()
-        let mhlBasePath: String? = nil
 
         let accumulator = ProgressAccumulator { progresses in
             Task { @MainActor in
@@ -89,7 +84,7 @@ class CustomCopierService: ObservableObject, TransferService {
             sources: sources,
             destinations: fanOutDestinations,
             verifyMode: verifyMode,
-            mhlBasePath: mhlBasePath,
+            mhlBasePath: nil,
             dryRun: dryRun,
             progressHandler: { [accumulator] prog in
                 Task { await accumulator.update(prog) }
@@ -118,17 +113,6 @@ class CustomCopierService: ObservableObject, TransferService {
 
         let copier = FanOutCopier(config: fanOutConfig)
         let destResults = try await copier.run()
-
-        // Fire per-dest webhooks
-        for result in destResults {
-            webhookHandler?(result, configName)
-        }
-
-        // v2 aggregated event (caller wires either per-dest OR aggregated based on config)
-        if let aggregatedWebhookHandler {
-            let sourceName = sources.first.map { ($0 as NSString).lastPathComponent } ?? ""
-            aggregatedWebhookHandler(destResults, sourceName)
-        }
 
         let totalBytes = destResults.reduce(0) { $0 + $1.bytesTransferred }
         let totalFiles = destResults.reduce(0) { $0 + $1.filesTransferred }

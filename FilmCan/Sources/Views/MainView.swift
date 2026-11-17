@@ -28,7 +28,7 @@ struct MainView: View {
     @State private var showDonationPrompt: Bool = false
     @State private var donationPromptTransferCount: Int = 0
     @State private var pendingDonationPromptCheck: Bool = false
-    @State private var workspaceObservers: [NSObjectProtocol] = []
+    @State private var isAttachedToDriveTicker = false
     @State private var hostWindow: NSWindow?
     @AppStorage("didShowQuickTour") private var didShowQuickTour: Bool = false
     @AppStorage("donationPromptSuppressed") private var donationPromptSuppressed: Bool = false
@@ -48,11 +48,17 @@ struct MainView: View {
                 if !didShowQuickTour {
                     startTour()
                 }
-                registerDriveObservers()
+                if !isAttachedToDriveTicker {
+                    isAttachedToDriveTicker = true
+                    DriveListTicker.shared.attach()
+                }
                 scheduleDonationPromptCheck()
             }
-            .onReceive(Timer.publish(every: 6, on: .main, in: .common).autoconnect()) { _ in
-                NotificationCenter.default.post(name: .filmCanDriveListChanged, object: nil)
+            .onDisappear {
+                if isAttachedToDriveTicker {
+                    isAttachedToDriveTicker = false
+                    DriveListTicker.shared.detach()
+                }
             }
             .onChange(of: canAdvanceTourStep) { completed in
                 if showQuickTour && completed && !lastTourCanAdvance && currentTourStep.requirement != .none {
@@ -99,11 +105,13 @@ struct MainView: View {
                 startTour()
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanTourNameConfirmed)) { _ in
+                guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
                 guard showQuickTour, currentTourStep.requirement == .renamedBackup else { return }
                 let name = selectedConfig?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 quickTourNameConfirmed = !name.isEmpty
             }
             .onReceive(NotificationCenter.default.publisher(for: .filmCanTourNameSubmitted)) { _ in
+                guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
                 guard showQuickTour, currentTourStep.requirement == .renamedBackup else { return }
                 let name = selectedConfig?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 guard !name.isEmpty else { return }
@@ -378,17 +386,6 @@ struct MainView: View {
         if stopped, appState.selectedConfigId == demoId {
             appState.selectedConfigId = appState.storage.configurations.first?.id
         }
-    }
-
-    private func registerDriveObservers() {
-        guard workspaceObservers.isEmpty else { return }
-        let center = NSWorkspace.shared.notificationCenter
-        let postRefresh: (Notification) -> Void = { _ in
-            NotificationCenter.default.post(name: .filmCanDriveListChanged, object: nil)
-        }
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main, using: postRefresh))
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.didUnmountNotification, object: nil, queue: .main, using: postRefresh))
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.didRenameVolumeNotification, object: nil, queue: .main, using: postRefresh))
     }
 
     private var catalogButton: some View {

@@ -30,6 +30,8 @@ struct BackupEditorView: View {
     @State var duplicateNameWarningMessage = ""
     @State var showEarlierCopyWarning = false
     @State var earlierCopyWarningMessage = ""
+    /// True while the Run checks read the cards off the main thread.
+    @State var isPreparingRun = false
     @State var confirmNetflixIngest = false
     @State var showSettingsExport = false
     @State var settingsExportDocument = JSONExportDocument(data: Data())
@@ -305,6 +307,7 @@ struct BackupEditorView: View {
             presentAddDestinationPanel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanHotkeyRefreshDrives)) { _ in
+            guard MainWindowTarget.shouldHandle(in: hostWindow) else { return }
             refreshAllDriveData(force: true, includePreview: true)
         }
         .onReceive(NotificationCenter.default.publisher(for: .filmCanDriveListChanged)) { _ in

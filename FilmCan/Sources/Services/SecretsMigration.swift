@@ -10,6 +10,7 @@ import Foundation
 /// the server rejects — while the old value stays readable in the preferences plist.
 enum SecretsMigration {
     /// Keychain account names that older builds also wrote to `UserDefaults`.
+    /// `webhookSecret` is legacy input only: see `moveWebhookSecretIntoHeaders`.
     static let accounts = ["ntfyBearerToken", "webhookHeaders", "webhookSecret"]
 
     /// Idempotent: after the first successful pass the legacy keys are gone, so later
@@ -40,6 +41,22 @@ enum SecretsMigration {
         if !migrated.isEmpty {
             DebugLog.info("Migrated secrets to Keychain: \(migrated.joined(separator: ", "))")
         }
+        moveWebhookSecretIntoHeaders(store: store)
         return migrated
+    }
+
+    /// The old single "webhook secret" field is not sent by anything any more: it was
+    /// only ever turned into an `Authorization: Bearer` header, and only when the
+    /// Push settings page was opened. Done here at launch instead, so a webhook works
+    /// without visiting Settings. Headers the user already set are never replaced;
+    /// in that case the old secret is left where it is.
+    static func moveWebhookSecretIntoHeaders(store: KeychainStore) {
+        let secret = (store.get("webhookSecret") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !secret.isEmpty else { return }
+        let headers = (store.get("webhookHeaders") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard headers.isEmpty else { return }
+        guard store.set("Authorization: Bearer \(secret)", for: "webhookHeaders") else { return }
+        store.delete("webhookSecret")
+        DebugLog.info("Moved the legacy webhook secret into the Authorization header")
     }
 }

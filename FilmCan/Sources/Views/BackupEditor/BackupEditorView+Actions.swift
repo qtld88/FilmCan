@@ -19,6 +19,8 @@ extension BackupEditorView {
     func startTransfer(confirmedDelete: Bool = false, skipNetflixValidation: Bool = false,
                        skipDuplicateNameWarning: Bool = false,
                        skipEarlierCopyWarning: Bool = false) {
+        // A pre-run check is still reading the cards: a second click must not start twice.
+        guard !isPreparingRun else { return }
         guard viewModel.validate() else { return }
 
         if !skipNetflixValidation && isNetflixPresetSelected {
@@ -46,12 +48,25 @@ extension BackupEditorView {
 
         // A card already copied under another roll name (typo, Untitled vs Untitled_01):
         // found by its clips in the Catalog, whatever drive or folder name it got.
-        if !skipEarlierCopyWarning, let message = earlierCopyWarning() {
-            earlierCopyWarningMessage = message
-            showEarlierCopyWarning = true
+        // The clips are read off the main thread; the next steps wait for the answer.
+        if !skipEarlierCopyWarning, needsEarlierCopyCheck {
+            isPreparingRun = true
+            Task { @MainActor in
+                let message = await earlierCopyWarning()
+                isPreparingRun = false
+                if let message {
+                    earlierCopyWarningMessage = message
+                    showEarlierCopyWarning = true
+                    return
+                }
+                checkSpaceThenBegin()
+            }
             return
         }
+        checkSpaceThenBegin()
+    }
 
+    private func checkSpaceThenBegin() {
         // Pre-flight space check
         let insufficientSpaceDestinations = checkSpaceBeforeTransfer()
         if !insufficientSpaceDestinations.isEmpty {
@@ -63,17 +78,25 @@ extension BackupEditorView {
         beginTransfer()
     }
 
-    /// Message for cards whose clips the Catalog already holds under another roll name.
     /// Content copies (no roll folder) are not checked: their folder is the destination's.
     @MainActor
-    func earlierCopyWarning() -> String? {
-        guard !viewModel.config.copyFolderContents else { return nil }
+    private var needsEarlierCopyCheck: Bool {
+        !viewModel.config.copyFolderContents && !MediaCatalogStore.shared.rolls.isEmpty
+    }
+
+    /// Message for cards whose clips the Catalog already holds under another roll name.
+    @MainActor
+    func earlierCopyWarning() async -> String? {
+        guard needsEarlierCopyCheck else { return nil }
         let catalog = MediaCatalogStore.shared
-        guard !catalog.rolls.isEmpty else { return nil }
-        let cards = viewModel.includedSourcePaths.map { path in
+        let paths = viewModel.includedSourcePaths
+        let planned = paths.map { (path: $0, name: viewModel.plannedRollName(for: $0),
+                                   kind: viewModel.mediaKind(for: $0)) }
+        let keys = await CardFingerprint.keys(forSources: paths)
+        let cards = planned.map { card in
             EarlierCopyWarning.Card(
-                plannedName: viewModel.plannedRollName(for: path),
-                earlier: catalog.earlierCopies(ofSource: path, mediaKind: viewModel.mediaKind(for: path)))
+                plannedName: card.name,
+                earlier: catalog.earlierCopies(ofClipKeys: keys[card.path] ?? [], mediaKind: card.kind))
         }
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

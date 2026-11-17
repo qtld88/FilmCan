@@ -792,9 +792,11 @@ actor FanOutCopier {
         return nil
     }
 
-    /// Run the fan-out copy. Sources from distinct drives are processed
-    /// concurrently (one worker per source drive); sources from the same
-    /// drive are processed sequentially within their drive's worker.
+    /// Run the fan-out copy. Every source is expanded into one ordered list of
+    /// files; the copy task group keeps up to one file in flight per distinct
+    /// source drive (`distinctSourceDriveCount`), each file read once and
+    /// broadcast to the destinations that need it. A single serial verify lane
+    /// checks file N while file N+1 copies.
     func run() async throws -> [DestResult] {
         guard !config.destinations.isEmpty else { throw Error.noDestinations }
         guard !config.sources.isEmpty else { throw Error.sourceNotFound("(empty)") }
@@ -1664,14 +1666,6 @@ actor FanOutCopier {
         }
     }
 
-    /// Source concurrency: one worker per distinct source drive, capped at sources.count.
-    /// Multi-card backup → parallel. Single-card with many files → sequential
-    /// (would otherwise thrash the card head).
-    nonisolated private func maxConcurrentSources() -> Int {
-        let driveIds = Set(config.sources.map { DriveUtilities.driveId(for: $0) })
-        return max(1, min(driveIds.count, config.sources.count))
-    }
-
     /// Distinguish source paths by their volume UUID (falling back to path)
     /// so files on the same physical drive get the same concurrency slot.
     private nonisolated func distinctSourceDriveCount(forPaths paths: [String]) -> Int {
@@ -1776,13 +1770,11 @@ actor FanOutCopier {
 
                 let writer: DestWriter
                 do {
-                    let sharedMHL = sharedMHLsByDest[destCfg.destPath]?[rootName]
                     writer = try await DestWriter(
                         destPath: destFileURL.path,
                         displayName: destCfg.displayName,
                         verifyMode: destCfg.verifyMode,
-                        requiresFullFsync: destCfg.requiresFullFsync,
-                        sharedMHLWriter: sharedMHL
+                        requiresFullFsync: destCfg.requiresFullFsync
                     )
                 } catch {
                     await channel.finish()
