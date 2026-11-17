@@ -401,9 +401,9 @@ sentence in the docs; not a code change recommendation.
 
 ## Side note — Paranoid mode's extra HDD costs (out of scope, but adjacent)
 
-- *(2026-11-17: fixed — the settle now counts from each file's write, applies per
-  destination that needs `F_FULLFSYNC`, to Fast too, and no longer delays Paranoid's
-  source re-read.)*
+- *(2026-11-17: fixed — the settle now counts from each file's write on the
+  monotonic clock, with the same coverage and minimum gap, and no longer delays
+  Paranoid's source re-read. Fast still has none.)*
 - 1 s settle sleep **per file** whenever any destination requires full fsync
   ([FanOutCopier.swift:1654–1661](../FilmCan/Sources/Services/FanOutCopier.swift)) —
   500 files ≈ 8 min of pure sleep. Could be gated to exFAT/known-liar drives
