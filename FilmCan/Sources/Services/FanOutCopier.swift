@@ -33,6 +33,10 @@ struct DestWriterResult: Sendable {
     /// and kept as-is: this run did not write it, so it must never delete it.
     var adoptedExisting: Bool = false
 
+    /// When the file was renamed into place (flushed, closed). Nil when this run did
+    /// not write it. The verify lane's settle counts from here.
+    var finalizedAt: Date? = nil
+
     /// True only for a file this run actually wrote to disk.
     var wroteFileThisRun: Bool { success && filesTransferred > 0 && !adoptedExisting }
 }
@@ -1931,6 +1935,7 @@ actor FanOutCopier {
                     )
                 }
 
+                let finalizedAt: Date? = adoptedExisting ? nil : Date()
                 let duration = Date().timeIntervalSince(startTime)
                 // The file is now finalized (renamed) on disk — fold its planned size
                 // into the finalized total (using sourceSize, the same units as the
@@ -1985,7 +1990,8 @@ actor FanOutCopier {
                     transferredRelPath: writtenRelPath,
                     rootPath: rootPath,
                     rollFolder: relPath.isEmpty ? nil : rollFolder,
-                    adoptedExisting: adoptedExisting
+                    adoptedExisting: adoptedExisting,
+                    finalizedAt: finalizedAt
                 )
             }
             writerTasks.append(task)
@@ -2097,6 +2103,17 @@ actor FanOutCopier {
 
     /// Verify one already-copied file. Runs on a single serial lane concurrently
     /// with the copy of later files, so paranoid re-reads don't block copying.
+    /// Minimum time between a file's write on a drive that may ignore F_FULLFSYNC and
+    /// its verification re-read.
+    static let fullFsyncSettle: TimeInterval = 1.0
+
+    /// What is left of `fullFsyncSettle` for a file written at `finalizedAt`.
+    static func settleRemaining(finalizedAt: Date?, now: Date,
+                                settle: TimeInterval = fullFsyncSettle) -> TimeInterval {
+        guard let finalizedAt else { return 0 }
+        return max(0, settle - now.timeIntervalSince(finalizedAt))
+    }
+
     nonisolated private func verifySource(_ c: CopyResult) async -> PerSourceOutcome {
         let fm = FileManager.default
 
@@ -2163,22 +2180,11 @@ actor FanOutCopier {
             }
         }
 
-        // Paranoid only: settle delay + re-read the SOURCE from disk to catch
-        // in-memory corruption. Fast mode trusts the copy-time source hash but
-        // still re-reads every destination below.
+        // Paranoid only: re-read the SOURCE from disk to catch in-memory corruption.
+        // Fast mode trusts the copy-time source hash but still re-reads every
+        // destination below (after the same settle as Paranoid).
         var corrupted = false
         if config.verifyMode == .paranoid {
-            // Give drives that don't reliably honor F_FULLFSYNC time to flush their
-            // write cache before the paranoid re-read. Without this, the re-read can
-            // return stale data and produce a false hash mismatch.
-            let hasFullFsyncDest = config.destinations.contains { $0.requiresFullFsync }
-            if hasFullFsyncDest {
-                await IOPerfProbe.shared.measureAsync(.settleSleep, key: "verify") {
-                    try? await Task.sleep(for: .seconds(1))
-                }
-            }
-
-            // Cancel can land during the settle delay.
             if config.shouldCancel?() == true {
                 // A stream mismatch found before the stop stays a verification
                 // failure; the rest were stopped, not checked.
@@ -2297,7 +2303,24 @@ actor FanOutCopier {
                 for r in c.writerResults where r.success && r.filesTransferred > 0 && !verifyFailed.contains(r.destPath) {
                     let destFileURL = URL(fileURLWithPath: r.writtenFilePath)
                     let destPath = r.destPath
+                    let needsSettle = r.verifyMode != .off
+                        && (config.destinations.first { $0.destPath == destPath }?.requiresFullFsync ?? false)
+                    let finalizedAt = r.finalizedAt
                     group.addTask {
+                        // A drive that may not honor F_FULLFSYNC (exFAT USB, some SD
+                        // cards) can answer a re-read from its write cache and give a
+                        // false mismatch: re-read it at least `fullFsyncSettle` after
+                        // the file was written. Counted from the write, so a file that
+                        // already waited behind the previous one is re-read at once.
+                        // Same for Fast and Paranoid; other drives never wait.
+                        if needsSettle {
+                            let wait = Self.settleRemaining(finalizedAt: finalizedAt, now: Date())
+                            if wait > 0 {
+                                await IOPerfProbe.shared.measureAsync(.settleSleep, key: "verify") {
+                                    try? await Task.sleep(for: .seconds(wait))
+                                }
+                            }
+                        }
                         #if DEBUG
                         if self.config._testForceDestReadHashNil { return (destPath, nil) }
                         #endif
