@@ -111,12 +111,27 @@ class TransferViewModel: ObservableObject {
         if !isBackgroundWorker, concurrentWorkers[config.id] != nil {
             return
         }
+        // This movie is already starting or running here: a second Run does nothing.
+        if !isBackgroundWorker, isTransferring, activeConfigId == config.id {
+            return
+        }
         let storedConfig = AppState.shared.storage.configurations
             .first(where: { $0.id == config.id }) ?? config
+        let included = storedConfig.restrictedToIncluded()
+        // Claim the run before the first suspension below, so a second Run (or another
+        // movie's Run, which goes to a concurrent worker) sees this one as started.
+        activeConfigId = included.id
+        isTransferring = true
+        if !isBackgroundWorker { activeTransferConfigIds.insert(included.id) }
+        // Drive facts (card keys, camera detection, capacities, IOKit) are read off the
+        // main thread, then used at the same steps as before.
+        let probe = await Self.probeRun(sources: included.sourcePaths,
+                                        destinations: included.destinationPaths,
+                                        detectCameras: included.rollNumbering.enabled)
         // Roll numbers and the shoot day are fixed before anything else reads the config,
         // and saved before the copy starts, so a cancelled run resumes into the same roll.
-        let activeConfig = applyRollNumberingAndDay(to: storedConfig.restrictedToIncluded())
-            .withGenericRollNames(keyFor: { RollNumberer.cardKey(forPath: $0) })
+        let activeConfig = applyRollNumberingAndDay(to: included, probe: probe)
+            .withGenericRollNames(keyFor: { probe.cardKey(for: $0) })
             .withRollNameFallbacks(rollNameFallbacks)
         self.config = activeConfig
         activeConfigId = activeConfig.id
@@ -131,7 +146,7 @@ class TransferViewModel: ObservableObject {
             progressBinding?.cancel()
             progressBinding = trackTabProgress(of: progress, configId: activeConfig.id)
         }
-        captureDriveSnapshot(paths: activeConfig.sourcePaths + activeConfig.destinationPaths)
+        driveCapacitySnapshot = probe.capacity
         verifiedDestinationsByConfig.removeValue(forKey: activeConfig.id)
         transferStartTime = Date()
         // Reset progress before starting new transfer
@@ -200,7 +215,8 @@ class TransferViewModel: ObservableObject {
             // one at a time, per the configured destination copy mode.
             let copySequentially = shouldCopyDestinationsSequentially(
                 mode: activeConfig.destinationCopyMode,
-                destinations: destinations
+                destinations: destinations,
+                probe: probe
             )
 
             // Run the fan-out engine either once (all dests) or once per dest.
@@ -243,7 +259,8 @@ class TransferViewModel: ObservableObject {
                     destinations: group,
                     sources: sources,
                     config: activeConfig,
-                    organizationPreset: organizationPreset
+                    organizationPreset: organizationPreset,
+                    probe: probe
                 )
                 groupPlans.append(fanOutResult.runPlan)
                 let exploded = explodeFanOutResult(fanOutResult, configName: activeConfig.name)
@@ -325,10 +342,12 @@ class TransferViewModel: ObservableObject {
                     copyFolderContents: activeConfig.copyFolderContents
                 )
             } else {
-                BackupLogWriter.writeFanOutLogs(
+                // Log files are written off the main thread; the run waits for them
+                // (history and notifications read the log path) as before.
+                perDestResults = await BackupLogWriter.writeFanOutLogsOffMain(
                     config: activeConfig,
                     sources: sources,
-                    results: &perDestResults,
+                    results: perDestResults,
                     preset: organizationPreset
                 )
                 let recordConfig = Self.recordConfig(activeConfig, recordAs: recordAs)
@@ -507,21 +526,6 @@ class TransferViewModel: ObservableObject {
         concurrentWorkerCancellables[configId]?.forEach { $0.cancel() }
         concurrentWorkerCancellables.removeValue(forKey: configId)
         concurrentWorkers.removeValue(forKey: configId)
-    }
-
-    private func captureDriveSnapshot(paths: [String]) {
-        var snapshot: [String: DriveCapacitySnapshot] = [:]
-        for path in paths {
-            let summary = DriveUtilities.summary(for: path)
-            if snapshot[summary.id] == nil {
-                let capacity = DriveUtilities.capacity(for: path)
-                snapshot[summary.id] = DriveCapacitySnapshot(
-                    totalBytes: capacity.total,
-                    availableBytes: capacity.available
-                )
-            }
-        }
-        driveCapacitySnapshot = snapshot
     }
 
     /// Seal each source card once the run is fully verified (best-effort — a seal
@@ -766,7 +770,7 @@ class TransferViewModel: ObservableObject {
     /// Apply automatic roll numbering and the shoot-day counter to this run's copy of the
     /// config. State lives in `RollNumberingStore` (not the config) so a stale editor save
     /// can never overwrite it.
-    private func applyRollNumberingAndDay(to stored: BackupConfiguration) -> BackupConfiguration {
+    private func applyRollNumberingAndDay(to stored: BackupConfiguration, probe: RunProbe) -> BackupConfiguration {
         guard stored.dayAutoAdvance || stored.rollNumbering.enabled else { return stored }
         var config = stored
         let store = RollNumberingStore.shared
@@ -784,18 +788,14 @@ class TransferViewModel: ObservableObject {
 
         if config.rollNumbering.enabled {
             let kinds = effectiveSourceMediaKinds(for: config, sources: config.sourcePaths)
-            let fm = FileManager.default
             let result = RollNumberer.assign(
                 sources: config.sourcePaths,
-                isDirectory: { path in
-                    var isDir: ObjCBool = false
-                    return fm.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
-                },
+                isDirectory: { probe.isDirectory[$0] ?? false },
                 kinds: kinds,
                 settings: config.rollNumbering,
                 existing: state.assignments,
-                keyFor: { RollNumberer.cardKey(forPath: $0) },
-                signatureFor: { CameraCardDetector.detect(rootPath: $0) })
+                keyFor: { probe.cardKey(for: $0) },
+                signatureFor: { probe.signatures[$0] })
             config.runRollNames = result.names
             state.assignments = result.assignments
         }
@@ -1008,7 +1008,8 @@ class TransferViewModel: ObservableObject {
     /// copies. A single destination is always one group (nothing to serialize).
     private func shouldCopyDestinationsSequentially(
         mode: DestinationCopyMode,
-        destinations: [String]
+        destinations: [String],
+        probe: RunProbe
     ) -> Bool {
         // Drives are only probed when the answer depends on them.
         guard mode == .automatic, destinations.count > 1 else {
@@ -1020,14 +1021,15 @@ class TransferViewModel: ObservableObject {
         }
         return DestinationCopyPlan.isSequential(
             mode: mode,
-            destinations: destinations.map { DriveSpeedClassifier.info(for: $0) })
+            destinations: destinations.map { probe.info(for: $0) })
     }
 
     private func runFanOut(
         destinations: [String],
         sources: [String],
         config: BackupConfiguration,
-        organizationPreset: OrganizationPreset?
+        organizationPreset: OrganizationPreset?,
+        probe: RunProbe
     ) async -> TransferResult {
         let service = CustomCopierService()
         currentService = service
@@ -1036,7 +1038,7 @@ class TransferViewModel: ObservableObject {
 
         let verifyMode = config.engineOptions.verificationMode
         let fanOutDests: [DestWriter.Config] = destinations.map { destPath in
-            let info = DriveSpeedClassifier.info(for: destPath)
+            let info = probe.info(for: destPath)
             return DestWriter.Config(
                 destPath: destPath,
                 displayName: (destPath as NSString).lastPathComponent,
@@ -1056,8 +1058,6 @@ class TransferViewModel: ObservableObject {
                 configName: config.name,
                 organizationPreset: organizationPreset,
                 copyFolderContents: config.copyFolderContents,
-                useHashListPrecheck: config.engineOptions.customVerifyEnabled,
-                hashListPath: nil,
                 duplicatePolicy: config.duplicatePolicy,
                 duplicateCounterTemplate: config.duplicateCounterTemplate,
                 duplicateResolver: (config.duplicatePolicy == .ask || config.duplicatePolicy == .verify)

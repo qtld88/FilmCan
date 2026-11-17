@@ -57,6 +57,21 @@ enum BackupLogWriter {
     /// never got created for the (only) FilmCan Engine. Mirrors that behavior:
     /// resolve the log path (same-as-destination or custom folder template) and
     /// write it, recording the path / any warning back onto each result.
+    /// `writeFanOutLogs` run off the main thread (log files can sit on a slow drive).
+    /// Returns the results with their log paths and warnings filled in.
+    static func writeFanOutLogsOffMain(
+        config: BackupConfiguration,
+        sources: [String],
+        results: [TransferResult],
+        preset: OrganizationPreset?
+    ) async -> [TransferResult] {
+        await Task.detached(priority: .utility) {
+            var written = results
+            BackupLogWriter.writeFanOutLogs(config: config, sources: sources, results: &written, preset: preset)
+            return written
+        }.value
+    }
+
     static func writeFanOutLogs(
         config: BackupConfiguration,
         sources: [String],

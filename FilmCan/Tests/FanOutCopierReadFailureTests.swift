@@ -94,8 +94,7 @@ final class FanOutCopierReadFailureTests: XCTestCase {
         let dir = try makeDir("w")
         let target = dir.appendingPathComponent("clip.mov")
         let writer = try await DestWriter(destPath: target.path, displayName: "w",
-                                          verifyMode: .paranoid, requiresFullFsync: false,
-                                          sharedMHLWriter: nil)
+                                          verifyMode: .paranoid, requiresFullFsync: false)
         try await writer.write(data: Data(repeating: 0xAB, count: 3))
         do {
             _ = try await writer.finalize(fileHash: "", sourceSize: 10)
@@ -103,6 +102,24 @@ final class FanOutCopierReadFailureTests: XCTestCase {
         } catch {}
         XCTAssertFalse(fm.fileExists(atPath: target.path), "no final file on size mismatch")
         XCTAssertEqual(tempFiles(under: dir), [], "temp removed on size mismatch")
+    }
+
+    // MARK: - 1c. a failed rename leaves no temp behind
+
+    func test_destWriterFinalize_renameFailure_leavesNoTempFile() async throws {
+        let dir = try makeDir("w2")
+        // The final name is taken by a non-empty folder: rename(2) of a file onto it fails.
+        let target = dir.appendingPathComponent("clip.mov")
+        try fm.createDirectory(at: target, withIntermediateDirectories: true)
+        try Data([0x01]).write(to: target.appendingPathComponent("inside.txt"))
+        let writer = try await DestWriter(destPath: target.path, displayName: "w",
+                                          verifyMode: .paranoid, requiresFullFsync: false)
+        try await writer.write(data: Data(repeating: 0xAB, count: 3))
+        do {
+            _ = try await writer.finalize(fileHash: "", sourceSize: 3)
+            XCTFail("finalize must throw when the rename fails")
+        } catch {}
+        XCTAssertEqual(tempFiles(under: dir), [], "the temp is removed when the rename fails")
     }
 
     // MARK: - 2. Paranoid source re-read that yields nothing

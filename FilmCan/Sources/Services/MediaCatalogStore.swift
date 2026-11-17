@@ -161,10 +161,10 @@ final class MediaCatalogStore: ObservableObject {
         return !needed.isEmpty && needed.isSubset(of: dr.verifiedSourcePaths)
     }
 
-    /// Earlier copies of the card at `sourcePath`, found by its clips (not its name).
-    func earlierCopies(ofSource sourcePath: String, mediaKind: SourceMediaKind) -> [CatalogEarlierCopy] {
-        MediaCatalog.earlierCopies(ofClipKeys: CardFingerprint.keys(forSource: sourcePath),
-                                   mediaKind: mediaKind, in: rolls)
+    /// Earlier copies of a card, found by its clips (not its name). The clip keys come
+    /// from `CardFingerprint.keys(forSources:)`, read off the main thread.
+    func earlierCopies(ofClipKeys clipKeys: [String], mediaKind: SourceMediaKind) -> [CatalogEarlierCopy] {
+        MediaCatalog.earlierCopies(ofClipKeys: clipKeys, mediaKind: mediaKind, in: rolls)
     }
 
     /// Currently mounted volume UUIDs.

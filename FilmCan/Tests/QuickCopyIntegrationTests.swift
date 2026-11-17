@@ -48,7 +48,6 @@ final class QuickCopyIntegrationTests: XCTestCase {
         return try await service.runCopyFanOut(
             sources: config.sourcePaths, fanOutDestinations: dests, configName: config.name,
             organizationPreset: preset, copyFolderContents: config.copyFolderContents,
-            useHashListPrecheck: config.engineOptions.customVerifyEnabled, hashListPath: nil,
             duplicatePolicy: config.duplicatePolicy,
             duplicateCounterTemplate: config.duplicateCounterTemplate, duplicateResolver: nil,
             verifyMode: mode, dryRun: false,

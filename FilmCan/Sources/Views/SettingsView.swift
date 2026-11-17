@@ -15,7 +15,6 @@ struct SettingsView: View {
     @AppStorage("webhookIncludeFullPaths") private var webhookIncludeFullPaths: Bool = false
     @State private var ntfyBearerToken: String = ""
     @State private var webhookHeaders: String = ""
-    @State private var webhookSecret: String = ""
     @AppStorage("historyRetentionLimit") private var historyRetentionLimit: Int = 200
     @AppStorage("disableSpotlightIndexing") private var disableSpotlightIndexing: Bool = true
     @AppStorage("appearanceAccentHex") private var appearanceAccentHex: String = AppearanceDefaults.accentHex
@@ -62,8 +61,7 @@ struct SettingsView: View {
                     webhookEnabled: $webhookEnabled,
                     webhookURL: $webhookURL,
                     webhookHeaders: $webhookHeaders,
-                    webhookIncludeFullPaths: $webhookIncludeFullPaths,
-                    legacyWebhookSecret: $webhookSecret
+                    webhookIncludeFullPaths: $webhookIncludeFullPaths
                 )
         case .history:
                 HistorySettingsView(
@@ -101,16 +99,12 @@ struct SettingsView: View {
             let store = KeychainStore()
             ntfyBearerToken = store.get("ntfyBearerToken") ?? ""
             webhookHeaders = store.get("webhookHeaders") ?? ""
-            webhookSecret = store.get("webhookSecret") ?? ""
         }
         .onChange(of: ntfyBearerToken) { newValue in
             KeychainStore().set(newValue, for: "ntfyBearerToken")
         }
         .onChange(of: webhookHeaders) { newValue in
             KeychainStore().set(newValue, for: "webhookHeaders")
-        }
-        .onChange(of: webhookSecret) { newValue in
-            KeychainStore().set(newValue, for: "webhookSecret")
         }
     }
 }
@@ -313,7 +307,6 @@ struct PushSettingsView: View {
     @Binding var webhookURL: String
     @Binding var webhookHeaders: String
     @Binding var webhookIncludeFullPaths: Bool
-    @Binding var legacyWebhookSecret: String
 
     @State private var ntfyTesting = false
     @State private var ntfyTestResult: NtfyOutcome?
@@ -513,18 +506,9 @@ struct PushSettingsView: View {
         .padding()
         .padding(.top, 30)
         .onAppear {
-            migrateLegacyWebhookSecretIfNeeded()
             useCustomServer = PhonePush.mode() == .custom
             advancedOpen = useCustomServer
         }
-    }
-
-    private func migrateLegacyWebhookSecretIfNeeded() {
-        let trimmedHeaders = webhookHeaders.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedSecret = legacyWebhookSecret.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedHeaders.isEmpty, !trimmedSecret.isEmpty else { return }
-        webhookHeaders = "Authorization: Bearer \(trimmedSecret)"
-        legacyWebhookSecret = ""
     }
 
     private var tokenList: [(token: String, description: String)] {

@@ -3,7 +3,7 @@
 FilmCan is a **local macOS app**. No backend, no database, no telemetry. The only
 outbound traffic is opt-in: ntfy / webhook notifications and the updater.
 
-_Last checked against the code: 2026-11-16 (`main` @ `d335a02`)._
+_Last checked against the code: 2026-11-17 (`main` after `cb1ad31`, sessions 1–5 of the audit merged)._
 
 ---
 
@@ -12,7 +12,7 @@ _Last checked against the code: 2026-11-16 (`main` @ `d335a02`)._
 **Views (SwiftUI)**
 UI components only. Layout and user interaction.
 Examples: `DestinationListView`, `InlineFanOutProgress` (per-destination progress row: two-color bar, percent, bytes/speed/ETA pills), `FanOutProgressBar`, `FailedDestRetryPanel`, `RetryRepairSheet`, `ExFATBanner`, `AlreadyBackedUpSheet`.
-(`MultiDestSummaryView` is deprecated dead code, superseded by the inline per-card progress.)
+Progress lives inside each destination card; there is no separate summary view.
 
 **ViewModels**
 UI state, validation, orchestration of transfer runs.
@@ -26,17 +26,17 @@ Copy engine:
 - (`RsyncService` was deleted in 1.2.x; nothing shells out to rsync at runtime.)
 
 Fan-out engine internals (`FanOutCopier`, a Swift actor):
-- **Copy/verify pipeline** — `run()` filters out already-backed-up files (resume skip), then runs a copy task group that produces `CopyResult`s into a `BoundedChannel`; a single serial verify lane (`drainVerifies` → `verifySource`) consumes them, so file N is verified while file N+1 copies.
-- `DestWriter` — one writer task per destination; opens a temp file with `F_NOCACHE` (write-once, keeps memory bounded), writes chunks, `F_FULLFSYNC`/`synchronize()` on finalize, atomic `rename(2)`.
-- **Speed/ETA** — `combinedThroughputETA` computes a moving-average (~10s window) of combined copy+verify throughput; the displayed speed is that ÷ verify factor, the ETA is remaining combined work ÷ throughput (stable and honest from the first seconds).
+- **Copy/verify pipeline** — `run()` filters out already-backed-up files (resume skip), then runs a copy task group (at most one file in flight per distinct source drive) that produces `CopyResult`s into a `BoundedChannel`; a single serial verify lane (`drainVerifies` → `verifySource`) consumes them, so file N is verified while file N+1 copies. **Fast** compares the hash streamed while writing, then **re-reads every destination file from disk** and compares it to the copy-time source hash. **Paranoid** does the same and also re-reads the **source** from disk; when any destination needs `F_FULLFSYNC` it first waits 1 s per file (settle delay) so a drive that ignores the flush is not read back from its cache. Off copies without any check.
+- `DestWriter` — one writer per (file, destination); opens a temp file with `F_NOCACHE` (write-once, keeps memory bounded), writes chunks. `finalize` refuses a temp whose byte count differs from the source (`sizeMismatch`), then `F_FULLFSYNC`/`synchronize()`, close, atomic `rename(2)`; any failure on that path removes the temp. Hash lists are written by the verify lane, not by the writer.
+- **Speed/ETA** — `combinedThroughputETA` measures combined copy+verify throughput over a 30 s sliding window, then smooths it with an asymmetric EMA (slow to believe a faster rate, quick to believe a slower one); the displayed speed is that ÷ verify factor, the ETA is remaining combined work ÷ throughput.
 - `BoundedChannel` — multi-producer/consumer bounded channel for backpressure between source reader and destination writers, and between the copy group and the verify lane.
 - `MHLWriting` — protocol over the two hash-list writers (both actors), chosen by `config.hashListStyle`:
   - `ASCMHLWriter` — visible `<roll>/ascmhl/` folder, one manifest per generation, recorded with its C4 hash in `ascmhl_chain.xml` (`ASCMHLChain`); read back by `ASCMHLReader`
   - `SimpleMHLWriter` — hidden `<dest>/.filmcan/hashlists/<roll>.mhl`, no chain; read by `SimpleMHLReader`
-- `ConflictScanner` — pre-flight: destination files that would be overwritten but are not in that destination's manifest are resolved by `DuplicatePolicy` before any copy, never mid-copy
+- `ConflictScanner` — pre-flight: destination files that would be overwritten but are not in that destination's manifest, or whose manifested source changed (`differsFromManifest`), are resolved by `DuplicatePolicy` before any copy, never mid-copy. A plan where two files resolve to one destination path (case/normalization insensitive) stops with `duplicateTargetPaths` before any write
 - `SiblingDestSource` — repair-from-sibling primitive: reads bytes from a verified neighbor, hash-verifies, atomic rename
 - `DriveSpeedClassifier` — IOKit-based probe that classifies a path's volume (SSD vs HDD, USB-2/3 vs Thunderbolt vs internal, exFAT vs APFS) and reports whether `F_FULLFSYNC` is required
-- `OrphanCleaner` — removes leftover `.filmcan-*` temp files at job start
+- `OrphanCleaner` — removes leftover `.filmcan-*` temp files in the run's roll folders and destination roots at job start, skipping temps another running job has registered
 - `FileEnumerator` — recursive directory walker with macOS-junk skip list, used by both fan-out and dry-run planning
 
 After a run:
@@ -73,7 +73,7 @@ FilmCan stores configuration, movies (each with its own organization preset), hi
 2. `TransferViewModel.startTransfer(...)` decides the copy mode (Automatic / Parallel / Sequential) and calls `runFanOut(...)` once (all dests) or once per dest
 3. `runFanOut(...)` builds one `DestWriter.Config` per destination (probing drive characteristics via `DriveSpeedClassifier`) and calls `CustomCopierService.runCopyFanOut(...)`, which instantiates a `FanOutCopier` actor and calls `run()`
 4. `FanOutCopier.run()` expands all sources via `FileEnumerator`, reads the **latest manifest on disk** per destination (sealed or partial), copies each file **only to the destinations missing it** (`destsNeeding`; `forceRecopy` disables the skip), runs the writability and disk-space pre-flights and the `ConflictScanner`, then opens one hash-list writer (`MHLWriting`) per (destination, roll)
-5. The copy task group reads each file once with `F_NOCACHE`, broadcasts to per-dest `BoundedChannel`s, each `DestWriter` writes + streams a hash, and produces a `CopyResult` into the verify channel. A single serial verify lane re-reads (paranoid) or stream-checks (fast) each destination, overlapping the next file's copy. **Stop** is honored cooperatively at every stage with no partial files left behind.
+5. The copy task group reads each file once with `F_NOCACHE`, broadcasts to per-dest `BoundedChannel`s, each `DestWriter` writes + streams a hash, and produces a `CopyResult` into the verify channel. A single serial verify lane re-reads every destination from disk (Fast and Paranoid; Paranoid also re-reads the source), overlapping the next file's copy, and records each verified file in the hash list. **Stop** is honored cooperatively at every stage (see Safety guarantees for what it leaves).
 6. On finalize: hash lists are closed (ASC MHL: new generation + chain entry; a cancelled run leaves a partial manifest without chain entry), per-dest results aggregated into a `TransferResult` with `destinationResults: [DestResult]`
 7. Progress streams back via `DestProgress` snapshots driving each destination card's `InlineFanOutProgress`. The view clamps copy/verify bytes to a per-dest running max so concurrent emits never step the bars backward
 8. If the whole backup was already present, no history card is recorded — `TransferViewModel` surfaces an `AlreadyBackedUpSheet` (with a *Verify data* button) instead
@@ -96,12 +96,12 @@ Spec: `docs/superpowers/specs/2026-10-15-quick-copy-design.md`.
 
 ## Safety guarantees (FilmCan Engine)
 
-- **No half-written files in the destination.** All writes go to `.filmcan-*` temp files; atomic `rename(2)` on success.
+- **No half-written files in the destination.** All writes go to `.filmcan-*` temp files. A temp is renamed into place only when its byte count equals the source's; a source read error mid-file discards the temp and fails that file at each destination (the rest of the run continues). A flush, close or rename failure removes the temp. A hard quit or crash can still leave a temp: see Orphan cleanup.
 - **Drive cache flushed before claiming success on exFAT / externals.** `F_FULLFSYNC` is invoked on the write handle; failure to honor the call is logged via `os_log` rather than swallowed.
-- **No silent corruption.** Source is read once with `F_NOCACHE` so we hash bytes coming off the platter, not the OS cache. Destinations are re-read from disk in paranoid mode to defeat firmware cache lies.
+- **No silent corruption.** Source is read once with `F_NOCACHE` so we hash bytes coming off the platter, not the OS cache. Destinations are re-read from disk in Fast and Paranoid; Paranoid also re-reads the source, and a source that cannot be re-read fails verification for that file. A destination is called verified, and a card sealed, only with a per-file hash proof (`DestResult.verifiedSourcePaths`).
 - **Hash-list aggregation is race-safe.** One writer actor (`ASCMHLWriter` or `SimpleMHLWriter`) per (destination, roll); concurrent file completions serialize through the actor.
 - **Orphan cleanup.** Any `.filmcan-*` left behind by a crash or hard quit is removed at the next job start.
-- **Stop is clean.** Cancellation is polled cooperatively; an aborted file's writer returns before finalize, so no partial file is ever renamed into place (the temp is removed by `DestWriter.deinit`). The verify lane skips remaining work and marks affected destinations cancelled.
+- **Stop is clean.** Cancellation is polled cooperatively; an aborted file's writer returns before finalize, so no partial file is ever renamed into place (the temp is removed by `DestWriter.deinit`). A Stop during verification is a cancellation, not a mismatch: files already renamed but not yet verified stay at their final name, are not counted as verified and are not entered in the hash list. The run closes a **partial** manifest (no chain entry); the next run resumes from it, and an unrecorded file at its final name goes through the conflict pre-flight like any unmanifested file (Skip policy hash-compares it).
 - **Memory is bounded.** Source reads and destination writes use `F_NOCACHE`, and the paranoid re-read drains its autorelease pool per chunk, so even a multi-hundred-GB offload stays within the small per-destination ring buffer (`clamp(physRAM / 128, 32 MB, 96 MB)`).
 
 ---
