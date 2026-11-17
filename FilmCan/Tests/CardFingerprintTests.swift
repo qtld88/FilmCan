@@ -68,7 +68,64 @@ final class CardFingerprintTests: XCTestCase {
         XCTAssertNotEqual(CardFingerprint.keys(forSource: root.path), before)
     }
 
+    /// Sound recorders: a card of short takes only (each under 1 MiB) still gets keys,
+    /// from its files of at least 64 KiB. A card with real clips keeps the 1 MiB rule.
+    func test_keys_cardOfShortTakesOnly_usesFilesOfAtLeast64KiB() throws {
+        let t = Date(timeIntervalSince1970: 1_731_400_000)
+        try write("SOUND/T01.WAV", bytes: 300_000, modified: t)
+        try write("SOUND/T02.WAV", bytes: 200_000, modified: t)
+        try write("SOUND/REPORT.CSV", bytes: 2_000, modified: t)
+        XCTAssertEqual(CardFingerprint.keys(forSource: root.path),
+                       [clipKey("T01.WAV", 300_000, 1_731_400_000), clipKey("T02.WAV", 200_000, 1_731_400_000)])
+        XCTAssertEqual(CardFingerprint.keys(forSource: root.appendingPathComponent("SOUND/T02.WAV").path),
+                       [clipKey("T02.WAV", 200_000, 1_731_400_000)])
+
+        try write("SOUND/T03.WAV", bytes: 2 * Int(mb), modified: t)
+        XCTAssertEqual(CardFingerprint.keys(forSource: root.path),
+                       [clipKey("T03.WAV", 2 * mb, 1_731_400_000)])
+    }
+
     // MARK: - Catalog
+
+    /// FAT32/exFAT store local time: after a time-zone or daylight-saving change the
+    /// Mac reads every clip of the same card shifted by the same whole number of hours.
+    func test_earlierCopies_sameCardReadInAnotherTimeZone_stillMatches() {
+        let base: TimeInterval = 1_731_400_000
+        let earlier = roll("A001", drive: "NAV_A",
+                           clipKeys: [clipKey("C0001.MP4", 5 * mb, base), clipKey("C0002.MP4", 7 * mb, base + 60)])
+        func card(shift: TimeInterval) -> [String] {
+            [clipKey("C0001.MP4", 5 * mb, base + shift), clipKey("C0002.MP4", 7 * mb, base + 60 + shift)]
+        }
+        for hours in [1.0, -1, 9, -14, 14] {
+            XCTAssertEqual(MediaCatalog.earlierCopies(ofClipKeys: card(shift: hours * 3600), mediaKind: .camera,
+                                                      in: [earlier]).map(\.matchingClips), [2], "\(hours) h")
+        }
+        XCTAssertEqual(MediaCatalog.earlierCopies(ofClipKeys: card(shift: 15 * 3600), mediaKind: .camera, in: [earlier]), [],
+                       "beyond any time-zone offset")
+        XCTAssertEqual(MediaCatalog.earlierCopies(ofClipKeys: card(shift: 1_800), mediaKind: .camera, in: [earlier]), [],
+                       "not a whole number of hours")
+        // One shift for the whole card: clips shifted differently count once, at the best shift.
+        let mixed = [clipKey("C0001.MP4", 5 * mb, base + 3_600), clipKey("C0002.MP4", 7 * mb, base + 60 + 7_200)]
+        XCTAssertEqual(MediaCatalog.earlierCopies(ofClipKeys: mixed, mediaKind: .camera, in: [earlier])
+            .map(\.matchingClips), [1])
+        // Another size: not the same clip, whatever the time.
+        XCTAssertEqual(MediaCatalog.earlierCopies(ofClipKeys: [clipKey("C0001.MP4", 6 * mb, base + 3_600)],
+                                                  mediaKind: .camera, in: [earlier]), [])
+    }
+
+    func test_merge_sameCardAfterDaylightSavingChange_foldsIntoOneRoll() {
+        let keys = [clipKey("C0001.MP4", 5 * mb, 10_000), clipKey("C0002.MP4", 7 * mb, 10_060)]
+        let shifted = [clipKey("C0001.MP4", 5 * mb, 13_600), clipKey("C0002.MP4", 7 * mb, 13_660)]
+        var rolls = MediaCatalog.merge(roll("A001", drive: "NAV_A", clipKeys: keys), into: [])
+        rolls = MediaCatalog.merge(roll("A001_01", drive: "NAV_B", clipKeys: shifted, date: 2_000), into: rolls)
+        XCTAssertEqual(rolls.count, 1)
+        XCTAssertEqual(rolls[0].coverage, .safe(drives: 2))
+        // A card with one more clip is not the same card.
+        let more = shifted + [clipKey("C0003.MP4", 9 * mb, 13_700)]
+        XCTAssertFalse(MediaCatalog.sameCard(roll("A", drive: "A", clipKeys: keys),
+                                             roll("B", drive: "B", clipKeys: more)))
+    }
+
 
     func test_merge_sameClipsUnderAnotherRollName_countsTwoDrives() {
         let keys = [clipKey("C0001.MP4", 5 * mb, 1), clipKey("C0002.MP4", 7 * mb, 2)]
