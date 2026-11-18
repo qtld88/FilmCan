@@ -4,9 +4,6 @@ name: Speed bench
 # Measurement only: nothing under FilmCan/Sources/ is touched. Numbers from a shared
 # VM are relative within one job; they are never a real disk's speed.
 on:
-  push:  # TEMPORARY (debug on the branch; removed before handing over)
-    branches: ['claude/awesome-mendel-olvgf0']
-    paths: ['.github/workflows/speed-bench.yml', 'FilmCan/scripts/speed_bench.py', 'FilmCan/Tests/SpeedBenchTests.swift']
   workflow_dispatch:
     inputs:
       ref_a:
@@ -54,8 +51,8 @@ jobs:
 
       - name: Prepare both refs side by side
         env:
-          REF_A: ${{ inputs.ref_a || '3aece5f' }}
-          REF_B: ${{ inputs.ref_b || '9fda565' }}
+          REF_A: ${{ inputs.ref_a }}
+          REF_B: ${{ inputs.ref_b }}
         run: |
           set -euo pipefail
           SHA_A=$(git rev-parse --verify "$REF_A^{commit}" 2>/dev/null || git rev-parse --verify "origin/$REF_A^{commit}")
@@ -96,8 +93,8 @@ jobs:
             --a-dir "$RUNNER_TEMP/wt_A" --b-dir "$RUNNER_TEMP/wt_B" \
             --a-dd "$RUNNER_TEMP/dd_A" --b-dd "$RUNNER_TEMP/dd_B" \
             --ref-a "$SHA_A" --ref-b "$SHA_B" \
-            --reps "${{ inputs.reps || 3 }}" --dataset "${{ inputs.dataset || 'card' }}" \
-            --dests "${{ inputs.dests || 'exfat,apfs,hfsx' }}" --max-minutes 300 \
+            --reps "${{ inputs.reps }}" --dataset "${{ inputs.dataset }}" \
+            --dests "${{ inputs.dests }}" --max-minutes 300 \
             --out "$RUNNER_TEMP/out"
           echo "bench exit: $?"
           test -f "$RUNNER_TEMP/out/bench.json"
