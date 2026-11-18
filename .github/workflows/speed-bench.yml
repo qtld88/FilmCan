@@ -70,7 +70,9 @@ jobs:
             (cd "$RUNNER_TEMP/wt_$L/FilmCan" && xcodegen generate)
           done
 
-      # Release configuration (what ships), testability on so @testable import works.
+      # Debug configuration (the Release one demands universal rsync, absent on the runner) but
+      # built optimised (-O, whole module) so the engine runs at release-like speed. Only the
+      # test-only #if DEBUG hooks differ from the shipped binary.
       - name: Build both refs
         run: |
           set -euo pipefail
@@ -78,7 +80,7 @@ jobs:
             xcodebuild build-for-testing \
               -project "$RUNNER_TEMP/wt_$L/FilmCan/FilmCan.xcodeproj" \
               -scheme FilmCan -destination 'platform=macOS' \
-              -configuration Release ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES \
+              -configuration Debug SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule GCC_OPTIMIZATION_LEVEL=s ONLY_ACTIVE_ARCH=YES \
               -derivedDataPath "$RUNNER_TEMP/dd_$L" > "$RUNNER_TEMP/build_$L.log" 2>&1 \
               || { tail -60 "$RUNNER_TEMP/build_$L.log"; exit 1; }
             echo "built $L"
