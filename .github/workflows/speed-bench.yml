@@ -96,8 +96,8 @@ jobs:
             --a-dir "$RUNNER_TEMP/wt_A" --b-dir "$RUNNER_TEMP/wt_B" \
             --a-dd "$RUNNER_TEMP/dd_A" --b-dd "$RUNNER_TEMP/dd_B" \
             --ref-a "$SHA_A" --ref-b "$SHA_B" \
-            --reps "${{ inputs.reps || 1 }}" --dataset "${{ inputs.dataset || 'card' }}" \
-            --dests "${{ inputs.dests || 'exfat' }}" --max-minutes 300 \
+            --reps "${{ inputs.reps || 3 }}" --dataset "${{ inputs.dataset || 'card' }}" \
+            --dests "${{ inputs.dests || 'exfat,apfs,hfsx' }}" --max-minutes 300 \
             --out "$RUNNER_TEMP/out"
           echo "bench exit: $?"
           test -f "$RUNNER_TEMP/out/bench.json"
@@ -108,6 +108,7 @@ jobs:
           if [ -f "$RUNNER_TEMP/out/bench.json" ]; then
             python3 FilmCan/scripts/speed_bench.py report --json "$RUNNER_TEMP/out/bench.json" \
               --summary "$GITHUB_STEP_SUMMARY" > /dev/null
+            cat "$GITHUB_STEP_SUMMARY"
           else
             echo "No bench.json produced; see the logs artifact." >> "$GITHUB_STEP_SUMMARY"
           fi
